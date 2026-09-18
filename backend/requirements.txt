@@ -28,9 +28,8 @@ pymupdf==1.28.2
 openpyxl==3.1.5
 pandas==2.2.3
 
-# PDF conversion (optional — requires MS Word or LibreOffice, not available on
-# Linux hosting).  The backend gracefully degrades when this is absent.
-docx2pdf==0.1.8; sys_platform != 'linux' or True
+# PDF conversion (optional — requires MS Word or LibreOffice at runtime)
+docx2pdf==0.1.8
 
 # File handling
 aiofiles==24.1.0
