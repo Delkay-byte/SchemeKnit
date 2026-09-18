@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 230" role="img" aria-label="SchemeKnit wordmark">
+  <title>SchemeKnit</title>
+  <!--
+    SchemeKnit wordmark: bold geometric sans.
+    "Scheme" = navy #102A43, "Knit" = cyan #04A9CE.
+    Uses a system heavy-sans stack so it renders identically on
+    Windows (Arial Black), macOS (Arial Black / Helvetica) and
+    Linux (Liberation Sans Narrow Bold fallback).
+  -->
+  <text x="0" y="178"
+        font-family="Arial Black, Helvetica, 'Liberation Sans Narrow Bold', sans-serif"
+        font-size="190" font-weight="900"
+        letter-spacing="-4">
+    <tspan fill="#102A43">Scheme</tspan><tspan fill="#04A9CE">Knit</tspan>
+  </text>
+</svg>

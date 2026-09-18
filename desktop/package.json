@@ -1,0 +1,72 @@
+{
+  "name": "schemeknit-desktop",
+  "version": "1.0.5",
+  "description": "SchemeKnit Desktop - Offline Lesson Planning for Ghanaian Teachers",
+  "main": "main.js",
+  "author": "BloomCore Technologies",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "electron .",
+    "build:frontend": "cd ../frontend && npm run build:desktop",
+    "build:backend": "cd ../backend && pyinstaller ../desktop/backend.spec --clean --noconfirm",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder --win"
+  },
+  "build": {
+    "appId": "com.bloomcore.schemeknit",
+    "productName": "SchemeKnit",
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/icon.ico",
+      "artifactName": "SchemeKnit-Setup-${version}-x64.${ext}",
+      "sign": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "SchemeKnit",
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "installerHeaderIcon": "assets/icon.ico",
+      "deleteAppDataOnUninstall": false,
+      "include": "installer.nsh"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "dist/schemeknit-backend",
+        "to": "backend",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "../frontend/out",
+        "to": "frontend",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "libreoffice",
+        "to": "libreoffice",
+        "filter": ["**/*"]
+      }
+    ]
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  }
+}

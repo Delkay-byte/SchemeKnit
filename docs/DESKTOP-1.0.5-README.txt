@@ -1,0 +1,205 @@
+================================================================================
+  SCHEMEKNIT DESKTOP 1.0.5 - LOCAL EVALUATION BUILD
+  Installer: SchemeKnit-Setup-1.0.5-x64.exe
+================================================================================
+
+Thank you for evaluating SchemeKnit. This build runs the complete
+application locally on your Windows PC. It does NOT require an internet
+connection, and it does NOT require any of the following to be installed:
+
+    - Node.js or npm
+    - Python or conda
+    - PostgreSQL
+    - Docker
+
+Everything needed is bundled inside the installer.
+
+
+--------------------------------------------------------------------------------
+  1. INSTALL
+--------------------------------------------------------------------------------
+
+1. Locate the file:  SchemeKnit-Setup-1.0.5-x64.exe
+
+2. Double-click it to run the installer.
+
+   NOTE: Because this is an unsigned evaluation build, Windows may show
+   a "Windows protected your PC" (SmartScreen) warning. If this happens:
+     a. Click "More info"
+     b. Click "Run anyway"
+
+   This is expected for a local evaluation build and is safe.
+
+3. Choose an installation folder (the default is fine), then click Next.
+
+4. Complete the installation. A "SchemeKnit" shortcut is created on your
+   Desktop and in the Start Menu.
+
+
+--------------------------------------------------------------------------------
+  2. VERIFY THE DOWNLOAD (OPTIONAL)
+--------------------------------------------------------------------------------
+
+A SHA-256 checksum is provided next to the installer:
+
+    SchemeKnit-Setup-1.0.5-x64.exe.sha256
+
+To verify the file has not been modified, open PowerShell and run:
+
+    Get-FileHash SchemeKnit-Setup-1.0.5-x64.exe -Algorithm SHA256
+
+The printed hash must exactly match:
+
+    8F57D74247AC80DF909C51C31EE4C37D8B7091130EF7012844F73F6043ECC7D6
+
+
+--------------------------------------------------------------------------------
+  3. RUN SCHEMEKNIT
+--------------------------------------------------------------------------------
+
+1. Double-click the "SchemeKnit" desktop shortcut (or find it in the
+   Start Menu).
+
+2. The first launch takes a few seconds longer than normal while the
+   local database is created. Please wait for the login page to appear.
+
+3. That is it. The application is now running entirely from your machine.
+
+
+--------------------------------------------------------------------------------
+  4. FIRST-TIME SETUP - CREATE YOUR PLATFORM ADMINISTRATOR
+--------------------------------------------------------------------------------
+
+SchemeKnit starts with an empty database, so the first account you create
+becomes the Platform Administrator.
+
+1. On the landing page, choose "Platform Administration".
+
+2. Follow the platform-admin setup flow to create the first admin account
+   and set its password.
+
+3. After this, use the Platform Admin console to:
+     - Activate a school and manage school licenses
+     - Create and manage teachers
+     - Configure plans and entitlements (Free Teacher / Teacher Pro /
+       School license)
+
+   Note: This local bootstrap is the ONLY way to create the first admin.
+   No admin email or password is hard-coded into the application.
+
+
+--------------------------------------------------------------------------------
+  5. TEACHER WORKFLOW
+--------------------------------------------------------------------------------
+
+As a teacher (created by a school admin, or register as an Individual
+Teacher from the landing page):
+
+1. Upload your scheme of work (e.g. a Basic 9 Science scheme .docx).
+2. Review the extracted curriculum weeks and indicators.
+3. Approve the scheme.
+4. Configure your term settings (teaching days, class size, duration).
+5. Click "Preview Allocation" - review how each curriculum indicator maps
+   to its own teaching period and lesson plan.
+6. Click "Confirm & Generate".
+7. Open any generated lesson, edit it, and save.
+8. Export: DOCX (single lesson or full batch), PDF, XLSX register, or ZIP.
+
+
+--------------------------------------------------------------------------------
+  6. WHERE YOUR DATA IS STORED
+--------------------------------------------------------------------------------
+
+All your data is kept in your own user account folder, NOT in Program
+Files and NOT in the installation folder:
+
+    %APPDATA%\schemeknit-desktop\data\
+
+Inside that folder you will find:
+
+    teachflow.db       Your local database (users, schemes, lessons)
+    .secrets.json      Local security keys (do not delete or share these)
+    uploads\           Uploaded scheme documents
+    exports\           Generated export files
+    temp\              Temporary working files
+    diagnostics.log    Technical log (useful if you need support)
+
+This data survives app restarts and Windows restarts. Uninstalling
+SchemeKnit does NOT delete this folder, so your lessons are preserved.
+
+
+--------------------------------------------------------------------------------
+  7. WORKING OFFLINE
+--------------------------------------------------------------------------------
+
+This build is designed to work fully offline. All services run locally:
+
+    - The application window
+    - The local web server (127.0.0.1:18235)
+    - The local backend service (127.0.0.1:18234)
+    - The local SQLite database
+    - Local file storage
+
+You can disconnect from the internet at any time; lesson plan generation,
+editing, and DOCX/XLSX export continue to work.
+
+AI-assisted enrichment (optional) uses a local Ollama installation. If
+Ollama is not installed or not running, SchemeKnit simply generates
+lesson plans deterministically - no AI features are required.
+
+
+--------------------------------------------------------------------------------
+  8. TROUBLESHOOTING
+--------------------------------------------------------------------------------
+
+PROBLEM: The window opens but shows an error, or the app will not start.
+
+  - Close SchemeKnit completely.
+  - Re-launch it from the shortcut. The app will offer a "Retry" option
+    if the local service failed to start.
+
+PROBLEM: SmartScreen blocked the installer.
+
+  - See step 1 above: "More info" then "Run anyway".
+
+PROBLEM: Antivirus quarantined the installer or the app.
+
+  - This can happen with unsigned builds. Restore the file in your
+    antivirus software and add an exception for the SchemeKnit install
+    folder, then re-run.
+
+PROBLEM: Something went wrong and I want a completely fresh start.
+
+  - Close SchemeKnit.
+  - Delete the folder:  %APPDATA%\schemeknit-desktop\
+  - Re-launch the app. A brand-new empty database is created and you
+    repeat the first-time setup in section 4.
+
+PROBLEM: I need technical support.
+
+  - Open:  %APPDATA%\schemeknit-desktop\data\diagnostics.log
+  - This file contains the startup log and any errors. Share it with
+    your support contact.
+
+
+--------------------------------------------------------------------------------
+  9. ABOUT THIS BUILD
+--------------------------------------------------------------------------------
+
+  Version:      1.0.5 (Desktop - Local Evaluation)
+  Application:  SchemeKnit - Lesson Plan Generator
+  Architecture: x64 (64-bit Windows)
+  Size:         ~112 MB
+  Signing:      Unsigned (evaluation build)
+
+  This is a LOCAL EVALUATION build. It is not the public production
+  release and does not connect to any cloud service. All features are
+  available locally.
+
+  The approved GES lesson-plan template structure and the indicator
+  allocation engine (one indicator = one teaching period = one lesson
+  plan) are identical to the production web application.
+
+================================================================================
+  END OF README
+================================================================================
