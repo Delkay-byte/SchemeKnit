@@ -81,3 +81,7 @@ schemeknit.png
 # Diagnostics and logs
 *.log
 diagnostics.log
+backend/opencode-be.err
+
+# Backend test outputs (generated, not source)
+backend/output/

@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     # checks (Postgres/Resend/public URLs/localhost CORS); the secret and
     # entitlement checks below still apply. Public web deploys leave it unset.
     DESKTOP_MODE: bool = False
+    # Preview mode for temporary public evaluation builds. Relaxes the
+    # EMAIL_FROM domain check (allows resend.dev test sender) while keeping
+    # all other production checks active. Set SCHEMEKNIT_PREVIEW=true on
+    # the Render backend to enable.
+    PREVIEW_MODE: bool = False
     SECRET_KEY: str = "CHANGE-ME-IN-PRODUCTION"
     ALLOWED_HOSTS: list[str] = ["localhost", "127.0.0.1"]
 
@@ -86,6 +91,9 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     MINIMAX_API_KEY: str = ""
     OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OPENCODE_ZEN_API_KEY: str = ""
+    OPENCODE_ZEN_MODEL: str = "nemotron-3-ultra-free"
+    OPENCODE_ZEN_BASE_URL: str = "https://opencode.ai/zen/v1"
 
     # Logging
     LOG_LEVEL: str = "INFO"
@@ -155,10 +163,18 @@ class Settings(BaseSettings):
             problems.append("RESEND_API_KEY (required for password reset email)")
         if not self.EMAIL_FROM:
             problems.append("EMAIL_FROM (required for transactional email)")
-        elif "localhost" in self.EMAIL_FROM or "resend.dev" in self.EMAIL_FROM:
+        elif "localhost" in self.EMAIL_FROM:
+            problems.append(
+                "EMAIL_FROM (must use a real email address, not localhost)"
+            )
+        elif (
+            "resend.dev" in self.EMAIL_FROM
+            and not self.PREVIEW_MODE
+            and not self.DEBUG
+        ):
             problems.append(
                 "EMAIL_FROM (must use a verified production domain, "
-                "not resend.dev or localhost)"
+                "not resend.dev — set SCHEMEKNIT_PREVIEW=true for test mode)"
             )
 
         # Object storage — required in production

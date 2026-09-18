@@ -157,6 +157,57 @@ class MiniMaxProvider(AIProvider):
         return "minimax"
 
 
+class OpenCodeZenProvider(AIProvider):
+    """OpenCode Zen provider — OpenAI-compatible gateway with free models.
+
+    Uses https://opencode.ai/zen/v1 as the base URL.
+    Free models: nemotron-3-ultra-free, mimo-v2.5-free, muse-spark-1.3, etc.
+    """
+
+    def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
+        self.api_key = api_key or os.environ.get("OPENCODE_ZEN_API_KEY", "")
+        self.model = model or os.environ.get("OPENCODE_ZEN_MODEL", "nemotron-3-ultra-free")
+        self.base_url = os.environ.get("OPENCODE_ZEN_BASE_URL", "https://opencode.ai/zen/v1")
+
+    def generate_lesson_content(self, indicator, strand, sub_strand, content_standard,
+                                 lesson_type="instruction", context=None):
+        if not self.is_available():
+            return {}
+        try:
+            from openai import OpenAI
+            client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+            prompt = (
+                f"Generate lesson content for a Ghanaian classroom.\n"
+                f"Strand: {strand}, Sub-strand: {sub_strand}\n"
+                f"Standard: {content_standard}\n"
+                f"Indicator: {indicator}\n"
+                f"Return ONLY a flat JSON object (no markdown fences) with ALL of these "
+                f"string keys: introduction, main_activity, learner_activity, assessment, conclusion"
+            )
+            response = client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7,
+                max_tokens=1000,
+            )
+            return self._parse_response(response.choices[0].message.content)
+        except Exception:
+            return {}
+
+    def is_available(self) -> bool:
+        return bool(self.api_key)
+
+    def get_name(self) -> str:
+        return "opencode-zen"
+
+    def _parse_response(self, text):
+        import json
+        try:
+            return json.loads(_strip_fences(text))
+        except Exception:
+            return {"introduction": _strip_fences(text)[:500] if text else ""}
+
+
 def _strip_fences(text: str) -> str:
     """Remove ```json ... ``` wrappers models often add around JSON payloads,
     including unclosed fences from truncated generations."""
@@ -265,6 +316,7 @@ def get_provider(mode: str = "OFF", **kwargs) -> AIProvider:
         "openai": OpenAIProvider,
         "minimax": MiniMaxProvider,
         "ollama": OllamaProvider,
+        "opencode-zen": OpenCodeZenProvider,
     }
     provider_class = providers.get(mode, MockProvider)
     return provider_class(**kwargs)
