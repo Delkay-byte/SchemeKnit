@@ -24,12 +24,13 @@ bcrypt==4.2.0
 # Document processing
 python-docx==1.1.2
 docxtpl==0.16.0
-pymupdf==1.24.10
+pymupdf==1.28.2
 openpyxl==3.1.5
 pandas==2.2.3
 
-# PDF conversion
-docx2pdf==0.1.8
+# PDF conversion (optional — requires MS Word or LibreOffice, not available on
+# Linux hosting).  The backend gracefully degrades when this is absent.
+docx2pdf==0.1.8; sys_platform != 'linux' or True
 
 # File handling
 aiofiles==24.1.0
@@ -48,7 +49,6 @@ structlog==24.4.0
 # Testing
 pytest==8.3.3
 pytest-asyncio==0.24.0
-httpx==0.27.2
 
 # Development
 black==24.8.0
