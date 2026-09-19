@@ -1,31 +1,159 @@
-# SchemeKnit
+<p align="center">
+  <img src="assets/brand/schemeknit-wordmark.svg" alt="SchemeKnit" width="360" />
+</p>
 
-AI-assisted lesson plan generator for Ghanaian schools. Upload your scheme of work, review curriculum alignment, allocate indicators to teaching periods, and generate full lesson plans — DOCX, PDF, XLSX, and ZIP exports.
+<p align="center">
+  <strong>AI-assisted lesson planning for Ghanaian schools.</strong>
+</p>
 
-## Architecture
+<p align="center">
+  <a href="https://schemeknit-frontend.onrender.com">Live Preview</a> &middot;
+  <a href="https://github.com/Delkay-byte/SchemeKnit">GitHub</a> &middot;
+  <a href="https://schemeknit-frontend.onrender.com/contact/">Contact</a>
+</p>
+
+---
+
+## What is SchemeKnit?
+
+SchemeKnit helps teachers turn a **scheme of work** into structured, curriculum-aligned **lesson plans**. It is built for Ghanaian schools — KG, Primary, JHS, and SHS — and follows the GES lesson plan format.
+
+A teacher uploads a scheme document. SchemeKnit extracts the curriculum content, validates the indicators, and generates individual lesson plans that can be edited and exported as DOCX, PDF, XLSX, or ZIP.
+
+## Why SchemeKnit?
+
+Writing lesson plans from a scheme of work is time-consuming and repetitive. SchemeKnit automates the transformation while keeping the teacher in control:
+
+- **Upload once, generate many** — a single scheme document produces a full term of lesson plans
+- **Curriculum alignment** — indicators are validated against the GES framework before generation
+- **Editable output** — every generated lesson can be refined by the teacher
+- **Multiple exports** — DOCX for editing, PDF for printing, XLSX for registers, ZIP for batch download
+- **Works offline** — the desktop application runs without internet
+
+## How it works
 
 ```
-┌─────────────┐     ┌──────────────────┐     ┌──────────────┐
-│  Frontend    │────▶│  FastAPI Backend  │────▶│  PostgreSQL   │
-│  (Next.js)  │     │  (Python)        │     │  (Neon)       │
-└─────────────┘     └──────────────────┘     └──────────────┘
-                           │                        │
-                    ┌──────┴──────┐          ┌──────┴──────┐
-                    │  R2 Storage │          │  AI Provider│
-                    │ (Cloudflare)│          │ (OpenCode   │
-                    └─────────────┘          │  Zen)       │
-                                             └─────────────┘
+Upload  →  Review  →  Allocate  →  Generate  →  Edit  →  Export
+scheme      curriculum    indicators    lesson        refine     DOCX / PDF /
+of work     content       to teaching   plans         lessons    XLSX / ZIP
+            extract       periods
+```
+
+1. **Upload** a scheme of work (DOCX or PDF)
+2. **Review** the extracted strands, sub-strands, content standards, and indicators
+3. **Validate** — SchemeKnit flags missing or duplicate indicators
+4. **Allocate** indicators to teaching periods within the school calendar
+5. **Generate** lesson plans for each teaching period
+6. **Edit** any generated lesson to match your teaching style
+7. **Export** as DOCX, PDF, XLSX, or download everything as a ZIP
+
+## Core teaching model
+
+SchemeKnit enforces a single core rule:
+
+> **ONE INDICATOR → ONE TEACHING PERIOD → ONE LESSON PLAN**
+
+A *week* in the scheme represents curriculum scope — the content to be covered. Within that week, each indicator maps to one teaching period and produces one lesson plan. If a week has three indicators, SchemeKnit generates three separate lesson plans.
+
+This ensures every indicator receives dedicated teaching time and no lesson plan tries to cover multiple unrelated objectives.
+
+## Key features
+
+- **Scheme parsing** — extracts curriculum structure from DOCX/PDF scheme documents
+- **Curriculum validation** — detects missing, duplicate, and unallocated indicators
+- **Allocation engine** — maps indicators to teaching periods with conflict detection
+- **Lesson generation** — produces complete lesson plans with objectives, activities, assessment, and conclusion
+- **AI enrichment** — optional AI-assisted content generation (via OpenCode Zen free models)
+- **Approved GES templates** — built-in lesson plan templates matching the official Ghana Education Service format
+- **Multi-format export** — DOCX, PDF, XLSX, and ZIP batch download
+- **Concurrent PDF generation** — multiple teachers can export PDFs simultaneously
+- **Desktop offline mode** — full functionality without internet on Windows
+
+## Designed for Ghanaian schools
+
+SchemeKnit is built specifically for the Ghana education system:
+
+- **GES lesson plan format** — templates follow the official structure for KG, Primary, JHS, and SHS
+- **Ghana curriculum framework** — strands, sub-strands, content standards, and indicators match the national curriculum
+- **Public holidays** — Ghana public holidays are pre-loaded for calendar planning
+- **School licensing** — activation-code-based licensing for school deployments
+- **Teacher management** — school admins can create and manage teacher accounts
+
+SchemeKnit is an independent product and is not endorsed by or affiliated with the Ghana Education Service or the Government of Ghana.
+
+## User roles
+
+| Role | Available on | Description |
+|------|-------------|-------------|
+| **Platform Admin** | Web only | Manages schools, licenses, activation codes, product plans, and platform settings |
+| **School Admin** | Web + Desktop | Manages teachers within their school, uploads schemes, generates lessons for the school |
+| **Teacher** | Web + Desktop | Uploads schemes, generates and edits personal lesson plans |
+| **Individual Teacher** | Web only | Standalone teacher without a school affiliation |
+
+## Exports
+
+| Format | Use case |
+|--------|----------|
+| **DOCX** | Editable lesson plans — open in Microsoft Word or Google Docs |
+| **PDF** | Print-ready lesson plans — desktop uses bundled LibreOffice, web uses pymupdf |
+| **XLSX** | Lesson register / tracking spreadsheet |
+| **ZIP** | Batch download of all exports for a generation job |
+
+Desktop PDF export works **offline** through a bundled LibreOffice runtime.
+
+## Screenshots
+
+> Screenshots are planned for a future update. The live preview at [schemeknit-frontend.onrender.com](https://schemeknit-frontend.onrender.com) shows the current application.
+
+## Project structure
+
+```
+SchemeKnit/
+├── backend/          FastAPI backend (Python)
+│   ├── src/          Application code, routers, engines, models
+│   ├── tests/        Backend test suite
+│   └── migrations/   Database migration scripts
+├── frontend/         Next.js frontend (TypeScript)
+│   ├── src/          Pages, components, lib
+│   └── public/       Static assets, icons, PWA manifest
+├── desktop/          Electron desktop application (Windows)
+│   ├── main.js       Electron main process
+│   └── backend.spec  PyInstaller build specification
+├── docs/             Documentation and acceptance reports
+└── assets/           Brand assets (SVG, ICO, color tokens)
+```
+
+## Web architecture
+
+```
+Browser  →  Next.js Frontend  →  FastAPI Backend  →  PostgreSQL (Neon)
+                                        ↓
+                               Cloudflare R2 (file storage)
+                               Resend (transactional email)
+                               OpenCode Zen (AI enrichment)
 ```
 
 - **Frontend**: Next.js 14, React 18, Tailwind CSS, Radix UI
 - **Backend**: FastAPI 0.141, SQLAlchemy 2.0, Python 3.11
 - **Database**: PostgreSQL (Neon serverless)
 - **Storage**: Cloudflare R2 (S3-compatible)
-- **Email**: Resend (transactional)
-- **AI**: OpenCode Zen (free tier — Nemotron 3 Ultra Free, MiMo V2.5 Free)
-- **PDF Export**: LibreOffice headless (desktop) / pymupdf (web)
+- **Email**: Resend
+- **AI**: OpenCode Zen — free models (Nemotron 3 Ultra Free, MiMo V2.5 Free)
 
-## Local Development
+## Desktop application
+
+The desktop version is a **local-first, offline-capable** Windows application:
+
+- **Backend**: Same FastAPI codebase, packaged as a standalone executable via PyInstaller
+- **Database**: SQLite (local file, no server required)
+- **Storage**: Local filesystem
+- **PDF export**: Bundled LibreOffice runtime (works offline)
+- **Installer**: Self-contained Windows installer (~500 MB)
+- **No internet required** — all processing happens on the user's machine
+
+The desktop and web versions share the same backend code but operate independently. Desktop data never leaves the user's computer.
+
+## Local development
 
 ### Backend
 
@@ -34,8 +162,7 @@ cd backend
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env
-# Edit .env — set DEBUG=true for local dev
+cp .env.example .env     # Set DEBUG=true for local dev
 python -m uvicorn src.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
@@ -44,8 +171,7 @@ python -m uvicorn src.main:app --reload --host 127.0.0.1 --port 8000
 ```bash
 cd frontend
 npm install
-npm run dev
-# Opens at http://localhost:3000
+npm run dev              # Opens at http://localhost:3000
 ```
 
 ### Desktop
@@ -53,13 +179,13 @@ npm run dev
 ```bash
 cd desktop
 npm install
-# Build backend: python package_backend.py
-# Build EXE: build.bat (requires NSIS)
+python package_backend.py   # Package backend for PyInstaller
+build.bat                   # Build installer (requires NSIS + PyInstaller)
 ```
 
-## Environment Variables
+## Environment configuration
 
-See `backend/.env.example` for the full list. Key variables:
+See [`backend/.env.example`](backend/.env.example) for the full list of environment variables. No real secrets, tokens, or credentials are committed to this repository.
 
 | Variable | Purpose | Required |
 |----------|---------|----------|
@@ -67,44 +193,41 @@ See `backend/.env.example` for the full list. Key variables:
 | `SECRET_KEY` | Session signing secret | Production |
 | `JWT_SECRET_KEY` | JWT signing secret | Production |
 | `STORAGE_BACKEND` | `local` or `s3` | Production |
-| `S3_ENDPOINT` | R2/S3 endpoint URL | When STORAGE_BACKEND=s3 |
-| `S3_BUCKET` | Object storage bucket | When STORAGE_BACKEND=s3 |
+| `S3_ENDPOINT` | R2/S3 endpoint URL | When `STORAGE_BACKEND=s3` |
+| `S3_BUCKET` | Object storage bucket | When `STORAGE_BACKEND=s3` |
 | `RESEND_API_KEY` | Resend email API key | Production |
 | `AI_MODE` | `OFF`, `opencode-zen`, `ollama`, etc. | Optional |
 | `PLATFORM_ADMIN_BOOTSTRAP_SECRET` | One-time bootstrap secret | First deploy |
-| `PREVIEW_MODE` | Allow resend.dev test sender | Preview builds |
+| `PREVIEW_MODE` | Allow test email sender | Preview builds |
 
-## Deployment
+## Status
 
-### Web (Render Free)
+| Component | Status |
+|-----------|--------|
+| Web preview | Available at [schemeknit-frontend.onrender.com](https://schemeknit-frontend.onrender.com) |
+| Desktop 1.0.5 | Windows installer available (see [Desktop Release Notes](docs/DESKTOP-1.0.5-RELEASE.md)) |
+| Backend tests | 780 passed, 7 skipped, 0 failed |
+| Production deployment | Not yet finalized — preview environment only |
 
-- **Frontend**: `cd frontend && npm install && npm run build:web` → `npx next start -p $PORT`
-- **Backend**: `cd backend && pip install -r requirements.txt` → `uvicorn src.main:app --host 0.0.0.0 --port $PORT`
-- Python 3.11 (see `.python-version`)
-- PostgreSQL via Neon (free tier)
-- File storage via Cloudflare R2 (free tier)
-- AI via OpenCode Zen free models
+## Security and privacy
 
-### Desktop (Windows)
+- Secrets and local databases are excluded from Git through `.gitignore`
+- API keys and database credentials are stored in environment variables, never in source code
+- Desktop data stays on the local machine — no telemetry, no cloud sync
+- Authentication uses JWT tokens with bcrypt password hashing
+- Rate limiting is applied to authentication endpoints
 
-- Local-first, offline-capable
-- SQLite database
-- Bundled LibreOffice for PDF export
-- Self-contained installer (~500 MB)
+If you discover a security vulnerability, please email [security@schemeknit.com](mailto:security@schemeknit.com).
 
-## Roles
+## Contact
 
-| Role | Platform | Capabilities |
-|------|----------|-------------|
-| Platform Admin | Web only | Manage schools, licenses, activation codes, platform settings |
-| School Admin | Web + Desktop | Manage teachers, upload schemes, generate lessons |
-| Teacher | Web + Desktop | Upload schemes, generate personal lesson plans |
-| Individual Teacher | Web only | Standalone teacher without school affiliation |
+- **General enquiries**: [support@schemeknit.com](mailto:support@schemeknit.com)
+- **Privacy concerns**: [privacy@schemeknit.com](mailto:privacy@schemeknit.com)
+- **Billing**: [billing@schemeknit.com](mailto:billing@schemeknit.com)
+- **Security vulnerabilities**: [security@schemeknit.com](mailto:security@schemeknit.com)
 
-## Version
+## Copyright
 
-Current: **1.0.5**
+&copy; 2026 SchemeKnit. All rights reserved.
 
-## License
-
-Proprietary — SchemeKnit. All rights reserved.
+This is proprietary software. The source code is available for inspection but is not open source. No open-source license is granted.
