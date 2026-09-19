@@ -101,9 +101,31 @@ SchemeKnit is an independent product and is not endorsed by or affiliated with t
 
 Desktop PDF export works **offline** through a bundled LibreOffice runtime.
 
-## Screenshots
+## Product preview
 
-> Screenshots are planned for a future update. The live preview at [schemeknit-frontend.onrender.com](https://schemeknit-frontend.onrender.com) shows the current application.
+<p align="center">
+  <img src="docs/screenshots/01-landing.png" alt="SchemeKnit landing page" width="800" />
+</p>
+
+### Teacher login
+
+![SchemeKnit teacher login](docs/screenshots/02-login.png)
+
+### Upload a scheme of work
+
+![Scheme upload interface](docs/screenshots/03-scheme-upload.png)
+
+### Configure and generate lesson plans
+
+![Generation configuration and allocation](docs/screenshots/04-allocation.png)
+
+### Edit generated lesson plans
+
+![Lesson plan detail with editable fields](docs/screenshots/05-lesson-plan.png)
+
+### Export as DOCX, PDF, XLSX, or ZIP
+
+![Export options](docs/screenshots/06-export.png)
 
 ## Project structure
 

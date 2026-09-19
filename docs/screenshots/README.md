@@ -1,31 +1,32 @@
 # Screenshots
 
-Product screenshots for documentation and GitHub presentation.
+Product screenshots for the SchemeKnit GitHub repository.
 
-## Planned screenshots
+## Captured screenshots
 
-| File | Description | Status |
-|------|-------------|--------|
-| `01-landing.png` | Public landing page with SchemeKnit branding | Pending |
-| `02-teacher-dashboard.png` | Teacher dashboard after login | Pending |
-| `03-scheme-upload.png` | Scheme upload and document review | Pending |
-| `04-allocation-preview.png` | Allocation preview table with indicator mapping | Pending |
-| `05-lesson-plan.png` | Generated lesson plan view | Pending |
-| `06-export.png` | Export options (DOCX, PDF, XLSX, ZIP) | Pending |
+| File | Description | Viewport | Captured from |
+|------|-------------|----------|---------------|
+| `01-landing.png` | Public landing page with SchemeKnit wordmark, hero text, and role selection cards | 1440x900 | Live preview (schemeknit-frontend.onrender.com) |
+| `02-login.png` | Teacher login page with email/password fields and role descriptions | 1440x900 | Live preview |
+| `03-scheme-upload.png` | Scheme upload interface with drag-and-drop and workflow steps | 1440x900 | Live preview (authenticated) |
+| `04-allocation.png` | Generate Lesson Plans page — configuration, coverage summary, and export buttons | 1440x900 | Live preview (authenticated) |
+| `05-lesson-plan.png` | Generated lesson plan detail — curriculum context, editable topic/introduction/assessment, AI assist | 1440x900 | Live preview (authenticated) |
+| `06-export.png` | Export sidebar — Download DOCX, PDF, Register (XLSX), Export ZIP, plus lesson plan detail fields | 1440x900 | Live preview (authenticated) |
 
-## How to capture
+## Capture details
 
-1. Start the local development environment (`npm run dev` + backend)
-2. Use browser DevTools to set viewport to 1280x720
-3. Navigate to each page and take a full-page screenshot
-4. Save to this directory with the naming convention above
+- **Date**: 2026-09-19
+- **Viewport**: 1440x900, device scale factor 1
+- **Browser**: Chromium (Playwright 1.49.1, headless)
+- **Demo data**: Basic 9 Science scheme (Living Things and Their Environment — Cells), 6 generated lesson plans
+- **Demo account**: teacher@schemeknit.com (Test Teacher, Test Preview School)
 
 ## Usage in README
 
-Reference screenshots in README.md as:
+Screenshots are referenced in README.md under the "Product preview" section using relative paths:
 
 ```markdown
-![SchemeKnit Landing](docs/screenshots/01-landing.png)
+![SchemeKnit landing page](docs/screenshots/01-landing.png)
 ```
 
 ## Existing brand assets
