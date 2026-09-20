@@ -134,6 +134,22 @@ Desktop PDF export works **offline** through a bundled LibreOffice runtime.
 
 ![Teacher dashboard with brand mark and Free Tier usage](docs/screenshots/07-dashboard.png)
 
+### School Admin / Headteacher dashboard
+
+![School Admin dashboard](docs/screenshots/08-school-admin.png)
+
+### Platform Admin console (direct route only)
+
+![Platform Admin dashboard](docs/screenshots/09-platform-admin.png)
+
+### Multi-subject document detection
+
+![Multiple subjects detected — confirm your subject](docs/screenshots/10-multi-subject-detect.png)
+
+### Subject-specific review after confirmation
+
+![Subject-specific review](docs/screenshots/11-multi-subject-generated.png)
+
 ## Project structure
 
 ```

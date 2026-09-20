@@ -68,6 +68,8 @@ async function land(page, path) {
   await land(page, '/');
   await page.getByRole('link', { name: 'Teacher Login' }).click();
   await page.waitForURL(/\/login/, { timeout: 10000 });
+  // The login card is client-rendered; wait for it to paint before asserting.
+  await page.getByText('SchemeKnit Teacher').waitFor({ timeout: 10000 });
   allPass = await expect(async () => await page.getByText('SchemeKnit Teacher').count() > 0, 'teacher login labelled') && allPass;
   allPass = await expect(async () => await page.getByText('School Teacher').count() > 0, 'teacher login: School Teacher path') && allPass;
   allPass = await expect(async () => await page.getByText('Individual Teacher').count() > 0, 'teacher login: Individual Teacher path') && allPass;

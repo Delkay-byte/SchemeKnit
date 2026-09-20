@@ -15,7 +15,7 @@ import re
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..auth import get_current_user, require_teacher_workflow
+from ..auth import get_current_user, get_optional_user, require_teacher_workflow
 from ..database import User
 from ..service import data_service
 from ..entitlements import require_ai_entitlement
@@ -584,14 +584,21 @@ def _issue_download_token(user_id: str, job_id: str, path, media_type: str,
     return token
 
 
-def _consume_download_token(token: Optional[str], user_id: str) -> Optional[dict]:
-    """Pop a valid, unexpired, user-matched token; else None."""
+def _consume_download_token(token: Optional[str], user_id: Optional[str] = None) -> Optional[dict]:
+    """Pop a valid, unexpired token; else None.
+
+    ``user_id`` is optional: the browser reaches this URL by *navigation* and
+    cannot attach a Bearer header, so the single-use token itself is the
+    credential (a presigned URL). When an authenticated identity IS present it
+    must still match the issuing user, so an authenticated caller can never
+    consume another user's token.
+    """
     if not token:
         return None
     entry = _DOWNLOAD_TOKENS.pop(token, None)
     if not entry:
         return None
-    if entry["user_id"] != user_id:
+    if user_id is not None and entry["user_id"] != user_id:
         return None
     if _time.time() > entry["expires_at"]:
         return None
@@ -624,7 +631,7 @@ async def issue_download_url(
         raise HTTPException(status_code=404, detail="No lesson plans found")
 
     fmt = (format or "").lower()
-    if fmt not in ("docx", "pdf", "zip"):
+    if fmt not in ("docx", "pdf", "zip", "xlsx"):
         raise HTTPException(status_code=400, detail="Unsupported format")
 
     scheme_db = data_service.get_scheme(db, job.scheme_id, user.id)
@@ -648,6 +655,13 @@ async def issue_download_url(
             template_id=template_id)
         media_type = "application/zip"
         filename = f"Lesson_Plans_{scheme_label}.zip"
+    elif fmt == "xlsx":
+        out = await _run_pipeline(
+            pipeline.export_xlsx, lp_models,
+            Path(f"exports/{user.id}/{job_id}/register.xlsx"))
+        media_type = ("application/vnd.openxmlformats-officedocument"
+                      ".spreadsheetml.sheet")
+        filename = f"Lesson_Register_{scheme_label}.xlsx"
     else:  # pdf
         from ..engines.pdf_export import (
             PDFExportEngine, PDFConversionError, _is_real_pdf,
@@ -692,7 +706,7 @@ async def issue_download_url(
 @router.get("/downloads/{token}")
 async def download_by_token(
     token: str,
-    user: User = Depends(get_current_user),
+    user: Optional[User] = Depends(get_optional_user),
 ):
     """Deliver a pre-validated export as a native browser download.
 
@@ -701,9 +715,11 @@ async def download_by_token(
     browser (or a download manager) owns the transfer — there is no JS body
     read on the page, so a successful handoff cannot surface as a false
     "Failed to fetch". Auth still applies: the token is user-bound and
-    single-use, so it cannot be shared or replayed.
+    single-use, so it cannot be shared or replayed. A plain navigation carries
+    no Bearer header, so the token itself is the credential; when an
+    authenticated identity is supplied it must match the issuing user.
     """
-    entry = _consume_download_token(token, user.id)
+    entry = _consume_download_token(token, user.id if user else None)
     if not entry:
         raise HTTPException(status_code=404, detail="Download link expired or invalid")
     path = Path(entry["path"])
