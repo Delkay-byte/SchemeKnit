@@ -180,6 +180,27 @@ class TestOneTimeDownloadUrl:
         assert job.id not in token and "exports" not in token
 
     @pytest.mark.asyncio
+    async def test_issuing_xlsx_returns_a_token_url(self, db, tmp_path, monkeypatch):
+        """The register (XLSX) must be reachable through the same one-time
+        download path as DOCX/PDF/ZIP, otherwise the export button 400s."""
+        def _fake_xlsx(lessons, out_path):
+            out_path = Path(out_path)
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path.write_bytes(b"PK\x03\x04stub xlsx body")
+            return out_path
+        monkeypatch.setattr(gen_router.pipeline, "export_xlsx", _fake_xlsx)
+        monkeypatch.chdir(tmp_path)
+        u = make_user(db, role="teacher", email="dl-xlsx@t.test")
+        _scheme, job = make_job_with_lessons(db, u, lessons=1)
+
+        res = await gen_router.issue_download_url(job.id, "xlsx", "GES-style", None, u, db)
+
+        assert res["download_url"].startswith("/api/generation/downloads/")
+        assert res["filename"].endswith(".xlsx")
+        assert res["media_type"] == \
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+    @pytest.mark.asyncio
     async def test_token_delivers_an_attachment_download_once(self, db, tmp_path, monkeypatch):
         self._stub_render(monkeypatch, tmp_path)
         u = make_user(db, role="teacher", email="dl-once@t.test")
@@ -213,6 +234,29 @@ class TestOneTimeDownloadUrl:
 
         with pytest.raises(HTTPException) as e:
             await gen_router.download_by_token(token, other)
+        assert e.value.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_browser_navigation_downloads_without_a_bearer_header(self, db, tmp_path, monkeypatch):
+        """The browser reaches this URL by navigation, which cannot carry an
+        Authorization header. The single-use token itself must therefore
+        authorize the transfer (a presigned URL), or every export 401s as soon
+        as the frontend and API are not the same origin (the web build).
+        """
+        self._stub_render(monkeypatch, tmp_path)
+        u = make_user(db, role="teacher", email="dl-nav@t.test")
+        _scheme, job = make_job_with_lessons(db, u, lessons=1)
+
+        res = await gen_router.issue_download_url(job.id, "docx", "GES-style", None, u, db)
+        token = res["download_url"].rsplit("/", 1)[-1]
+
+        # No authenticated user (browser navigation) still delivers once...
+        delivered = await gen_router.download_by_token(token, None)
+        assert isinstance(delivered, FileResponse)
+        assert delivered.headers["content-disposition"].startswith("attachment;")
+        # ...and only once.
+        with pytest.raises(HTTPException) as e:
+            await gen_router.download_by_token(token, None)
         assert e.value.status_code == 404
 
     @pytest.mark.asyncio

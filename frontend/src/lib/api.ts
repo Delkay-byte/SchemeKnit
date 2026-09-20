@@ -464,8 +464,17 @@ class ApiService {
     // A real navigation to an attachment response saves the file without
     // replacing the page. Using window.location would still work, but an
     // anchor click keeps browser history clean and matches the Electron path.
+    //
+    // The server issues a root-relative URL. In the split-origin web build the
+    // app is served from a different host/port than the API (e.g. :3000 vs
+    // :8000), so a bare relative href would navigate the page to the frontend
+    // origin and hit a 404 instead of the download. Resolve it against the API
+    // base so the browser reaches the real endpoint.
+    const href = /^(https?:)?\/\//i.test(downloadUrl)
+      ? downloadUrl
+      : `${this.baseUrl}${downloadUrl}`
     const a = document.createElement('a')
-    a.href = downloadUrl
+    a.href = href
     a.rel = 'noopener'
     a.style.display = 'none'
     document.body.appendChild(a)

@@ -13,10 +13,14 @@ Product screenshots for the SchemeKnit GitHub repository.
 | `05-lesson-plan.png` | Generated lesson plan detail — curriculum context, editable topic/introduction/assessment, AI assist | 1440x900 | Local production build (2026-09-20) |
 | `06-export.png` | Export sidebar — Download DOCX, PDF, Register (XLSX), Export ZIP, plus lesson plan detail fields | 1440x900 | Local production build (2026-09-20) |
 | `07-dashboard.png` | Authenticated teacher dashboard — brand mark in the header, **Free Tier** plan label, lifetime AI generations remaining | 1440x900 | Local production build (2026-09-20) |
+| `08-school-admin.png` | School Admin / Headteacher dashboard — canonical brand mark in the header, teacher management overview | 1440x900 | Local production build (2026-09-20) |
+| `09-platform-admin.png` | Platform Admin console — canonical brand mark, schools/licenses overview. Reached only through the direct `/login/platform-admin` route (never linked publicly) | 1440x900 | Local production build (2026-09-20) |
+| `10-multi-subject-detect.png` | Multi-subject document detection — a single "Basic 7 Scheme of Learning" containing English, Mathematics and Science; the teacher must confirm which subject section to use | 1440x900 | Local production build (2026-09-20) |
+| `11-multi-subject-generated.png` | Subject-specific review after confirming **Science** — only the confirmed subject section is extracted for review | 1440x900 | Local production build (2026-09-20) |
 
 ## Capture details
 
-- **Date**: 2026-09-20 (01, 03, 04, 05, 06, 07); 02 predates this change set
+- **Date**: 2026-09-20 (01, 03, 04, 05, 06, 07, 08, 09, 10, 11); 02 predates this change set
 - **Viewport**: 1440x900, device scale factor 1
 - **Browser**: Chromium (Playwright 1.49.1, headless)
 - **Demo data**: Basic 9 Science scheme, 15 instructional weeks, generated lesson plans
@@ -33,6 +37,9 @@ Product screenshots for the SchemeKnit GitHub repository.
 - The allocation preview is grouped by actual teaching week and shows
   carry-forward plainly.
 - The header exposes a compact WhatsApp + email contact action on every page.
+- Screenshots 08–11 add the school-admin and platform-admin dashboards (both
+  rendering the fixed branding) and the multi-subject detection → confirmation
+  → subject-specific review flow.
 
 ## Usage in README
 
