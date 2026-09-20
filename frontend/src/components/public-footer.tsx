@@ -1,13 +1,17 @@
 import React from 'react'
 import Link from 'next/link'
 import { SchemeKnitMark } from '@/components/scheme-knit-mark'
-import { isDesktop } from '@/lib/build-target'
+import { WhatsAppIcon } from '@/components/whatsapp-button'
+import { whatsappUrl, contactMailtoUrl, CONTACT_EMAIL } from '@/lib/contact'
 
 /**
  * Public site footer — appears on the landing page and all public legal pages.
  *
- * Links are grouped: Product, Support, Legal, Platform.
+ * Links are grouped: Product, Support, Legal.
  * Must remain usable on mobile (single column stack).
+ *
+ * Staff/Platform Admin is deliberately NOT linked here: it stays reachable only
+ * through its secure direct route, outside the normal public journey.
  */
 export function PublicFooter() {
   return (
@@ -60,6 +64,27 @@ export function PublicFooter() {
                   Contact Support
                 </Link>
               </li>
+              <li>
+                <a
+                  href={contactMailtoUrl('SchemeKnit enquiry')}
+                  className="text-white/70 hover:text-white break-all"
+                  aria-label={`Email BloomCore Technologies at ${CONTACT_EMAIL}`}
+                >
+                  {CONTACT_EMAIL}
+                </a>
+              </li>
+              <li>
+                <a
+                  href={whatsappUrl()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-white/70 hover:text-white"
+                  aria-label="Chat with BloomCore Technologies on WhatsApp"
+                >
+                  <WhatsAppIcon className="h-4 w-4 text-[#25D366]" />
+                  WhatsApp
+                </a>
+              </li>
             </ul>
           </div>
 
@@ -98,31 +123,12 @@ export function PublicFooter() {
           </div>
         </div>
 
-        {/* Platform — web only */}
-        {!isDesktop && (
-          <div className="mt-8 border-t border-white/20 pt-6">
-            <div className="flex flex-col items-start gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-white/60">
-                &copy; {new Date().getFullYear()} SchemeKnit. All rights reserved.
-              </p>
-              <div className="flex items-center gap-4">
-                <Link
-                  href="/login/platform-admin"
-                  className="text-white/60 hover:text-white"
-                >
-                  Staff / Platform Admin
-                </Link>
-              </div>
-            </div>
-          </div>
-        )}
-        {isDesktop && (
-          <div className="mt-8 border-t border-white/20 pt-6">
-            <p className="text-white/60 text-sm">
-              &copy; {new Date().getFullYear()} SchemeKnit. All rights reserved.
-            </p>
-          </div>
-        )}
+        <div className="mt-8 border-t border-white/20 pt-6">
+          <p className="text-white/60 text-sm">
+            &copy; {new Date().getFullYear()} SchemeKnit. All rights reserved.
+            {' '}A product of BloomCore Technologies.
+          </p>
+        </div>
       </div>
     </footer>
   )

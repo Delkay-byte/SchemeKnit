@@ -70,7 +70,7 @@ export default function IndividualSignupPage() {
           </span>
           <CardTitle className="text-2xl">Create your SchemeKnit account</CardTitle>
           <CardDescription>
-            Sign up as an individual teacher — no school required. You start on the Free plan and can upgrade to Pro anytime.
+            Sign up as an individual teacher — no school required. You start on the Free Tier and can upgrade to Pro anytime.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -126,8 +126,8 @@ export default function IndividualSignupPage() {
 
           <div className="mt-6 p-4 bg-muted rounded-lg">
             <p className="text-sm text-muted-foreground text-center">
-              Free plan includes 3 lesson generations, individual DOCX and PDF export,
-              1 custom template and 5 AI trial credits.
+              Free Tier includes 3 lesson generations, individual DOCX and PDF export,
+              1 custom template and 5 lifetime AI generations.
             </p>
           </div>
 

@@ -16,13 +16,19 @@ from ..database import get_db
 from ..auth import get_current_user, require_teacher_workflow
 from ..database import User
 from ..service import data_service
-from ..parsers.docx_parser import DOCXParser
-from ..models import SchemeOfWork
+from ..parsers.pdf_parser import get_document_parser
+from ..database import WeekDB
+from ..models import SchemeOfWork, Subject
 from ..logging_config import get_logger, log_event
 
 router = APIRouter()
-parser = DOCXParser()
 logger = get_logger()
+
+SUPPORTED_EXTENSIONS = (".docx", ".pdf")
+
+#: Detection statuses that require the teacher to confirm a subject section
+#: before any generation may proceed (§4 STEP 4-7).
+NEEDS_SUBJECT_CONFIRMATION = ("multiple",)
 
 MAX_UPLOAD_SIZE = 50 * 1024 * 1024  # 50MB
 
@@ -43,6 +49,27 @@ def _write_file_sync(path: Path, data: bytes):
 def _read_file_sync(path: Path) -> bytes:
     """Synchronous file read for use in run_in_executor."""
     return path.read_bytes()
+
+
+def _analyze_document(document_parser, file_path: Path) -> dict:
+    """Run section detection, degrading safely when it fails.
+
+    Detection failure must never fail the upload: the teacher keeps the scheme
+    and can still review it manually (low_confidence).
+    """
+    try:
+        info = document_parser.analyze(file_path)
+        if not isinstance(info, dict):
+            raise ValueError("unexpected analyze() result")
+        return info
+    except Exception:
+        logger.warning("document_analysis_failed", path=str(file_path))
+        return {
+            "title": "",
+            "detected_subjects": [],
+            "sections": [],
+            "detection_status": "low_confidence",
+        }
 
 
 def _resolve_scheme_or_raise(db, scheme_id: str, user_id: str):
@@ -72,13 +99,19 @@ async def upload_scheme(
         raise HTTPException(status_code=400, detail="No file provided")
 
     ext = Path(file.filename).suffix.lower()
-    if ext != ".docx":
-        raise HTTPException(status_code=400, detail="Only .docx files are supported")
+    if ext not in SUPPORTED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail="Only .docx and .pdf files are supported",
+        )
     content_type = (file.content_type or "").split(";")[0].strip().lower()
-    if content_type and content_type not in (
+    allowed_content_types = {
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/pdf",
         "application/octet-stream",
-    ):
+        "",
+    }
+    if content_type not in allowed_content_types:
         raise HTTPException(status_code=400, detail="Unsupported file type")
 
     # Stream-read to check size before loading full content
@@ -103,16 +136,33 @@ async def upload_scheme(
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(None, _write_file_sync, file_path, content)
 
-        # Parse using executor to avoid blocking event loop.
-        # Preserve the teacher's original filename for display; the file on
-        # disk keeps a UUID-based storage name.
-        scheme = await parser.parse(file_path, original_filename=file.filename)
+        # Parse using the parser for this format (DOCX or PDF). Preserve the
+        # teacher's original filename for display; the file on disk keeps a
+        # UUID-based storage name.
+        document_parser = get_document_parser(file_path)
+        if document_parser is None:
+            raise HTTPException(status_code=400, detail="Unsupported file type")
+        scheme = await document_parser.parse(file_path, original_filename=file.filename)
 
         db_scheme = data_service.create_scheme(db, user.id, scheme, school_id=user.school_id)
         # Track storage location for safe orphan cleanup on delete (server-side only).
         db_scheme.storage_filename = str(file_path)
+
+        # ── Multi-subject document detection (§4) ───────────────────────
+        # Inspect the document for subject sections. When more than one subject
+        # is present the teacher MUST confirm which one to use before
+        # generation — the system never silently picks a subject.
+        detection = _analyze_document(document_parser, file_path)
+        db_scheme.document_title = detection.get("title") or ""
+        db_scheme.detected_subjects = [
+            s["subject"] for s in detection.get("sections", [])
+        ]
+        db_scheme.detection_status = detection.get("detection_status", "")
+        db_scheme.subject_sections = detection.get("sections", [])
         db.commit()
-        log_event("scheme_uploaded", user_id=user.id, scheme_id=scheme.id, filename=file.filename)
+        log_event("scheme_uploaded", user_id=user.id, scheme_id=scheme.id,
+                  filename=file.filename,
+                  detection_status=db_scheme.detection_status)
 
         return {
             "scheme_id": scheme.id,
@@ -121,6 +171,13 @@ async def upload_scheme(
             "class_level": scheme.class_level.value if hasattr(scheme.class_level, 'value') else str(scheme.class_level),
             "weeks_count": len(scheme.weeks),
             "status": "uploaded",
+            "detection": {
+                "status": db_scheme.detection_status,
+                "title": db_scheme.document_title,
+                "subjects": db_scheme.detected_subjects or [],
+                "sections": db_scheme.subject_sections or [],
+                "needs_confirmation": db_scheme.detection_status in NEEDS_SUBJECT_CONFIRMATION,
+            },
         }
     except HTTPException:
         raise
@@ -182,6 +239,12 @@ async def get_scheme(
         "weeks_count": len(scheme.weeks),
         "status": scheme.status,
         "upload_date": scheme.upload_date.isoformat() if scheme.upload_date else None,
+        "document_title": scheme.document_title or "",
+        "detected_subjects": scheme.detected_subjects or [],
+        "detection_status": scheme.detection_status or "",
+        "needs_subject_confirmation": (
+            scheme.detection_status in NEEDS_SUBJECT_CONFIRMATION
+        ),
     }
 
 
@@ -209,6 +272,132 @@ async def get_scheme_weeks(
         })
 
     return {"weeks": weeks}
+
+
+@router.get("/{scheme_id}/detection")
+async def get_document_detection(
+    scheme_id: str,
+    user: User = Depends(get_current_user),
+    db=Depends(get_db),
+):
+    """Detected document structure for the subject-confirmation screen (§4).
+
+    Returns the detected subjects, the detection confidence, and whether the
+    teacher must confirm a subject section before generating.
+    """
+    scheme = _resolve_scheme_or_raise(db, scheme_id, user.id)
+    return {
+        "scheme_id": scheme.id,
+        "filename": scheme.filename,
+        "document_title": scheme.document_title or "",
+        "detected_subjects": scheme.detected_subjects or [],
+        "sections": scheme.subject_sections or [],
+        "detection_status": scheme.detection_status or "",
+        "confirmed_subject": (
+            scheme.subject if (scheme.detection_status == "confirmed") else None
+        ),
+        "needs_confirmation": (
+            scheme.detection_status in NEEDS_SUBJECT_CONFIRMATION
+        ),
+    }
+
+
+@router.post("/{scheme_id}/confirm-subject")
+async def confirm_subject_section(
+    scheme_id: str,
+    body: dict,
+    user: User = Depends(get_current_user),
+    db=Depends(get_db),
+):
+    """Confirm which subject section of a multi-subject document to use (§4).
+
+    The chosen section is re-extracted from the stored document and becomes the
+    scheme's curriculum. Other subject sections are ignored — never silently
+    mixed in. The teacher must confirm before generation proceeds.
+    """
+    scheme = _resolve_scheme_or_raise(db, scheme_id, user.id)
+
+    requested = (body or {}).get("subject", "")
+    if not requested:
+        raise HTTPException(status_code=400, detail="A subject is required")
+
+    try:
+        subject = Subject(requested)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Unknown subject")
+
+    detected = scheme.detected_subjects or []
+    if detected and subject.value not in detected:
+        # Mismatch handling (§4): warn rather than silently accept.
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"'{subject.value}' is not one of the subjects detected in this "
+                f"document ({', '.join(detected)}). Choose a detected subject or "
+                f"re-upload the correct file."
+            ),
+        )
+
+    storage = scheme.storage_filename
+    if not storage:
+        raise HTTPException(status_code=409, detail="The uploaded file is no longer available")
+    file_path = Path(storage)
+    if not file_path.exists():
+        raise HTTPException(status_code=409, detail="The uploaded file is no longer available")
+
+    document_parser = get_document_parser(file_path)
+    if document_parser is None:
+        raise HTTPException(status_code=400, detail="Unsupported file type")
+
+    try:
+        extracted = await document_parser.parse(
+            file_path,
+            original_filename=scheme.filename,
+            target_subject=subject.value,
+        )
+    except Exception as e:
+        log_event("subject_confirm_failed", user_id=user.id, scheme_id=scheme_id, error=str(e))
+        raise HTTPException(status_code=422, detail="Could not re-read the subject section")
+
+    if not extracted.weeks:
+        raise HTTPException(
+            status_code=422,
+            detail="No curriculum content found in that subject section",
+        )
+
+    # Replace the scheme's extracted curriculum with the confirmed section.
+    db.query(WeekDB).filter(WeekDB.scheme_id == scheme_id).delete()
+    for w in extracted.weeks:
+        db.add(WeekDB(
+            id=w.id,
+            scheme_id=scheme_id,
+            week_number=w.week_number,
+            week_type=w.week_type.value if hasattr(w.week_type, "value") else str(w.week_type),
+            start_date=w.start_date,
+            end_date=w.end_date,
+            strand=w.strand or "",
+            sub_strand=w.sub_strand or "",
+            content_standards=w.content_standards,
+            indicators=w.indicators,
+            resources=w.resources,
+        ))
+
+    scheme.subject = extracted.subject.value if hasattr(extracted.subject, "value") else str(extracted.subject)
+    scheme.class_level = (
+        extracted.class_level.value if hasattr(extracted.class_level, "value") else str(extracted.class_level)
+    )
+    scheme.detection_status = "confirmed"
+    db.commit()
+    log_event("subject_confirmed", user_id=user.id, scheme_id=scheme_id,
+              subject=scheme.subject)
+
+    return {
+        "scheme_id": scheme.id,
+        "confirmed_subject": scheme.subject,
+        "class_level": scheme.class_level,
+        "weeks_count": len(extracted.weeks),
+        "detection_status": scheme.detection_status,
+    }
 
 
 @router.get("/{scheme_id}/workflow")

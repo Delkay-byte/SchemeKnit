@@ -20,7 +20,7 @@ const FEATURES: Feature[] = [
   { label: 'PDF export', free: true, pro: true },
   { label: 'Custom templates', free: '1 saved', pro: '10 saved' },
   { label: 'Approved GES templates', free: true, pro: true },
-  { label: 'AI assistance', free: 'Trial (5 credits)', pro: 'Full (50 credits)' },
+  { label: 'AI assistance', free: '5 lifetime generations', pro: 'Full (50 credits)' },
   { label: 'Lesson history', free: '10 lessons', pro: '100 lessons' },
   { label: 'Advanced analytics', free: false, pro: true },
   { label: 'Priority features', free: false, pro: true },
@@ -43,10 +43,10 @@ export function PlanComparisonCard() {
         Choose Your Plan
       </h3>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Free Teacher Card */}
+        {/* Free Tier Card */}
         <div className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm">
           <div className="text-center mb-4">
-            <h4 className="text-xl font-bold text-gray-800">Free Teacher</h4>
+            <h4 className="text-xl font-bold text-gray-800">Free Tier</h4>
             <p className="text-sm text-gray-500 mt-1">For teachers exploring SchemeKnit</p>
           </div>
           <div className="space-y-3">

@@ -12,7 +12,11 @@ from ..database import get_db
 from ..auth import get_current_user, get_optional_user
 from ..database import User
 from ..service import data_service
-from ..models import Subject, ClassLevel, Holiday, AIMode, TemplateType, EducationalLevel
+from ..models import (
+    Subject, ClassLevel, Holiday, AIMode, TemplateType, EducationalLevel,
+    CLASS_LEVEL_TO_EDUCATIONAL_LEVEL, CLASS_LEVEL_SUBJECTS,
+    subjects_for_class_level,
+)
 
 router = APIRouter()
 
@@ -97,8 +101,34 @@ async def delete_holiday(
 
 
 @router.get("/subjects")
-async def list_subjects():
-    return {"subjects": [s.value for s in Subject]}
+async def list_subjects(level: Optional[str] = None):
+    """Subjects available, optionally scoped to a class level.
+
+    Without ``level`` the full catalogue is returned (backwards compatible).
+    With ``level`` (e.g. ``?level=KG 1`` or ``?level=SHS 2``) only the subjects
+    that belong to that level are returned — the level-aware availability the
+    product requires, driven by the canonical taxonomy.
+    """
+    subjects = subjects_for_class_level(level) if level else list(Subject)
+    return {"subjects": [s.value for s in subjects], "level": level or None}
+
+
+@router.get("/subjects/by-level")
+async def list_subjects_by_level():
+    """Canonical LEVEL → AVAILABLE SUBJECTS map (single source of truth).
+
+    The UI reads this instead of duplicating subject definitions per component.
+    """
+    return {
+        "levels": [
+            {
+                "class_level": cl.value,
+                "educational_level": CLASS_LEVEL_TO_EDUCATIONAL_LEVEL[cl].value,
+                "subjects": [s.value for s in subjects],
+            }
+            for cl, subjects in CLASS_LEVEL_SUBJECTS.items()
+        ]
+    }
 
 
 @router.get("/class-levels")

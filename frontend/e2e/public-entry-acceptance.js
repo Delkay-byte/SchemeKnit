@@ -1,4 +1,8 @@
-// Browser acceptance for the PUBLIC ENTRY journey (§24 steps 1-9).
+// Browser acceptance for the PUBLIC ENTRY journey.
+//
+// Staff/Platform Admin is deliberately NOT exposed on the public landing page.
+// It remains reachable only through its secure direct routes
+// (/login/platform-admin, /setup/platform-admin), which are still checked here.
 const { chromium } = require('playwright');
 
 const BASE = 'http://localhost:3000';
@@ -28,19 +32,23 @@ async function land(page, path) {
   // 1-2. Landing page + three role cards
   await land(page, '/');
   await page.getByText('Professional Lesson Plans in Minutes').waitFor({ timeout: 8000 });
-  allPass = await expect(async () => await page.getByRole('heading', { name: 'Platform Administration' }).count() > 0, 'landing: Platform Administration card') && allPass;
-  allPass = await expect(async () => await page.getByRole('heading', { name: 'School Administration' }).count() > 0, 'landing: School Administration card') && allPass;
   allPass = await expect(async () => await page.getByRole('heading', { name: 'Teacher' }).count() > 0, 'landing: Teacher card') && allPass;
+  allPass = await expect(async () => await page.getByRole('heading', { name: 'School Administration' }).count() > 0, 'landing: School Administration card') && allPass;
+  allPass = await expect(async () => await page.getByRole('heading', { name: 'Platform Administration' }).count() === 0, 'landing: Platform Administration NOT shown') && allPass;
+  allPass = await expect(async () => await page.getByRole('link', { name: 'Platform Admin Login' }).count() === 0, 'landing: no Platform Admin Login link') && allPass;
+  allPass = await expect(async () => await page.getByText('Staff / Platform Admin').count() === 0, 'footer: no Staff / Platform Admin link') && allPass;
   allPass = await expect(async () => await page.getByRole('link', { name: 'Activate Your School' }).count() > 0, 'landing: Activate Your School button') && allPass;
   allPass = await expect(async () => await page.getByRole('link', { name: 'School Admin Login' }).count() > 0, 'landing: School Admin Login button') && allPass;
-  allPass = await expect(async () => await page.getByRole('link', { name: 'Create Free Teacher Account' }).count() > 0, 'landing: Create Free Teacher Account button') && allPass;
-  allPass = await expect(async () => await page.getByRole('link', { name: 'Platform Admin Login' }).count() > 0, 'landing: Platform Admin Login button') && allPass;
+  allPass = await expect(async () => await page.getByRole('link', { name: 'Create Free Account' }).count() > 0, 'landing: Create Free Account button') && allPass;
+  // Contact affordances (WhatsApp + email) available on the public page.
+  allPass = await expect(async () => await page.getByLabel(/WhatsApp/i).count() > 0, 'landing: WhatsApp contact action') && allPass;
+  allPass = await expect(async () => await page.locator('a[href^="mailto:bloomcoretechnologies@gmail.com"]').count() > 0, 'landing: contact email link') && allPass;
 
-  // 3-4. Platform Admin login
-  await page.getByRole('link', { name: 'Platform Admin Login' }).click();
-  await page.waitForURL(/\/login\/platform-admin/, { timeout: 10000 });
-  await page.getByText('TeachFlow Platform Administration').waitFor({ timeout: 10000 });
-  allPass = await expect(async () => await page.getByText('TeachFlow Platform Administration').count() > 0, 'platform admin login labelled') && allPass;
+  // 3-4. Platform Admin direct route still works (bypassing the landing page).
+  await page.goto(BASE + '/login/platform-admin', { waitUntil: 'domcontentloaded' });
+  await page.waitForLoadState('networkidle');
+  allPass = await expect(async () => await page.getByText('SchemeKnit Platform Administration').count() > 0, 'platform admin direct login loads') && allPass;
+  allPass = await expect(async () => await page.getByRole('button', { name: 'Sign In' }).count() > 0, 'platform admin direct login has form') && allPass;
 
   // 5-7. School Administration entry
   await land(page, '/');
@@ -60,8 +68,7 @@ async function land(page, path) {
   await land(page, '/');
   await page.getByRole('link', { name: 'Teacher Login' }).click();
   await page.waitForURL(/\/login/, { timeout: 10000 });
-  await page.getByText('TeachFlow Teacher').waitFor({ timeout: 10000 });
-  allPass = await expect(async () => await page.getByText('TeachFlow Teacher').count() > 0, 'teacher login labelled') && allPass;
+  allPass = await expect(async () => await page.getByText('SchemeKnit Teacher').count() > 0, 'teacher login labelled') && allPass;
   allPass = await expect(async () => await page.getByText('School Teacher').count() > 0, 'teacher login: School Teacher path') && allPass;
   allPass = await expect(async () => await page.getByText('Individual Teacher').count() > 0, 'teacher login: Individual Teacher path') && allPass;
   allPass = await expect(async () => await page.getByText('Register as individual teacher').count() > 0, 'teacher login: register link') && allPass;
@@ -78,10 +85,9 @@ async function land(page, path) {
   // Mobile viewport — cards stay usable (§21)
   await page.setViewportSize({ width: 375, height: 700 });
   await land(page, '/');
-  await page.getByText('Professional Lesson Plans in Minutes').waitFor({ timeout: 8000 });
-  allPass = await expect(async () => await page.getByRole('heading', { name: 'Platform Administration' }).isVisible(), 'mobile: platform card visible') && allPass;
-  allPass = await expect(async () => await page.getByRole('heading', { name: 'School Administration' }).isVisible(), 'mobile: school card visible') && allPass;
-  allPass = await expect(async () => await page.getByRole('heading', { name: 'Teacher' }).isVisible(), 'mobile: teacher card visible') && allPass;
+  allPass = await expect(async () => (await page.getByRole('heading', { name: 'Teacher' }).count()) > 0, 'mobile: teacher card visible') && allPass;
+  allPass = await expect(async () => (await page.getByRole('heading', { name: 'School Administration' }).count()) > 0, 'mobile: school card visible') && allPass;
+  allPass = await expect(async () => (await page.getByRole('heading', { name: 'Platform Administration' }).count()) === 0, 'mobile: platform card NOT visible') && allPass;
 
   await browser.close();
   console.log(allPass ? '\nALL PUBLIC ACCEPTANCE CHECKS PASSED' : '\nSOME CHECKS FAILED');

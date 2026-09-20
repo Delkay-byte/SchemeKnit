@@ -172,7 +172,8 @@ export default function Dashboard() {
                 sees FREE TEACHER / TEACHER PRO with an upgrade path. */}
             {plan && (
               <Card className="mb-8">
-                <CardContent className="p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <CardContent className="p-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-4">
                     <div className={`p-3 rounded-full ${
                       plan.source === 'school' || plan.source === 'individual+school'
@@ -215,9 +216,9 @@ export default function Dashboard() {
                       ) : (
                         <>
                           <span className="inline-block text-[11px] font-bold uppercase tracking-wider text-gray-600 bg-gray-100 px-2 py-0.5 rounded mb-1">
-                            Free Teacher
+                            Free Tier
                           </span>
-                          <h3 className="font-semibold">Free Teacher</h3>
+                          <h3 className="font-semibold">Free Tier</h3>
                           <p className="text-sm text-muted-foreground">
                             Individual plan
                           </p>
@@ -240,9 +241,13 @@ export default function Dashboard() {
                     </div>
                     <div className="text-center">
                       <div className="font-semibold text-foreground">
-                        {plan.ai_credits === 0 ? 'Unlimited' : plan.ai_credits_used + '/' + plan.ai_credits}
+                        {plan.ai_credits === 0
+                          ? 'Unlimited'
+                          : `${Math.max(plan.ai_credits - plan.ai_credits_used, 0)} / ${plan.ai_credits}`}
                       </div>
-                      <div>AI Credits</div>
+                      <div>
+                        {plan.ai_lifetime ? 'AI generations (lifetime)' : 'AI generations remaining'}
+                      </div>
                     </div>
                     {plan.edition === 'free' && plan.source === 'free' && (
                       <Button asChild size="sm" className="bg-emerald-600 hover:bg-emerald-700">
@@ -250,6 +255,15 @@ export default function Dashboard() {
                       </Button>
                     )}
                   </div>
+                </div>
+                {/* Free Tier AI is a one-time lifetime allowance — say so plainly
+                    (never "resets tomorrow"). */}
+                {plan.ai_lifetime && plan.ai_credits > 0 &&
+                  Math.max(plan.ai_credits - plan.ai_credits_used, 0) === 0 && (
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      You&apos;ve used all {plan.ai_credits} free AI generations included with the Free Tier.
+                    </p>
+                )}
                 </CardContent>
               </Card>
             )}

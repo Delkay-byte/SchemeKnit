@@ -14,7 +14,7 @@ from ..database import get_db, User, LessonPlanDB, AIEnrichmentCacheDB, generate
 from ..auth import get_current_user
 from ..models import AIMode, ContentSource, SectionRegenerationRequest
 from ..engines.ai_provider import get_provider
-from ..entitlements import require_ai_entitlement
+from ..entitlements import require_ai_entitlement, consume_ai_generation
 from ..logging_config import get_logger, log_event
 
 router = APIRouter()
@@ -48,6 +48,9 @@ class SectionRegenerateRequest(BaseModel):
     section: str
     ai_mode: str = "BASIC"
     additional_context: str = ""
+    #: Client-generated id for THIS user action. Used to make the lifetime
+    #: AI-generation consumption idempotent across duplicate submissions.
+    request_id: str = ""
 
 
 class SectionRegenerateResponse(BaseModel):
@@ -125,6 +128,10 @@ async def regenerate_section(
             raise ValueError("AI response too short or empty")
 
         _save_enrichment_cache(db, lp.id, req.section, new_content, provider.__class__.__name__, mode_label)
+
+        # Only a SUCCESSFUL generation consumes one lifetime AI generation.
+        # Failed/empty/provider-unavailable attempts above never reach here.
+        consume_ai_generation(user, db, request_id=req.request_id or None)
 
         log_event("section_regenerated",
                   user_id=user.id, lesson_plan_id=req.lesson_plan_id,
@@ -270,6 +277,8 @@ class EnrichLessonRequest(BaseModel):
     #: template id, so the caller states it; empty means the approved
     #: organizational format.
     template_id: str = ""
+    #: Client-generated id for THIS user action (idempotent consumption).
+    request_id: str = ""
 
 
 def _existing_texts(raw) -> list:
@@ -445,6 +454,8 @@ async def enrich_lesson(
     lp.teacher_edited = True
     _save_enrichment_cache(db, lp.id, "enrich-lesson", _json.dumps(validated)[:2000],
                            provider.__class__.__name__, mode)
+    # One successful generation consumes one lifetime AI generation.
+    consume_ai_generation(user, db, request_id=req.request_id or None)
     log_event("lesson_enriched", user_id=user.id, lesson_plan_id=lp.id,
               written=written)
     db.commit()

@@ -4,18 +4,23 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Shield, Building2, GraduationCap, ArrowRight, KeyRound, LogIn, UserPlus } from 'lucide-react'
+import { Building2, GraduationCap, ArrowRight, KeyRound, LogIn, UserPlus } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { SchemeKnitMark } from '@/components/scheme-knit-mark'
 import { PublicFooter } from '@/components/public-footer'
-import { isDesktop } from '@/lib/build-target'
+import { WhatsAppButton } from '@/components/whatsapp-button'
 
 /**
  * Public landing page (§2, §3).
  *
- * This is the single public entry point. It presents the three audiences
- * SchemeKnit serves as distinct, cohesive cards so a visitor immediately knows
- * which door is theirs. It is deliberately NOT an internal dashboard.
+ * This is the single public entry point. It presents the two public audiences
+ * SchemeKnit serves — Teachers and School Administration — as distinct,
+ * cohesive cards so a visitor immediately knows which door is theirs. It is
+ * deliberately NOT an internal dashboard.
+ *
+ * Staff/Platform Admin access is intentionally NOT advertised here. It stays in
+ * the same deployment behind its secure direct routes (/login/platform-admin,
+ * /setup/platform-admin) and is not part of the normal public journey.
  *
  * Role routing after login is decided by the backend role, never here.
  */
@@ -67,10 +72,9 @@ export default function Home() {
           </p>
         </div>
 
-        {/* Role cards — the primary audience first, Platform Admin last and
-            visually secondary (it is operations, not a purchase option).
-            Platform Admin is web-only and excluded from desktop builds. */}
-        <div className={`grid gap-6 max-w-6xl mx-auto ${isDesktop ? 'md:grid-cols-2' : 'md:grid-cols-3'}`}>
+        {/* Role cards — the two public audiences only. Staff/Platform Admin is
+            deliberately not shown: it is operations, not a public option. */}
+        <div className="grid gap-6 max-w-4xl mx-auto md:grid-cols-2">
           {/* Teacher — blue, the classroom audience */}
           <Card className="flex flex-col border-blue-300 hover:border-blue-400 transition-colors md:order-1">
             <CardHeader>
@@ -108,7 +112,7 @@ export default function Home() {
                 className="inline-flex items-center justify-center w-full px-4 py-2.5 rounded-md border border-blue-300 text-blue-700 font-medium hover:bg-blue-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 <UserPlus className="h-4 w-4 mr-2" aria-hidden="true" />
-                Create Free Teacher Account
+                Create Free Account
               </Link>
             </CardContent>
           </Card>
@@ -146,45 +150,12 @@ export default function Home() {
               </Link>
             </CardContent>
           </Card>
-
-          {/* Platform Admin — web only. Excluded from desktop builds. */}
-          {!isDesktop && (
-            <Card className="flex flex-col border-slate-200 bg-slate-50/50 hover:border-slate-300 transition-colors md:order-3">
-              <CardHeader>
-                <div className="p-3 rounded-full bg-slate-100 text-slate-600 w-fit mb-4">
-                  <Shield className="h-7 w-7" />
-                </div>
-                <span className="inline-block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">
-                  Staff Only
-                </span>
-                <CardTitle className="text-xl text-slate-700">Platform Administration</CardTitle>
-                <CardDescription>
-                  Administrative entry for managing schools, licensing, plans and
-                  platform operations.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="mt-auto">
-                <p className="text-xs text-muted-foreground mb-4">
-                  Authorized platform administrators only. First time?{' '}
-                  <Link href="/setup/platform-admin" className="underline hover:text-foreground">
-                    Set up the first admin account
-                  </Link>
-                </p>
-                <Link
-                  href="/login/platform-admin"
-                  className="inline-flex items-center justify-center w-full px-4 py-2.5 rounded-md bg-slate-800 text-white font-medium hover:bg-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                >
-                  <LogIn className="h-4 w-4 mr-2" aria-hidden="true" />
-                  Platform Admin Login
-                  <ArrowRight className="h-4 w-4 ml-2" aria-hidden="true" />
-                </Link>
-              </CardContent>
-            </Card>
-          )}
         </div>
       </main>
 
       <PublicFooter />
+      {/* Contact affordance on the public entry point (desktop + mobile). */}
+      <WhatsAppButton />
     </div>
   )
 }

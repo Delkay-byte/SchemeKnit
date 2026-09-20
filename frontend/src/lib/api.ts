@@ -247,6 +247,21 @@ class ApiService {
     return response.json()
   }
 
+  // ── Multi-subject document detection (§4) ────────────────────────────
+  async getDocumentDetection(schemeId: string): Promise<any> {
+    return this.request(`/api/documents/${schemeId}/detection`)
+  }
+
+  async confirmSubjectSection(schemeId: string, subject: string): Promise<any> {
+    return this.request(`/api/documents/${schemeId}/confirm-subject`, {
+      method: 'POST',
+      body: JSON.stringify({ subject }),
+    })
+  }
+
+
+
+
   async getScheme(schemeId: string): Promise<any> {
     return this.request(`/api/documents/${schemeId}`)
   }
@@ -344,10 +359,18 @@ class ApiService {
     return this.request(`/api/generation/lessons/${lessonId}`)
   }
 
-  async regenerateSection(lessonId: string, section: string, aiMode = 'ollama', context = ''): Promise<any> {
+  async regenerateSection(lessonId: string, section: string, aiMode = 'ollama', context = '', requestId = ''): Promise<any> {
     return this.request('/api/ai/regenerate-section', {
       method: 'POST',
-      body: JSON.stringify({ lesson_plan_id: lessonId, section, ai_mode: aiMode, additional_context: context }),
+      body: JSON.stringify({
+        lesson_plan_id: lessonId,
+        section,
+        ai_mode: aiMode,
+        additional_context: context,
+        // Idempotency key: a duplicate submission for the same successful
+        // generation must not consume a second AI allowance.
+        request_id: requestId || undefined,
+      }),
     })
   }
 
@@ -565,8 +588,13 @@ class ApiService {
     })
   }
 
-  async listSubjects(): Promise<{ subjects: string[] }> {
-    return this.request('/api/settings/subjects')
+  async listSubjects(level?: string): Promise<{ subjects: string[]; level?: string | null }> {
+    const qs = level ? `?level=${encodeURIComponent(level)}` : ''
+    return this.request(`/api/settings/subjects${qs}`)
+  }
+
+  async listSubjectsByLevel(): Promise<{ levels: { class_level: string; educational_level: string; subjects: string[] }[] }> {
+    return this.request('/api/settings/subjects/by-level')
   }
 
   async listClassLevels(): Promise<{ class_levels: string[] }> {

@@ -500,7 +500,8 @@ class TestAIEntitlement:
         u, _ = _make_individual_teacher(db, "ai-free@test.com")
         entitled, reason = ai_entitlement(u, db)
         assert entitled
-        assert reason == "paid_entitlement"
+        # The Free Tier is a LIFETIME trial, distinct from a paid entitlement.
+        assert reason == "free_trial"
 
     def test_pro_teacher_ai(self, db):
         u, _ = _make_individual_teacher(db, "ai-pro@test.com", edition="teacher")

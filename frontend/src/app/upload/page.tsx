@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Upload, FileText, CheckCircle } from 'lucide-react'
+import { Upload, FileText, CheckCircle, AlertTriangle } from 'lucide-react'
 import { api } from '@/lib/api'
 import { Header } from '@/components/header'
+import { WhatsAppButton } from '@/components/whatsapp-button'
 import { formatFileSize } from '@/lib/utils-display'
 
 export default function UploadPage() {
@@ -19,14 +20,18 @@ export default function UploadPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [result, setResult] = useState<any>(null)
+  // Multi-subject document confirmation state (§4). When a document contains
+  // several subjects the teacher must confirm which section to use.
+  const [confirmingSubject, setConfirmingSubject] = useState<string | null>(null)
+
+  const validExtensions = ['.docx', '.pdf']
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
     if (selectedFile) {
-      const validTypes = ['.docx']
       const fileExtension = '.' + selectedFile.name.split('.').pop()?.toLowerCase()
-      if (!validTypes.includes(fileExtension)) {
-        setError('Please select a .docx file')
+      if (!validExtensions.includes(fileExtension)) {
+        setError('Please select a .docx or .pdf file')
         return
       }
       setFile(selectedFile)
@@ -79,8 +84,33 @@ export default function UploadPage() {
     e.stopPropagation()
     const droppedFile = e.dataTransfer.files?.[0]
     if (droppedFile) {
+      const ext = '.' + droppedFile.name.split('.').pop()?.toLowerCase()
+      if (!validExtensions.includes(ext)) {
+        setError('Please select a .docx or .pdf file')
+        return
+      }
       setFile(droppedFile)
       setError(null)
+    }
+  }
+
+  const needsSubjectConfirmation = Boolean(result?.detection?.needs_confirmation)
+  const detectedSections: { subject: string; week_count?: number }[] =
+    result?.detection?.sections?.length
+      ? result.detection.sections
+      : (result?.detection?.subjects || []).map((s: string) => ({ subject: s }))
+
+  const handleConfirmSubject = async (subject: string) => {
+    if (!result?.scheme_id) return
+    try {
+      setConfirmingSubject(subject)
+      setError(null)
+      await api.confirmSubjectSection(result.scheme_id, subject)
+      router.push(`/review/${result.scheme_id}`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not confirm that subject')
+    } finally {
+      setConfirmingSubject(null)
     }
   }
 
@@ -91,6 +121,52 @@ export default function UploadPage() {
         <div className="max-w-2xl mx-auto">
           {/* Success State */}
           {success && result ? (
+            needsSubjectConfirmation ? (
+              /* STEP 4 — multi-subject detection: the teacher must confirm which
+                 subject section to use before anything is generated. */
+              <Card className="border-amber-200 bg-amber-50">
+                <CardContent className="p-8">
+                  <div className="text-center">
+                    <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-3" />
+                    <h2 className="text-xl font-bold mb-2">Multiple subjects detected</h2>
+                    <p className="text-sm font-medium mb-1">
+                      {result.detection?.title || result.filename || file?.name}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      This document contains more than one subject. Choose the
+                      subject you are teaching — SchemeKnit will use only that
+                      section.
+                    </p>
+                  </div>
+                  <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {detectedSections.map((s, i) => (
+                      <Button
+                        key={`${s.subject}-${i}`}
+                        variant="outline"
+                        className="h-auto py-3 flex flex-col gap-1"
+                        disabled={confirmingSubject !== null}
+                        onClick={() => handleConfirmSubject(s.subject)}
+                      >
+                        <span className="font-medium">{s.subject}</span>
+                        {typeof s.week_count === 'number' && (
+                          <span className="text-xs text-muted-foreground">
+                            {s.week_count} week{s.week_count === 1 ? '' : 's'}
+                          </span>
+                        )}
+                      </Button>
+                    ))}
+                  </div>
+                  {confirmingSubject && (
+                    <p className="mt-4 text-sm text-muted-foreground text-center">
+                      Confirming {confirmingSubject}…
+                    </p>
+                  )}
+                  {error && (
+                    <p className="mt-4 text-sm text-destructive text-center">{error}</p>
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
             <Card className="border-green-200 bg-green-50">
               <CardContent className="p-8 text-center">
                 <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
@@ -101,6 +177,15 @@ export default function UploadPage() {
                   {result.class_level && <p><strong>Class:</strong> {result.class_level}</p>}
                   {result.term && <p><strong>Term:</strong> {result.term}</p>}
                   {result.weeks_count && <p><strong>Weeks detected:</strong> {result.weeks_count}</p>}
+                  {result.detection?.status === 'single' && (
+                    <p className="text-xs">Subject section identified.</p>
+                  )}
+                  {result.detection?.status === 'low_confidence' && (
+                    <p className="text-xs">
+                      We could not confidently identify the subject section —
+                      please review the extracted content.
+                    </p>
+                  )}
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
                   <Button size="lg" onClick={() => router.push(`/review/${result.scheme_id}`)}>
@@ -110,6 +195,7 @@ export default function UploadPage() {
                 </div>
               </CardContent>
             </Card>
+            )
           ) : (
             <>
               {/* Upload Area */}
@@ -117,8 +203,9 @@ export default function UploadPage() {
                 <CardHeader>
                   <CardTitle>Upload Your Scheme of Work</CardTitle>
                   <CardDescription>
-                    Upload a Word document (.docx) containing your scheme of work.
-                    SchemeKnit will automatically extract the curriculum data.
+                    Upload your scheme of work as Word (.docx) or PDF. SchemeKnit
+                    will automatically extract the curriculum data — including
+                    documents that contain more than one subject.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -164,7 +251,7 @@ export default function UploadPage() {
                         <input
                           ref={fileInputRef}
                           type="file"
-                          accept=".docx"
+                          accept=".docx,.pdf"
                           onChange={handleFileSelect}
                           className="hidden"
                         />
@@ -232,7 +319,7 @@ export default function UploadPage() {
                     <li>You review, edit, and export your lesson plans</li>
                   </ol>
                   <p className="text-xs text-muted-foreground mt-4">
-                    Supported format: Word (.docx). Maximum file size: 50 MB.
+                    Supported formats: Word (.docx) and PDF. Maximum file size: 50 MB.
                   </p>
                 </CardContent>
               </Card>
@@ -240,6 +327,7 @@ export default function UploadPage() {
           )}
         </div>
       </main>
+      <WhatsAppButton />
     </div>
   )
 }

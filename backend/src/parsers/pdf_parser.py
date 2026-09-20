@@ -1,0 +1,277 @@
+"""
+SchemeKnit PDF Scheme Parser
+
+PDFs are extremely common for schemes of learning. This parser turns a PDF into
+the same ordered "block" stream the DOCX parser produces (paragraph-like text
+lines and table rows), then reuses the shared week/strand/indicator grammar and
+multi-subject section detection. PDF support must never regress DOCX support —
+both feed the identical downstream pipeline.
+"""
+
+import re
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+from ..models import SchemeOfWork
+from .docx_parser import DOCXParser
+from .subject_keywords import canonical_subject_from_heading, detect_document_title
+
+
+class PDFParser:
+    """Production parser for PDF scheme of work documents."""
+
+    def __init__(self):
+        # The week/strand/indicator grammar lives in the DOCX parser; reuse it
+        # rather than maintaining a second, drifting implementation.
+        self._grammar = DOCXParser()
+
+    # ── Block extraction ────────────────────────────────────────────────
+
+    def _clamp(self, v, lo, hi):
+        return max(lo, min(hi, v))
+
+    def _blocks(self, file_path: Path) -> List[Tuple[str, Any]]:
+        """Extract ordered blocks: ("paragraph", line) | ("table", rows)."""
+        import fitz
+
+        blocks: List[Tuple[str, Any]] = []
+        pdf = fitz.open(file_path)
+        try:
+            for page in pdf:
+                items: List[Tuple[float, str, Any]] = []
+                table_boxes: List[Tuple[float, float, float, float]] = []
+
+                try:
+                    finder = page.find_tables()
+                    for t in getattr(finder, "tables", []) or []:
+                        table_boxes.append(tuple(t.bbox[:4]))
+                        rows = [
+                            [(cell or "").strip() for cell in row]
+                            for row in t.extract()
+                        ]
+                        rows = [r for r in rows if any(c for c in r)]
+                        if rows:
+                            items.append((t.bbox[1], "table", rows))
+                except Exception:
+                    pass
+
+                for b in page.get_text("blocks"):
+                    x0, y0, x1, y1 = b[0], b[1], b[2], b[3]
+                    text = (b[4] or "").strip()
+                    if not text:
+                        continue
+                    # Skip text already captured by a detected table.
+                    inside = False
+                    for (bx0, by0, bx1, by1) in table_boxes:
+                        if not (x1 < bx0 or x0 > bx1 or y1 < by0 or y0 > by1):
+                            inside = True
+                            break
+                    if inside:
+                        continue
+                    items.append((y0, "text", text))
+
+                items.sort(key=lambda it: it[0])
+                for _, kind, payload in items:
+                    if kind == "table":
+                        blocks.append(("table", payload))
+                    else:
+                        for line in payload.splitlines():
+                            line = line.strip()
+                            if line:
+                                blocks.append(("paragraph", line))
+        finally:
+            pdf.close()
+        return blocks
+
+    def _rows_from_text(self, lines: List[str]) -> List[List[str]]:
+        """Best-effort table rows when the PDF has no detectable tables.
+
+        Splits on runs of two or more spaces (the usual way a PDF renders
+        column gaps without ruled lines). Lines that do not split become
+        single-cell rows. This is a fallback only — a genuinely tabular PDF is
+        read through the table extractor above.
+        """
+        rows: List[List[str]] = []
+        for line in lines:
+            if "|" in line:
+                cells = [c.strip() for c in line.split("|")]
+            else:
+                cells = [c.strip() for c in re.split(r"\s{2,}", line)]
+            cells = [c for c in cells if c != ""]
+            if cells:
+                rows.append(cells)
+        return rows
+
+    # ── Public surface (mirrors DOCXParser) ─────────────────────────────
+
+    def _has_real_tables(self, blocks: List[Tuple[str, Any]]) -> bool:
+        return any(k == "table" for k, _ in blocks)
+
+    def _text_sections(self, lines: List[str]) -> List[Dict[str, Any]]:
+        """Split a text-only PDF into subject sections at heading lines.
+
+        Used when the PDF has no extractable tables (no ruled lines). Each
+        section keeps the raw lines that follow its heading so the shared row
+        grammar can parse them.
+        """
+        sections: List[Dict[str, Any]] = []
+        current: Optional[Dict[str, Any]] = None
+        for line in lines:
+            subject = canonical_subject_from_heading(line)
+            if subject is not None:
+                if current and current["lines"]:
+                    sections.append(current)
+                current = {"subject": subject, "title": line, "lines": []}
+            else:
+                if current is None:
+                    current = {"subject": None, "title": "", "lines": []}
+                current["lines"].append(line)
+        if current and current["lines"]:
+            sections.append(current)
+
+        merged: List[Dict[str, Any]] = []
+        for s in sections:
+            if merged and merged[-1]["subject"] == s["subject"]:
+                merged[-1]["lines"].extend(s["lines"])
+            else:
+                merged.append(s)
+        return merged
+
+    def _resolve_sections(
+        self, blocks: List[Tuple[str, Any]], text_sections: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Normalise section candidates to {subject, title, tables}."""
+        if self._has_real_tables(blocks):
+            out = []
+            for s in self._grammar._detect_sections(blocks):
+                if s["subject"] is None:
+                    continue
+                out.append({
+                    "subject": s["subject"],
+                    "title": s["title"],
+                    "tables": s["tables"],
+                })
+            return out
+        out = []
+        for s in text_sections:
+            if s["subject"] is None:
+                continue
+            out.append({
+                "subject": s["subject"],
+                "title": s["title"],
+                "tables": [self._rows_from_text(s["lines"])],
+            })
+        return out
+
+    async def parse(
+        self,
+        file_path: Path,
+        original_filename: str = None,
+        target_subject: str = None,
+    ) -> SchemeOfWork:
+        blocks = self._blocks(file_path)
+        raw_text = "\n".join(p for k, p in blocks if k == "paragraph")
+        text_sections = self._text_sections([p for k, p in blocks if k == "paragraph"])
+
+        tables = [p for k, p in blocks if k == "table"]
+        forced_subject = None
+
+        if target_subject:
+            sections = self._resolve_sections(blocks, text_sections)
+            selected = [
+                s for s in sections
+                if s["subject"] is not None and s["subject"].value == target_subject
+            ]
+            if selected:
+                tables = [t for s in selected for t in s["tables"]]
+                forced_subject = selected[0]["subject"]
+
+        if not tables:
+            non_heading = [
+                p for k, p in blocks
+                if k == "paragraph" and canonical_subject_from_heading(p) is None
+            ]
+            # Wrap the synthesized rows as a single table so downstream code
+            # sees the same `[table][row][cell]` shape as a ruled PDF/DOCX.
+            rows = self._rows_from_text(non_heading)
+            tables = [rows] if rows else []
+        if not tables:
+            # No usable structure — return an empty scheme; the caller reports
+            # the extraction failure rather than inventing content.
+            return SchemeOfWork(
+                filename=original_filename or file_path.name,
+                upload_date=datetime.utcnow(),
+                subject=self._grammar._detect_subject(None, raw_text),
+                class_level=self._grammar._detect_class_level(None, raw_text),
+                term=self._grammar._detect_term(raw_text),
+                academic_year=self._grammar._detect_academic_year(raw_text),
+                weeks=[],
+                raw_text=raw_text,
+                status="extracted",
+            )
+
+        parsed = self._grammar._parse_scheme(tables, raw_text, file_path.name)
+        weeks = self._grammar._convert_to_weeks(parsed)
+
+        return SchemeOfWork(
+            filename=original_filename or file_path.name,
+            upload_date=datetime.utcnow(),
+            subject=forced_subject or self._grammar._detect_subject(parsed, raw_text),
+            class_level=self._grammar._detect_class_level(parsed, raw_text),
+            term=parsed.term or self._grammar._detect_term(raw_text),
+            academic_year=parsed.academic_year or self._grammar._detect_academic_year(raw_text),
+            weeks=weeks,
+            raw_text=raw_text,
+            status="extracted",
+        )
+
+    def analyze(self, file_path: Path) -> Dict[str, Any]:
+        """Same contract as DOCXParser.analyze (§4), for PDFs."""
+        blocks = self._blocks(file_path)
+        lines = [p for k, p in blocks if k == "paragraph"]
+        title = detect_document_title(lines)
+        raw_text = "\n".join(lines)
+        sections = self._resolve_sections(blocks, self._text_sections(lines))
+
+        described: List[Dict[str, Any]] = []
+        for s in sections:
+            if s["subject"] is None:
+                continue
+            parsed = self._grammar._parse_scheme(s["tables"], raw_text, file_path.name)
+            described.append({
+                "subject": s["subject"].value,
+                "title": s["title"],
+                "week_count": len(parsed.weeks),
+            })
+
+        seen: Dict[str, Dict[str, Any]] = {}
+        for d in described:
+            if d["subject"] not in seen or d["week_count"] > seen[d["subject"]]["week_count"]:
+                seen[d["subject"]] = d
+        described = list(seen.values())
+
+        non_empty = [d for d in described if d["week_count"] > 0]
+        if len(non_empty) > 1:
+            status = "multiple"
+        elif len(non_empty) == 1:
+            status = "single"
+        else:
+            status = "low_confidence"
+
+        return {
+            "title": title,
+            "detected_subjects": [d["subject"] for d in described],
+            "sections": described,
+            "detection_status": status,
+        }
+
+
+def get_document_parser(file_path: Path):
+    """Return the parser for a document's extension, or None if unsupported."""
+    suffix = Path(file_path).suffix.lower()
+    if suffix == ".docx":
+        return DOCXParser()
+    if suffix == ".pdf":
+        return PDFParser()
+    return None

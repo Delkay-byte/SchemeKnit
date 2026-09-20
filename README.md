@@ -33,19 +33,20 @@ Writing lesson plans from a scheme of work is time-consuming and repetitive. Sch
 ## How it works
 
 ```
-Upload  →  Review  →  Allocate  →  Generate  →  Edit  →  Export
-scheme      curriculum    indicators    lesson        refine     DOCX / PDF /
-of work     content       to teaching   plans         lessons    XLSX / ZIP
-            extract       periods
+Upload  →  Detect  →  Confirm  →  Review  →  Allocate  →  Generate  →  Edit  →  Export
+scheme      subjects    subject      curriculum  indicators  lesson        refine   DOCX / PDF /
+of work     in one      section      content     to teaching plans         lessons  XLSX / ZIP
+            document                 extract     periods
 ```
 
 1. **Upload** a scheme of work (DOCX or PDF)
-2. **Review** the extracted strands, sub-strands, content standards, and indicators
-3. **Validate** — SchemeKnit flags missing or duplicate indicators
-4. **Allocate** indicators to teaching periods within the school calendar
-5. **Generate** lesson plans for each teaching period
-6. **Edit** any generated lesson to match your teaching style
-7. **Export** as DOCX, PDF, XLSX, or download everything as a ZIP
+2. **Detect** — if one document contains several subjects for the same level, confirm which subject section to use
+3. **Review** the extracted strands, sub-strands, content standards, and indicators
+4. **Validate** — SchemeKnit flags missing or duplicate indicators
+5. **Allocate** indicators to teaching periods within the school calendar
+6. **Generate** lesson plans for each teaching period
+7. **Edit** any generated lesson to match your teaching style
+8. **Export** as DOCX, PDF, XLSX, or download everything as a ZIP
 
 ## Core teaching model
 
@@ -56,6 +57,8 @@ SchemeKnit enforces a single core rule:
 A *week* in the scheme represents curriculum scope — the content to be covered. Within that week, each indicator maps to one teaching period and produces one lesson plan. If a week has three indicators, SchemeKnit generates three separate lesson plans.
 
 This ensures every indicator receives dedicated teaching time and no lesson plan tries to cover multiple unrelated objectives.
+
+When a curriculum week contains more indicators than the teacher has teaching periods, the remaining indicators **carry forward** to the following teaching week. Every lesson keeps both its original curriculum week and the actual teaching week it is taught in, and nothing is dropped, duplicated, or merged.
 
 ## Key features
 
@@ -126,6 +129,10 @@ Desktop PDF export works **offline** through a bundled LibreOffice runtime.
 ### Export as DOCX, PDF, XLSX, or ZIP
 
 ![Export options](docs/screenshots/06-export.png)
+
+### Teacher dashboard
+
+![Teacher dashboard with brand mark and Free Tier usage](docs/screenshots/07-dashboard.png)
 
 ## Project structure
 
@@ -228,7 +235,7 @@ See [`backend/.env.example`](backend/.env.example) for the full list of environm
 |-----------|--------|
 | Web preview | Available at [schemeknit-frontend.onrender.com](https://schemeknit-frontend.onrender.com) |
 | Desktop 1.0.5 | Windows installer available (see [Desktop Release Notes](docs/DESKTOP-1.0.5-RELEASE.md)) |
-| Backend tests | 780 passed, 7 skipped, 0 failed |
+| Backend tests | 834 passed, 7 skipped, 0 failed |
 | Production deployment | Not yet finalized — preview environment only |
 
 ## Security and privacy
@@ -243,8 +250,10 @@ If you discover a security vulnerability, please email [security@schemeknit.com]
 
 ## Contact
 
-- **General enquiries**: [support@schemeknit.com](mailto:support@schemeknit.com)
-- **Privacy concerns**: [privacy@schemeknit.com](mailto:privacy@schemeknit.com)
+SchemeKnit is a product of **BloomCore Technologies**.
+
+- **Email**: [bloomcoretechnologies@gmail.com](mailto:bloomcoretechnologies@gmail.com)
+- **WhatsApp**: [+233 24 006 4668](https://wa.me/233240064668) (local: 0240064668)
 - **Billing**: [billing@schemeknit.com](mailto:billing@schemeknit.com)
 - **Security vulnerabilities**: [security@schemeknit.com](mailto:security@schemeknit.com)
 

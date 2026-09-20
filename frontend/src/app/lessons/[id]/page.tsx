@@ -76,7 +76,10 @@ export default function LessonDetailPage() {
       setRegenBusy(section)
       setRegenNote(null)
       setError(null)
-      const res = await api.regenerateSection(lesson.id, section, 'ollama')
+      // Stable idempotency key for this user action so a retried submission
+      // cannot consume a second lifetime AI generation.
+      const requestId = `${lesson.id}:${section}:${Date.now()}`
+      const res = await api.regenerateSection(lesson.id, section, 'ollama', '', requestId)
       const text = res.new_content || ''
       if (section === 'introduction') setIntroduction(text)
       if (section === 'assessment') setAssessment(text)
