@@ -148,6 +148,39 @@ export default function GeneratePage() {
     await handleGenerate()
   }
 
+  // Allocation preview grouped by ACTUAL teaching week, with carried-forward
+  // lessons marked in simple language (§10). Falls back to curriculum-week
+  // grouping when the API response predates teaching-week grouping.
+  const previewTeachingWeeks: any[] = (() => {
+    if (!allocationPreview) return []
+    if (allocationPreview.teaching_weeks?.length) {
+      return allocationPreview.teaching_weeks.map((tw: any) => ({
+        teaching_week: tw.teaching_week,
+        lesson_count: tw.lessons?.length || 0,
+        periods: (tw.lessons || []).map((l: any) => ({
+          period_index: l.period_index,
+          lesson_date: l.lesson_date,
+          indicator_code: l.indicator_code,
+          indicator_description: l.indicator_description,
+          status: l.status || 'scheduled',
+          source_week: l.source_week,
+        })),
+      }))
+    }
+    return (allocationPreview.weeks || []).map((w: any) => ({
+      teaching_week: w.week_number,
+      lesson_count: w.lesson_count,
+      periods: (w.periods || []).map((p: any) => ({
+        ...p,
+        status: p.needs_review
+          ? 'needs_review'
+          : p.carry_forward
+            ? 'carried_forward'
+            : 'scheduled',
+      })),
+    }))
+  })()
+
   const handleGenerate = async () => {
     try {
       setGenerating(true)
@@ -555,14 +588,16 @@ export default function GeneratePage() {
                     </div>
                   )}
 
-                  {/* Allocation table: Week | Date | Period | Indicator | Status */}
+                  {/* Allocation preview, grouped by ACTUAL teaching week. A lesson
+                      carried forward from an earlier curriculum week says so in
+                      plain language. */}
                   <div className="space-y-3 max-h-72 overflow-y-auto">
-                    {allocationPreview.weeks?.map((week: any) => (
-                      <div key={week.week_number}>
+                    {previewTeachingWeeks.map((week: any) => (
+                      <div key={`tw-${week.teaching_week}`}>
                         <h4 className="text-xs font-semibold text-muted-foreground mb-1.5 sticky top-0 bg-background">
-                          Week {week.week_number}
+                          Week {week.teaching_week}
                           <span className="font-normal ml-2">
-                            ({week.lesson_count} lesson{week.lesson_count === 1 ? '' : 's'} · {week.indicator_count} indicator{week.indicator_count === 1 ? '' : 's'})
+                            ({week.lesson_count} lesson{week.lesson_count === 1 ? '' : 's'})
                           </span>
                         </h4>
                         <table className="w-full border-collapse text-xs">
@@ -576,9 +611,8 @@ export default function GeneratePage() {
                           </thead>
                           <tbody className="divide-y">
                             {week.periods?.map((alloc: any) => {
-                              const hasConflict = (allocationPreview.allocation_conflicts?.length ?? 0) > 0
                               return (
-                                <tr key={`${week.week_number}-${alloc.period_index}`}>
+                                <tr key={`${week.teaching_week}-${alloc.period_index}`}>
                                   <td className="py-1.5 pr-2 whitespace-nowrap">
                                     {alloc.lesson_date
                                       ? new Date(alloc.lesson_date).toLocaleDateString('en-GB')
@@ -591,10 +625,14 @@ export default function GeneratePage() {
                                     <span className="font-mono">{alloc.indicator_code}</span>
                                   </td>
                                   <td className="py-1.5">
-                                    {hasConflict ? (
-                                      <span className="text-yellow-700 font-medium">Conflict</span>
+                                    {alloc.status === 'needs_review' ? (
+                                      <span className="text-yellow-700 font-medium">Needs review</span>
+                                    ) : alloc.status === 'carried_forward' ? (
+                                      <span className="text-blue-700 font-medium">
+                                        Carried forward from Week {alloc.source_week}
+                                      </span>
                                     ) : (
-                                      <span className="text-green-700 font-medium">Ready</span>
+                                      <span className="text-green-700 font-medium">Scheduled</span>
                                     )}
                                   </td>
                                 </tr>
@@ -699,7 +737,8 @@ export default function GeneratePage() {
                         {(allocationPreview.allocation_conflicts?.length > 0 ||
                           allocationPreview.indicators_unallocated > 0) && (
                           <p className="text-xs text-yellow-700 text-center">
-                            Conflicts detected — all indicators will still be allocated, but some share a date.
+                            Indicators carry forward to the next teaching week — none are dropped
+                            or merged.
                           </p>
                         )}
                       </>

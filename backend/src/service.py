@@ -260,6 +260,8 @@ class DataService:
             owner_id=owner_id,
             scheme_id=scheme_id,
             week_number=lp.week_number,
+            teaching_week=getattr(lp, "teaching_week", 0) or lp.week_number,
+            carry_forward=bool(getattr(lp, "carry_forward", False)),
             lesson_sequence=lp.lesson_sequence,
             lesson_date=lp.lesson_date,
             lesson_number=lp.lesson_number,

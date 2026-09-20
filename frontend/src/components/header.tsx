@@ -3,9 +3,12 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { BookOpen, LogOut, LayoutDashboard, Upload, FileText, Settings, Users, Shield } from 'lucide-react'
+import { BookOpen, LogOut, LayoutDashboard, Upload, FileText, Settings, Users, Shield, Mail } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { isDesktop } from '@/lib/build-target'
+import { SchemeKnitMark } from '@/components/scheme-knit-mark'
+import { WhatsAppIcon } from '@/components/whatsapp-button'
+import { whatsappUrl, contactMailtoUrl, CONTACT_EMAIL } from '@/lib/contact'
 
 export function Header() {
   const { user, logout } = useAuth()
@@ -24,14 +27,10 @@ export function Header() {
               href={isPlatformAdmin ? '/platform-admin' : isSchoolAdmin ? '/school-admin' : '/dashboard'}
               className="flex items-center space-x-2"
             >
-              <img
-                src="/icons/icon-32.png"
-                alt=""
-                width={28}
-                height={28}
-                className="h-7 w-7 rounded-md"
-                aria-hidden="true"
-              />
+              {/* Master brand mark — the same canonical SVG used by the
+                  landing page, footer and legal pages. Never a raster path
+                  that may be absent from a given deployment. */}
+              <SchemeKnitMark size={28} className="h-7 w-7 rounded-md" />
               <span className="text-xl font-bold">SchemeKnit</span>
             </Link>
             {user && (
@@ -90,6 +89,27 @@ export function Header() {
             )}
           </div>
           <div className="flex items-center space-x-3">
+            {/* Contact/help actions — one canonical contact config, kept compact
+                in the header so support is reachable from every page without
+                crowding the UI. */}
+            <a
+              href={whatsappUrl()}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Chat with BloomCore Technologies on WhatsApp"
+              title="Chat with BloomCore Technologies on WhatsApp"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[#25D366] hover:bg-[#25D366]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <WhatsAppIcon className="h-5 w-5" />
+            </a>
+            <a
+              href={contactMailtoUrl('SchemeKnit enquiry')}
+              aria-label={`Email BloomCore Technologies at ${CONTACT_EMAIL}`}
+              title={`Email ${CONTACT_EMAIL}`}
+              className="hidden sm:inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <Mail className="h-4 w-4" />
+            </a>
             {user && (
               <>
                 <span className="text-sm text-muted-foreground hidden sm:inline">

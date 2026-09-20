@@ -11,7 +11,7 @@ import uuid
 
 from sqlalchemy import (
     create_engine, Column, String, Integer, Float, Boolean, DateTime, Date,
-    Text, ForeignKey, JSON, Enum as SAEnum, Index
+    Text, ForeignKey, JSON, Enum as SAEnum, Index, UniqueConstraint,
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
@@ -93,6 +93,15 @@ class SchemeDB(Base):
     upload_date = Column(DateTime, default=datetime.utcnow)
     raw_text = Column(Text, default="")
     validation_issues = Column(JSON, default=list)
+    # ── Multi-subject document detection (§4) ────────────────────────────
+    # One large document may contain several subjects for the same level. The
+    # detected subject sections are stored so the teacher can confirm which one
+    # to use without SchemeKnit guessing. `detection_status` is one of
+    # "single" | "multiple" | "low_confidence".
+    document_title = Column(String, default="")
+    detected_subjects = Column(JSON, default=list)
+    detection_status = Column(String, default="")
+    subject_sections = Column(JSON, default=list)
 
     owner = relationship("User", back_populates="schemes")
     weeks = relationship("WeekDB", back_populates="scheme", cascade="all, delete-orphan")
@@ -197,7 +206,12 @@ class LessonPlanDB(Base):
     scheme_id = Column(String, ForeignKey("schemes.id"), nullable=False)
     school_id = Column(String, ForeignKey("schools.id"), nullable=True)
 
+    #: Source curriculum week (the scheme week the indicator belongs to).
     week_number = Column(Integer, nullable=False)
+    #: Actual teaching week the lesson is delivered in. Differs from
+    #: week_number only when the indicator carried forward.
+    teaching_week = Column(Integer, nullable=True)
+    carry_forward = Column(Boolean, default=False)
     lesson_sequence = Column(Integer, nullable=False)
     lesson_date = Column(Date, nullable=True)
     lesson_number = Column(Integer, default=1)
@@ -435,6 +449,28 @@ class AIEnrichmentCacheDB(Base):
 
     __table_args__ = (
         Index("ix_ai_cache_lesson_section", "lesson_plan_id", "section"),
+    )
+
+
+class AIUsageEventDB(Base):
+    """Idempotency ledger for successful AI generations.
+
+    Records that one successful AI generation request consumed an allowance.
+    It is NOT a second quota system — the quota itself lives on
+    EntitlementDB.ai_credits / ai_credits_used. This table only guarantees a
+    duplicate submission for the same request cannot double-consume
+    (``request_id`` is supplied by the client per user action).
+    """
+    __tablename__ = "ai_usage_events"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    request_id = Column(String, nullable=True)
+    consumed = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "request_id", name="uq_ai_usage_user_request"),
     )
 
 

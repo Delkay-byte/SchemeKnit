@@ -274,6 +274,8 @@ export interface PlanResolution {
   ai_enabled: boolean
   ai_credits: number
   ai_credits_used: number
+  //: True when AI credits are a one-time lifetime allowance (Free Tier).
+  ai_lifetime?: boolean
   expires_at: string | null
   is_active: boolean
   school_name: string | null

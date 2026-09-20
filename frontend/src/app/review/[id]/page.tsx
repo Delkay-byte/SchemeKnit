@@ -32,6 +32,10 @@ interface SchemeData {
   academic_year: string
   weeks_count: number
   status: string
+  // Multi-subject detection (§4)
+  detection_status?: string
+  detected_subjects?: string[]
+  needs_subject_confirmation?: boolean
 }
 
 const WEEK_TYPE_LABELS: Record<string, string> = {
@@ -54,6 +58,7 @@ export default function ReviewPage() {
   const [selectedWeek, setSelectedWeek] = useState<number>(1)
   const [validation, setValidation] = useState<any>(null)
   const [approving, setApproving] = useState(false)
+  const [confirmingSubject, setConfirmingSubject] = useState<string | null>(null)
 
   useEffect(() => {
     loadSchemeData()
@@ -90,6 +95,19 @@ export default function ReviewPage() {
       setError(err instanceof Error ? err.message : 'Failed to approve scheme')
     } finally {
       setApproving(false)
+    }
+  }
+
+  const handleConfirmSubject = async (subject: string) => {
+    setConfirmingSubject(subject)
+    setError(null)
+    try {
+      await api.confirmSubjectSection(schemeId, subject)
+      await loadSchemeData()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not confirm that subject')
+    } finally {
+      setConfirmingSubject(null)
     }
   }
 
@@ -149,6 +167,34 @@ export default function ReviewPage() {
     <div className="min-h-screen bg-background">
       <Header />
       <main className="container mx-auto px-4 py-8">
+        {/* Subject-section confirmation (§4). A document with several subjects
+            must be confirmed before generation; nothing is generated from an
+            unconfirmed section. */}
+        {scheme.needs_subject_confirmation && (
+          <Card className="mb-6 border-amber-300 bg-amber-50">
+            <CardContent className="p-4">
+              <p className="font-semibold text-sm mb-1">Multiple subjects detected</p>
+              <p className="text-sm text-muted-foreground mb-3">
+                This document contains more than one subject. Choose the subject
+                you are teaching — only that section will be used.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {(scheme.detected_subjects || []).map((s) => (
+                  <Button
+                    key={s}
+                    size="sm"
+                    variant="outline"
+                    disabled={confirmingSubject !== null}
+                    onClick={() => handleConfirmSubject(s)}
+                  >
+                    {confirmingSubject === s ? 'Confirming…' : s}
+                  </Button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Scheme Info Banner */}
         <Card className="mb-6">
           <CardContent className="p-4">

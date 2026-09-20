@@ -26,6 +26,9 @@ from ..models import (
     ParsedScheme, ParsedWeek, ParsedContentStandard, ParsedIndicator,
     ValidationIssue, ValidationSeverity
 )
+from .subject_keywords import (
+    SUBJECT_KEYWORDS, canonical_subject_from_heading, detect_document_title,
+)
 
 
 HEADER_ALIASES = {
@@ -72,16 +75,40 @@ class DOCXParser:
     def __init__(self):
         self.validation_issues: List[ValidationIssue] = []
 
-    async def parse(self, file_path: Path, original_filename: str = None) -> SchemeOfWork:
+    async def parse(
+        self,
+        file_path: Path,
+        original_filename: str = None,
+        target_subject: str = None,
+    ) -> SchemeOfWork:
         """Parse a scheme document.
 
         `original_filename` is the name the teacher's file had on their machine.
         It is what the UI must display; the on-disk storage name (UUID-based) is
         never shown to users.
+
+        `target_subject` restricts parsing to the detected subject section of the
+        requested subject name. This is how a multi-subject document is reduced to
+        the one subject the teacher confirmed — the other subject sections are
+        ignored, never silently mixed in.
         """
         doc = Document(file_path)
         raw_text = self._extract_raw_text(doc)
-        tables_data = self._extract_tables(doc)
+        blocks = self._iter_blocks(doc)
+
+        tables_data = [payload for kind, payload in blocks if kind == "table"]
+        forced_subject: Optional[Subject] = None
+        if target_subject:
+            sections = self._detect_sections(blocks)
+            selected = [
+                s for s in sections
+                if s["subject"] is not None
+                and s["subject"].value == target_subject
+            ]
+            if selected:
+                tables_data = [t for s in selected for t in s["tables"]]
+                forced_subject = selected[0]["subject"]
+
         parsed_scheme = self._parse_scheme(tables_data, raw_text, file_path.name)
 
         weeks = self._convert_to_weeks(parsed_scheme)
@@ -89,7 +116,7 @@ class DOCXParser:
         scheme = SchemeOfWork(
             filename=original_filename or file_path.name,
             upload_date=datetime.utcnow(),
-            subject=self._detect_subject(parsed_scheme, raw_text),
+            subject=forced_subject or self._detect_subject(parsed_scheme, raw_text),
             class_level=self._detect_class_level(parsed_scheme, raw_text),
             term=parsed_scheme.term or self._detect_term(raw_text),
             academic_year=parsed_scheme.academic_year or self._detect_academic_year(raw_text),
@@ -98,6 +125,113 @@ class DOCXParser:
             status="extracted"
         )
         return scheme
+
+    # ── Multi-subject document detection (§4) ────────────────────────────
+
+    def analyze(self, file_path: Path) -> Dict[str, Any]:
+        """Inspect a document WITHOUT generating anything.
+
+        Returns the document title, the subject sections detected, and a
+        detection status:
+          "multiple"       — more than one subject section found (teacher must
+                             confirm which one to use)
+          "single"         — exactly one subject section found
+          "low_confidence" — no subject section could be identified
+        Never invents a classification.
+        """
+        doc = Document(file_path)
+        raw_text = self._extract_raw_text(doc)
+        blocks = self._iter_blocks(doc)
+        title = detect_document_title(
+            [payload for kind, payload in blocks if kind == "paragraph"]
+        )
+        sections = self._detect_sections(blocks)
+
+        described = []
+        for s in sections:
+            if s["subject"] is None:
+                continue
+            parsed = self._parse_scheme(s["tables"], raw_text, file_path.name)
+            described.append({
+                "subject": s["subject"].value,
+                "title": s["title"],
+                "week_count": len(parsed.weeks),
+            })
+
+        # De-duplicate by subject (a document may repeat a subject heading).
+        seen: Dict[str, Dict[str, Any]] = {}
+        for d in described:
+            if d["subject"] not in seen or d["week_count"] > seen[d["subject"]]["week_count"]:
+                seen[d["subject"]] = d
+        described = list(seen.values())
+
+        non_empty = [d for d in described if d["week_count"] > 0]
+        if len(non_empty) > 1:
+            status = "multiple"
+        elif len(non_empty) == 1:
+            status = "single"
+        else:
+            status = "low_confidence"
+
+        return {
+            "title": title,
+            "detected_subjects": [d["subject"] for d in described],
+            "sections": described,
+            "detection_status": status,
+        }
+
+    def _iter_blocks(self, doc: Document) -> List[Tuple[str, Any]]:
+        """Yield document blocks IN ORDER as ("paragraph"|"table", payload).
+
+        python-docx exposes paragraphs and tables as separate collections, which
+        loses their document order. Section detection needs the true order so a
+        subject heading is associated with the table that follows it.
+        """
+        from docx.oxml.table import CT_Tbl
+        from docx.oxml.text.paragraph import CT_P
+
+        blocks: List[Tuple[str, Any]] = []
+        for child in doc.element.body.iterchildren():
+            if isinstance(child, CT_P):
+                from docx.text.paragraph import Paragraph
+                text = Paragraph(child, doc).text.strip()
+                if text:
+                    blocks.append(("paragraph", text))
+            elif isinstance(child, CT_Tbl):
+                from docx.table import Table
+                table = Table(child, doc)
+                rows = [[cell.text.strip() for cell in row.cells] for row in table.rows]
+                blocks.append(("table", rows))
+        return blocks
+
+    def _detect_sections(self, blocks: List[Tuple[str, Any]]) -> List[Dict[str, Any]]:
+        """Split ordered blocks into subject sections at subject headings."""
+        sections: List[Dict[str, Any]] = []
+        current: Optional[Dict[str, Any]] = None
+
+        for kind, payload in blocks:
+            if kind == "paragraph":
+                subject = canonical_subject_from_heading(payload)
+                if subject is not None:
+                    if current and current["tables"]:
+                        sections.append(current)
+                    current = {"subject": subject, "title": payload, "tables": []}
+            else:  # table
+                if current is None:
+                    current = {"subject": None, "title": "", "tables": []}
+                current["tables"].append(payload)
+
+        if current and current["tables"]:
+            sections.append(current)
+
+        # Merge consecutive sections that share a subject (repeated headings).
+        merged: List[Dict[str, Any]] = []
+        for s in sections:
+            if merged and merged[-1]["subject"] == s["subject"]:
+                merged[-1]["tables"].extend(s["tables"])
+            else:
+                merged.append(s)
+        return merged
 
     def _extract_raw_text(self, doc: Document) -> str:
         parts = []
@@ -169,17 +303,16 @@ class DOCXParser:
         seen_headers_in_table: Dict[int, bool] = {}
 
         for t_idx, r_idx, row in all_rows:
-            if t_idx not in seen_headers_in_table:
+            # Keep scanning until the header row is found. Some documents (and
+            # PDF-to-row conversions) place a title row above the header, so
+            # only looking at row 0 would miss the column mapping entirely.
+            if not seen_headers_in_table.get(t_idx, False):
                 detected = self._detect_header(row)
                 if detected:
                     header_map = detected
                     seen_headers_in_table[t_idx] = True
                     continue
-                else:
-                    seen_headers_in_table[t_idx] = False
-
-            if seen_headers_in_table.get(t_idx) is True and r_idx == 0:
-                continue
+                seen_headers_in_table[t_idx] = False
 
             normalized = self._normalize_row(row, header_map)
 
@@ -290,6 +423,19 @@ class DOCXParser:
             return {
                 "week_number": week_num,
                 "date": None
+            }
+
+        # PDF (and some Word) cells separate the week number and date with a
+        # plain space rather than a pipe/newline. Same week cell, different
+        # rendering — accept it so PDF extraction is not silently blind.
+        match = re.match(
+            r'^(\d{1,2})\s+(\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2,4})\s*$',
+            cleaned,
+        )
+        if match:
+            return {
+                "week_number": int(match.group(1)),
+                "date": self._parse_date(match.group(2)),
             }
 
         if any(kw in cleaned.lower() for kw in SPECIAL_WEEK_KEYWORDS):
@@ -474,17 +620,17 @@ class DOCXParser:
                 ))
 
     def _extract_subject_from_text(self, text: str) -> Optional[str]:
-        text_lower = text.lower()
-        if 'mathematics' in text_lower or 'maths' in text_lower or 'math' in text_lower:
-            return "Mathematics"
-        elif 'science' in text_lower:
-            return "Science"
-        elif 'english' in text_lower:
-            return "English Language"
-        elif 'social studies' in text_lower:
-            return "Social Studies"
-        elif 'ict' in text_lower or 'computing' in text_lower:
-            return "ICT"
+        """Best-effort subject from free text, using the canonical keyword list.
+
+        Specific phrases are tried before generic substrings (Integrated Science
+        before Science, Core Mathematics before Mathematics). Detection is only
+        a hint — a multi-subject document is confirmed by the teacher, never
+        silently classified.
+        """
+        text_lower = (text or "").lower()
+        for keyword, subject in SUBJECT_KEYWORDS:
+            if keyword in text_lower:
+                return subject.value
         return None
 
     def _extract_class_level_from_text(self, text: str) -> Optional[str]:
@@ -519,19 +665,18 @@ class DOCXParser:
             return f"{year_match.group(1)}/{year_match.group(2)}"
         return None
 
-    def _detect_subject(self, parsed: ParsedScheme, raw_text: str) -> Subject:
-        subj = parsed.subject or self._extract_subject_from_text(raw_text)
-        mapping = {
-            "Mathematics": Subject.MATHEMATICS,
-            "Science": Subject.SCIENCE,
-            "English Language": Subject.ENGLISH,
-            "Social Studies": Subject.SOCIAL_STUDIES,
-            "ICT": Subject.ICT,
-        }
-        return mapping.get(subj, Subject.MATHEMATICS)
+    def _detect_subject(self, parsed: Optional[ParsedScheme], raw_text: str) -> Subject:
+        subj = (parsed.subject if parsed else None) or self._extract_subject_from_text(raw_text)
+        if not subj:
+            # Never invent a subject classification — leave the safe default.
+            return Subject.MATHEMATICS
+        try:
+            return Subject(subj)
+        except ValueError:
+            return Subject.MATHEMATICS
 
-    def _detect_class_level(self, parsed: ParsedScheme, raw_text: str) -> ClassLevel:
-        level = parsed.class_level or self._extract_class_level_from_text(raw_text)
+    def _detect_class_level(self, parsed: Optional[ParsedScheme], raw_text: str) -> ClassLevel:
+        level = (parsed.class_level if parsed else None) or self._extract_class_level_from_text(raw_text)
         mapping = {
             "Nursery": ClassLevel.NURSERY,
             "KG 1": ClassLevel.KG1,

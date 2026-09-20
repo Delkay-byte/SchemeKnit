@@ -22,7 +22,7 @@ indicator→period rule — they retain their existing behaviour.
 """
 
 from datetime import date
-from typing import List, Optional, Dict, Tuple
+from typing import List, Optional, Dict, Tuple, Any
 from collections import defaultdict
 
 from ..models import (
@@ -49,102 +49,159 @@ class AllocationEngine:
     ) -> CurriculumCoverage:
         """Allocate each instruction indicator to its own teaching period.
 
-        Returns a CurriculumCoverage describing every allocation plus any
-        conflicts (e.g. more indicators than configured teaching periods).
-        Conflicts are reported, never silently resolved.
+        Teaching model (§6-§9):
+          ONE INDICATOR → ONE TEACHING PERIOD → ONE LESSON PLAN
+
+        Indicators are processed in curriculum order. Each is placed in the next
+        available teaching period of its source week. When a source week contains
+        more indicators than it has teaching periods, the surplus CARRY FORWARD
+        to the following teaching week(s) — in order, never merged, never
+        dropped, never duplicated. Unused periods in a week are left unused; a
+        later week's indicator is never moved backwards into an earlier week.
+
+        Every allocation keeps BOTH the source curriculum week and the actual
+        teaching week so the lesson stays connected to its scheme origin while
+        accurately representing when it is taught.
         """
         allocations: List[AllocatedIndicator] = []
         warnings: List[str] = []
         conflicts: List[str] = []
 
-        instruction_weeks = [
-            w for w in weeks
-            if include_special_weeks or w.week_type == WeekType.INSTRUCTION
-        ]
+        instruction_weeks = sorted(
+            (w for w in weeks
+             if include_special_weeks or w.week_type == WeekType.INSTRUCTION),
+            key=lambda w: w.week_number,
+        )
 
-        # ── Build one AllocatedIndicator per indicator per week ──────
-        # The period_index is the 1-based position of the indicator within
-        # its week. Period 1 = first lesson, Period 2 = second, etc.
+        if not instruction_weeks:
+            return CurriculumCoverage()
+
+        last_teaching_week = instruction_weeks[-1].week_number
+
+        # Carried-over indicators awaiting a teaching period in a later week.
+        # Each pending item carries its SOURCE week's curriculum context (strand,
+        # sub-strand, content standard) so a carried lesson still describes the
+        # right curriculum even though it is taught later.
+        pending: List[Dict[str, Any]] = []
         total_indicators = 0
-        for week in instruction_weeks:
-            # Real schemes often store multiple indicators concatenated into
-            # a single string. Split them so each gets its own lesson.
-            week_indicators = self._split_indicators(week.indicators)
-            week_indicator_count = len(week_indicators)
+        #: period counters per ACTUAL teaching week (1-based).
+        period_counter: Dict[int, int] = defaultdict(int)
 
-            # Available teaching dates for this week from the calendar.
-            # These are real dates derived from teaching_days + holidays.
-            available_dates = [
+        def _make_alloc(item: Dict[str, Any], teaching_week: int,
+                        lesson_date: Optional[date], period_index: int,
+                        carry_forward: bool, needs_review: bool) -> AllocatedIndicator:
+            return AllocatedIndicator(
+                indicator_code=item["code"],
+                indicator_description=item["text"],
+                content_standard_code=item["cs_code"],
+                content_standard_description=item["cs_text"],
+                strand=item["strand"],
+                sub_strand=item["sub_strand"],
+                week_number=item["source_week"],
+                week_ending=item["week_ending"],
+                lesson_date=lesson_date,
+                period_index=period_index,
+                allocated=True,
+                teaching_week=teaching_week,
+                carry_forward=carry_forward,
+                carry_forward_from_week=(item["source_week"] if carry_forward else None),
+                needs_review=needs_review,
+            )
+
+        for week in instruction_weeks:
+            # Real teaching dates for this week (teaching days minus holidays).
+            available_dates = sorted(
                 d.date for d in calendar.days
                 if d.is_teaching_day and d.week_number == week.week_number
+            )
+
+            # Real schemes store multiple indicators concatenated in one string.
+            week_indicators = self._split_indicators(week.indicators)
+            cs_text = week.content_standards[0] if week.content_standards else ""
+            cs_code = self._extract_cs_code(cs_text)
+
+            own_items = [
+                {
+                    "code": self._extract_indicator_code(t),
+                    "text": t,
+                    "cs_code": cs_code,
+                    "cs_text": cs_text,
+                    "strand": week.strand or "",
+                    "sub_strand": week.sub_strand or "",
+                    "source_week": week.week_number,
+                    "week_ending": week.end_date,
+                }
+                for t in week_indicators
             ]
 
-            # ── Conflict detection ────────────────────────────────────
-            # If the week has more indicators than available teaching
-            # periods, surface a conflict. Do NOT merge indicators.
-            if week_indicator_count > len(available_dates) and week_indicator_count > 0:
+            # ── Conflict detection (§7) ──────────────────────────────
+            # A source week with more indicators than its own teaching periods.
+            if len(own_items) > len(available_dates) and own_items:
+                overflow = len(own_items) - len(available_dates)
                 conflicts.append(
-                    f"Week {week.week_number} contains {week_indicator_count} "
+                    f"Week {week.week_number} contains {len(own_items)} "
                     f"indicators but only {len(available_dates)} teaching periods "
-                    f"are available. All {week_indicator_count} indicators will "
-                    f"still be allocated, but some share a date."
+                    f"are available; {overflow} indicator"
+                    f"{'s' if overflow != 1 else ''} will continue in the next "
+                    f"teaching week(s)."
                 )
 
-            if week_indicator_count == 0:
-                warnings.append(
-                    f"Week {week.week_number}: no indicators found"
-                )
+            if not own_items and not pending:
+                warnings.append(f"Week {week.week_number}: no indicators found")
                 if not available_dates:
                     warnings.append(
                         f"Week {week.week_number}: no teaching dates available"
                     )
                 continue
 
-            if not available_dates:
-                warnings.append(
-                    f"Week {week.week_number}: no teaching dates available; "
-                    f"{week_indicator_count} indicators allocated without dates"
-                )
+            # Carried indicators fill the earliest periods, then this week's own
+            # indicators. Anything that does not fit becomes the new backlog.
+            work = pending + own_items
+            pending = []
 
-            cs_text = week.content_standards[0] if week.content_standards else ""
-            cs_code = self._extract_cs_code(cs_text)
+            for idx, item in enumerate(work):
+                if idx >= len(available_dates):
+                    # No period left this week → carry forward to next week.
+                    pending.append(item)
+                    continue
 
-            for idx, ind_text in enumerate(week_indicators):
-                code = self._extract_indicator_code(ind_text)
-                period_index = idx + 1  # 1-based
-
-                # Assign a date: cycle through available dates if there
-                # are more indicators than dates (conflict already reported).
-                lesson_date: Optional[date] = None
-                if available_dates:
-                    date_idx = idx % len(available_dates)
-                    lesson_date = available_dates[date_idx]
-
-                alloc = AllocatedIndicator(
-                    indicator_code=code,
-                    indicator_description=ind_text,
-                    content_standard_code=cs_code,
-                    content_standard_description=cs_text,
-                    strand=week.strand or "",
-                    sub_strand=week.sub_strand or "",
-                    week_number=week.week_number,
-                    week_ending=week.end_date,
-                    lesson_date=lesson_date,
-                    period_index=period_index,
-                    allocated=True,
-                )
-                allocations.append(alloc)
+                carry = item["source_week"] != week.week_number
+                period_counter[week.week_number] += 1
+                allocations.append(_make_alloc(
+                    item,
+                    teaching_week=week.week_number,
+                    lesson_date=available_dates[idx],
+                    period_index=period_counter[week.week_number],
+                    carry_forward=carry,
+                    needs_review=False,
+                ))
                 total_indicators += 1
 
-        # ── Assign global lesson sequence ────────────────────────────
-        lesson_sequence = 0
-        for alloc in allocations:
-            alloc.lesson_sequence = lesson_sequence
-            lesson_sequence += 1
+        # ── Any indicators still pending have no teaching week left ──────
+        # (the scheme ran out of teaching weeks). They are still allocated —
+        # never dropped — but flagged for teacher review.
+        for item in pending:
+            carry = item["source_week"] != last_teaching_week
+            period_counter[last_teaching_week] += 1
+            allocations.append(_make_alloc(
+                item,
+                teaching_week=last_teaching_week,
+                lesson_date=None,
+                period_index=period_counter[last_teaching_week],
+                carry_forward=carry,
+                needs_review=True,
+            ))
+            total_indicators += 1
+            warnings.append(
+                f"Indicator {item['code']} (Week {item['source_week']}) has no "
+                f"remaining teaching period in the term and needs review."
+            )
+
+        # ── Assign global lesson sequence (curriculum order) ─────────────
+        for seq, alloc in enumerate(allocations):
+            alloc.lesson_sequence = seq
 
         # ── Real coverage calculation ────────────────────────────────
-        # Every indicator must be allocated exactly once.
-        unique_codes = set(a.indicator_code for a in allocations)
         code_counts: Dict[str, int] = defaultdict(int)
         for a in allocations:
             code_counts[a.indicator_code] += 1
@@ -189,37 +246,37 @@ class AllocationEngine:
         """
         lesson_plans: List[LessonPlan] = []
 
-        # Group allocations by week, then by period_index within the week.
-        per_week: Dict[int, List[AllocatedIndicator]] = defaultdict(list)
-        for alloc in coverage.allocations:
-            per_week[alloc.week_number].append(alloc)
-
+        # Iterate in CURRICULUM ORDER (allocation sequence). Grouping by source
+        # week and sorting by period_index would reorder carried indicators
+        # (whose period_index resets in the later teaching week), so the
+        # allocation sequence is authoritative here.
         lesson_counter = 0  # global sequence across the whole term
-        for week_num in sorted(per_week.keys()):
-            # Sort by period_index so Period 1, 2, 3... are in order.
-            allocs = sorted(per_week[week_num], key=lambda a: a.period_index)
+        for alloc in sorted(coverage.allocations, key=lambda a: a.lesson_sequence):
+            week_num = alloc.week_number
+            lesson_counter += 1
+            period_index = alloc.period_index
+            # Each lesson carries exactly ONE indicator.
+            single_indicator = alloc.indicator_description
+            single_code = alloc.indicator_code
 
-            for alloc in allocs:
-                lesson_counter += 1
-                period_index = alloc.period_index
+            topic = self._derive_topic(alloc)
+            objectives = self._generate_objectives(single_indicator, single_code)
+            intro = self._generate_introduction(alloc)
+            main_acts = self._generate_main_activities(alloc, config)
+            learner_acts = self._generate_learner_activities(alloc)
+            teacher_acts = self._generate_teacher_activities(alloc)
+            assessment = self._generate_assessment(alloc)
+            conclusion = self._generate_conclusion(alloc)
 
-                # Each lesson carries exactly ONE indicator.
-                single_indicator = alloc.indicator_description
-                single_code = alloc.indicator_code
-
-                topic = self._derive_topic(alloc)
-                objectives = self._generate_objectives(single_indicator, single_code)
-                intro = self._generate_introduction(alloc)
-                main_acts = self._generate_main_activities(alloc, config)
-                learner_acts = self._generate_learner_activities(alloc)
-                teacher_acts = self._generate_teacher_activities(alloc)
-                assessment = self._generate_assessment(alloc)
-                conclusion = self._generate_conclusion(alloc)
-
-                lp = LessonPlan(
+            lp = LessonPlan(
                     scheme_of_work_id=scheme_id,
                     term_config_id=config.id,
+                    # Source curriculum week is preserved verbatim.
                     week_number=week_num,
+                    # Actual teaching week (differs from week_number only when the
+                    # indicator carried forward).
+                    teaching_week=alloc.teaching_week or week_num,
+                    carry_forward=bool(alloc.carry_forward),
                     lesson_sequence=lesson_counter,
                     lesson_date=alloc.lesson_date or config.term_start_date,
                     # lesson_number = the period within this week (1-based)
@@ -257,8 +314,8 @@ class AllocationEngine:
                     keywords=list(getattr(config, "keywords", []) or []),
                     status=LessonStatus.GENERATED,
                     ai_generated=False,
-                )
-                lesson_plans.append(lp)
+            )
+            lesson_plans.append(lp)
 
         return lesson_plans
 

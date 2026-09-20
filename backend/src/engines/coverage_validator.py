@@ -183,11 +183,46 @@ class CoverageValidator:
                         "indicator_code": a.indicator_code,
                         "indicator_description": a.indicator_description,
                         "lesson_date": a.lesson_date.isoformat() if a.lesson_date else None,
+                        # Source curriculum week is week_number; the actual
+                        # teaching week is preserved separately so the preview
+                        # can show carry-forward without losing curriculum origin.
+                        "source_week": a.week_number,
+                        "teaching_week": a.teaching_week or a.week_number,
+                        "carry_forward": bool(a.carry_forward),
+                        "needs_review": bool(a.needs_review),
                     }
                     for a in sorted(
                         [x for x in coverage.allocations if x.week_number == w.week_number],
-                        key=lambda x: x.period_index,
+                        key=lambda x: x.lesson_sequence,
                     )
+                ],
+            })
+
+        # ── Actual teaching-week grouping (§10) ──────────────────────────
+        # The simple, teacher-facing preview: lessons as they are actually
+        # taught, week by week, with carry-forward clearly marked.
+        teaching_week_map: Dict[int, list] = defaultdict(list)
+        for a in coverage.allocations:
+            teaching_week_map[a.teaching_week or a.week_number].append(a)
+        teaching_weeks = []
+        for tw in sorted(teaching_week_map.keys()):
+            rows = sorted(teaching_week_map[tw], key=lambda x: x.period_index)
+            teaching_weeks.append({
+                "teaching_week": tw,
+                "lessons": [
+                    {
+                        "period_index": a.period_index,
+                        "indicator_code": a.indicator_code,
+                        "indicator_description": a.indicator_description,
+                        "lesson_date": a.lesson_date.isoformat() if a.lesson_date else None,
+                        "source_week": a.week_number,
+                        "status": (
+                            "needs_review" if a.needs_review
+                            else "carried_forward" if a.carry_forward
+                            else "scheduled"
+                        ),
+                    }
+                    for a in rows
                 ],
             })
 
@@ -203,4 +238,5 @@ class CoverageValidator:
             "warnings": coverage.warnings,
             "allocation_conflicts": coverage.allocation_conflicts,
             "weeks": week_summaries,
+            "teaching_weeks": teaching_weeks,
         }

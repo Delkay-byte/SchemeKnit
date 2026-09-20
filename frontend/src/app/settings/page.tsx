@@ -13,6 +13,7 @@ import { Holiday } from '@/types'
 export default function SettingsPage() {
   const [holidays, setHolidays] = useState<Holiday[]>([])
   const [subjects, setSubjects] = useState<string[]>([])
+  const [subjectGroups, setSubjectGroups] = useState<{ class_level: string; educational_level: string; subjects: string[] }[]>([])
   const [classLevels, setClassLevels] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -30,14 +31,16 @@ export default function SettingsPage() {
   const loadSettings = async () => {
     try {
       setLoading(true)
-      const [holidaysData, subjectsData, classLevelsData, profileData] = await Promise.all([
+      const [holidaysData, subjectsData, classLevelsData, profileData, groupsData] = await Promise.all([
         api.listHolidays(),
         api.listSubjects(),
         api.listClassLevels(),
         api.getProfile().catch(() => null),
+        api.listSubjectsByLevel().catch(() => ({ levels: [] })),
       ])
       setHolidays(holidaysData.holidays || [])
       setSubjects(subjectsData.subjects || [])
+      setSubjectGroups(groupsData.levels || [])
       setClassLevels(classLevelsData.class_levels || [])
       if (profileData) {
         setProfile(profileData)
@@ -255,14 +258,37 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Available Subjects</CardTitle>
-              <CardDescription>Subjects supported by SchemeKnit</CardDescription>
+              <CardDescription>
+                Subjects available per level. The list shown when you upload or
+                generate follows the level you select.
+              </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="grid md:grid-cols-3 gap-2">
-                {subjects.map((subject) => (
-                  <div key={subject} className="p-2 bg-muted rounded text-sm">{subject}</div>
-                ))}
-              </div>
+            <CardContent className="space-y-4">
+              {subjectGroups.length > 0 ? (
+                subjectGroups.map((group) => (
+                  <div key={group.class_level}>
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
+                      {group.class_level}
+                      <span className="ml-2 font-normal normal-case">
+                        {group.educational_level}
+                      </span>
+                    </h4>
+                    <div className="grid md:grid-cols-3 gap-2">
+                      {group.subjects.map((subject) => (
+                        <div key={`${group.class_level}-${subject}`} className="p-2 bg-muted rounded text-sm">
+                          {subject}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="grid md:grid-cols-3 gap-2">
+                  {subjects.map((subject) => (
+                    <div key={subject} className="p-2 bg-muted rounded text-sm">{subject}</div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 

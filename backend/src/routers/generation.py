@@ -134,6 +134,18 @@ async def generate_lesson_plans(
     if not scheme_db:
         raise HTTPException(status_code=404, detail="Scheme not found")
 
+    # ── Subject-section confirmation gate (§4) ──────────────────────────
+    # A document that contains several subject sections must be confirmed before
+    # anything is generated. The system never silently picks a subject.
+    if getattr(scheme_db, "detection_status", "") == "multiple":
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "This document contains more than one subject. Confirm which "
+                "subject section to use before generating lesson plans."
+            ),
+        )
+
     # Server-authoritative identity (PART 14/15/32). School and teacher names are
     # derived from the authenticated user's real school relationship and profile —
     # never from the request body — so a client cannot generate another school's
@@ -864,6 +876,9 @@ def _serialize_lesson(lp) -> dict:
         "scheme_id": lp.scheme_id,
         "job_id": lp.job_id,
         "week_number": lp.week_number,
+        "source_week": lp.week_number,
+        "teaching_week": getattr(lp, "teaching_week", None) or lp.week_number,
+        "carry_forward": bool(getattr(lp, "carry_forward", False)),
         "lesson_sequence": lp.lesson_sequence,
         "lesson_date": lp.lesson_date.isoformat() if lp.lesson_date else None,
         "lesson_number": lp.lesson_number,
@@ -927,6 +942,8 @@ def _db_to_lesson_model(lp) -> LessonPlan:
         scheme_of_work_id=lp.scheme_id,
         term_config_id=lp.job_id,
         week_number=lp.week_number,
+        teaching_week=getattr(lp, "teaching_week", None) or lp.week_number,
+        carry_forward=bool(getattr(lp, "carry_forward", False)),
         lesson_sequence=lp.lesson_sequence,
         lesson_date=lp.lesson_date,
         lesson_number=lp.lesson_number,

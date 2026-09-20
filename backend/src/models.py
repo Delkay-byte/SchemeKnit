@@ -25,6 +25,29 @@ class Subject(str, Enum):
     PHE = "Physical and Health Education"
     CREATIVE_ARTS = "Creative Arts and Design"
     CAREER_TECHNOLOGY = "Career Technology"
+    # KG / Early Childhood (the new standards-based KG curriculum)
+    LANGUAGE_AND_LITERACY = "Language and Literacy"
+    NUMERACY = "Numeracy"
+    OUR_WORLD_OUR_PEOPLE = "Our World Our People"
+    PHYSICAL_DEVELOPMENT = "Physical Development"
+    # SHS (Senior High School) — core and elective subjects
+    CORE_MATHEMATICS = "Core Mathematics"
+    INTEGRATED_SCIENCE = "Integrated Science"
+    BIOLOGY = "Biology"
+    CHEMISTRY = "Chemistry"
+    PHYSICS = "Physics"
+    ELECTIVE_MATHEMATICS = "Elective Mathematics"
+    ECONOMICS = "Economics"
+    GEOGRAPHY = "Geography"
+    GOVERNMENT = "Government"
+    HISTORY = "History"
+    LITERATURE_IN_ENGLISH = "Literature in English"
+    FRENCH = "French"
+    BUSINESS_MANAGEMENT = "Business Management"
+    FINANCIAL_ACCOUNTING = "Financial Accounting"
+    COST_ACCOUNTING = "Cost Accounting"
+    GENERAL_AGRICULTURE = "General Agriculture"
+    GENERAL_KNOWLEDGE_IN_ART = "General Knowledge in Art"
 
 
 class EducationalLevel(str, Enum):
@@ -73,6 +96,133 @@ CLASS_LEVEL_TO_EDUCATIONAL_LEVEL = {
 EDUCATIONAL_LEVEL_TO_CLASS_LEVELS = {}
 for _cl, _el in CLASS_LEVEL_TO_EDUCATIONAL_LEVEL.items():
     EDUCATIONAL_LEVEL_TO_CLASS_LEVELS.setdefault(_el, []).append(_cl)
+
+
+# ── Level-aware subject availability ──────────────────────────────────────────
+# The single source of truth for "which subjects are available at this level".
+# The UI (settings, upload, generation) reads this through the API rather than
+# keeping its own list, so availability can never drift between components.
+
+KG_SUBJECTS: List["Subject"] = [
+    Subject.LANGUAGE_AND_LITERACY,
+    Subject.NUMERACY,
+    Subject.OUR_WORLD_OUR_PEOPLE,
+    Subject.CREATIVE_ARTS,
+    Subject.PHYSICAL_DEVELOPMENT,
+]
+
+PRIMARY_SUBJECTS: List["Subject"] = [
+    Subject.ENGLISH,
+    Subject.MATHEMATICS,
+    Subject.SCIENCE,
+    Subject.OUR_WORLD_OUR_PEOPLE,
+    Subject.GHANAIAN_LANGUAGE,
+    Subject.RME,
+    Subject.CREATIVE_ARTS,
+    Subject.PHE,
+    Subject.ICT,
+    Subject.HISTORY,
+]
+
+JHS_SUBJECTS: List["Subject"] = [
+    Subject.ENGLISH,
+    Subject.MATHEMATICS,
+    Subject.SCIENCE,
+    Subject.SOCIAL_STUDIES,
+    Subject.CAREER_TECHNOLOGY,
+    Subject.GHANAIAN_LANGUAGE,
+    Subject.RME,
+    Subject.CREATIVE_ARTS,
+    Subject.ICT,
+    Subject.PHE,
+    Subject.FRENCH,
+]
+
+SHS_SUBJECTS: List["Subject"] = [
+    Subject.ENGLISH,
+    Subject.CORE_MATHEMATICS,
+    Subject.INTEGRATED_SCIENCE,
+    Subject.SOCIAL_STUDIES,
+    Subject.BIOLOGY,
+    Subject.CHEMISTRY,
+    Subject.PHYSICS,
+    Subject.ELECTIVE_MATHEMATICS,
+    Subject.ECONOMICS,
+    Subject.GEOGRAPHY,
+    Subject.GOVERNMENT,
+    Subject.HISTORY,
+    Subject.LITERATURE_IN_ENGLISH,
+    Subject.FRENCH,
+    Subject.ICT,
+    Subject.BUSINESS_MANAGEMENT,
+    Subject.FINANCIAL_ACCOUNTING,
+    Subject.COST_ACCOUNTING,
+    Subject.GENERAL_AGRICULTURE,
+    Subject.GENERAL_KNOWLEDGE_IN_ART,
+]
+
+#: Canonical LEVEL → AVAILABLE SUBJECTS mapping.
+CLASS_LEVEL_SUBJECTS: Dict["ClassLevel", List["Subject"]] = {
+    ClassLevel.NURSERY: KG_SUBJECTS,
+    ClassLevel.KG1: KG_SUBJECTS,
+    ClassLevel.KG2: KG_SUBJECTS,
+    ClassLevel.BASIC_1: PRIMARY_SUBJECTS,
+    ClassLevel.BASIC_2: PRIMARY_SUBJECTS,
+    ClassLevel.BASIC_3: PRIMARY_SUBJECTS,
+    ClassLevel.BASIC_4: PRIMARY_SUBJECTS,
+    ClassLevel.BASIC_5: PRIMARY_SUBJECTS,
+    ClassLevel.BASIC_6: PRIMARY_SUBJECTS,
+    ClassLevel.BASIC_7: JHS_SUBJECTS,
+    ClassLevel.BASIC_8: JHS_SUBJECTS,
+    ClassLevel.BASIC_9: JHS_SUBJECTS,
+    ClassLevel.SHS_1: SHS_SUBJECTS,
+    ClassLevel.SHS_2: SHS_SUBJECTS,
+    ClassLevel.SHS_3: SHS_SUBJECTS,
+}
+
+#: The subjects that have ever been generally available (used as a safe
+#: fallback and for global checks).
+ALL_SUBJECTS: List["Subject"] = list(Subject)
+
+
+def _coerce_class_level(level) -> "Optional[ClassLevel]":
+    """Accept a ClassLevel, its value, or a level-like string."""
+    if isinstance(level, ClassLevel):
+        return level
+    if not level:
+        return None
+    try:
+        return ClassLevel(str(level))
+    except ValueError:
+        return None
+
+
+def subjects_for_class_level(level) -> List["Subject"]:
+    """Return the subjects available at a class level (level-aware).
+
+    Accepts a ``ClassLevel`` or its string value. Falls back to all subjects
+    when the level is unknown so callers never get an empty list.
+    """
+    cl = _coerce_class_level(level)
+    if cl is None:
+        return list(ALL_SUBJECTS)
+    return list(CLASS_LEVEL_SUBJECTS.get(cl, ALL_SUBJECTS))
+
+
+def subjects_for_educational_level(level) -> List["Subject"]:
+    """Return the union of subjects across every class level in a stage."""
+    el = level
+    if not isinstance(el, EducationalLevel):
+        try:
+            el = EducationalLevel(str(level))
+        except ValueError:
+            return list(ALL_SUBJECTS)
+    out: List["Subject"] = []
+    for cl in EDUCATIONAL_LEVEL_TO_CLASS_LEVELS.get(el, []):
+        for s in CLASS_LEVEL_SUBJECTS.get(cl, []):
+            if s not in out:
+                out.append(s)
+    return out or list(ALL_SUBJECTS)
 
 
 class AIMode(str, Enum):
@@ -383,14 +533,26 @@ class AllocatedIndicator(BaseModel):
     content_standard_description: str
     strand: str
     sub_strand: str
+    #: Source curriculum week — the week the indicator belongs to in the scheme.
     week_number: int
     week_ending: Optional[date] = None
     lesson_date: Optional[date] = None
     lesson_sequence: int = 0
-    # Position of this indicator within its week (1-based).
-    # Period 1 = first lesson of the week, Period 2 = second, etc.
+    # Position of this indicator within its actual teaching week (1-based).
+    # Period 1 = first lesson of the teaching week, Period 2 = second, etc.
     period_index: int = 0
     allocated: bool = False
+    #: Actual teaching week the lesson is delivered in. Equal to week_number
+    #: when no carry-forward was required, otherwise a later teaching week.
+    teaching_week: int = 0
+    #: True when the indicator carried forward out of its source week because
+    #: that week had more indicators than available teaching periods.
+    carry_forward: bool = False
+    #: The source week the indicator carried forward from (None when not moved).
+    carry_forward_from_week: Optional[int] = None
+    #: True when the indicator could not be placed on a real teaching date
+    #: (e.g. the term has no further teaching periods) and needs teacher review.
+    needs_review: bool = False
 
 
 class CurriculumCoverage(BaseModel):
@@ -432,10 +594,18 @@ class LessonPlan(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     scheme_of_work_id: str
     term_config_id: str
+    #: Source curriculum week the lesson's indicator belongs to.
     week_number: int
     lesson_sequence: int
     lesson_date: date
     lesson_number: int = 0
+    #: Actual teaching week the lesson is delivered in. Retains the link to the
+    #: source curriculum week via ``week_number`` while representing when the
+    #: teacher is actually scheduled to teach it.
+    teaching_week: int = 0
+    #: True when this lesson carries an indicator forward from an earlier
+    #: source week.
+    carry_forward: bool = False
     # Timetable slot, e.g. "1st & 2nd". Teacher-configured; never invented.
     period: str = ""
 
