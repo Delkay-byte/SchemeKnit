@@ -134,7 +134,7 @@ class DOCXParser:
         Returns the document title, the subject sections detected, and a
         detection status:
           "multiple"       — more than one subject section found (teacher must
-                             confirm which one to use)
+                              confirm which one to use)
           "single"         — exactly one subject section found
           "low_confidence" — no subject section could be identified
         Never invents a classification.
@@ -152,10 +152,28 @@ class DOCXParser:
             if s["subject"] is None:
                 continue
             parsed = self._parse_scheme(s["tables"], raw_text, file_path.name)
+            
+            # Determine extraction confidence
+            total_weeks = len(parsed.weeks)
+            primary_count = len(getattr(parsed, "_extraction_primary", set()))
+            fallback_count = len(getattr(parsed, "_extraction_fallback", set()))
+            
+            if total_weeks == 0:
+                extraction_status = "failed"
+            elif fallback_count == 0:
+                extraction_status = "primary"
+            elif primary_count == 0:
+                extraction_status = "fallback_only"
+            else:
+                extraction_status = "mixed"
+
             described.append({
                 "subject": s["subject"].value,
                 "title": s["title"],
-                "week_count": len(parsed.weeks),
+                "week_count": total_weeks,
+                "extraction_status": extraction_status,
+                "primary_weeks": primary_count,
+                "fallback_weeks": fallback_count,
             })
 
         # De-duplicate by subject (a document may repeat a subject heading).
@@ -301,6 +319,10 @@ class DOCXParser:
 
         week_rows: Dict[int, List[Dict[str, Any]]] = {}
         seen_headers_in_table: Dict[int, bool] = {}
+        
+        # Track extraction method for confidence reporting
+        primary_weeks = set()
+        fallback_weeks = set()
 
         for t_idx, r_idx, row in all_rows:
             # Keep scanning until the header row is found. Some documents (and
@@ -316,8 +338,23 @@ class DOCXParser:
 
             normalized = self._normalize_row(row, header_map)
 
+            # Primary: try to extract week from the header-mapped week_ending column
             week_text = normalized.get("week_ending", "")
             week_info = self._extract_week_info(week_text)
+            extraction_method = "primary"
+
+            # Fallback: if header-based extraction failed, scan ALL cells in the row
+            # for week-like content. This handles cases where:
+            # - header detection failed or week column wasn't mapped
+            # - week cell uses "Week N" format instead of bare number/date
+            # - week column has a non-standard header name
+            if not week_info:
+                for cell_text in row:
+                    fallback_info = self._extract_week_info(cell_text)
+                    if fallback_info:
+                        week_info = fallback_info
+                        extraction_method = "fallback"
+                        break
 
             if week_info:
                 current_week = week_info["week_number"]
@@ -328,6 +365,12 @@ class DOCXParser:
 
                 if current_week not in week_rows:
                     week_rows[current_week] = []
+                
+                # Track extraction method per week
+                if extraction_method == "fallback":
+                    fallback_weeks.add(current_week)
+                else:
+                    primary_weeks.add(current_week)
 
             strand_text = normalized.get("strand", "").strip()
             if strand_text:
@@ -365,6 +408,10 @@ class DOCXParser:
             rows = week_rows[week_num]
             parsed_week = self._merge_week_rows(week_num, rows)
             scheme.weeks.append(parsed_week)
+
+        # Attach extraction method info for confidence reporting
+        scheme._extraction_primary = primary_weeks
+        scheme._extraction_fallback = fallback_weeks
 
         self._run_validation(scheme)
         scheme.validation_issues = self.validation_issues
@@ -420,6 +467,15 @@ class DOCXParser:
         match = WEEK_ONLY_PATTERN.match(cleaned)
         if match:
             week_num = int(match.group(1))
+            return {
+                "week_number": week_num,
+                "date": None
+            }
+
+        # Handle "Week N" format (e.g., "Week 1", "Week 2", "WEEK 1")
+        week_text_pattern = re.match(r'^week\s+(\d{1,2})\b', cleaned, re.IGNORECASE)
+        if week_text_pattern:
+            week_num = int(week_text_pattern.group(1))
             return {
                 "week_number": week_num,
                 "date": None

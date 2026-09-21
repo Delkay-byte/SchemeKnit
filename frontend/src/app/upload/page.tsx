@@ -143,7 +143,7 @@ export default function UploadPage() {
                       <Button
                         key={`${s.subject}-${i}`}
                         variant="outline"
-                        className="h-auto py-3 flex flex-col gap-1"
+                        className="h-auto py-3 flex flex-col gap-1 whitespace-normal text-left"
                         disabled={confirmingSubject !== null}
                         onClick={() => handleConfirmSubject(s.subject)}
                       >

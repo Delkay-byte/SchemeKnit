@@ -128,6 +128,24 @@ class ApiService {
     })
   }
 
+  async activateIndividualLicense(activationCode: string): Promise<any> {
+    return this.request('/api/auth/activate-individual', {
+      method: 'POST',
+      body: JSON.stringify({ activation_code: activationCode }),
+    })
+  }
+
+  async createIndividualActivationCode(teacherEmail: string, productPlanId: string): Promise<any> {
+    return this.request('/api/platform-admin/activation-codes', {
+      method: 'POST',
+      body: JSON.stringify({ teacher_email: teacherEmail, product_plan_id: productPlanId }),
+    })
+  }
+
+  async listIndividualActivationCodes(): Promise<{ codes: any[]; count: number }> {
+    return this.request('/api/platform-admin/activation-codes')
+  }
+
   async listUsers(): Promise<{ users: any[] }> {
     return this.request('/api/auth/users')
   }

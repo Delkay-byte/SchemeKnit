@@ -184,6 +184,7 @@ export default function ReviewPage() {
                     key={s}
                     size="sm"
                     variant="outline"
+                    className="whitespace-normal"
                     disabled={confirmingSubject !== null}
                     onClick={() => handleConfirmSubject(s)}
                   >

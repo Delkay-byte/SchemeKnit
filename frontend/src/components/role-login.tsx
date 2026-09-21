@@ -75,7 +75,6 @@ const ENTRY_COPY: Record<EntryRole, {
 const ENTRIES: { role: EntryRole; href: string; label: string }[] = [
   { role: 'teacher', href: '/login', label: 'Teacher' },
   { role: 'school_admin', href: '/login/school-admin', label: 'Headteacher' },
-  ...(!isDesktop ? [{ role: 'platform_admin' as EntryRole, href: '/login/platform-admin', label: 'Platform admin' }] : []),
 ]
 
 export function RoleLogin({ entry }: { entry: EntryRole }) {

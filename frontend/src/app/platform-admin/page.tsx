@@ -32,7 +32,7 @@ export default function PlatformAdminPage() {
   // Licenses data
   const [licenses, setLicenses] = useState<any[]>([])
   const [showCreateLicense, setShowCreateLicense] = useState(false)
-  const [newLicense, setNewLicense] = useState({ school_id: '', product_plan_id: '', seat_limit: 10 })
+  const [newLicense, setNewLicense] = useState({ license_type: 'school' as 'school' | 'individual', school_id: '', teacher_email: '', product_plan_id: '', seat_limit: 10 })
 
   // Plans data
   const [plans, setPlans] = useState<any[]>([])
@@ -130,8 +130,15 @@ export default function PlatformAdminPage() {
           setPayments(pay.payments || [])
           break
         case 'activations':
-          const act = await api.listActivationCodes()
-          setActivations(act.activations || [])
+          const [act, indAct] = await Promise.all([
+            api.listActivationCodes().catch(() => ({ activations: [] })),
+            api.listIndividualActivationCodes().catch(() => ({ codes: [] })),
+          ])
+          const allActivations = [
+            ...(act.activations || []).map((a: any) => ({ ...a, type: 'school' })),
+            ...(indAct.codes || []).map((c: any) => ({ ...c, type: 'individual' })),
+          ]
+          setActivations(allActivations)
           break
         case 'audit':
           const aud = await api.listPlatformAuditLogs(50)
@@ -167,17 +174,32 @@ export default function PlatformAdminPage() {
   }
 
   const handleCreateLicense = async () => {
-    if (!newLicense.school_id || !newLicense.product_plan_id) {
-      setError('Please select a school and a plan')
-      return
-    }
-    try {
-      await api.createLicense(newLicense)
-      setShowCreateLicense(false)
-      setNewLicense({ school_id: '', product_plan_id: '', seat_limit: 10 })
-      loadTabData('licenses')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create license')
+    if (newLicense.license_type === 'individual') {
+      if (!newLicense.teacher_email || !newLicense.product_plan_id) {
+        setError('Please enter teacher email and select a plan')
+        return
+      }
+      try {
+        await api.createIndividualActivationCode(newLicense.teacher_email, newLicense.product_plan_id)
+        setShowCreateLicense(false)
+        setNewLicense({ license_type: 'school', school_id: '', teacher_email: '', product_plan_id: '', seat_limit: 10 })
+        loadTabData('activations')
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to create individual activation')
+      }
+    } else {
+      if (!newLicense.school_id || !newLicense.product_plan_id) {
+        setError('Please select a school and a plan')
+        return
+      }
+      try {
+        await api.createLicense({ school_id: newLicense.school_id, product_plan_id: newLicense.product_plan_id, seat_limit: newLicense.seat_limit })
+        setShowCreateLicense(false)
+        setNewLicense({ license_type: 'school', school_id: '', teacher_email: '', product_plan_id: '', seat_limit: 10 })
+        loadTabData('licenses')
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to create license')
+      }
     }
   }
 
@@ -643,8 +665,16 @@ export default function PlatformAdminPage() {
                   <Card key={a.id}>
                     <CardContent className="p-4 flex items-center justify-between">
                       <div>
-                        <p className="font-mono font-semibold">{a.code}</p>
-                        <p className="text-sm text-muted-foreground">License: {a.license_code} &bull; {a.used_by_school || 'Not used'}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-mono font-semibold">{a.code}</p>
+                          <span className={`px-2 py-0.5 rounded text-xs ${a.type === 'individual' ? 'bg-purple-100 text-purple-700' : 'bg-sky-100 text-sky-700'}`}>
+                            {a.type === 'individual' ? 'Individual' : 'School'}
+                          </span>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {a.type === 'individual' ? (a.teacher_email || 'Individual teacher') : (a.license_code || 'N/A')}
+                          &bull; {a.used_by_school || a.used_by_user_id || 'Not used'}
+                        </p>
                       </div>
                       <div className="flex gap-2">
                         <span className={`px-2 py-1 rounded text-xs ${a.status === 'active' ? 'bg-green-100 text-green-700' : a.status === 'used' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>
@@ -857,17 +887,27 @@ export default function PlatformAdminPage() {
                 <CardTitle>Create License</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <select value={newLicense.school_id} onChange={(e) => setNewLicense({ ...newLicense, school_id: e.target.value })} className="w-full px-3 py-2 border rounded-md">
-                  <option value="">Select School</option>
-                  {schools.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
+                <div className="flex gap-2">
+                  <Button variant={newLicense.license_type === 'school' ? 'default' : 'outline'} onClick={() => setNewLicense({ ...newLicense, license_type: 'school', school_id: '' })}>School</Button>
+                  <Button variant={newLicense.license_type === 'individual' ? 'default' : 'outline'} onClick={() => setNewLicense({ ...newLicense, license_type: 'individual', teacher_email: '' })}>Individual Teacher</Button>
+                </div>
+                {newLicense.license_type === 'school' ? (
+                  <select value={newLicense.school_id} onChange={(e) => setNewLicense({ ...newLicense, school_id: e.target.value })} className="w-full px-3 py-2 border rounded-md">
+                    <option value="">Select School</option>
+                    {schools.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                ) : (
+                  <input type="email" placeholder="Teacher Email" value={newLicense.teacher_email} onChange={(e) => setNewLicense({ ...newLicense, teacher_email: e.target.value })} className="w-full px-3 py-2 border rounded-md" />
+                )}
                 <select value={newLicense.product_plan_id} onChange={(e) => setNewLicense({ ...newLicense, product_plan_id: e.target.value })} className="w-full px-3 py-2 border rounded-md">
                   <option value="">Select Plan</option>
                   {plans.map((p) => <option key={p.id} value={p.id}>{p.name} ({formatCurrency(p.price)})</option>)}
                 </select>
-                <input type="number" placeholder="Seat Limit" value={newLicense.seat_limit} onChange={(e) => setNewLicense({ ...newLicense, seat_limit: parseInt(e.target.value) || 10 })} className="w-full px-3 py-2 border rounded-md" />
+                {newLicense.license_type === 'school' && (
+                  <input type="number" placeholder="Seat Limit" value={newLicense.seat_limit} onChange={(e) => setNewLicense({ ...newLicense, seat_limit: parseInt(e.target.value) || 10 })} className="w-full px-3 py-2 border rounded-md" />
+                )}
                 <div className="flex gap-2">
-                  <Button onClick={handleCreateLicense}>Create</Button>
+                  <Button onClick={handleCreateLicense}>{newLicense.license_type === 'individual' ? 'Create & Send Code' : 'Create'}</Button>
                   <Button variant="outline" onClick={() => setShowCreateLicense(false)}>Cancel</Button>
                 </div>
               </CardContent>
