@@ -319,21 +319,48 @@ class DOCXParser:
 
         week_rows: Dict[int, List[Dict[str, Any]]] = {}
         seen_headers_in_table: Dict[int, bool] = {}
+        header_buffer: Dict[int, List[List[str]]] = {}
         
         # Track extraction method for confidence reporting
         primary_weeks = set()
         fallback_weeks = set()
 
         for t_idx, r_idx, row in all_rows:
-            # Keep scanning until the header row is found. Some documents (and
-            # PDF-to-row conversions) place a title row above the header, so
-            # only looking at row 0 would miss the column mapping entirely.
             if not seen_headers_in_table.get(t_idx, False):
+                # Single-row detection always takes priority
                 detected = self._detect_header(row)
                 if detected:
-                    header_map = detected
+                    # If we have buffered rows, check if merged version is better
+                    if t_idx in header_buffer and header_buffer[t_idx]:
+                        test_rows = header_buffer[t_idx] + [row]
+                        merged = self._detect_header_with_merge(test_rows, 0)
+                        if merged and len(merged) > len(detected):
+                            header_map = merged
+                        else:
+                            header_map = detected
+                    else:
+                        header_map = detected
                     seen_headers_in_table[t_idx] = True
+                    header_buffer.pop(t_idx, None)
                     continue
+
+                # Single-row failed — buffer for potential multi-row merge
+                if t_idx not in header_buffer:
+                    header_buffer[t_idx] = []
+                header_buffer[t_idx].append(row)
+
+                # After buffering 3 rows, attempt merged detection
+                if len(header_buffer[t_idx]) >= 3:
+                    merged = self._detect_header_with_merge(header_buffer[t_idx], 0)
+                    if merged:
+                        header_map = merged
+                        seen_headers_in_table[t_idx] = True
+                        header_buffer.pop(t_idx, None)
+                        continue
+                    # Merge also failed — these aren't header rows
+                    seen_headers_in_table[t_idx] = True
+                    header_buffer.pop(t_idx, None)
+
                 seen_headers_in_table[t_idx] = False
 
             normalized = self._normalize_row(row, header_map)
@@ -429,6 +456,42 @@ class DOCXParser:
                 matched += 1
         if matched >= 3:
             return header_map
+        return None
+
+    def _detect_header_with_merge(self, rows: List[List[str]], start_idx: int) -> Optional[Dict[str, int]]:
+        """Detect header by merging up to 3 consecutive rows.
+
+        PDFs with vertically-merged cells often split a single logical header
+        across multiple rows.  Row 0 may have "STRAND" while Row 1 has
+        "SUB-STRAND", "CONTENT STANDARD", etc.  Neither row alone passes the
+        match threshold, but merged they do.
+
+        Returns the merged header_map and the number of rows consumed.
+        """
+        if start_idx >= len(rows):
+            return None
+
+        merged: Dict[str, int] = {}
+        consumed = 0
+
+        for offset in range(min(3, len(rows) - start_idx)):
+            row = rows[start_idx + offset]
+            row_map: Dict[str, int] = {}
+            row_matched = 0
+            for c_idx, cell in enumerate(row):
+                normalized = self._normalize_header_text(cell)
+                if normalized in HEADER_ALIASES:
+                    field = HEADER_ALIASES[normalized]
+                    if field not in merged:
+                        row_map[field] = c_idx
+                        row_matched += 1
+            merged.update(row_map)
+            consumed += 1
+            if len(merged) >= 3:
+                return merged
+
+        if len(merged) >= 3:
+            return merged
         return None
 
     def _normalize_header_text(self, text: str) -> str:

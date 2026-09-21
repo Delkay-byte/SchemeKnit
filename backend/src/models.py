@@ -673,6 +673,9 @@ class GenerationJob(BaseModel):
     error_message: Optional[str] = None
     result_files: List[str] = []
     lesson_plan_ids: List[str] = []
+    ai_enrichment_errors: Dict[str, str] = {}
+    ai_enrichment_total_attempted: int = 0
+    ai_enrichment_succeeded: int = 0
 
 
 # ── AI Enrichment ─────────────────────────────────────────────────────────────
