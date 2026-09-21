@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useServiceStatus } from '@/hooks/useServiceStatus'
 
 export function ServiceStatusBanner() {
@@ -9,18 +9,22 @@ export function ServiceStatusBanner() {
   const [bannerMessage, setBannerMessage] = useState('')
   const [bannerType, setBannerType] = useState<'offline' | 'maintenance' | 'recovery'>('offline')
   const [hasNotifiedRecovery, setHasNotifiedRecovery] = useState(false)
+  const [dismissed, setDismissed] = useState(false)
 
+  // Determine banner visibility from status — only show for confirmed outage or maintenance
   useEffect(() => {
     if (isMaintenance) {
       setBannerType('maintenance')
       setBannerMessage(maintenanceMessage || 'SchemeKnit is currently undergoing maintenance. We\'ll be back shortly.')
       setShowBanner(true)
       setHasNotifiedRecovery(false)
+      setDismissed(false)
     } else if (status === 'offline') {
       setBannerType('offline')
       setBannerMessage('SchemeKnit server is currently unavailable. We\'ll reconnect automatically.')
       setShowBanner(true)
       setHasNotifiedRecovery(false)
+      setDismissed(false)
     } else if (isOnline && showBanner && !hasNotifiedRecovery) {
       // Transition from offline/maintenance to healthy
       setBannerType('recovery')
@@ -33,10 +37,13 @@ export function ServiceStatusBanner() {
         setShowBanner(false)
       }, 5000)
       return () => clearTimeout(timer)
-    } else if (isOnline && !showBanner) {
+    } else if (isOnline) {
+      // Healthy — ensure no stale banner
       setShowBanner(false)
+      setDismissed(false)
     }
-  }, [status, isOnline, isMaintenance, maintenanceMessage, showBanner, hasNotifiedRecovery])
+    // During 'unknown' or 'checking' states: do NOT show any banner
+  }, [status, isOnline, isMaintenance, maintenanceMessage])
 
   // Listen for custom events from the service status hook
   useEffect(() => {
@@ -45,6 +52,7 @@ export function ServiceStatusBanner() {
       setBannerMessage('SchemeKnit server is currently unavailable. We\'ll reconnect automatically.')
       setShowBanner(true)
       setHasNotifiedRecovery(false)
+      setDismissed(false)
     }
 
     const handleBackOnline = () => {
@@ -60,6 +68,7 @@ export function ServiceStatusBanner() {
       setBannerMessage(e.detail?.message || 'SchemeKnit is currently undergoing maintenance.')
       setShowBanner(true)
       setHasNotifiedRecovery(false)
+      setDismissed(false)
     }
 
     const handleMaintenanceEnded = () => {
@@ -83,7 +92,19 @@ export function ServiceStatusBanner() {
     }
   }, [])
 
-  if (!showBanner) return null
+  // Retry handler: triggers a fresh health check via page reload
+  const handleRetry = useCallback(() => {
+    setDismissed(false)
+    window.location.reload()
+  }, [])
+
+  // Dismiss handler
+  const handleDismiss = useCallback(() => {
+    setShowBanner(false)
+    setDismissed(true)
+  }, [])
+
+  if (!showBanner || dismissed) return null
 
   const bgColor = bannerType === 'maintenance'
     ? 'bg-amber-50 border-amber-200'
@@ -118,14 +139,14 @@ export function ServiceStatusBanner() {
         <div className="flex items-center gap-2">
           {bannerType !== 'recovery' && (
             <button
-              onClick={() => window.location.reload()}
+              onClick={handleRetry}
               className="text-xs px-3 py-1 rounded border border-current opacity-75 hover:opacity-100 transition-opacity"
             >
               Retry
             </button>
           )}
           <button
-            onClick={() => setShowBanner(false)}
+            onClick={handleDismiss}
             className="text-xs opacity-50 hover:opacity-100 transition-opacity"
             aria-label="Dismiss"
           >
