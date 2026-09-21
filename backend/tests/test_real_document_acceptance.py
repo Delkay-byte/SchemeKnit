@@ -84,6 +84,18 @@ class TestBasic7RealDocument:
         assert total_ind >= 5
 
     @pytest.mark.skipif(not BASIC7_PDF.exists(), reason="Basic 7 PDF not found")
+    def test_02b_strand_extraction(self):
+        """Verify strand is now extracted from the real PDF (was empty before fix)."""
+        scheme = asyncio.run(
+            self.parser.parse(BASIC7_PDF, original_filename="BASIC 7 TERM 1.pdf", target_subject="Science")
+        )
+        strands = {w.strand for w in scheme.weeks if w.strand}
+        print(f"\n[BASIC7-Strand] Unique strands: {strands}")
+        assert len(strands) >= 2, f"Expected at least 2 unique strands, got {strands}"
+        assert "Diversity Of Matter" in strands or "Diversity of Matter" in strands, \
+            f"Expected 'Diversity Of/Matter' strand, got {strands}"
+
+    @pytest.mark.skipif(not BASIC7_PDF.exists(), reason="Basic 7 PDF not found")
     def test_03_no_english_leakage(self):
         scheme = asyncio.run(
             self.parser.parse(BASIC7_PDF, original_filename="BASIC 7 TERM 1.pdf", target_subject="Science")
@@ -106,7 +118,7 @@ class TestBasic7RealDocument:
         for w in special:
             print(f"  Wk {w.week_number}: {w.week_type.value}")
         for w in special:
-            assert w.week_type in [WeekType.REVISION, WeekType.ASSESSMENT, WeekType.SBA, WeekType.HOLIDAY]
+            assert w.week_type in [WeekType.REVISION, WeekType.ASSESSMENT, WeekType.SBA, WeekType.OTHER]
 
     @pytest.mark.skipif(not BASIC7_PDF.exists(), reason="Basic 7 PDF not found")
     def test_05_allocation_engine(self):

@@ -5,9 +5,12 @@ Production pipeline:
 Validated Scheme → Term Config → Calendar → Allocation → Lesson Plans → Validation → Export
 """
 
+import logging
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 from ..models import (
     SchemeOfWork, Week, WeekType, TermConfig, TeachingCalendar,
@@ -91,7 +94,17 @@ class GenerationPipeline:
             job.progress = 60
 
             if config.ai_mode != AIMode.OFF:
-                self._enrich_with_ai(lesson_plans, config)
+                try:
+                    self._enrich_with_ai(lesson_plans, config, job)
+                except Exception as e:
+                    logger.error(
+                        "AI enrichment pipeline failed for job %s: %s: %s",
+                        job.id, type(e).__name__, e,
+                    )
+                    job.error_message = (
+                        f"AI enrichment could not be completed. "
+                        f"Your lessons were generated using the standard lesson engine."
+                    )
             job.progress = 80
 
             for lp in lesson_plans:
@@ -201,24 +214,33 @@ class GenerationPipeline:
         self,
         lesson_plans: List[LessonPlan],
         config: TermConfig,
+        job: GenerationJob,
     ):
         """Enrich lesson plans using Generation V2 with quality gate.
 
         V2 uses indicator-grounded, subject-aware prompts.
         Quality gate validates each enriched lesson before marking it ready.
         Falls back to deterministic content if V2 fails quality validation.
+
+        Unexpected exceptions are logged with full diagnostic context and
+        tracked on the job so they are never silently swallowed.
         """
         from ..curriculum.quality_gate import validate_lesson_quality, QualityStatus
-        from ..curriculum.indicator_interpretation import Indicator as CurriculumIndicator
+        from ..curriculum.indicator_interpreter import Indicator as CurriculumIndicator
 
         provider = get_provider(config.ai_mode.value)
         if not provider.is_available():
+            logger.info(
+                "AI provider unavailable (mode=%s) — deterministic generation for job %s",
+                config.ai_mode.value, job.id,
+            )
             return
 
         # Build previous/next context for lesson sequence continuity
         sorted_plans = sorted(lesson_plans, key=lambda lp: lp.lesson_sequence)
 
         for idx, lp in enumerate(sorted_plans):
+            job.ai_enrichment_total_attempted += 1
             try:
                 # Determine previous and next lesson context
                 prev_context = None
@@ -257,6 +279,12 @@ class GenerationPipeline:
                 )
 
                 if not content:
+                    logger.warning(
+                        "V2 provider returned empty content for lesson %s "
+                        "(indicator=%s, week=%d) — deterministic fallback",
+                        lp.id, lp.indicator_codes, lp.week_number,
+                    )
+                    job.ai_enrichment_errors[lp.id] = "empty_response"
                     continue
 
                 # Apply V2 content to the lesson plan
@@ -277,15 +305,30 @@ class GenerationPipeline:
 
                 if report.passed:
                     lp.ai_generated = True
+                    job.ai_enrichment_succeeded += 1
                 else:
                     # Quality gate failed — revert to deterministic content
                     # The deterministic content from generate_lesson_plans() is still in place
                     # so we just skip the AI enrichment for this lesson
-                    pass
+                    failed_checks = [i.check_name for i in report.failures]
+                    logger.warning(
+                        "Quality gate failed for lesson %s (indicator=%s): %s — "
+                        "deterministic fallback",
+                        lp.id, lp.indicator_codes, failed_checks,
+                    )
+                    job.ai_enrichment_errors[lp.id] = f"quality_gate_failed: {failed_checks}"
 
-            except Exception:
+            except Exception as e:
                 # AI failure does not block the pipeline — deterministic content remains
-                continue
+                # But we ALWAYS log and record the diagnostic
+                logger.error(
+                    "V2 enrichment failed for lesson %s (indicator=%s, week=%d): "
+                    "%s: %s",
+                    lp.id, lp.indicator_codes, lp.week_number,
+                    type(e).__name__, e,
+                )
+                job.ai_enrichment_errors[lp.id] = f"{type(e).__name__}: {e}"
+                # ai_generated remains False — deterministic fallback
 
     def _apply_v2_content(self, lp: LessonPlan, content: dict):
         """Apply V2 structured content to a lesson plan.
