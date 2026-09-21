@@ -73,6 +73,11 @@ export default function PlatformAdminPage() {
   const [resetLoading, setResetLoading] = useState(false)
   const [resetResult, setResetResult] = useState<string | null>(null)
 
+  // Maintenance mode
+  const [maintenanceMode, setMaintenanceMode] = useState(false)
+  const [maintenanceMessage, setMaintenanceMessage] = useState('')
+  const [maintenanceRestore, setMaintenanceRestore] = useState('')
+
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -763,6 +768,7 @@ export default function PlatformAdminPage() {
               <div className="space-y-6 max-w-2xl">
                 <h2 className="text-lg font-semibold">Platform Settings</h2>
                 <ChangePasswordCard />
+                <MaintenanceControl />
               </div>
             )}
           </>
@@ -980,5 +986,94 @@ export default function PlatformAdminPage() {
         )}
       </main>
     </div>
+  )
+}
+
+function MaintenanceControl() {
+  const [enabled, setEnabled] = useState(false)
+  const [message, setMessage] = useState('')
+  const [estimatedRestore, setEstimatedRestore] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    api.getMaintenanceMode().then((data) => {
+      setEnabled(data.maintenance.active)
+      setMessage(data.maintenance.message || '')
+      setEstimatedRestore(data.maintenance.estimated_restore || '')
+      setLoading(false)
+    }).catch(() => setLoading(false))
+  }, [])
+
+  const handleToggle = async () => {
+    setSaving(true)
+    try {
+      await api.setMaintenanceMode(!enabled, message, estimatedRestore)
+      setEnabled(!enabled)
+    } catch (err) {
+      console.error('Failed to toggle maintenance mode:', err)
+    }
+    setSaving(false)
+  }
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await api.setMaintenanceMode(enabled, message, estimatedRestore)
+    } catch (err) {
+      console.error('Failed to save maintenance settings:', err)
+    }
+    setSaving(false)
+  }
+
+  if (loading) return <div className="text-sm text-muted-foreground">Loading...</div>
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Maintenance Mode</CardTitle>
+        <CardDescription>Toggle maintenance mode to show a global notification to all users.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="font-medium">{enabled ? 'Maintenance Mode: ON' : 'Maintenance Mode: OFF'}</p>
+            <p className="text-sm text-muted-foreground">
+              {enabled ? 'All users see the maintenance banner.' : 'Normal operation.'}
+            </p>
+          </div>
+          <Button
+            variant={enabled ? 'destructive' : 'default'}
+            onClick={handleToggle}
+            disabled={saving}
+          >
+            {saving ? 'Saving...' : enabled ? 'Disable Maintenance' : 'Enable Maintenance'}
+          </Button>
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Maintenance Message</label>
+          <input
+            type="text"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="SchemeKnit is currently undergoing maintenance. We'll be back shortly."
+            className="w-full px-3 py-2 border rounded-md text-sm"
+          />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Estimated Restoration Time</label>
+          <input
+            type="text"
+            value={estimatedRestore}
+            onChange={(e) => setEstimatedRestore(e.target.value)}
+            placeholder="e.g. 2 hours, 30 minutes"
+            className="w-full px-3 py-2 border rounded-md text-sm"
+          />
+        </div>
+        <Button variant="outline" onClick={handleSave} disabled={saving}>
+          Save Settings
+        </Button>
+      </CardContent>
+    </Card>
   )
 }

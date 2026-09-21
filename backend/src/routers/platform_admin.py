@@ -1170,3 +1170,61 @@ async def reset_demo_data(
 
     logger.info("demo_data_reset", actor=user.email, removed=removed)
     return {"message": "Demo commercial data reset", "removed": removed}
+
+
+# ── Maintenance Mode Control ────────────────────────────────────────────────
+
+class MaintenanceRequest(BaseModel):
+    enabled: bool
+    message: str = ""
+    estimated_restore: str = ""
+
+
+@router.post("/maintenance")
+async def set_maintenance_mode(
+    req: MaintenanceRequest,
+    user: User = Depends(require_platform_admin),
+):
+    """Toggle maintenance mode. Changes take effect immediately."""
+    from ..config import get_settings
+    settings = get_settings()
+
+    # Update the in-memory settings (this only affects the current process)
+    settings.MAINTENANCE_MODE = req.enabled
+    if req.message:
+        settings.MAINTENANCE_MESSAGE = req.message
+    if req.estimated_restore:
+        settings.MAINTENANCE_ESTIMATED_RESTORE = req.estimated_restore
+
+    _audit_log(db, user, "maintenance_mode_toggled" if not req.enabled else "maintenance_mode_enabled",
+               "platform", None, {
+                   "enabled": req.enabled,
+                   "message": req.message,
+                   "estimated_restore": req.estimated_restore,
+               })
+    db.commit()
+
+    return {
+        "maintenance": {
+            "active": req.enabled,
+            "message": settings.MAINTENANCE_MESSAGE,
+            "estimated_restore": settings.MAINTENANCE_ESTIMATED_RESTORE,
+        }
+    }
+
+
+@router.get("/maintenance")
+async def get_maintenance_mode(
+    user: User = Depends(require_platform_admin),
+):
+    """Get current maintenance mode status."""
+    from ..config import get_settings
+    settings = get_settings()
+
+    return {
+        "maintenance": {
+            "active": settings.MAINTENANCE_MODE,
+            "message": settings.MAINTENANCE_MESSAGE,
+            "estimated_restore": settings.MAINTENANCE_ESTIMATED_RESTORE,
+        }
+    }

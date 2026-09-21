@@ -1,0 +1,549 @@
+"""
+SchemeKnit Lesson Quality Gate
+================================
+
+Validates a generated lesson plan against curriculum fidelity, pedagogical
+coherence, and practical quality criteria.
+
+A lesson that fails the quality gate is flagged for review or regeneration.
+No lesson is silently returned with poor quality.
+"""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
+
+from . import Indicator, CurriculumWeekType
+from .indicator_interpreter import IndicatorInterpretation
+
+
+class QualityStatus:
+    PASS = "pass"
+    WARN = "warn"
+    FAIL = "fail"
+
+
+@dataclass
+class QualityIssue:
+    """A single quality check result."""
+    check_name: str
+    status: str  # QualityStatus.PASS / WARN / FAIL
+    message: str
+    severity: str = "error"  # error / warning / info
+    category: str = ""  # curriculum / objectives / activities / assessment / coherence / practicality
+
+
+@dataclass
+class QualityReport:
+    """Aggregated quality validation report for a lesson plan."""
+    overall_status: str = QualityStatus.PASS
+    issues: List[QualityIssue] = field(default_factory=list)
+    score: float = 0.0  # 0-100
+
+    @property
+    def passed(self) -> bool:
+        return self.overall_status != QualityStatus.FAIL
+
+    @property
+    def failures(self) -> List[QualityIssue]:
+        return [i for i in self.issues if i.status == QualityStatus.FAIL]
+
+    @property
+    def warnings(self) -> List[QualityIssue]:
+        return [i for i in self.issues if i.status == QualityStatus.WARN]
+
+    def summary(self) -> Dict[str, Any]:
+        return {
+            "status": self.overall_status,
+            "score": self.score,
+            "total_checks": len(self.issues),
+            "failures": len(self.failures),
+            "warnings": len(self.warnings),
+            "failure_messages": [i.message for i in self.failures],
+            "warning_messages": [i.message for i in self.warnings],
+        }
+
+
+# ── Validation Functions ──────────────────────────────────────────────────
+
+def _check_curriculum_match(lesson: Dict[str, Any], indicator: Indicator) -> List[QualityIssue]:
+    """Verify curriculum identity fields match the source indicator."""
+    issues = []
+
+    # Exact indicator code match
+    lesson_codes = lesson.get("indicator_codes", [])
+    if indicator.code and indicator.code not in lesson_codes:
+        issues.append(QualityIssue(
+            check_name="indicator_code_match",
+            status=QualityStatus.FAIL,
+            message=f"Indicator code mismatch: lesson has {lesson_codes}, expected {indicator.code}",
+            severity="error",
+            category="curriculum",
+        ))
+    else:
+        issues.append(QualityIssue(
+            check_name="indicator_code_match",
+            status=QualityStatus.PASS,
+            message="Indicator code matches source.",
+            category="curriculum",
+        ))
+
+    # Subject match
+    lesson_subject = lesson.get("subject", "").lower()
+    if indicator.source_subject.lower() not in lesson_subject and lesson_subject not in indicator.source_subject.lower():
+        issues.append(QualityIssue(
+            check_name="subject_match",
+            status=QualityStatus.WARN,
+            message=f"Subject mismatch: lesson has '{lesson.get('subject')}', indicator is from '{indicator.source_subject}'",
+            severity="warning",
+            category="curriculum",
+        ))
+    else:
+        issues.append(QualityIssue(
+            check_name="subject_match",
+            status=QualityStatus.PASS,
+            message="Subject matches.",
+            category="curriculum",
+        ))
+
+    # Strand match
+    lesson_strand = lesson.get("strand", "").lower().strip()
+    indicator_strand = lesson.get("strand", "").lower().strip()  # from allocation
+    if lesson_strand and indicator_strand and lesson_strand != indicator_strand:
+        issues.append(QualityIssue(
+            check_name="strand_match",
+            status=QualityStatus.WARN,
+            message=f"Strand mismatch: lesson has '{lesson.get('strand')}'",
+            severity="warning",
+            category="curriculum",
+        ))
+    else:
+        issues.append(QualityIssue(
+            check_name="strand_match",
+            status=QualityStatus.PASS,
+            message="Strand matches.",
+            category="curriculum",
+        ))
+
+    return issues
+
+
+def _check_objectives(lesson: Dict[str, Any]) -> List[QualityIssue]:
+    """Validate learning objectives are measurable and traceable."""
+    issues = []
+    objectives = lesson.get("learning_objectives", [])
+
+    if not objectives:
+        issues.append(QualityIssue(
+            check_name="has_objectives",
+            status=QualityStatus.FAIL,
+            message="No learning objectives found.",
+            severity="error",
+            category="objectives",
+        ))
+        return issues
+
+    issues.append(QualityIssue(
+        check_name="has_objectives",
+        status=QualityStatus.PASS,
+        message=f"Found {len(objectives)} learning objective(s).",
+        category="objectives",
+    ))
+
+    # Check for measurable verbs
+    vague_verbs = {"understand", "know", "appreciate", "learn", "be aware of", "familiarize"}
+    measurable_prefixes = {"identify", "classify", "calculate", "compare", "explain",
+                           "construct", "demonstrate", "analyze", "analyse", "create",
+                           "justify", "describe", "list", "define", "solve", "apply",
+                           "examine", "investigate", "discuss", "design", "evaluate",
+                           "demonstrate", "measure", "record", "draw", "write", "read",
+                           "speak", "listen", "perform", "practise", "practice"}
+
+    for obj in objectives:
+        if isinstance(obj, dict):
+            desc = obj.get("description", "")
+        elif isinstance(obj, str):
+            desc = obj
+        else:
+            continue
+
+        desc_lower = desc.lower()
+        has_learner_can = "learners can" in desc_lower or "students can" in desc_lower
+
+        if not has_learner_can:
+            issues.append(QualityIssue(
+                check_name="objectives_learner_can",
+                status=QualityStatus.WARN,
+                message=f"Objective should start with 'Learners can': {desc[:80]}",
+                severity="warning",
+                category="objectives",
+            ))
+
+        # Check for vague verbs
+        for vague in vague_verbs:
+            if vague in desc_lower:
+                issues.append(QualityIssue(
+                    check_name="objectives_measurable",
+                    status=QualityStatus.WARN,
+                    message=f"Objective may use vague verb '{vague}': {desc[:80]}",
+                    severity="warning",
+                    category="objectives",
+                ))
+
+        # Check for at least one measurable verb
+        has_measurable = any(v in desc_lower for v in measurable_prefixes)
+        if not has_measurable and has_learner_can:
+            issues.append(QualityIssue(
+                check_name="objectives_measurable_verb",
+                status=QualityStatus.WARN,
+                message=f"Objective may lack measurable verb: {desc[:80]}",
+                severity="warning",
+                category="objectives",
+            ))
+
+    if not any(i.status == QualityStatus.FAIL for i in issues if i.check_name.startswith("objectives")):
+        issues.append(QualityIssue(
+            check_name="objectives_quality",
+            status=QualityStatus.PASS,
+            message="Objectives appear measurable.",
+            category="objectives",
+        ))
+
+    return issues
+
+
+def _check_activities(lesson: Dict[str, Any]) -> List[QualityIssue]:
+    """Validate activities address objectives and are realistic."""
+    issues = []
+
+    main_activities = lesson.get("main_activities", [])
+    assessment = lesson.get("assessment", "")
+
+    if not main_activities:
+        issues.append(QualityIssue(
+            check_name="has_main_activities",
+            status=QualityStatus.FAIL,
+            message="No main activities found.",
+            severity="error",
+            category="activities",
+        ))
+        return issues
+
+    issues.append(QualityIssue(
+        check_name="has_main_activities",
+        status=QualityStatus.PASS,
+        message=f"Found {len(main_activities)} main activity/activities.",
+        category="activities",
+    ))
+
+    # Check teacher and learner actions are explicit
+    for i, act in enumerate(main_activities):
+        if isinstance(act, dict):
+            desc = act.get("description", "")
+        elif isinstance(act, str):
+            desc = act
+        else:
+            continue
+
+        if len(desc) < 20:
+            issues.append(QualityIssue(
+                check_name=f"activity_{i}_detail",
+                status=QualityStatus.WARN,
+                message=f"Activity {i+1} may lack detail ({len(desc)} chars).",
+                severity="warning",
+                category="activities",
+            ))
+
+    # Check timing is valid
+    total_duration = 0
+    for act in main_activities:
+        if isinstance(act, dict):
+            dur = act.get("duration_minutes", 0)
+            if dur > 0:
+                total_duration += dur
+
+    lesson_duration = lesson.get("duration_minutes", 60)
+    if total_duration > lesson_duration * 1.2:
+        issues.append(QualityIssue(
+            check_name="timing_valid",
+            status=QualityStatus.WARN,
+            message=f"Activity total ({total_duration}min) exceeds lesson duration ({lesson_duration}min).",
+            severity="warning",
+            category="activities",
+        ))
+    else:
+        issues.append(QualityIssue(
+            check_name="timing_valid",
+            status=QualityStatus.PASS,
+            message="Activity timing is within lesson duration.",
+            category="activities",
+        ))
+
+    return issues
+
+
+def _check_assessment(lesson: Dict[str, Any]) -> List[QualityIssue]:
+    """Validate assessment checks the indicator and objectives."""
+    issues = []
+    assessment = lesson.get("assessment", "")
+
+    if not assessment:
+        issues.append(QualityIssue(
+            check_name="has_assessment",
+            status=QualityStatus.FAIL,
+            message="No assessment found.",
+            severity="error",
+            category="assessment",
+        ))
+        return issues
+
+    issues.append(QualityIssue(
+        check_name="has_assessment",
+        status=QualityStatus.PASS,
+        message="Assessment section present.",
+        category="assessment",
+    ))
+
+    # Check assessment is not generic
+    generic_phrases = ["what did we learn today", "what do you think",
+                       "any questions", "discuss generally"]
+    is_generic = any(phrase in assessment.lower() for phrase in generic_phrases)
+    if is_generic:
+        issues.append(QualityIssue(
+            check_name="assessment_specific",
+            status=QualityStatus.WARN,
+            message="Assessment may be too generic. Should check the specific indicator.",
+            severity="warning",
+            category="assessment",
+        ))
+    else:
+        issues.append(QualityIssue(
+            check_name="assessment_specific",
+            status=QualityStatus.PASS,
+            message="Assessment appears specific to the lesson content.",
+            category="assessment",
+        ))
+
+    return issues
+
+
+def _check_coherence(lesson: Dict[str, Any]) -> List[QualityIssue]:
+    """Validate lesson phases connect logically."""
+    issues = []
+
+    starter = lesson.get("starter_activity", lesson.get("introduction", ""))
+    main = lesson.get("main_activities", [])
+    assessment = lesson.get("assessment", "")
+    conclusion = lesson.get("conclusion", "")
+
+    # Starter exists
+    if not starter:
+        issues.append(QualityIssue(
+            check_name="has_starter",
+            status=QualityStatus.WARN,
+            message="No starter/introduction found.",
+            severity="warning",
+            category="coherence",
+        ))
+    else:
+        issues.append(QualityIssue(
+            check_name="has_starter",
+            status=QualityStatus.PASS,
+            message="Starter/introduction present.",
+            category="coherence",
+        ))
+
+    # Conclusion exists
+    if not conclusion:
+        issues.append(QualityIssue(
+            check_name="has_conclusion",
+            status=QualityStatus.WARN,
+            message="No conclusion/plenary found.",
+            severity="warning",
+            category="coherence",
+        ))
+    else:
+        issues.append(QualityIssue(
+            check_name="has_conclusion",
+            status=QualityStatus.PASS,
+            message="Conclusion/plenary present.",
+            category="coherence",
+        ))
+
+    return issues
+
+
+def _check_practicality(lesson: Dict[str, Any]) -> List[QualityIssue]:
+    """Validate lesson is practical for Ghanaian classrooms."""
+    issues = []
+
+    # Check no expensive equipment assumptions
+    expensive_keywords = ["projector", "smartboard", "computer lab", "internet access",
+                          "laptop", "tablet", "digital device", "laboratory equipment"]
+    all_text = " ".join([
+        str(lesson.get("introduction", "")),
+        str(lesson.get("assessment", "")),
+        str(lesson.get("conclusion", "")),
+    ])
+    for act in lesson.get("main_activities", []):
+        if isinstance(act, dict):
+            all_text += " " + str(act.get("description", ""))
+    for act in lesson.get("learner_activities", []):
+        if isinstance(act, dict):
+            all_text += " " + str(act.get("description", ""))
+
+    for keyword in expensive_keywords:
+        if keyword in all_text.lower():
+            issues.append(QualityIssue(
+                check_name="practical_resources",
+                status=QualityStatus.WARN,
+                message=f"Lesson assumes '{keyword}' which may not be available in all Ghanaian classrooms.",
+                severity="warning",
+                category="practicality",
+            ))
+
+    if not issues:
+        issues.append(QualityIssue(
+            check_name="practical_resources",
+            status=QualityStatus.PASS,
+            message="Resources appear practical for Ghanaian classrooms.",
+            category="practicality",
+        ))
+
+    # Check class size feasibility
+    class_size = lesson.get("class_size", 35)
+    if class_size > 60:
+        issues.append(QualityIssue(
+            check_name="class_size_feasible",
+            status=QualityStatus.WARN,
+            message=f"Class size of {class_size} may be too large for some activities.",
+            severity="warning",
+            category="practicality",
+        ))
+    else:
+        issues.append(QualityIssue(
+            check_name="class_size_feasible",
+            status=QualityStatus.PASS,
+            message="Class size is within typical range.",
+            category="practicality",
+        ))
+
+    return issues
+
+
+def _check_anti_hallucination(lesson: Dict[str, Any]) -> List[QualityIssue]:
+    """Check for invented codes, references, or page numbers."""
+    issues = []
+
+    all_text = " ".join([
+        str(lesson.get("introduction", "")),
+        str(lesson.get("assessment", "")),
+        str(lesson.get("conclusion", "")),
+        str(lesson.get("homework", "")),
+        str(lesson.get("previous_knowledge", "")),
+    ])
+    for act in lesson.get("main_activities", []):
+        if isinstance(act, dict):
+            all_text += " " + str(act.get("description", ""))
+
+    # Check for invented page references
+    page_pattern = re.compile(r'page\s+\d+', re.IGNORECASE)
+    if page_pattern.search(all_text):
+        issues.append(QualityIssue(
+            check_name="no_invented_references",
+            status=QualityStatus.WARN,
+            message="Lesson contains page references that may be invented.",
+            severity="warning",
+            category="anti_hallucination",
+        ))
+    else:
+        issues.append(QualityIssue(
+            check_name="no_invented_references",
+            status=QualityStatus.PASS,
+            message="No invented page references detected.",
+            category="anti_hallucination",
+        ))
+
+    # Check for invented curriculum codes (codes not from the source indicator)
+    source_code = lesson.get("indicator_codes", [""])[0] if lesson.get("indicator_codes") else ""
+    code_pattern = re.compile(r'[Bb]\d+\.\d+\.\d+\.\d+')
+    found_codes = code_pattern.findall(all_text)
+    for code in found_codes:
+        if source_code and code != source_code:
+            issues.append(QualityIssue(
+                check_name="no_invented_codes",
+                status=QualityStatus.WARN,
+                message=f"Found curriculum code '{code}' in generated text that differs from source '{source_code}'.",
+                severity="warning",
+                category="anti_hallucination",
+            ))
+            break
+
+    if not any(i.check_name == "no_invented_codes" for i in issues):
+        issues.append(QualityIssue(
+            check_name="no_invented_codes",
+            status=QualityStatus.PASS,
+            message="No invented curriculum codes detected.",
+            category="anti_hallucination",
+        ))
+
+    return issues
+
+
+# ── Main Quality Gate ─────────────────────────────────────────────────────
+
+def validate_lesson_quality(
+    lesson: Dict[str, Any],
+    indicator: Optional[Indicator] = None,
+) -> QualityReport:
+    """Run the full quality gate on a generated lesson plan.
+
+    Args:
+        lesson: The lesson plan as a dictionary.
+        indicator: The source curriculum indicator (for curriculum checks).
+
+    Returns:
+        QualityReport with pass/warn/fail status and issues.
+    """
+    report = QualityReport()
+
+    # Run all checks
+    all_issues = []
+
+    if indicator:
+        all_issues.extend(_check_curriculum_match(lesson, indicator))
+
+    all_issues.extend(_check_objectives(lesson))
+    all_issues.extend(_check_activities(lesson))
+    all_issues.extend(_check_assessment(lesson))
+    all_issues.extend(_check_coherence(lesson))
+    all_issues.extend(_check_practicality(lesson))
+    all_issues.extend(_check_anti_hallucination(lesson))
+
+    report.issues = all_issues
+
+    # Calculate overall status
+    has_failures = any(i.status == QualityStatus.FAIL for i in all_issues)
+    has_warnings = any(i.status == QualityStatus.WARN for i in all_issues)
+
+    if has_failures:
+        report.overall_status = QualityStatus.FAIL
+    elif has_warnings:
+        report.overall_status = QualityStatus.WARN
+    else:
+        report.overall_status = QualityStatus.PASS
+
+    # Calculate score (0-100)
+    total = len(all_issues)
+    passed = sum(1 for i in all_issues if i.status == QualityStatus.PASS)
+    warned = sum(1 for i in all_issues if i.status == QualityStatus.WARN)
+    failed = sum(1 for i in all_issues if i.status == QualityStatus.FAIL)
+
+    if total > 0:
+        report.score = round((passed * 100 + warned * 70) / total, 1)
+    else:
+        report.score = 0.0
+
+    return report

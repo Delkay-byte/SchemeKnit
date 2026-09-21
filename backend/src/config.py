@@ -99,6 +99,11 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     LOG_FORMAT: str = "json"
 
+    # Maintenance Mode
+    MAINTENANCE_MODE: bool = False
+    MAINTENANCE_MESSAGE: str = "SchemeKnit is currently undergoing maintenance. We'll be back shortly."
+    MAINTENANCE_ESTIMATED_RESTORE: str = ""  # e.g. "2 hours" or "30 minutes"
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
     def validate_production(self):

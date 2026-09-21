@@ -244,6 +244,32 @@ async def health_check():
     return {"status": "healthy", "service": "SchemeKnit", "version": settings.APP_VERSION}
 
 
+@app.get("/api/service-status")
+async def service_status():
+    """Machine-readable service status for the frontend status layer.
+
+    Returns:
+    - status: healthy | maintenance | degraded
+    - maintenance: maintenance mode details
+    - version: app version
+    """
+    if settings.MAINTENANCE_MODE:
+        return {
+            "status": "maintenance",
+            "maintenance": {
+                "active": True,
+                "message": settings.MAINTENANCE_MESSAGE,
+                "estimated_restore": settings.MAINTENANCE_ESTIMATED_RESTORE,
+            },
+            "version": settings.APP_VERSION,
+        }
+    return {
+        "status": "healthy",
+        "maintenance": {"active": False},
+        "version": settings.APP_VERSION,
+    }
+
+
 @app.get("/api/ready")
 async def readiness_check():
     """Readiness: process alive AND database + storage reachable.

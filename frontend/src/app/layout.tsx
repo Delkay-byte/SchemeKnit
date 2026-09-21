@@ -5,6 +5,7 @@ import { Toaster } from '@/components/ui/toaster'
 import { AuthProvider } from '@/lib/auth-context'
 import { PwaManager } from '@/components/pwa/pwa-manager'
 import { DesktopMenuListener } from '@/components/desktop-menu-listener'
+import { ServiceStatusBanner } from '@/components/ServiceStatusBanner'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -55,6 +56,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <AuthProvider>
           <DesktopMenuListener />
+          <ServiceStatusBanner />
           <div className="min-h-screen bg-background">
             {children}
           </div>
