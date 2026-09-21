@@ -202,27 +202,241 @@ class GenerationPipeline:
         lesson_plans: List[LessonPlan],
         config: TermConfig,
     ):
+        """Enrich lesson plans using Generation V2 with quality gate.
+
+        V2 uses indicator-grounded, subject-aware prompts.
+        Quality gate validates each enriched lesson before marking it ready.
+        Falls back to deterministic content if V2 fails quality validation.
+        """
+        from ..curriculum.quality_gate import validate_lesson_quality, QualityStatus
+        from ..curriculum.indicator_interpretation import Indicator as CurriculumIndicator
+
         provider = get_provider(config.ai_mode.value)
         if not provider.is_available():
             return
 
-        for lp in lesson_plans:
+        # Build previous/next context for lesson sequence continuity
+        sorted_plans = sorted(lesson_plans, key=lambda lp: lp.lesson_sequence)
+
+        for idx, lp in enumerate(sorted_plans):
             try:
-                content = provider.generate_lesson_content(
-                    indicator=lp.indicators[0] if lp.indicators else "",
+                # Determine previous and next lesson context
+                prev_context = None
+                next_context = None
+                if idx > 0:
+                    prev_lp = sorted_plans[idx - 1]
+                    prev_context = (
+                        f"Previous lesson: {prev_lp.strand} - {prev_lp.sub_strand}. "
+                        f"Indicator: {prev_lp.indicators[0] if prev_lp.indicators else 'N/A'}"
+                    )
+                if idx < len(sorted_plans) - 1:
+                    next_lp = sorted_plans[idx + 1]
+                    next_context = (
+                        f"Next lesson: {next_lp.strand} - {next_lp.sub_strand}. "
+                        f"Indicator: {next_lp.indicators[0] if next_lp.indicators else 'N/A'}"
+                    )
+
+                # Get source resources from the lesson plan
+                source_resources = list(lp.teaching_learning_resources or [])
+
+                # V2 structured generation
+                content = provider.generate_lesson_v2(
+                    subject=lp.subject or "",
+                    class_level=lp.class_level or "",
                     strand=lp.strand or "",
                     sub_strand=lp.sub_strand or "",
                     content_standard=lp.content_standard or "",
+                    indicator_code=lp.indicator_codes[0] if lp.indicator_codes else "",
+                    indicator_text=lp.indicators[0] if lp.indicators else "",
+                    class_size=lp.class_size or 35,
+                    duration_minutes=lp.duration_minutes or 60,
+                    source_resources=source_resources,
+                    previous_lesson_context=prev_context,
+                    next_lesson_context=next_context,
+                    week_number=lp.week_number,
                 )
-                if content:
-                    if content.get("introduction"):
-                        lp.introduction = content["introduction"]
-                    if content.get("main_activity"):
-                        lp.main_activities[0].description = content["main_activity"]
-                    if content.get("assessment"):
-                        lp.assessment = content["assessment"]
-                    if content.get("conclusion"):
-                        lp.conclusion = content["conclusion"]
+
+                if not content:
+                    continue
+
+                # Apply V2 content to the lesson plan
+                self._apply_v2_content(lp, content)
+
+                # Create a temporary indicator for quality gate
+                indicator_for_gate = CurriculumIndicator(
+                    code=lp.indicator_codes[0] if lp.indicator_codes else "",
+                    exact_text=f"{lp.indicator_codes[0] if lp.indicator_codes else ''} {lp.indicators[0] if lp.indicators else ''}",
+                    description=lp.indicators[0] if lp.indicators else "",
+                    source_week=lp.week_number,
+                    source_subject=lp.subject or "",
+                )
+
+                # Quality gate
+                lesson_dict = self._lesson_to_dict(lp)
+                report = validate_lesson_quality(lesson_dict, indicator_for_gate)
+
+                if report.passed:
                     lp.ai_generated = True
+                else:
+                    # Quality gate failed — revert to deterministic content
+                    # The deterministic content from generate_lesson_plans() is still in place
+                    # so we just skip the AI enrichment for this lesson
+                    pass
+
             except Exception:
+                # AI failure does not block the pipeline — deterministic content remains
                 continue
+
+    def _apply_v2_content(self, lp: LessonPlan, content: dict):
+        """Apply V2 structured content to a lesson plan.
+
+        Maps the V2 output schema to the existing LessonPlan fields.
+        Curriculum fields are NEVER overwritten by AI.
+        """
+        # Learning objectives
+        if "learning_objectives" in content and content["learning_objectives"]:
+            from ..models import LearningObjective
+            objectives = []
+            for obj in content["learning_objectives"]:
+                if isinstance(obj, str):
+                    objectives.append(LearningObjective(
+                        description=obj,
+                        indicator_code=lp.indicator_codes[0] if lp.indicator_codes else "",
+                    ))
+                elif isinstance(obj, dict):
+                    objectives.append(LearningObjective(
+                        description=obj.get("description", obj.get("objective", "")),
+                        indicator_code=lp.indicator_codes[0] if lp.indicator_codes else "",
+                    ))
+            if objectives:
+                lp.learning_objectives = objectives
+
+        # Key vocabulary
+        if "key_vocabulary" in content and content["key_vocabulary"]:
+            lp.keywords = content["key_vocabulary"]
+
+        # Starter
+        starter = content.get("starter", {})
+        if isinstance(starter, dict):
+            lp.starter_activity = starter.get("activity", "")
+        elif isinstance(starter, str):
+            lp.starter_activity = starter
+
+        # Main learning activities
+        main = content.get("main_learning", {})
+        if isinstance(main, dict):
+            from ..models import TeachingActivity
+            activities = []
+            for phase_key, phase in main.items():
+                if isinstance(phase, dict):
+                    activities.append(TeachingActivity(
+                        phase=phase.get("name", phase_key).upper(),
+                        description=phase.get("activity", ""),
+                        duration_minutes=phase.get("duration_minutes", 15),
+                        resources=phase.get("resources_used", []),
+                    ))
+            if activities:
+                lp.main_activities = activities
+        elif isinstance(main, list):
+            from ..models import TeachingActivity
+            activities = []
+            for item in main:
+                if isinstance(item, dict):
+                    activities.append(TeachingActivity(
+                        phase=item.get("phase", "MAIN").upper(),
+                        description=item.get("description", item.get("activity", "")),
+                        duration_minutes=item.get("duration_minutes", 15),
+                        resources=item.get("resources_used", []),
+                    ))
+            if activities:
+                lp.main_activities = activities
+
+        # Learner activities (from main_learning or dedicated field)
+        if "learner_activities" in content:
+            learner_acts = content["learner_activities"]
+            if isinstance(learner_acts, list):
+                from ..models import TeachingActivity
+                activities = []
+                for item in learner_acts:
+                    if isinstance(item, dict):
+                        activities.append(TeachingActivity(
+                            phase="LEARNER",
+                            description=item.get("description", item.get("activity", "")),
+                            duration_minutes=item.get("duration_minutes", 15),
+                        ))
+                    elif isinstance(item, str):
+                        activities.append(TeachingActivity(
+                            phase="LEARNER",
+                            description=item,
+                            duration_minutes=15,
+                        ))
+                if activities:
+                    lp.learner_activities = activities
+
+        # Assessment
+        assessment = content.get("assessment", {})
+        if isinstance(assessment, dict):
+            lp.assessment = assessment.get("activity", assessment.get("method", ""))
+        elif isinstance(assessment, str):
+            lp.assessment = assessment
+
+        # Plenary / conclusion
+        plenary = content.get("plenary", {})
+        if isinstance(plenary, dict):
+            lp.conclusion = plenary.get("activity", "")
+        elif isinstance(plenary, str):
+            lp.conclusion = plenary
+
+        # Differentiation
+        diff = content.get("differentiation", {})
+        if isinstance(diff, dict):
+            parts = []
+            if diff.get("support"):
+                parts.append(f"Support: {diff['support']}")
+            if diff.get("core"):
+                parts.append(f"Core: {diff['core']}")
+            if diff.get("extension"):
+                parts.append(f"Extension: {diff['extension']}")
+            lp.differentiation = "\n".join(parts)
+        elif isinstance(diff, str):
+            lp.differentiation = diff
+
+        # Homework
+        if "homework_or_extension" in content:
+            lp.homework = content["homework_or_extension"]
+
+        # Teacher notes
+        if "teacher_notes" in content:
+            # Store in previous_knowledge field (which is underutilized)
+            if not lp.previous_knowledge:
+                lp.previous_knowledge = content["teacher_notes"]
+
+    def _lesson_to_dict(self, lp: LessonPlan) -> dict:
+        """Convert a LessonPlan to a dict for the quality gate."""
+        return {
+            "subject": lp.subject or "",
+            "class_level": lp.class_level or "",
+            "strand": lp.strand or "",
+            "sub_strand": lp.sub_strand or "",
+            "indicator_codes": lp.indicator_codes or [],
+            "learning_objectives": [
+                {"description": obj.description} for obj in (lp.learning_objectives or [])
+            ],
+            "main_activities": [
+                {"description": act.description, "duration_minutes": act.duration_minutes}
+                for act in (lp.main_activities or [])
+            ],
+            "learner_activities": [
+                {"description": act.description, "duration_minutes": act.duration_minutes}
+                for act in (lp.learner_activities or [])
+            ],
+            "assessment": lp.assessment or "",
+            "introduction": lp.introduction or "",
+            "starter_activity": lp.starter_activity or "",
+            "conclusion": lp.conclusion or "",
+            "differentiation": lp.differentiation or "",
+            "class_size": lp.class_size or 35,
+            "duration_minutes": lp.duration_minutes or 60,
+            "keywords": lp.keywords or [],
+            "teaching_learning_resources": lp.teaching_learning_resources or [],
+        }

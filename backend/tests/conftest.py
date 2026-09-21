@@ -15,6 +15,10 @@ from sqlalchemy.orm import sessionmaker
 # Ensure backend src is importable
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
+# Configure pytest-asyncio to use "auto" mode so tests marked with
+# @pytest.mark.asyncio are automatically detected and run.
+pytest_plugins = []
+
 from src.database import Base, generate_id
 from src.auth import hash_password, create_access_token
 

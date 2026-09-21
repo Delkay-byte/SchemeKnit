@@ -239,6 +239,7 @@ class LessonPlanDB(Base):
     teaching_learning_resources = Column(JSON, default=list)
 
     introduction = Column(Text, default="")
+    starter_activity = Column(Text, default="")
     main_activities = Column(JSON, default=list)
     learner_activities = Column(JSON, default=list)
     teacher_activities = Column(JSON, default=list)
