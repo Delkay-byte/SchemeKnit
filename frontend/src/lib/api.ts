@@ -146,6 +146,21 @@ class ApiService {
     return this.request('/api/platform-admin/activation-codes')
   }
 
+  async getMaintenanceMode(): Promise<{ maintenance: { active: boolean; message: string; estimated_restore: string } }> {
+    return this.request('/api/platform-admin/maintenance')
+  }
+
+  async setMaintenanceMode(enabled: boolean, message?: string, estimatedRestore?: string): Promise<any> {
+    return this.request('/api/platform-admin/maintenance', {
+      method: 'POST',
+      body: JSON.stringify({ enabled, message: message || '', estimated_restore: estimatedRestore || '' }),
+    })
+  }
+
+  async getServiceStatus(): Promise<{ status: string; maintenance: { active: boolean; message: string; estimated_restore: string }; version: string }> {
+    return this.request('/api/service-status')
+  }
+
   async listUsers(): Promise<{ users: any[] }> {
     return this.request('/api/auth/users')
   }
