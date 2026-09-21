@@ -16,7 +16,7 @@ from sqlalchemy import func
 
 from ..database import (
     get_db, User, SchoolDB, SchoolMembershipDB, SchoolLicenseDB,
-    ActivationCodeDB, ProductPlanDB, PaymentDB, PlatformAuditLogDB,
+    ActivationCodeDB, IndividualActivationCodeDB, ProductPlanDB, PaymentDB, PlatformAuditLogDB,
     LicenseCacheDB, generate_id,
 )
 from ..auth import get_current_user, require_platform_admin
@@ -807,6 +807,75 @@ async def generate_license_activation_code(
     db.refresh(code)
 
     return _serialize_activation(db, code)
+
+
+# ── Individual Activation Codes ──────────────────────────────────────────────
+
+class CreateIndividualActivationRequest(BaseModel):
+    teacher_email: str
+    product_plan_id: str
+
+@router.post("/activation-codes")
+async def create_individual_activation_code(
+    req: CreateIndividualActivationRequest,
+    user: User = Depends(require_platform_admin),
+    db: Session = Depends(get_db),
+):
+    """Create an individual teacher activation code. Returns the code for the admin to share."""
+    from ..database import IndividualActivationCodeDB
+
+    plan = db.query(ProductPlanDB).filter(ProductPlanDB.id == req.product_plan_id).first()
+    if not plan:
+        raise HTTPException(status_code=404, detail="Product plan not found")
+
+    code_value = f"TF-IND-{''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(12))}"
+
+    activation_code = IndividualActivationCodeDB(
+        id=generate_id(),
+        product_plan_id=req.product_plan_id,
+        code=code_value,
+        status="active",
+        expires_at=datetime.utcnow() + timedelta(days=30),
+    )
+    db.add(activation_code)
+    _audit_log(db, user, "individual_activation_code_created", "product_plan", req.product_plan_id,
+               {"code": code_value, "teacher_email": req.teacher_email})
+    db.commit()
+    db.refresh(activation_code)
+
+    return {
+        "id": activation_code.id,
+        "code": activation_code.code,
+        "teacher_email": req.teacher_email,
+        "product_plan_id": activation_code.product_plan_id,
+        "status": activation_code.status,
+        "expires_at": activation_code.expires_at.isoformat() if activation_code.expires_at else None,
+        "created_at": activation_code.created_at.isoformat() if activation_code.created_at else None,
+    }
+
+
+@router.get("/activation-codes")
+async def list_individual_activation_codes(
+    user: User = Depends(require_platform_admin),
+    db: Session = Depends(get_db),
+):
+    """List all individual activation codes."""
+    from ..database import IndividualActivationCodeDB
+
+    codes = db.query(IndividualActivationCodeDB).order_by(IndividualActivationCodeDB.created_at.desc()).all()
+    result = []
+    for c in codes:
+        result.append({
+            "id": c.id,
+            "code": c.code,
+            "product_plan_id": c.product_plan_id,
+            "status": c.status,
+            "used_by_user_id": c.used_by_user_id,
+            "used_at": c.used_at.isoformat() if c.used_at else None,
+            "expires_at": c.expires_at.isoformat() if c.expires_at else None,
+            "created_at": c.created_at.isoformat() if c.created_at else None,
+        })
+    return {"codes": result, "count": len(result)}
 
 
 # ── Individual Teacher Management ────────────────────────────────────────────

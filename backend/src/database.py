@@ -666,6 +666,27 @@ class ActivationCodeDB(Base):
     )
 
 
+# ── Individual Teacher Activation Code ────────────────────────────────────────
+
+class IndividualActivationCodeDB(Base):
+    __tablename__ = "individual_activation_codes"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    product_plan_id = Column(String, ForeignKey("product_plans.id"), nullable=False)
+    code = Column(String, unique=True, nullable=False)
+    status = Column(String, default="active")  # active, used, revoked
+    used_by_user_id = Column(String, ForeignKey("users.id"), nullable=True)
+    used_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime, nullable=True)
+
+    product_plan = relationship("ProductPlanDB")
+
+    __table_args__ = (
+        Index("ix_individual_activation_code", "code"),
+    )
+
+
 # ── Platform Audit Log ────────────────────────────────────────────────────────
 
 class PlatformAuditLogDB(Base):

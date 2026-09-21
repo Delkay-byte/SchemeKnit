@@ -27,6 +27,9 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [plan, setPlan] = useState<PlanResolution | null>(null)
+  const [showActivateModal, setShowActivateModal] = useState(false)
+  const [activationCode, setActivationCode] = useState('')
+  const [activating, setActivating] = useState(false)
   // Server-persisted workflow stages for the active scheme (null = fallback to status).
   const [workflowStages, setWorkflowStages] = useState<{ key: string; state: string }[] | null>(null)
 
@@ -53,6 +56,25 @@ export default function Dashboard() {
       setError(err instanceof Error ? err.message : 'Failed to load schemes')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleActivateLicense = async () => {
+    if (!activationCode.trim()) {
+      setError('Please enter an activation code')
+      return
+    }
+    setActivating(true)
+    setError(null)
+    try {
+      await api.activateIndividualLicense(activationCode)
+      setShowActivateModal(false)
+      setActivationCode('')
+      await loadSchemes() // Refresh plan
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Activation failed')
+    } finally {
+      setActivating(false)
     }
   }
 
@@ -250,8 +272,12 @@ export default function Dashboard() {
                       </div>
                     </div>
                     {plan.edition === 'free' && plan.source === 'free' && (
-                      <Button asChild size="sm" className="bg-emerald-600 hover:bg-emerald-700">
-                        <Link href="/upgrade">Upgrade to Pro</Link>
+                      <Button
+                        size="sm"
+                        className="bg-emerald-600 hover:bg-emerald-700"
+                        onClick={() => setShowActivateModal(true)}
+                      >
+                        Activate License
                       </Button>
                     )}
                   </div>
@@ -494,6 +520,50 @@ export default function Dashboard() {
                 </div>
               )}
             </div>
+            {showActivateModal && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowActivateModal(false)}>
+                <Card className="max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+                  <CardHeader>
+                    <CardTitle className="text-xl">Activate License</CardTitle>
+                    <CardDescription>
+                      Enter your activation code to unlock Teacher Pro features.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {error && (
+                      <p className="text-sm text-destructive bg-destructive/10 p-2 rounded">{error}</p>
+                    )}
+                    <div>
+                      <label className="block text-sm font-medium mb-1">License / Activation Code</label>
+                      <input
+                        type="text"
+                        value={activationCode}
+                        onChange={(e) => setActivationCode(e.target.value)}
+                        placeholder="Enter your activation code"
+                        className="w-full px-3 py-2 border rounded-md"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={handleActivateLicense}
+                        disabled={activating || !activationCode.trim()}
+                        className="flex-1"
+                      >
+                        {activating ? 'Activating…' : 'Activate License'}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => { setShowActivateModal(false); setActivationCode(''); setError(null); }}
+                        disabled={activating}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
           </>
         )}
       </main>

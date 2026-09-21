@@ -204,6 +204,10 @@ class SetupSchoolAdminRequest(BaseModel):
     school_id: str = None
 
 
+class IndividualActivateRequest(BaseModel):
+    activation_code: str
+
+
 @router.post("/activation/validate")
 async def validate_activation_code(req: ActivationValidateRequest, db: Session = Depends(get_db)):
     """Public code check for the onboarding UX. Reveals display info only
@@ -223,6 +227,147 @@ async def validate_activation_code(req: ActivationValidateRequest, db: Session =
             "expiry_date": license.expiry_date.isoformat(),
             "seat_limit": license.seat_limit,
         },
+    }
+
+
+@router.post("/activate-individual")
+async def activate_individual_license(
+    req: IndividualActivateRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Activate an individual teacher license using an activation code.
+
+    The teacher must be logged in and on the Free Tier. The activation code
+    is validated and redeemed atomically, granting the teacher the paid
+    individual entitlement associated with the code's product plan.
+    """
+    if not req.activation_code or not req.activation_code.strip():
+        raise HTTPException(status_code=422, detail="Activation code is required")
+
+    # Load the individual activation code with row lock
+    code = db.query(IndividualActivationCodeDB).filter(
+        IndividualActivationCodeDB.code == req.activation_code.strip(),
+    ).with_for_update().first()
+    if not code:
+        raise HTTPException(status_code=404, detail="Invalid activation code")
+
+    # Validate code state
+    if code.status == "revoked":
+        raise HTTPException(status_code=403, detail="Activation code has been revoked")
+    if code.status == "used":
+        raise HTTPException(status_code=403, detail="Activation code already used")
+    if code.expires_at and code.expires_at < datetime.utcnow():
+        raise HTTPException(status_code=403, detail="Activation code has expired")
+    if code.status != "active":
+        raise HTTPException(status_code=403, detail="Activation code is not active")
+
+    # Get the product plan
+    plan = db.query(ProductPlanDB).filter(
+        ProductPlanDB.id == code.product_plan_id).first()
+    if not plan:
+        raise HTTPException(status_code=404, detail="Product plan not found")
+    if plan.customer_type != "individual_teacher":
+        raise HTTPException(status_code=403, detail="Activation code is not for individual teacher license")
+
+    # Check if user is on Free Tier (not already on a paid plan)
+    from ..entitlements import resolve_entitlement
+    entitlement = resolve_entitlement(db, user)
+    if entitlement["edition"] != "free":
+        raise HTTPException(status_code=403, detail="Your account already has a paid plan")
+
+    # Redeem the code
+    code.status = "used"
+    code.used_by_user_id = user.id
+    redeemed_at = datetime.utcnow()
+    code.used_at = redeemed_at
+
+    # Create or update subscription
+    from ..database import EntitlementDB, SubscriptionDB
+    now = datetime.utcnow()
+    duration_days = plan.duration_days or 365
+
+    sub = db.query(SubscriptionDB).filter(
+        SubscriptionDB.user_id == user.id,
+        SubscriptionDB.status == "active",
+    ).first()
+
+    if sub:
+        if sub.expires_at and sub.expires_at > now:
+            sub.expires_at = sub.expires_at + timedelta(days=duration_days)
+        else:
+            sub.expires_at = now + timedelta(days=duration_days)
+        sub.status = "active"
+        sub.plan_name = plan.name
+    else:
+        sub = SubscriptionDB(
+            id=generate_id(),
+            user_id=user.id,
+            edition="teacher",
+            plan_name=plan.name,
+            status="active",
+            started_at=now,
+            expires_at=now + timedelta(days=duration_days),
+            payment_provider="activation_code",
+            external_id=code.id,
+        )
+        db.add(sub)
+
+    # Create or update entitlement
+    ent = db.query(EntitlementDB).filter(
+        EntitlementDB.user_id == user.id,
+    ).first()
+
+    if ent:
+        ent.edition = "teacher"
+        ent.subscription_type = "individual"
+        ent.ai_enabled = getattr(plan, 'ai_enabled', True)
+        ent.batch_generation = getattr(plan, 'batch_generation', True)
+        ent.zip_export = getattr(plan, 'zip_export', True)
+        ent.pdf_export = getattr(plan, 'pdf_export', True)
+        ent.custom_template_limit = getattr(plan, 'custom_template_limit', 10)
+        ent.history_limit = getattr(plan, 'history_limit', 100)
+        ent.ai_credits = getattr(plan, 'ai_credits', 50)
+        ent.generation_limit = getattr(plan, 'generation_limit', 0)
+        ent.expires_at = now + timedelta(days=duration_days)
+        ent.updated_at = now
+    else:
+        ent = EntitlementDB(
+            id=generate_id(),
+            user_id=user.id,
+            edition="teacher",
+            subscription_type="individual",
+            features=["ai_basic", "cloud_sync", "template_import", "content_library"],
+            ai_enabled=getattr(plan, 'ai_enabled', True),
+            batch_generation=getattr(plan, 'batch_generation', True),
+            zip_export=getattr(plan, 'zip_export', True),
+            pdf_export=getattr(plan, 'pdf_export', True),
+            custom_template_limit=getattr(plan, 'custom_template_limit', 10),
+            history_limit=getattr(plan, 'history_limit', 100),
+            ai_credits=getattr(plan, 'ai_credits', 50),
+            ai_credits_used=0,
+            generation_limit=getattr(plan, 'generation_limit', 0),
+            generations_used=0,
+            cloud_sync=True,
+            template_import=True,
+            content_library=True,
+            expires_at=now + timedelta(days=duration_days),
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(ent)
+
+    # Update user subscription_type
+    user.subscription_type = "individual"
+
+    log_security("individual_license_activated", user_id=user.id,
+                 plan=plan.name, activation_code_id=code.id)
+    db.commit()
+
+    return {
+        "message": "License activated successfully",
+        "plan": plan.name,
+        "expires_at": (now + timedelta(days=duration_days)).isoformat(),
     }
 
 
