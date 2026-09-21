@@ -25,9 +25,10 @@ interface UseServiceStatusReturn {
   error: string | null
 }
 
-const CHECK_INTERVAL_MS = 30000 // 30 seconds
-const CONSECUTIVE_FAILURES_THRESHOLD = 3
-const RETRY_BACKOFF_MS = [2000, 5000, 10000] // progressive backoff
+const CHECK_INTERVAL_MS = 45000 // 45 seconds between stable checks
+const CONSECUTIVE_FAILURES_THRESHOLD = 5 // require 5 failures before declaring offline
+const RETRY_BACKOFF_MS = [3000, 5000, 8000, 12000] // progressive backoff on failures
+const COLD_START_TIMEOUT_MS = 15000 // 15s initial timeout to tolerate Render cold starts
 
 export function useServiceStatus(apiBaseUrl: string = ''): UseServiceStatusReturn {
   const [status, setStatus] = useState<ServiceStatus>('unknown')
@@ -44,6 +45,7 @@ export function useServiceStatus(apiBaseUrl: string = ''): UseServiceStatusRetur
   const retryIndex = useRef(0)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const mountedRef = useRef(true)
+  const hasCompletedFirstCheck = useRef(false)
 
   const baseUrl = apiBaseUrl || ''
 
@@ -52,7 +54,9 @@ export function useServiceStatus(apiBaseUrl: string = ''): UseServiceStatusRetur
 
     try {
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10s timeout
+      // Use longer timeout on first check to tolerate Render cold starts
+      const timeoutMs = hasCompletedFirstCheck.current ? 10000 : COLD_START_TIMEOUT_MS
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
       const response = await fetch(`${baseUrl}/api/service-status`, {
         method: 'GET',
@@ -70,6 +74,8 @@ export function useServiceStatus(apiBaseUrl: string = ''): UseServiceStatusRetur
 
       if (!mountedRef.current) return
 
+      hasCompletedFirstCheck.current = true
+
       // Reset failure tracking
       consecutiveFailures.current = 0
       retryIndex.current = 0
@@ -85,7 +91,6 @@ export function useServiceStatus(apiBaseUrl: string = ''): UseServiceStatusRetur
 
       // State transition notifications
       if (prevStatus === 'offline' && newStatus === 'healthy') {
-        // Back online — will be handled by the component
         window.dispatchEvent(new CustomEvent('schemeknit:back-online'))
       }
       if (prevStatus !== 'maintenance' && newStatus === 'maintenance') {
@@ -101,6 +106,7 @@ export function useServiceStatus(apiBaseUrl: string = ''): UseServiceStatusRetur
     } catch (err) {
       if (!mountedRef.current) return
 
+      hasCompletedFirstCheck.current = true
       consecutiveFailures.current += 1
 
       if (consecutiveFailures.current >= CONSECUTIVE_FAILURES_THRESHOLD) {
@@ -108,13 +114,13 @@ export function useServiceStatus(apiBaseUrl: string = ''): UseServiceStatusRetur
         setStatus(newStatus)
         setError('Server unavailable')
 
-        // State transition: healthy → offline
+        // State transition: not-offline → offline
         if (previousStatus.current !== 'offline') {
           window.dispatchEvent(new CustomEvent('schemeknit:server-down'))
         }
         previousStatus.current = newStatus
       } else {
-        // Transient failure — don't change status yet
+        // Transient failure — keep current status, do NOT change to offline
         setError(`Check failed (${consecutiveFailures.current}/${CONSECUTIVE_FAILURES_THRESHOLD})`)
       }
 
