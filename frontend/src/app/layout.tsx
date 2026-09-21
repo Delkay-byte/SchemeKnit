@@ -56,8 +56,9 @@ export default function RootLayout({
       <body className={inter.className}>
         <AuthProvider>
           <DesktopMenuListener />
-          <ServiceStatusBanner />
-          <div className="min-h-screen bg-background">
+           {/* v1.0.5.1 */}
+           <ServiceStatusBanner />
+           <div className="min-h-screen bg-background">
             {children}
           </div>
           <Toaster />
