@@ -2,7 +2,18 @@
 
 import { DEV_TOOLS_ENABLED } from './dev-tools'
 
-function getApiBaseUrl(): string {
+/**
+ * Single source of truth for the API base URL.
+ *
+ * - Electron (desktop): local bundled backend at 127.0.0.1:18234
+ * - Web production: NEXT_PUBLIC_API_URL (e.g. https://schemeknit-api.onrender.com)
+ * - Local dev fallback: http://localhost:8000
+ *
+ * Exported so the service-status health check and any other client-side
+ * code that needs the backend origin can reuse this without duplicating
+ * the Electron / env-var logic.
+ */
+export function getApiBaseUrl(): string {
   if (typeof window !== 'undefined' && (window as any).electronAPI) {
     return 'http://127.0.0.1:18234'
   }
