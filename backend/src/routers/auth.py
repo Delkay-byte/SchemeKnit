@@ -536,7 +536,7 @@ async def register_individual_teacher(
     if existing:
         raise HTTPException(status_code=409, detail="Email already registered")
 
-    from ..entitlements import get_user_entitlement
+    from ..entitlements import get_user_entitlement, FREE_TIER_LESSON_PLANS_PER_MONTH
     from ..database import EntitlementDB
 
     new_user = User(
@@ -554,13 +554,15 @@ async def register_individual_teacher(
     db.add(new_user)
     db.flush()
 
-    # Create Free Teacher entitlement
+    # Create Free Tier entitlement. Lesson plans are 5 per CALENDAR MONTH
+    # (enforced server-side via the usage ledger); AI is a separate lifetime
+    # allowance of 5.
     free_ent = EntitlementDB(
         id=generate_id(),
         user_id=new_user.id,
         edition="free",
         subscription_type="individual",
-        generation_limit=3,
+        generation_limit=FREE_TIER_LESSON_PLANS_PER_MONTH,
         generations_used=0,
         batch_generation=False,
         zip_export=False,

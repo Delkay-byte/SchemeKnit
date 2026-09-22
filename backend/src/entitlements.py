@@ -22,6 +22,10 @@ from .database import (
     get_db, User, EntitlementDB, SubscriptionDB, SchoolLicenseDB, SchoolDB,
     AIUsageEventDB,
 )
+from .usage_quota import (
+    PERIOD_TYPE_CALENDAR_MONTH, current_period_key, get_units_used,
+    remaining_for_limit, reserve_lesson_units, release_lesson_units,
+)
 
 #: User-facing, secret-free message for a denied AI request.
 AI_ENTITLEMENT_REQUIRED = (
@@ -36,6 +40,26 @@ FREE_TIER_AI_GENERATIONS = 5
 #: Visible plan label for the free individual-teacher tier (§14). The internal
 #: edition identifier stays "free"; only this user-facing wording changes.
 FREE_TIER_PLAN_NAME = "Free Tier"
+
+#: Free Tier LESSON-PLAN allowance: this many lesson plans per CALENDAR MONTH.
+#: One indicator → one period → one lesson plan → one unit. This is entirely
+#: separate from the AI allowance above, which stays a lifetime AI count.
+FREE_TIER_LESSON_PLANS_PER_MONTH = 5
+
+
+def free_tier_lesson_quota_message(remaining: int) -> str:
+    """User-facing explanation of the monthly Free Tier lesson allowance."""
+    if remaining <= 0:
+        return (
+            "You've used all "
+            f"{FREE_TIER_LESSON_PLANS_PER_MONTH} Free Tier lesson plans for this "
+            "month. This allowance renews on the 1st of next month. "
+            "Upgrade to Teacher Pro to generate unlimited lesson plans now."
+        )
+    return (
+        f"You have {remaining} Free Tier lesson plan"
+        f"{'s' if remaining != 1 else ''} remaining this month."
+    )
 
 
 def free_tier_ai_exhausted_message(limit: int = FREE_TIER_AI_GENERATIONS) -> str:
@@ -132,8 +156,14 @@ def resolve_entitlement(db: Session, user: User) -> Dict[str, Any]:
         "plan_name": FREE_TIER_PLAN_NAME,
         #: Free Tier AI is a LIFETIME allowance (never reset).
         "ai_lifetime": True,
-        "generation_limit": 3,
-        "generations_used": ent.generations_used if ent else 0,
+        #: Free Tier LESSON PLANS are a CALENDAR-MONTH allowance.
+        "generation_limit": FREE_TIER_LESSON_PLANS_PER_MONTH,
+        "generations_used": 0,
+        "lesson_quota_period": PERIOD_TYPE_CALENDAR_MONTH,
+        "lesson_quota_period_key": "",
+        "lesson_quota_unlimited": False,
+        "lesson_quota_limit": FREE_TIER_LESSON_PLANS_PER_MONTH,
+        "lesson_quota_remaining": FREE_TIER_LESSON_PLANS_PER_MONTH,
         "batch_generation": False,
         "zip_export": False,
         "pdf_export": True,
@@ -153,10 +183,16 @@ def resolve_entitlement(db: Session, user: User) -> Dict[str, Any]:
         result["edition"] = ent.edition or "teacher"
         result["subscription_type"] = "individual"
         result["plan_name"] = "Teacher Pro" if ent.edition == "teacher" else FREE_TIER_PLAN_NAME
-        #: Only the free edition is a lifetime allowance; paid plans keep their
-        #: own (configurable) allowance and are never lifetime-capped here.
+        #: Only the free edition is a lifetime AI allowance; paid plans keep
+        #: their own (configurable) AI allowance and are never lifetime-capped.
         result["ai_lifetime"] = (ent.edition or "free") == "free"
-        result["generation_limit"] = ent.generation_limit or 0
+        #: The Free Tier lesson-plan allowance is fixed at N per calendar month,
+        #: independent of any legacy stored value. Paid plans use the stored
+        #: generation_limit (0 = unlimited).
+        if (ent.edition or "free") == "free":
+            result["generation_limit"] = FREE_TIER_LESSON_PLANS_PER_MONTH
+        else:
+            result["generation_limit"] = ent.generation_limit or 0
         result["generations_used"] = ent.generations_used or 0
         result["batch_generation"] = bool(ent.batch_generation)
         result["zip_export"] = bool(ent.zip_export)
@@ -194,7 +230,55 @@ def resolve_entitlement(db: Session, user: User) -> Dict[str, Any]:
 
         # School AI entitlement is handled by ai_entitlement() separately
 
+    # ── Calendar-period authoritative usage for finite lesson allowances ────
+    # The stored generations_used column is legacy; the real usage is the
+    # calendar-month ledger. The month always comes from the SERVER clock.
+    limit = result.get("generation_limit", 0) or 0
+    if limit > 0:
+        pk = current_period_key()
+        result["generation_limit"] = limit
+        result["generations_used"] = get_units_used(db, user.id, pk)
+        result["lesson_quota_period"] = PERIOD_TYPE_CALENDAR_MONTH
+        result["lesson_quota_period_key"] = pk
+        result["lesson_quota_unlimited"] = False
+        result["lesson_quota_limit"] = limit
+        result["lesson_quota_remaining"] = remaining_for_limit(db, user.id, limit, pk)
+    else:
+        result["generation_limit"] = 0
+        result["generations_used"] = 0
+        result["lesson_quota_period"] = PERIOD_TYPE_CALENDAR_MONTH
+        result["lesson_quota_period_key"] = current_period_key()
+        result["lesson_quota_unlimited"] = True
+        result["lesson_quota_limit"] = 0
+        result["lesson_quota_remaining"] = None
+
     return result
+
+
+def lesson_quota_status(db: Session, user: User, resolved: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Server-side lesson-plan quota snapshot for the current calendar month.
+
+    This is what the UI displays (“N of M used this month, K remaining”). It is
+    always derived server-side; the browser never supplies the month.
+    """
+    resolved = resolved or resolve_entitlement(db, user)
+    limit = resolved.get("generation_limit", 0) or 0
+    enforced = limit > 0
+    period_key = resolved.get("lesson_quota_period_key") or current_period_key()
+    used = resolved.get("generations_used", 0) if enforced else 0
+    remaining = (max(limit - used, 0) if enforced else None)
+    return {
+        "plan_name": resolved.get("plan_name"),
+        "edition": resolved.get("edition"),
+        "enforced": enforced,
+        "unlimited": not enforced,
+        "limit": limit,
+        "used": used,
+        "remaining": remaining,
+        "period_type": PERIOD_TYPE_CALENDAR_MONTH,
+        "period_key": period_key,
+        "unit": "lesson_plan",
+    }
 
 
 # ── Feature gates ────────────────────────────────────────────────────────────
@@ -276,7 +360,12 @@ def can_create_custom_template(user: User, db: Session) -> Tuple[bool, str]:
 
 
 def increment_generation_count(user: User, db: Session, count: int = 1) -> None:
-    """Atomically increment the generation counter for the user's entitlement."""
+    """Legacy lifetime-counter helper (kept for compatibility only).
+
+    New code MUST use ``reserve_lesson_units`` / ``release_lesson_units`` from
+    usage_quota for the calendar-month allowance. This function no longer
+    drives enforcement.
+    """
     ent = get_user_entitlement(db, user.id)
     if ent:
         ent.generations_used = (ent.generations_used or 0) + count

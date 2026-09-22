@@ -141,7 +141,7 @@ def up(db):
         "created_at": now,
         "updated_at": now,
         "customer_type": "individual_teacher",
-        "generation_limit": 3,
+        "generation_limit": 5,
         "batch_generation": False,
         "zip_export": False,
         "pdf_export": True,
@@ -149,7 +149,7 @@ def up(db):
         "history_limit": 10,
         "ai_enabled": True,
         "ai_credits": 5,
-        "max_generations_per_period": 3,
+        "max_generations_per_period": 5,
     }, inspector)
 
     _seed_plan(db, {

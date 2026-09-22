@@ -251,9 +251,13 @@ export default function Dashboard() {
                   <div className="flex items-center gap-6 text-sm text-muted-foreground">
                     <div className="text-center">
                       <div className="font-semibold text-foreground">
-                        {plan.generation_limit === 0 ? 'Unlimited' : plan.generations_used + '/' + plan.generation_limit}
+                        {plan.generation_limit === 0
+                          ? 'Unlimited'
+                          : `${plan.generations_used}/${plan.generation_limit}`}
                       </div>
-                      <div>Generations</div>
+                      <div>
+                        {plan.edition === 'free' ? 'Lesson plans this month' : 'Generations'}
+                      </div>
                     </div>
                     <div className="text-center">
                       <div className="font-semibold text-foreground">
@@ -282,6 +286,15 @@ export default function Dashboard() {
                     )}
                   </div>
                 </div>
+                {/* Free Tier lesson plans are a CALENDAR-MONTH allowance that
+                    renews on the 1st — state it plainly. */}
+                {plan.edition === 'free' && plan.generation_limit > 0 && (
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    {plan.generations_used} of {plan.generation_limit} lesson plans used this month ·{' '}
+                    {Math.max(plan.generation_limit - plan.generations_used, 0)} remaining.
+                    {' '}Your allowance renews on the 1st. Upgrade to Teacher Pro for unlimited lesson plans.
+                  </p>
+                )}
                 {/* Free Tier AI is a one-time lifetime allowance — say so plainly
                     (never "resets tomorrow"). */}
                 {plan.ai_lifetime && plan.ai_credits > 0 &&

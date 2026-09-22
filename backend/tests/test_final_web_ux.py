@@ -123,9 +123,23 @@ class TestServerDerivedIdentity:
             )
 
         # Avoid the real (heavy) parse + render; this test is about identity,
-        # not document generation.
+        # not document generation. The stub still carries one real instruction
+        # week so the indicator/quota pre-check has something to allocate.
+        from datetime import date as _date
+        from src.models import Week as _Week, WeekType as _WeekType
+
+        def _stub_scheme_to_model(db_scheme):
+            return SimpleNamespace(weeks=[_Week(
+                week_number=1,
+                start_date=_date(2026, 9, 11), end_date=_date(2026, 9, 18),
+                week_type=_WeekType.INSTRUCTION,
+                strand="Numbers", sub_strand="Counting",
+                content_standards=[], indicators=["B7.1.1.1.1 Test indicator"],
+                resources=[], scheme_of_work_id=_scheme.id,
+            )])
+
         monkeypatch.setattr(gen_router.data_service, "scheme_to_model",
-                            lambda db_scheme: SimpleNamespace(weeks=[]))
+                            _stub_scheme_to_model)
         monkeypatch.setattr(gen_router.pipeline, "generate_all", _stub_generate_all)
 
         config = _term_config(_scheme.id)

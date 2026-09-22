@@ -31,21 +31,66 @@ from .subject_keywords import (
 )
 
 
+#: Controlled aliases for equivalent curriculum concepts (PART G). Matching is
+#: done on a deterministic normalisation of the header cell, never on exact
+#: spelling alone, so a different school's wording still maps to the same
+#: concept. Unknown headers are preserved (never discarded) — see
+#: ``ParsedScheme.unknown_columns``.
 HEADER_ALIASES = {
-    "week ending": "week_ending",
+    # ── week concept ────────────────────────────────────────────────────
     "week": "week_ending",
     "week no": "week_ending",
+    "week no.": "week_ending",
     "week number": "week_ending",
+    "week ending": "week_ending",
+    "week ending date": "week_ending",
+    "week date": "week_ending",
+    "wk": "week_ending",
+    "wk no": "week_ending",
+    "wks": "week_ending",
+    "week/date": "week_ending",
+    # ── strand / theme ──────────────────────────────────────────────────
     "strand": "strand",
+    "strands": "strand",
+    "strand/theme": "strand",
+    "theme": "strand",
+    # ── sub-strand / context ────────────────────────────────────────────
     "sub-strand": "sub_strand",
     "sub strand": "sub_strand",
+    "substrand": "sub_strand",
     "sub_strand": "sub_strand",
+    "sub-strand/topic": "sub_strand",
+    "sub strand/topic": "sub_strand",
+    "sub theme": "sub_strand",
+    "subtheme": "sub_strand",
+    "sub-theme": "sub_strand",
+    "topic": "sub_strand",
+    # ── content standard ────────────────────────────────────────────────
     "content standard": "content_standard",
     "content standards": "content_standard",
+    "standard": "content_standard",
+    "standards": "content_standard",
+    "content standard/codes": "content_standard",
+    # ── indicator concept ───────────────────────────────────────────────
     "indicators": "indicators",
     "indicator": "indicators",
+    "learning indicator": "indicators",
+    "learning indicators": "indicators",
+    "performance indicator": "indicators",
+    "performance indicators": "indicators",
+    "specific indicator": "indicators",
+    "specific indicators": "indicators",
+    "indicator/indicators": "indicators",
+    "learning indicator/codes": "indicators",
+    # ── resources ───────────────────────────────────────────────────────
     "resources": "resources",
     "resource": "resources",
+    "teaching learning resources": "resources",
+    "teaching and learning resources": "resources",
+    "tlrs": "resources",
+    "tlr": "resources",
+    "materials": "resources",
+    "instructional materials": "resources",
 }
 
 SPECIAL_WEEK_KEYWORDS = [
@@ -122,26 +167,56 @@ class DOCXParser:
                 forced_subject = selected[0]["subject"]
 
         filename_for_detection = original_filename or file_path.name
-        parsed_scheme = self._parse_scheme(tables_data, raw_text, file_path.name)
+        parsed_scheme = self._parse_scheme(tables_data, raw_text, filename_for_detection)
 
         weeks = self._convert_to_weeks(parsed_scheme)
+
+        # ── Classification: detect, or be honest about not knowing (PART E) ──
+        # Never fabricate a class or subject. Unknown → Subject.UNKNOWN /
+        # ClassLevel.UNKNOWN plus an explicit "needs confirmation" warning.
+        detected_subject = forced_subject or self._detect_subject(parsed_scheme, raw_text)
+        detected_class = self._detect_class_level(
+            parsed_scheme, raw_text, filename_for_detection)
 
         scheme = SchemeOfWork(
             filename=filename_for_detection,
             upload_date=datetime.utcnow(),
-            subject=forced_subject or self._detect_subject(parsed_scheme, raw_text),
-            class_level=self._detect_class_level(parsed_scheme, raw_text, filename_for_detection),
+            subject=detected_subject or Subject.UNKNOWN,
+            class_level=detected_class or ClassLevel.UNKNOWN,
             term=parsed_scheme.term or self._detect_term(raw_text),
             academic_year=parsed_scheme.academic_year or self._detect_academic_year(raw_text),
             weeks=weeks,
             raw_text=raw_text,
-            status="extracted"
+            # A document that yielded no weeks is an extraction FAILURE, not a
+            # usable empty curriculum (PART J).
+            status="extracted" if weeks else "extraction_failed",
         )
+        if detected_subject is None:
+            scheme.validation_issues.append(ValidationIssue(
+                severity=ValidationSeverity.WARNING,
+                field="subject",
+                message=("Subject could not be detected from this document — "
+                         "needs confirmation before generating."),
+            ))
+        if detected_class is None:
+            scheme.validation_issues.append(ValidationIssue(
+                severity=ValidationSeverity.WARNING,
+                field="class_level",
+                message=("Class level could not be detected from this document — "
+                         "needs confirmation before generating."),
+            ))
+        if not weeks:
+            scheme.validation_issues.append(ValidationIssue(
+                severity=ValidationSeverity.ERROR,
+                field="weeks",
+                message=("Scheme could not be reliably extracted. Review the "
+                         "detected structure or upload a clearer copy."),
+            ))
         return scheme
 
     # ── Multi-subject document detection (§4) ────────────────────────────
 
-    def analyze(self, file_path: Path) -> Dict[str, Any]:
+    def analyze(self, file_path: Path, original_filename: str = None) -> Dict[str, Any]:
         """Inspect a document WITHOUT generating anything.
 
         Returns the document title, the subject sections detected, and a
@@ -217,11 +292,46 @@ class DOCXParser:
         else:
             status = "low_confidence"
 
+        # ── Metadata reconciliation (PART H) ────────────────────────────────
+        # Class/subject are detected from multiple independent signals and
+        # conflicts are reported rather than silently resolved. The filename is
+        # secondary evidence only.
+        detection_filename = original_filename or file_path.name
+        class_signals = self.class_level_signals(raw_text, detection_filename)
+        subject_signals = self.subject_signals(raw_text, detection_filename)
+        metadata = {
+            "subject": subject_signals["resolved"],
+            "class_level": class_signals["resolved"],
+            "subject_signals": subject_signals,
+            "class_signals": class_signals,
+        }
+        needs_confirmation = bool(
+            class_signals["conflict"] or subject_signals["conflict"]
+            or class_signals["resolved"] is None
+            or subject_signals["resolved"] is None
+        )
+
+        if status in ("single", "low_confidence") and needs_confirmation:
+            # Could not confirm subject/class from the document itself.
+            status = "needs_confirmation"
+
+        if not non_empty:
+            # Distinguish a genuine extraction failure from a low-confidence
+            # subject-section detection: try the raw tables directly.
+            raw_parsed = self._parse_scheme(tables_data, raw_text, detection_filename)
+            if not raw_parsed.weeks:
+                status = "extraction_failed"
+            elif status == "low_confidence":
+                # Content exists but no subject heading was recognised.
+                status = "needs_confirmation"
+
         return {
             "title": title,
             "detected_subjects": [d["subject"] for d in described],
             "sections": described,
             "detection_status": status,
+            "needs_confirmation": needs_confirmation,
+            "metadata": metadata,
         }
 
     def _iter_blocks(self, doc: Document) -> List[Tuple[str, Any]]:
@@ -779,30 +889,17 @@ class DOCXParser:
         return None
 
     def _extract_class_level_from_text(self, text: str, filename: str = "") -> Optional[str]:
-        # Combine document text and filename for detection
-        # Normalize underscores and hyphens in filename to spaces for matching
-        import re as _re
-        normalized_filename = _re.sub(r"[_\-]+", " ", filename)
-        combined = f"{text} {normalized_filename}".lower()
-        text_lower = text.lower()
-        levels = [
-            ("basic 7", "Basic 7"), ("b7", "Basic 7"), ("jhs 1", "Basic 7"),
-            ("basic 8", "Basic 8"), ("b8", "Basic 8"), ("jhs 2", "Basic 8"),
-            ("basic 9", "Basic 9"), ("b9", "Basic 9"), ("jhs 3", "Basic 9"),
-            ("basic 10", "Basic 10"), ("b10", "Basic 10"),
-            ("shs 1", "SHS 1"), ("senior high 1", "SHS 1"),
-            ("shs 2", "SHS 2"), ("senior high 2", "SHS 2"),
-            ("shs 3", "SHS 3"), ("senior high 3", "SHS 3"),
-        ]
-        # First try document text (higher confidence)
-        for keyword, level in levels:
-            if keyword in text_lower:
-                return level
-        # Then try filename as secondary signal
-        for keyword, level in levels:
-            if keyword in combined:
-                return level
-        return None
+        """Class level from the document body (primary), then the filename.
+
+        Uses the code-aware ``_first_signal`` matcher so indicator-code prefixes
+        (B7/B8/B9) are never mistaken for a class. The document body is always
+        tried before the filename (secondary evidence).
+        """
+        doc_level = self._first_signal(text)
+        if doc_level:
+            return doc_level
+        normalized_filename = re.sub(r"[_\-]+", " ", filename)
+        return self._first_signal(normalized_filename)
 
     def _extract_term_from_text(self, text: str) -> Optional[str]:
         text_lower = text.lower()
@@ -820,36 +917,130 @@ class DOCXParser:
             return f"{year_match.group(1)}/{year_match.group(2)}"
         return None
 
-    def _detect_subject(self, parsed: Optional[ParsedScheme], raw_text: str) -> Subject:
+    def _detect_subject(self, parsed: Optional[ParsedScheme], raw_text: str) -> Optional[Subject]:
+        """Detect the subject, or return None when it genuinely cannot be known.
+
+        NEVER defaults to Mathematics (PART E): uncertainty is represented as
+        None and surfaced to the teacher as "needs confirmation".
+        """
         subj = (parsed.subject if parsed else None) or self._extract_subject_from_text(raw_text)
         if not subj:
-            # Never invent a subject classification — leave the safe default.
-            return Subject.MATHEMATICS
+            return None
         try:
-            return Subject(subj)
+            detected = Subject(subj)
         except ValueError:
-            return Subject.MATHEMATICS
+            return None
+        return None if detected is Subject.UNKNOWN else detected
 
-    def _detect_class_level(self, parsed: Optional[ParsedScheme], raw_text: str, filename: str = "") -> ClassLevel:
-        level = (parsed.class_level if parsed else None) or self._extract_class_level_from_text(raw_text, filename)
-        mapping = {
-            "Nursery": ClassLevel.NURSERY,
-            "KG 1": ClassLevel.KG1,
-            "KG 2": ClassLevel.KG2,
-            "Basic 1": ClassLevel.BASIC_1,
-            "Basic 2": ClassLevel.BASIC_2,
-            "Basic 3": ClassLevel.BASIC_3,
-            "Basic 4": ClassLevel.BASIC_4,
-            "Basic 5": ClassLevel.BASIC_5,
-            "Basic 6": ClassLevel.BASIC_6,
-            "Basic 7": ClassLevel.BASIC_7,
-            "Basic 8": ClassLevel.BASIC_8,
-            "Basic 9": ClassLevel.BASIC_9,
-            "SHS 1": ClassLevel.SHS_1,
-            "SHS 2": ClassLevel.SHS_2,
-            "SHS 3": ClassLevel.SHS_3,
+    _CLASS_LEVEL_MAPPING = {
+        "Nursery": ClassLevel.NURSERY,
+        "KG 1": ClassLevel.KG1,
+        "KG 2": ClassLevel.KG2,
+        "Basic 1": ClassLevel.BASIC_1,
+        "Basic 2": ClassLevel.BASIC_2,
+        "Basic 3": ClassLevel.BASIC_3,
+        "Basic 4": ClassLevel.BASIC_4,
+        "Basic 5": ClassLevel.BASIC_5,
+        "Basic 6": ClassLevel.BASIC_6,
+        "Basic 7": ClassLevel.BASIC_7,
+        "Basic 8": ClassLevel.BASIC_8,
+        "Basic 9": ClassLevel.BASIC_9,
+        "SHS 1": ClassLevel.SHS_1,
+        "SHS 2": ClassLevel.SHS_2,
+        "SHS 3": ClassLevel.SHS_3,
+    }
+
+    #: (keyword, canonical level name) — specific first.
+    _LEVEL_SIGNALS = [
+        ("basic 7", "Basic 7"), ("b7", "Basic 7"), ("jhs 1", "Basic 7"),
+        ("basic 8", "Basic 8"), ("b8", "Basic 8"), ("jhs 2", "Basic 8"),
+        ("basic 9", "Basic 9"), ("b9", "Basic 9"), ("jhs 3", "Basic 9"),
+        ("basic 10", "Basic 10"), ("b10", "Basic 10"),
+        ("shs 1", "SHS 1"), ("senior high 1", "SHS 1"),
+        ("shs 2", "SHS 2"), ("senior high 2", "SHS 2"),
+        ("shs 3", "SHS 3"), ("senior high 3", "SHS 3"),
+        ("basic 1", "Basic 1"), ("basic 2", "Basic 2"),
+        ("basic 3", "Basic 3"), ("basic 4", "Basic 4"),
+        ("basic 5", "Basic 5"), ("basic 6", "Basic 6"),
+        ("kg 1", "KG 1"), ("kg 2", "KG 2"), ("nursery", "Nursery"),
+    ]
+
+    @staticmethod
+    def _first_signal(text: str) -> Optional[str]:
+        """First class-level signal in text, ignoring indicator-code prefixes.
+
+        Curriculum codes such as ``B7.1.1.1.1`` contain compact level tokens
+        (``b7``/``b8``/``b9``). Those must NOT be read as a class signal — a
+        Basic 8 document full of B7-coded content is still Basic 8. The
+        negative lookahead rejects a token immediately followed by a digit or
+        a dot (i.e. the start of a curriculum code).
+        """
+        lower = (text or "").lower()
+        for keyword, level in DOCXParser._LEVEL_SIGNALS:
+            # Require a genuine standalone token: not preceded by an
+            # alphanumeric (so the 'b8' inside a UUID/hash is ignored) and not
+            # followed by a digit/dot/letter (so the 'b9' at the start of the
+            # code 'B9.1.1.1' is ignored).
+            pattern = r"(?<![a-z0-9])" + re.escape(keyword) + r"(?![0-9a-z.])"
+            if re.search(pattern, lower):
+                return level
+        return None
+
+    def subject_signals(self, raw_text: str, filename: str = "") -> dict:
+        """Independent subject signals (document body vs filename) + conflict.
+
+        The document body is authoritative; the filename is secondary evidence
+        only (PART H). A mismatch is reported for teacher confirmation.
+        """
+        doc = self._extract_subject_from_text(raw_text)
+        normalized_filename = re.sub(r"[_\-]+", " ", filename or "")
+        fn = self._extract_subject_from_text(normalized_filename)
+        conflict = bool(doc and fn and doc != fn)
+        resolved = None if conflict else (doc or fn)
+        return {
+            "document": doc,
+            "filename": fn,
+            "resolved": resolved,
+            "conflict": conflict,
         }
-        return mapping.get(level, ClassLevel.BASIC_9)
+
+    def class_level_signals(self, raw_text: str, filename: str = "") -> dict:
+        """Independent class-level signals + reconciliation (PART H).
+
+        The document body is the primary signal; the filename is secondary
+        evidence only. They are reconciled, never blindly trusted. A mismatch
+        between the two is reported so the teacher can confirm.
+        """
+        normalized_filename = re.sub(r"[_\-]+", " ", filename or "")
+        doc_level = self._first_signal(raw_text)
+        fn_level = self._first_signal(normalized_filename)
+        conflict = bool(doc_level and fn_level and doc_level != fn_level)
+        resolved = None if conflict else (doc_level or fn_level)
+        return {
+            "document": doc_level,
+            "filename": fn_level,
+            "resolved": resolved,
+            "conflict": conflict,
+        }
+
+    def _detect_class_level(
+        self, parsed: Optional[ParsedScheme], raw_text: str, filename: str = ""
+    ) -> Optional[ClassLevel]:
+        """Detect the class level, or return None (never a fabricated Basic 9).
+
+        Reconciliation rule: an explicit value parsed from the table wins; then
+        the document body; then the filename (secondary). A body/filename
+        mismatch resolves to None → teacher confirmation.
+        """
+        # Reconciliation ALWAYS runs first: a document-body/filename mismatch
+        # must surface as "needs confirmation", not be resolved by whichever
+        # value happened to be parsed from the table.
+        signals = self.class_level_signals(raw_text, filename)
+        if signals["conflict"]:
+            return None
+        if parsed and parsed.class_level:
+            return self._CLASS_LEVEL_MAPPING.get(parsed.class_level)
+        return self._CLASS_LEVEL_MAPPING.get(signals["resolved"]) if signals["resolved"] else None
 
     def _detect_term(self, raw_text: str) -> str:
         return self._extract_term_from_text(raw_text) or "First Term"

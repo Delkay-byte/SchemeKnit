@@ -8,6 +8,7 @@ import asyncio
 import json
 import os
 import httpx
+import pytest
 from pathlib import Path
 from datetime import date
 
@@ -23,6 +24,13 @@ BASIC7_PDF = REAL_DOCS / "BASIC 7 TERM 1.pdf"
 OPENROUTER_KEY = os.environ.get("OPENCODE_ZEN_API_KEY", "")
 OPENROUTER_BASE = os.environ.get("OPENCODE_ZEN_BASE_URL", "https://openrouter.ai/api/v1")
 OPENROUTER_MODEL = os.environ.get("OPENCODE_ZEN_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free")
+
+# These tests call a REAL external AI provider. Without a configured key they
+# cannot run, so skip cleanly rather than failing on an empty Bearer header.
+pytestmark = pytest.mark.skipif(
+    not OPENROUTER_KEY,
+    reason="requires OPENCODE_ZEN_API_KEY (real AI provider credentials)",
+)
 
 SYSTEM_PROMPT = "You are an expert Ghanaian educator. Output valid JSON only. No markdown fences."
 

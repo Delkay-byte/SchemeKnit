@@ -475,6 +475,61 @@ class AIUsageEventDB(Base):
     )
 
 
+# ── Usage Quota (calendar-period lesson-plan allowance) ───────────────────────
+
+class UsagePeriodDB(Base):
+    """Aggregate lesson-plan usage for one user in one calendar period.
+
+    Keyed by (user_id, period_type, period_key). For the Free Tier the period
+    is a calendar month (period_key = "YYYY-MM" derived from the SERVER clock),
+    so January usage never affects February and no cron job is required to
+    reset anything: a new month simply reads a different row.
+
+    ``units_used`` mirrors the number of ``usage_units`` rows for the period and
+    is only ever changed through the atomic reservation API in usage_quota.py.
+    """
+    __tablename__ = "usage_periods"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    period_type = Column(String, nullable=False)   # "calendar_month"
+    period_key = Column(String, nullable=False)    # e.g. "2026-09"
+    units_used = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "period_type", "period_key",
+                         name="uq_usage_period"),
+    )
+
+
+class UsageUnitDB(Base):
+    """One billable unit (one generated lesson plan) inside a usage period.
+
+    The unit is keyed by (user, period, kind, key) where the key identifies the
+    exact lesson being generated (``<scheme_id>:<indicator_code>``). This makes
+    the quota idempotent: regenerating the same indicator for the same scheme in
+    the same month does NOT consume another unit, because the row already exists.
+    """
+    __tablename__ = "usage_units"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    period_type = Column(String, nullable=False)
+    period_key = Column(String, nullable=False)
+    unit_kind = Column(String, nullable=False)     # "lesson_plan"
+    unit_key = Column(String, nullable=False)      # "<scheme_id>:<indicator_code>"
+    scheme_id = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "period_type", "period_key",
+                         "unit_kind", "unit_key", name="uq_usage_unit"),
+        Index("ix_usage_units_period", "user_id", "period_type", "period_key"),
+    )
+
+
 # ── Payment ───────────────────────────────────────────────────────────────────
 
 class PaymentDB(Base):

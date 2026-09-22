@@ -26,9 +26,14 @@ logger = get_logger()
 
 SUPPORTED_EXTENSIONS = (".docx", ".pdf")
 
-#: Detection statuses that require the teacher to confirm a subject section
-#: before any generation may proceed (§4 STEP 4-7).
+#: Detection statuses that require the teacher to review/confirm something
+#: before generation. "multiple" needs a subject choice; "needs_confirmation"
+#: means the class/subject could not be detected; "extraction_failed" means no
+#: usable curriculum was extracted.
 NEEDS_SUBJECT_CONFIRMATION = ("multiple",)
+NEEDS_REVIEW_STATUSES = (
+    "multiple", "needs_confirmation", "low_confidence", "extraction_failed",
+)
 
 MAX_UPLOAD_SIZE = 50 * 1024 * 1024  # 50MB
 
@@ -51,14 +56,17 @@ def _read_file_sync(path: Path) -> bytes:
     return path.read_bytes()
 
 
-def _analyze_document(document_parser, file_path: Path) -> dict:
+def _analyze_document(document_parser, file_path: Path,
+                      original_filename: str = None) -> dict:
     """Run section detection, degrading safely when it fails.
 
     Detection failure must never fail the upload: the teacher keeps the scheme
-    and can still review it manually (low_confidence).
+    and can still review it manually (low_confidence). The teacher's ORIGINAL
+    filename is passed for metadata reconciliation — the on-disk storage name is
+    a UUID and carries no signal.
     """
     try:
-        info = document_parser.analyze(file_path)
+        info = document_parser.analyze(file_path, original_filename=original_filename)
         if not isinstance(info, dict):
             raise ValueError("unexpected analyze() result")
         return info
@@ -152,31 +160,45 @@ async def upload_scheme(
         # Inspect the document for subject sections. When more than one subject
         # is present the teacher MUST confirm which one to use before
         # generation — the system never silently picks a subject.
-        detection = _analyze_document(document_parser, file_path)
+        detection = _analyze_document(document_parser, file_path, file.filename)
         db_scheme.document_title = detection.get("title") or ""
         db_scheme.detected_subjects = [
             s["subject"] for s in detection.get("sections", [])
         ]
         db_scheme.detection_status = detection.get("detection_status", "")
         db_scheme.subject_sections = detection.get("sections", [])
+        # A document that yielded no weeks is an extraction FAILURE, never a
+        # usable empty curriculum (PART J).
+        if not scheme.weeks:
+            db_scheme.detection_status = "extraction_failed"
+            db_scheme.status = "extraction_failed"
         db.commit()
         log_event("scheme_uploaded", user_id=user.id, scheme_id=scheme.id,
                   filename=file.filename,
                   detection_status=db_scheme.detection_status)
 
+        metadata = detection.get("metadata", {}) or {}
         return {
             "scheme_id": scheme.id,
             "filename": file.filename,
             "subject": scheme.subject.value if hasattr(scheme.subject, 'value') else str(scheme.subject),
             "class_level": scheme.class_level.value if hasattr(scheme.class_level, 'value') else str(scheme.class_level),
             "weeks_count": len(scheme.weeks),
-            "status": "uploaded",
+            "status": db_scheme.status,
             "detection": {
                 "status": db_scheme.detection_status,
                 "title": db_scheme.document_title,
                 "subjects": db_scheme.detected_subjects or [],
                 "sections": db_scheme.subject_sections or [],
-                "needs_confirmation": db_scheme.detection_status in NEEDS_SUBJECT_CONFIRMATION,
+                "needs_confirmation": db_scheme.detection_status in NEEDS_REVIEW_STATUSES,
+                "subject_confidence": "none" if not metadata.get("subject") else "high",
+                "class_confidence": "none" if not metadata.get("class_level") else "high",
+                "subject_signals": metadata.get("subject_signals", {}),
+                "class_signals": metadata.get("class_signals", {}),
+            },
+            "extraction": {
+                "weeks_count": len(scheme.weeks),
+                "status": db_scheme.detection_status,
             },
         }
     except HTTPException:

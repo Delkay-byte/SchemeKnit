@@ -13,14 +13,15 @@ from datetime import datetime
 from ..database import get_db, User, LessonPlanDB, AIEnrichmentCacheDB, generate_id
 from ..auth import get_current_user
 from ..models import AIMode, ContentSource, SectionRegenerationRequest
-from ..engines.ai_provider import get_provider
+from ..engines.ai_provider import get_provider, resolve_provider_mode, NAMED_PROVIDERS
 from ..entitlements import require_ai_entitlement, consume_ai_generation
 from ..logging_config import get_logger, log_event
 
 router = APIRouter()
 logger = get_logger()
 
-REAL_AI_MODES = ("ollama", "gemini", "openai", "minimax")
+#: Named real providers plus the legacy mode token accepted for enrichment.
+REAL_AI_MODES = ("ollama", "gemini", "groq", "openai", "minimax", "opencode-zen")
 
 
 def _require_ai_entitlement(user: User, db) -> User:
@@ -88,15 +89,18 @@ async def regenerate_section(
 
     previous_content = _get_section_content(lp, req.section)
 
-    # Local-provider modes bypass the OFF/BASIC/ENHANCED enum (which resolve
-    # to the deterministic Mock provider). Anything else falls back to BASIC.
-    if (req.ai_mode or "").lower() == "ollama":
-        mode_label = "ollama"
-        provider = get_provider("ollama")
+    # Named providers (gemini/groq/ollama/…) bypass the OFF/BASIC/ENHANCED
+    # enum (which resolves to the deterministic Mock provider). BASIC/
+    # ENHANCED resolve through the same helper as batch generation so every
+    # entry point reaches the same real provider when one is configured.
+    mode_in = (req.ai_mode or "").strip().lower()
+    if mode_in in NAMED_PROVIDERS:
+        mode_label = mode_in
+        provider = get_provider(mode_in)
     else:
         ai_mode = AIMode(req.ai_mode) if req.ai_mode in [m.value for m in AIMode] else AIMode.BASIC
         mode_label = ai_mode.value
-        provider = get_provider(ai_mode.value)
+        provider = get_provider(resolve_provider_mode(ai_mode))
 
     if not provider or not provider.is_available():
         raise HTTPException(
@@ -338,12 +342,19 @@ async def enrich_lesson(
 
     _require_ai_entitlement(user, db)
 
-    mode = (req.ai_mode or "").lower()
+    mode = (req.ai_mode or "").strip().lower()
     if mode not in REAL_AI_MODES:
-        raise HTTPException(
-            status_code=400,
-            detail="Enrichment requires a real AI provider mode (e.g. ollama).",
-        )
+        # BASIC/ENHANCED may still resolve to a configured real provider.
+        if mode in ("basic", "enhanced", "off"):
+            mode = resolve_provider_mode(mode)
+        if mode not in REAL_AI_MODES:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Enrichment requires a real AI provider mode "
+                    "(e.g. gemini, groq, ollama)."
+                ),
+            )
     provider = get_provider(mode)
     if not provider or not provider.is_available():
         raise HTTPException(

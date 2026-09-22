@@ -244,77 +244,33 @@ class AllocationEngine:
           - knows its lesson_number = period_index within the week
           - derives objectives, activities, assessment from that indicator
         """
+        # Generation Engine V3: the deterministic subject-aware lesson builder
+        # composes ONE coherent three-phase lesson per indicator. The old
+        # helpers below remain for API compatibility but are no longer the
+        # generation path.
+        from ..curriculum.lesson_builder import build_lesson
+
+        ordered = sorted(coverage.allocations, key=lambda a: a.lesson_sequence)
         lesson_plans: List[LessonPlan] = []
-
-        # Iterate in CURRICULUM ORDER (allocation sequence). Grouping by source
-        # week and sorting by period_index would reorder carried indicators
-        # (whose period_index resets in the later teaching week), so the
-        # allocation sequence is authoritative here.
-        lesson_counter = 0  # global sequence across the whole term
-        for alloc in sorted(coverage.allocations, key=lambda a: a.lesson_sequence):
-            week_num = alloc.week_number
+        lesson_counter = 0
+        for idx, alloc in enumerate(ordered):
             lesson_counter += 1
-            period_index = alloc.period_index
-            # Each lesson carries exactly ONE indicator.
-            single_indicator = alloc.indicator_description
-            single_code = alloc.indicator_code
-
-            topic = self._derive_topic(alloc)
-            objectives = self._generate_objectives(single_indicator, single_code)
-            intro = self._generate_introduction(alloc)
-            main_acts = self._generate_main_activities(alloc, config)
-            learner_acts = self._generate_learner_activities(alloc)
-            teacher_acts = self._generate_teacher_activities(alloc)
-            assessment = self._generate_assessment(alloc)
-            conclusion = self._generate_conclusion(alloc)
-
-            lp = LessonPlan(
-                    scheme_of_work_id=scheme_id,
-                    term_config_id=config.id,
-                    # Source curriculum week is preserved verbatim.
-                    week_number=week_num,
-                    # Actual teaching week (differs from week_number only when the
-                    # indicator carried forward).
-                    teaching_week=alloc.teaching_week or week_num,
-                    carry_forward=bool(alloc.carry_forward),
-                    lesson_sequence=lesson_counter,
-                    lesson_date=alloc.lesson_date or config.term_start_date,
-                    # lesson_number = the period within this week (1-based)
-                    lesson_number=period_index,
-                    # Period label: "Period 1", "Period 2", etc.
-                    # Teacher-configured period string is preserved if set.
-                    period=self._period_label(period_index, config),
-                    class_level=config.class_level,
-                    subject=config.subject,
-                    class_size=config.class_size,
-                    duration_minutes=config.lesson_duration_minutes,
-                    school_name=config.school_name,
-                    teacher_name=config.teacher_name,
-                    strand=alloc.strand,
-                    sub_strand=alloc.sub_strand,
-                    content_standard=alloc.content_standard_description,
-                    content_standard_code=alloc.content_standard_code,
-                    # ONE indicator per lesson — the core of this redesign.
-                    indicators=[single_indicator],
-                    indicator_codes=[single_code],
-                    lesson_topic=topic,
-                    previous_knowledge="",
-                    learning_objectives=objectives,
-                    core_competencies=list(getattr(config, "core_competencies", []) or []),
-                    teaching_learning_resources=(
-                        list(getattr(config, "teaching_learning_resources", []) or [])
-                    ),
-                    introduction=intro,
-                    main_activities=main_acts,
-                    learner_activities=learner_acts,
-                    teacher_activities=teacher_acts,
-                    assessment=assessment,
-                    conclusion=conclusion,
-                    references=list(getattr(config, "references", []) or []),
-                    keywords=list(getattr(config, "keywords", []) or []),
-                    status=LessonStatus.GENERATED,
-                    ai_generated=False,
+            previous_indicator = (
+                ordered[idx - 1].indicator_description if idx > 0 else None
             )
+            next_indicator = (
+                ordered[idx + 1].indicator_description
+                if idx < len(ordered) - 1 else None
+            )
+            lp = build_lesson(
+                alloc, config, scheme_id,
+                previous_indicator=previous_indicator,
+                next_indicator=next_indicator,
+            )
+            # Curriculum order and period label are assigned here so the
+            # builder stays position-independent (and deterministic).
+            lp.lesson_sequence = lesson_counter
+            lp.period = self._period_label(alloc.period_index, config)
             lesson_plans.append(lp)
 
         return lesson_plans

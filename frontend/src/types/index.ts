@@ -90,6 +90,9 @@ export interface TermConfig {
   teaching_learning_resources?: string[]
   core_competencies?: string[]
   references?: string[]
+  // Free Tier: which indicators the teacher chose to spend this month's
+  // lesson-plan units on. Empty = all indicators (paid/unlimited).
+  selected_indicator_codes?: string[]
 }
 
 export interface Holiday {
@@ -276,6 +279,12 @@ export interface PlanResolution {
   ai_credits_used: number
   //: True when AI credits are a one-time lifetime allowance (Free Tier).
   ai_lifetime?: boolean
+  //: Free Tier lesson-plan allowance is a CALENDAR-MONTH quota (server-derived).
+  lesson_quota_period?: string
+  lesson_quota_period_key?: string
+  lesson_quota_unlimited?: boolean
+  lesson_quota_limit?: number
+  lesson_quota_remaining?: number | null
   expires_at: string | null
   is_active: boolean
   school_name: string | null

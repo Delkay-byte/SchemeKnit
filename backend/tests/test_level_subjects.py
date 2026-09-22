@@ -89,8 +89,12 @@ class TestExistingBasicAndJHSRegression:
         assert "Numeracy" in ec
 
     def test_unknown_level_falls_back_to_all(self):
+        from src.models import ALL_SUBJECTS
         subjects = subjects_for_class_level("Not A Level")
-        assert len(subjects) == len(list(Subject))
+        assert len(subjects) == len(ALL_SUBJECTS)
+        # The explicit UNKNOWN sentinel is a "needs confirmation" state, not an
+        # offered subject, so it is never in the selectable list.
+        assert Subject.UNKNOWN not in subjects
 
 
 class TestSubjectsEndpoint:

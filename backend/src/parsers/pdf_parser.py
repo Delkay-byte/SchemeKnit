@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from ..models import SchemeOfWork
+from ..models import SchemeOfWork, Subject, ClassLevel
 from .docx_parser import DOCXParser
 from .subject_keywords import canonical_subject_from_heading, detect_document_title
 
@@ -215,35 +215,37 @@ class PDFParser:
             # No usable structure — return an empty scheme; the caller reports
             # the extraction failure rather than inventing content.
             fname = original_filename or file_path.name
+            # No usable structure → honest extraction failure, never an empty
+            # "successful" curriculum and never a fabricated class/subject.
             return SchemeOfWork(
                 filename=fname,
                 upload_date=datetime.utcnow(),
-                subject=self._grammar._detect_subject(None, raw_text),
-                class_level=self._grammar._detect_class_level(None, raw_text, fname),
+                subject=self._grammar._detect_subject(None, raw_text) or Subject.UNKNOWN,
+                class_level=self._grammar._detect_class_level(None, raw_text, fname) or ClassLevel.UNKNOWN,
                 term=self._grammar._detect_term(raw_text),
                 academic_year=self._grammar._detect_academic_year(raw_text),
                 weeks=[],
                 raw_text=raw_text,
-                status="extracted",
+                status="extraction_failed",
             )
 
-        parsed = self._grammar._parse_scheme(tables, raw_text, file_path.name)
-        weeks = self._grammar._convert_to_weeks(parsed)
         fname = original_filename or file_path.name
+        parsed = self._grammar._parse_scheme(tables, raw_text, fname)
+        weeks = self._grammar._convert_to_weeks(parsed)
 
         return SchemeOfWork(
             filename=fname,
             upload_date=datetime.utcnow(),
-            subject=forced_subject or self._grammar._detect_subject(parsed, raw_text),
-            class_level=self._grammar._detect_class_level(parsed, raw_text, fname),
+            subject=forced_subject or self._grammar._detect_subject(parsed, raw_text) or Subject.UNKNOWN,
+            class_level=self._grammar._detect_class_level(parsed, raw_text, fname) or ClassLevel.UNKNOWN,
             term=parsed.term or self._grammar._detect_term(raw_text),
             academic_year=parsed.academic_year or self._grammar._detect_academic_year(raw_text),
             weeks=weeks,
             raw_text=raw_text,
-            status="extracted",
+            status="extracted" if weeks else "extraction_failed",
         )
 
-    def analyze(self, file_path: Path) -> Dict[str, Any]:
+    def analyze(self, file_path: Path, original_filename: str = None) -> Dict[str, Any]:
         """Same contract as DOCXParser.analyze (§4), for PDFs."""
         blocks = self._blocks(file_path)
         lines = [p for k, p in blocks if k == "paragraph"]
@@ -276,11 +278,37 @@ class PDFParser:
         else:
             status = "low_confidence"
 
+        # Metadata reconciliation + honest extraction state (PART E/H/J).
+        detection_filename = original_filename or file_path.name
+        class_signals = self._grammar.class_level_signals(raw_text, detection_filename)
+        subject_signals = self._grammar.subject_signals(raw_text, detection_filename)
+        needs_confirmation = bool(
+            class_signals["conflict"] or subject_signals["conflict"]
+            or class_signals["resolved"] is None
+            or subject_signals["resolved"] is None
+        )
+        if status in ("single", "low_confidence") and needs_confirmation:
+            status = "needs_confirmation"
+        if not non_empty:
+            tables = [p for k, p in blocks if k == "table"]
+            raw_parsed = self._grammar._parse_scheme(tables, raw_text, file_path.name)
+            if not raw_parsed.weeks:
+                status = "extraction_failed"
+            elif status == "low_confidence":
+                status = "needs_confirmation"
+
         return {
             "title": title,
             "detected_subjects": [d["subject"] for d in described],
             "sections": described,
             "detection_status": status,
+            "needs_confirmation": needs_confirmation,
+            "metadata": {
+                "subject": subject_signals["resolved"],
+                "class_level": class_signals["resolved"],
+                "subject_signals": subject_signals,
+                "class_signals": class_signals,
+            },
         }
 
 

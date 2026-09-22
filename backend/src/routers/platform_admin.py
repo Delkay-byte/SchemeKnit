@@ -21,6 +21,7 @@ from ..database import (
 )
 from ..auth import get_current_user, require_platform_admin
 from ..config import get_settings
+from ..entitlements import FREE_TIER_LESSON_PLANS_PER_MONTH
 from ..logging_config import get_logger, log_event
 
 router = APIRouter()
@@ -927,7 +928,7 @@ async def list_individual_teachers(
             "ai_enabled": bool(ent.ai_enabled) if ent else False,
             "ai_credits": ent.ai_credits if ent else 5,
             "ai_credits_used": ent.ai_credits_used if ent else 0,
-            "generation_limit": ent.generation_limit if ent else 3,
+            "generation_limit": ent.generation_limit if ent else FREE_TIER_LESSON_PLANS_PER_MONTH,
             "generations_used": ent.generations_used if ent else 0,
             "expires_at": ent.expires_at.isoformat() if ent and ent.expires_at else None,
             "created_at": t.created_at.isoformat() if t.created_at else None,
@@ -973,7 +974,7 @@ async def get_individual_teacher(
         "entitlement": {
             "edition": ent.edition if ent else "free",
             "subscription_type": ent.subscription_type if ent else None,
-            "generation_limit": ent.generation_limit if ent else 3,
+            "generation_limit": ent.generation_limit if ent else FREE_TIER_LESSON_PLANS_PER_MONTH,
             "generations_used": ent.generations_used if ent else 0,
             "batch_generation": bool(ent.batch_generation) if ent else False,
             "zip_export": bool(ent.zip_export) if ent else False,

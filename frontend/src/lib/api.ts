@@ -363,6 +363,11 @@ class ApiService {
     return this.request(`/api/curriculum/${schemeId}/summary`)
   }
 
+  // Free Tier lesson-plan quota for the current calendar month (server-derived).
+  async getLessonQuota(): Promise<any> {
+    return this.request('/api/generation/quota')
+  }
+
   // Allocation preview
   async getAllocationPreview(schemeId: string, config: any): Promise<any> {
     return this.request(`/api/generation/${schemeId}/allocation-preview`, {

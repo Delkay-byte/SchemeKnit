@@ -7,7 +7,15 @@ Environment-based settings. All secrets come from .env.
 import os
 from pathlib import Path
 from functools import lru_cache
+from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
+
+# Export backend/.env into os.environ so provider modules that read
+# os.environ directly (ai_provider) see the same secrets as Settings.
+# Real environment variables always win over .env file values.
+_ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
+if _ENV_FILE.is_file():
+    load_dotenv(_ENV_FILE, override=False)
 
 
 class Settings(BaseSettings):
@@ -85,12 +93,20 @@ class Settings(BaseSettings):
     EMAIL_FROM: str = ""
     EMAIL_REPLY_TO: str = ""
 
-    # AI Providers
+    # AI Providers — secrets and model IDs come from the environment only.
+    # AI_MODE may be OFF/BASIC/ENHANCED (deterministic fallback) or a named
+    # provider: gemini | groq | openai | ollama | opencode-zen | minimax.
     AI_MODE: str = "OFF"
     GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-2.5-flash"
+    GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
+    GROQ_BASE_URL: str = "https://api.groq.com/openai/v1"
     OPENAI_API_KEY: str = ""
+    OPENAI_MODEL: str = "gpt-4o-mini"
     MINIMAX_API_KEY: str = ""
     OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_MODEL: str = "llama3"
     OPENCODE_ZEN_API_KEY: str = ""
     OPENCODE_ZEN_MODEL: str = "nemotron-3-ultra-free"
     OPENCODE_ZEN_BASE_URL: str = "https://opencode.ai/zen/v1"
