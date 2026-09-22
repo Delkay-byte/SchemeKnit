@@ -26,7 +26,7 @@ from src.engines.ai_provider import AIProvider, _build_v2_prompt_from_context, _
 from src.curriculum import Indicator
 from src.curriculum.quality_gate import validate_lesson_quality, QualityStatus
 
-REAL_DOCS = Path("real_documents")
+REAL_DOCS = Path(__file__).parent.parent / "real_documents"
 BASIC7_PDF = REAL_DOCS / "BASIC 7 TERM 1.pdf"
 BASIC9_PDF = REAL_DOCS / "BASIC 9 TERM 1.pdf"
 

@@ -18,7 +18,7 @@ from src.engines.ai_provider import _build_v2_prompt_from_context, _parse_json_r
 from src.curriculum import Indicator
 from src.curriculum.quality_gate import validate_lesson_quality
 
-REAL_DOCS = Path("real_documents")
+REAL_DOCS = Path(__file__).parent.parent / "real_documents"
 BASIC7_PDF = REAL_DOCS / "BASIC 7 TERM 1.pdf"
 
 OPENROUTER_KEY = os.environ.get("OPENCODE_ZEN_API_KEY", "")
