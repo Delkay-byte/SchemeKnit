@@ -171,8 +171,23 @@ class PDFParser:
         target_subject: str = None,
     ) -> SchemeOfWork:
         blocks = self._blocks(file_path)
-        raw_text = "\n".join(p for k, p in blocks if k == "paragraph")
-        text_sections = self._text_sections([p for k, p in blocks if k == "paragraph"])
+        paragraph_lines = [p for k, p in blocks if k == "paragraph"]
+        raw_text = "\n".join(paragraph_lines)
+        text_sections = self._text_sections(paragraph_lines)
+
+        # Include table cell text in raw_text so that class-level, subject,
+        # and term detection can read metadata embedded in table headers
+        # (common in Ghanaian scheme PDFs).
+        table_text_parts = []
+        for k, p in blocks:
+            if k == "table":
+                for row in p:
+                    for cell in row:
+                        cell_text = (cell or "").strip()
+                        if cell_text:
+                            table_text_parts.append(cell_text)
+        if table_text_parts:
+            raw_text = raw_text + "\n" + "\n".join(table_text_parts)
 
         tables = [p for k, p in blocks if k == "table"]
         forced_subject = None
@@ -199,11 +214,12 @@ class PDFParser:
         if not tables:
             # No usable structure — return an empty scheme; the caller reports
             # the extraction failure rather than inventing content.
+            fname = original_filename or file_path.name
             return SchemeOfWork(
-                filename=original_filename or file_path.name,
+                filename=fname,
                 upload_date=datetime.utcnow(),
                 subject=self._grammar._detect_subject(None, raw_text),
-                class_level=self._grammar._detect_class_level(None, raw_text),
+                class_level=self._grammar._detect_class_level(None, raw_text, fname),
                 term=self._grammar._detect_term(raw_text),
                 academic_year=self._grammar._detect_academic_year(raw_text),
                 weeks=[],
@@ -213,12 +229,13 @@ class PDFParser:
 
         parsed = self._grammar._parse_scheme(tables, raw_text, file_path.name)
         weeks = self._grammar._convert_to_weeks(parsed)
+        fname = original_filename or file_path.name
 
         return SchemeOfWork(
-            filename=original_filename or file_path.name,
+            filename=fname,
             upload_date=datetime.utcnow(),
             subject=forced_subject or self._grammar._detect_subject(parsed, raw_text),
-            class_level=self._grammar._detect_class_level(parsed, raw_text),
+            class_level=self._grammar._detect_class_level(parsed, raw_text, fname),
             term=parsed.term or self._grammar._detect_term(raw_text),
             academic_year=parsed.academic_year or self._grammar._detect_academic_year(raw_text),
             weeks=weeks,

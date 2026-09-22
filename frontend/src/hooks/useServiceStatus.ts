@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { getApiBaseUrl } from '@/lib/api'
 
 type ServiceStatus = 'healthy' | 'degraded' | 'offline' | 'maintenance' | 'unknown'
 
@@ -30,7 +31,7 @@ const CONSECUTIVE_FAILURES_THRESHOLD = 5 // require 5 failures before declaring 
 const RETRY_BACKOFF_MS = [3000, 5000, 8000, 12000] // progressive backoff on failures
 const COLD_START_TIMEOUT_MS = 15000 // 15s initial timeout to tolerate Render cold starts
 
-export function useServiceStatus(apiBaseUrl: string = ''): UseServiceStatusReturn {
+export function useServiceStatus(apiBaseUrl?: string): UseServiceStatusReturn {
   const [status, setStatus] = useState<ServiceStatus>('unknown')
   const [maintenanceInfo, setMaintenanceInfo] = useState<MaintenanceInfo>({
     active: false,
@@ -47,7 +48,7 @@ export function useServiceStatus(apiBaseUrl: string = ''): UseServiceStatusRetur
   const mountedRef = useRef(true)
   const hasCompletedFirstCheck = useRef(false)
 
-  const baseUrl = apiBaseUrl || ''
+  const baseUrl = apiBaseUrl ?? getApiBaseUrl()
 
   const checkStatus = useCallback(async () => {
     if (!mountedRef.current) return

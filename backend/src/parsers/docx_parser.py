@@ -96,7 +96,19 @@ class DOCXParser:
         raw_text = self._extract_raw_text(doc)
         blocks = self._iter_blocks(doc)
 
+        # Include table cell text in raw_text so class-level, subject,
+        # and term detection can read metadata embedded in table headers.
         tables_data = [payload for kind, payload in blocks if kind == "table"]
+        table_text_parts = []
+        for table in tables_data:
+            for row in table:
+                for cell in row:
+                    cell_text = (cell or "").strip()
+                    if cell_text:
+                        table_text_parts.append(cell_text)
+        if table_text_parts:
+            raw_text = raw_text + "\n" + "\n".join(table_text_parts)
+
         forced_subject: Optional[Subject] = None
         if target_subject:
             sections = self._detect_sections(blocks)
@@ -109,15 +121,16 @@ class DOCXParser:
                 tables_data = [t for s in selected for t in s["tables"]]
                 forced_subject = selected[0]["subject"]
 
+        filename_for_detection = original_filename or file_path.name
         parsed_scheme = self._parse_scheme(tables_data, raw_text, file_path.name)
 
         weeks = self._convert_to_weeks(parsed_scheme)
 
         scheme = SchemeOfWork(
-            filename=original_filename or file_path.name,
+            filename=filename_for_detection,
             upload_date=datetime.utcnow(),
             subject=forced_subject or self._detect_subject(parsed_scheme, raw_text),
-            class_level=self._detect_class_level(parsed_scheme, raw_text),
+            class_level=self._detect_class_level(parsed_scheme, raw_text, filename_for_detection),
             term=parsed_scheme.term or self._detect_term(raw_text),
             academic_year=parsed_scheme.academic_year or self._detect_academic_year(raw_text),
             weeks=weeks,
@@ -142,6 +155,19 @@ class DOCXParser:
         doc = Document(file_path)
         raw_text = self._extract_raw_text(doc)
         blocks = self._iter_blocks(doc)
+
+        # Include table cell text in raw_text for metadata detection
+        tables_data = [payload for kind, payload in blocks if kind == "table"]
+        table_text_parts = []
+        for table in tables_data:
+            for row in table:
+                for cell in row:
+                    cell_text = (cell or "").strip()
+                    if cell_text:
+                        table_text_parts.append(cell_text)
+        if table_text_parts:
+            raw_text = raw_text + "\n" + "\n".join(table_text_parts)
+
         title = detect_document_title(
             [payload for kind, payload in blocks if kind == "paragraph"]
         )
@@ -300,7 +326,7 @@ class DOCXParser:
             return scheme
 
         scheme.subject = self._extract_subject_from_text(raw_text)
-        scheme.class_level = self._extract_class_level_from_text(raw_text)
+        scheme.class_level = self._extract_class_level_from_text(raw_text, filename)
         scheme.term = self._extract_term_from_text(raw_text)
         scheme.academic_year = self._extract_academic_year_from_text(raw_text)
 
@@ -752,7 +778,12 @@ class DOCXParser:
                 return subject.value
         return None
 
-    def _extract_class_level_from_text(self, text: str) -> Optional[str]:
+    def _extract_class_level_from_text(self, text: str, filename: str = "") -> Optional[str]:
+        # Combine document text and filename for detection
+        # Normalize underscores and hyphens in filename to spaces for matching
+        import re as _re
+        normalized_filename = _re.sub(r"[_\-]+", " ", filename)
+        combined = f"{text} {normalized_filename}".lower()
         text_lower = text.lower()
         levels = [
             ("basic 7", "Basic 7"), ("b7", "Basic 7"), ("jhs 1", "Basic 7"),
@@ -763,8 +794,13 @@ class DOCXParser:
             ("shs 2", "SHS 2"), ("senior high 2", "SHS 2"),
             ("shs 3", "SHS 3"), ("senior high 3", "SHS 3"),
         ]
+        # First try document text (higher confidence)
         for keyword, level in levels:
             if keyword in text_lower:
+                return level
+        # Then try filename as secondary signal
+        for keyword, level in levels:
+            if keyword in combined:
                 return level
         return None
 
@@ -794,8 +830,8 @@ class DOCXParser:
         except ValueError:
             return Subject.MATHEMATICS
 
-    def _detect_class_level(self, parsed: Optional[ParsedScheme], raw_text: str) -> ClassLevel:
-        level = (parsed.class_level if parsed else None) or self._extract_class_level_from_text(raw_text)
+    def _detect_class_level(self, parsed: Optional[ParsedScheme], raw_text: str, filename: str = "") -> ClassLevel:
+        level = (parsed.class_level if parsed else None) or self._extract_class_level_from_text(raw_text, filename)
         mapping = {
             "Nursery": ClassLevel.NURSERY,
             "KG 1": ClassLevel.KG1,
