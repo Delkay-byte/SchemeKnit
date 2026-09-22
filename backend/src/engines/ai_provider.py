@@ -688,10 +688,13 @@ class OllamaProvider(AIProvider):
 
         self.last_error = None
         try:
+            # Full V2 lesson JSON regularly exceeds 800 tokens and was
+            # truncated mid-object on real-doc runs (unparseable → empty).
+            # 2048 covers the schema with headroom for differentiation/notes.
             resp = requests.post(
                 f"{self.base_url}/api/generate",
                 json={"model": self.model, "prompt": prompt, "stream": False,
-                      "options": {"num_predict": 800}},
+                      "options": {"num_predict": 2048}},
                 timeout=180,
             )
             if resp.status_code != 200:
