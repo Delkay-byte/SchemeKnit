@@ -15,6 +15,10 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+# Import config FIRST so load_dotenv() runs and populates os.environ
+# before pytest evaluates @pytest.mark.skipif at collection time.
+import src.config  # noqa: F401  isort:skip
+
 from src.engines.ai_provider import (
     DEFAULT_GEMINI_MODEL,
     DEFAULT_GROQ_MODEL,
@@ -411,7 +415,7 @@ class TestLiveGemini:
             strand="Diversity of Matter", sub_strand="Separating mixtures",
             content_standard="Separate mixtures by filtration",
             indicator_code="B9.1.1.1.1",
-            indicator_text="Separate mixtures by filtration by filtration and evaporation",
+            indicator_text="Separate mixtures by filtration and evaporation",
             duration_minutes=40,
         )
         if not out and p.last_error in ("auth_failed", "invalid_api_key", "missing_api_key"):
@@ -434,7 +438,7 @@ class TestLiveGroq:
             strand="Diversity of Matter", sub_strand="Separating mixtures",
             content_standard="Separate mixtures by filtration",
             indicator_code="B9.1.1.1.1",
-            indicator_text="Separate mixtures by filtration by filtration and evaporation",
+            indicator_text="Separate mixtures by filtration and evaporation",
             duration_minutes=40,
         )
         if not out and p.last_error in ("auth_failed", "invalid_api_key", "missing_api_key"):
