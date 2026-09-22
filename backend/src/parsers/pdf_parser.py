@@ -36,10 +36,14 @@ class PDFParser:
         import fitz
 
         blocks: List[Tuple[str, Any]] = []
+        # Diagnostic scan stats: distinguish an image-only (scanned) PDF from a
+        # text PDF with no extractable table, so failures give an honest reason.
+        scan = {"pages": 0, "text_chars": 0, "blank_pages": 0}
         pdf = fitz.open(file_path)
         try:
             for page in pdf:
                 items: List[Tuple[float, str, Any]] = []
+                page_chars = 0
                 table_boxes: List[Tuple[float, float, float, float]] = []
 
                 try:
@@ -52,6 +56,7 @@ class PDFParser:
                         ]
                         rows = [r for r in rows if any(c for c in r)]
                         if rows:
+                            page_chars += sum(len(c) for row in rows for c in row)
                             items.append((t.bbox[1], "table", rows))
                 except Exception:
                     pass
@@ -61,6 +66,7 @@ class PDFParser:
                     text = (b[4] or "").strip()
                     if not text:
                         continue
+                    page_chars += len(text)
                     # Skip text already captured by a detected table.
                     inside = False
                     for (bx0, by0, bx1, by1) in table_boxes:
@@ -80,8 +86,14 @@ class PDFParser:
                             line = line.strip()
                             if line:
                                 blocks.append(("paragraph", line))
+
+                scan["pages"] += 1
+                scan["text_chars"] += page_chars
+                if page_chars == 0:
+                    scan["blank_pages"] += 1
         finally:
             pdf.close()
+        self._last_scan = scan
         return blocks
 
     def _rows_from_text(self, lines: List[str]) -> List[List[str]]:
@@ -107,6 +119,19 @@ class PDFParser:
 
     def _has_real_tables(self, blocks: List[Tuple[str, Any]]) -> bool:
         return any(k == "table" for k, _ in blocks)
+
+    def _scan_stats(self) -> Dict[str, Any]:
+        """Machine-readable extraction diagnostic for the last scanned document."""
+        scan = getattr(self, "_last_scan", None) or {}
+        if not scan.get("pages"):
+            return {"reason": "not_scanned", "pages": 0, "text_chars": 0, "blank_pages": 0}
+        no_text = (scan.get("text_chars") or 0) == 0
+        return {
+            "reason": "no_text_layer" if no_text else None,
+            "pages": scan["pages"],
+            "text_chars": scan["text_chars"],
+            "blank_pages": scan["blank_pages"],
+        }
 
     def _text_sections(self, lines: List[str]) -> List[Dict[str, Any]]:
         """Split a text-only PDF into subject sections at heading lines.
@@ -217,6 +242,17 @@ class PDFParser:
             fname = original_filename or file_path.name
             # No usable structure → honest extraction failure, never an empty
             # "successful" curriculum and never a fabricated class/subject.
+            from ..models import ValidationIssue, ValidationSeverity
+
+            issue_message = (
+                "The PDF could not be extracted. This document appears to be "
+                "a scanned or image-only copy with no machine-readable text. "
+                "Provide a text-based PDF (Export/Print as PDF) or run it "
+                "through a text-layer OCR tool such as Adobe Scan."
+                if self._scan_stats()["reason"] == "no_text_layer"
+                else ("Scheme could not be reliably extracted. Review the "
+                      "document or upload a clearer copy.")
+            )
             return SchemeOfWork(
                 filename=fname,
                 upload_date=datetime.utcnow(),
@@ -227,6 +263,11 @@ class PDFParser:
                 weeks=[],
                 raw_text=raw_text,
                 status="extraction_failed",
+                validation_issues=[ValidationIssue(
+                    severity=ValidationSeverity.ERROR,
+                    field="weeks",
+                    message=issue_message,
+                )],
             )
 
         fname = original_filename or file_path.name
@@ -297,12 +338,23 @@ class PDFParser:
             elif status == "low_confidence":
                 status = "needs_confirmation"
 
+        # Machine-readable extraction diagnostic: image-only scans vs. text
+        # documents with no table structure are two distinct failure reasons.
+        extraction = self._scan_stats()
+        if extraction["reason"] is None and not ([p for k, p in blocks if k == "table"] or
+                                                 self._rows_from_text([
+                                                     p for k, p in blocks
+                                                     if k == "paragraph" and canonical_subject_from_heading(p) is None
+                                                 ])):
+            extraction["reason"] = "no_curriculum_table"
+
         return {
             "title": title,
             "detected_subjects": [d["subject"] for d in described],
             "sections": described,
             "detection_status": status,
             "needs_confirmation": needs_confirmation,
+            "extraction": extraction,
             "metadata": {
                 "subject": subject_signals["resolved"],
                 "class_level": class_signals["resolved"],

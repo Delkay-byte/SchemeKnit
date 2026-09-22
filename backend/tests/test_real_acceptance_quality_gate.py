@@ -45,7 +45,8 @@ class RealisticV2MockProvider(AIProvider):
                            content_standard, indicator_code, indicator_text,
                            class_size=35, duration_minutes=60, source_resources=None,
                            previous_lesson_context=None, next_lesson_context=None,
-                           teaching_day=None, week_number=None):
+                           teaching_day=None, week_number=None,
+                           term=None, teaching_week=None, period=None):
         verb = indicator_text.split(' ', 1)[-1] if ' ' in indicator_text else indicator_text
         topic = indicator_text.split('.')[0] if '.' in indicator_text else indicator_text
 

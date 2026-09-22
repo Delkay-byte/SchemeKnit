@@ -206,6 +206,9 @@ def build_generation_prompt(
     source_resources: Optional[List[str]] = None,
     teaching_day: Optional[str] = None,
     week_number: Optional[int] = None,
+    term: Optional[str] = None,
+    teaching_week: Optional[int] = None,
+    period: Optional[str] = None,
 ) -> str:
     """Build a structured, indicator-grounded generation prompt.
 
@@ -240,8 +243,11 @@ Misconception Risks: {interpretation.misconception_risks}""")
     sections.append(f"""CLASS CONTEXT
 Class Size: {class_size} learners
 Duration: {duration_minutes} minutes
+{f'Term: {term}' if term else ''}
+{f'Curriculum Week: {week_number}' if week_number else ''}
+{f'Teaching Week: {teaching_week}' if teaching_week else ''}
 {f'Teaching Day: {teaching_day}' if teaching_day else ''}
-{f'Week: {week_number}' if week_number else ''}""")
+{f'Teaching Period: {period}' if period else ''}""")
 
     # Subject-specific pedagogy
     sections.append(f"""SUBJECT PEDAGOGY
@@ -283,7 +289,11 @@ CRITICAL RULES:
 7. NO invented textbook references, page numbers, or curriculum codes.
 8. NO ICT/projector/smartboard assumptions unless clearly appropriate.
 9. Differentiation must be COMPACT — not three separate lessons.
-10. The lesson must form a COHERENT instructional story.""")
+10. The lesson must form a COHERENT instructional story.
+11. lesson_identity MUST copy subject, class_level, strand, sub_strand,
+    indicator_code and indicator_text EXACTLY from CURRICULUM CONTEXT — never
+    paraphrased, reworded, or invented. Generation can enrich pedagogy but can
+    NEVER change or fabricate curriculum facts.""")
 
     return "\n\n".join(sections)
 

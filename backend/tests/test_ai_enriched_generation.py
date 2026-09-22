@@ -42,7 +42,8 @@ class RealisticV2MockProvider(AIProvider):
                            content_standard, indicator_code, indicator_text,
                            class_size=35, duration_minutes=60, source_resources=None,
                            previous_lesson_context=None, next_lesson_context=None,
-                           teaching_day=None, week_number=None):
+                           teaching_day=None, week_number=None,
+                           term=None, teaching_week=None, period=None):
         # Build the real V2 prompt (proves prompt construction works)
         prompt = _build_v2_prompt_from_context(
             subject=subject, class_level=class_level, strand=strand,

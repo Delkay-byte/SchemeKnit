@@ -143,6 +143,27 @@ class TestV2PromptBuilder:
         assert "Next" in prompt
         assert "Monday" in prompt
 
+    def test_build_v2_prompt_with_schedule_context(self):
+        """16J: the teaching schedule (term / week / period) must be anchored
+        into the generation prompt so AI is pinned to the exact curriculum slot."""
+        prompt = _build_v2_prompt_from_context(
+            subject="Mathematics",
+            class_level="Basic 8",
+            strand="Number",
+            sub_strand="Operations",
+            content_standard="Add and subtract",
+            indicator_code="B8.2.1.1.3",
+            indicator_text="Add fractions",
+            term="First Term",
+            teaching_week=4,
+            week_number=3,
+            period="Period 1",
+        )
+        assert "First Term" in prompt
+        assert "Teaching Week: 4" in prompt
+        assert "Curriculum Week: 3" in prompt
+        assert "Period 1" in prompt
+
     def test_build_generation_prompt_directly(self):
         ind = Indicator(
             code="B9.1.1.1",
@@ -183,13 +204,19 @@ class TestJsonParsing:
         result = _parse_json_response('Here is the result: {"key": "value"} done.')
         assert result == {"key": "value"}
 
-    def test_parse_empty_response(self):
-        assert _parse_json_response("") == {}
-        assert _parse_json_response(None) == {}
+    def test_parse_empty_response_raises(self):
+        import pytest
+        from src.engines.ai_provider import AIResponseParseError
+        with pytest.raises(AIResponseParseError):
+            _parse_json_response("")
+        with pytest.raises(AIResponseParseError):
+            _parse_json_response(None)
 
-    def test_parse_invalid_json(self):
-        result = _parse_json_response("not json at all")
-        assert result == {}
+    def test_parse_invalid_json_raises(self):
+        import pytest
+        from src.engines.ai_provider import AIResponseParseError
+        with pytest.raises(AIResponseParseError):
+            _parse_json_response("not json at all")
 
     def test_strip_fences(self):
         assert _strip_fences('```json\n{"a":1}\n```') == '{"a":1}'
@@ -534,6 +561,9 @@ class TestV2ContentApplication:
         )
         d = pipeline._lesson_to_dict(lp)
         assert d["subject"] == "Science"
+        assert isinstance(d["subject"], str)
+        assert d["class_level"] == "Basic 9"
+        assert isinstance(d["class_level"], str)
         assert d["indicator_codes"] == ["B9.1.1.1"]
         assert len(d["learning_objectives"]) == 1
         assert d["starter_activity"] == "Quiz"

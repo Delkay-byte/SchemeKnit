@@ -20,6 +20,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import src.config  # noqa: F401  isort:skip
 
 from src.engines.ai_provider import (
+    AIResponseParseError,
     DEFAULT_GEMINI_MODEL,
     DEFAULT_GROQ_MODEL,
     GeminiProvider,
@@ -161,10 +162,22 @@ class TestStructuredOutputHandling:
     def test_parse_fenced_json(self):
         assert _parse_json_response('```json\n{"a": 1}\n```') == {"a": 1}
 
-    def test_parse_malformed_returns_empty(self):
-        assert _parse_json_response("not json at all") == {}
-        assert _parse_json_response('{"partial": ') == {}
-        assert _parse_json_response("") == {}
+    def test_parse_malformed_raises_structure_error(self):
+        import pytest
+        with pytest.raises(AIResponseParseError):
+            _parse_json_response("not json at all")
+        with pytest.raises(AIResponseParseError):
+            _parse_json_response('{"partial": ')
+        with pytest.raises(AIResponseParseError):
+            _parse_json_response("")
+        with pytest.raises(AIResponseParseError):
+            _parse_json_response("[]")  # parseable but not an object
+
+    def test_non_object_json_raises_schema_invalid(self):
+        import pytest
+        with pytest.raises(AIResponseParseError) as exc_info:
+            _parse_json_response("[1, 2, 3]")
+        assert exc_info.value.args[0] == "schema_invalid"
 
     def test_parse_json_embedded_in_text(self):
         assert _parse_json_response('Here you go: {"ok": true} thanks') == {"ok": True}
@@ -214,7 +227,7 @@ class TestGeminiFailurePaths:
             assert p.generate_structured("{}") == {}
         assert "refused" in (p.last_error or "") or "empty" in (p.last_error or "")
 
-    def test_malformed_json_body_yields_empty_dict(self):
+    def test_malformed_json_body_yields_empty_dict_with_diagnostic(self):
         p = self._provider()
         resp = MagicMock(status_code=200)
         resp.json.return_value = {
@@ -223,6 +236,25 @@ class TestGeminiFailurePaths:
         with patch("requests.post", return_value=resp):
             out = p.generate_structured("prompt")
         assert out == {}
+        # 16H: malformed output is a DISTINCT diagnostic from "valid empty".
+        assert p.last_error == "malformed_json"
+
+    def test_v2_schema_invalid_content_is_not_a_false_success(self):
+        """A well-formed JSON object that lacks the V2 lesson shape must NOT be
+        accepted as a successful lesson (16H/16J — never fabricate success)."""
+        p = self._provider()
+        resp = MagicMock(status_code=200)
+        resp.json.return_value = {
+            "candidates": [{"content": {"parts": [{"text": '{"note": "hello"}'}]}}],
+        }
+        with patch("requests.post", return_value=resp):
+            out = p.generate_lesson_v2(
+                subject="Science", class_level="Basic 9", strand="Energy",
+                sub_strand="Forms", content_standard="Describe",
+                indicator_code="B9.1.1.1", indicator_text="Identify energy forms",
+            )
+        assert out == {}
+        assert p.last_error == "schema_invalid"
 
     def test_valid_structured_lesson_json(self):
         p = self._provider()
@@ -418,7 +450,8 @@ class TestLiveGemini:
             indicator_text="Separate mixtures by filtration and evaporation",
             duration_minutes=40,
         )
-        if not out and p.last_error in ("auth_failed", "invalid_api_key", "missing_api_key"):
+        if not out and p.last_error in ("auth_failed", "auth_key_type_unsupported",
+                                        "invalid_api_key", "missing_api_key"):
             pytest.skip(f"Gemini credentials rejected (last_error={p.last_error}) — update GEMINI_API_KEY")
         assert out, f"Gemini returned empty (last_error={p.last_error})"
         assert "learning_objectives" in out or "starter" in out or "assessment" in out

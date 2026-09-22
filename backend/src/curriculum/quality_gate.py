@@ -68,6 +68,48 @@ class QualityReport:
 
 # ── Validation Functions ──────────────────────────────────────────────────
 
+# Verbs matched as whole words (with common inflections), never as substrings:
+# a substring test flags "learn" inside "learners/learning" and "use" inside
+# "because/excuse" — the two classic false positives seen in real generations.
+_VAGUE_VERBS = ("understand", "know", "appreciate", "learn", "be aware of", "familiarize")
+
+# Bloom-level measurable verbs, including the ones used in real GES indicators
+# (express/round/model/state/name/match/estimate/order/label/order...).
+_MEASURABLE_VERBS = (
+    "identify", "classify", "calculate", "compute", "compare", "contrast",
+    "explain", "construct", "demonstrate", "analyze", "analyse", "create",
+    "justify", "describe", "list", "define", "solve", "apply", "examine",
+    "investigate", "discuss", "design", "evaluate", "measure", "record",
+    "draw", "write", "read", "speak", "listen", "perform", "practise",
+    "practice", "state", "name", "match", "label", "round", "express",
+    "model", "estimate", "order", "sort", "group", "represent", "sketch",
+    "build", "prepare", "follow", "trace", "recall", "predict", "test",
+    "experiment", "gather", "choose", "select", "outline", "organize",
+    "organise", "relate", "summarise", "summarize", "convert", "translate",
+    "substitute", "change", "reorder", "rewrite",
+)
+
+_INFLECTION = r"(?:s|es|ed|ing)?"
+
+
+def _verb_pattern(word: str) -> "re.Pattern[str]":
+    if " " in word:
+        return re.compile(rf"\b{'\\s+'.join(re.escape(p) for p in word.split())}\b")
+    return re.compile(rf"\b{re.escape(word)}{_INFLECTION}\b")
+
+
+_VAGUE_PATTERNS = [(_verb_pattern(v), v) for v in _VAGUE_VERBS]
+_MEASURABLE_PATTERNS = [_verb_pattern(v) for v in _MEASURABLE_VERBS]
+
+
+def _normalize_subject(subject: str) -> str:
+    """Fold enum-style subject rendering ('Subject.Mathematics',
+    'MATHEMATICS') down to the pedagogy-registry key ('mathematics')."""
+    s = (subject or "").strip().lower()
+    if s.startswith("subject."):
+        s = s[len("subject."):]
+    return s.replace("_", " ").strip()
+
 def _check_curriculum_match(lesson: Dict[str, Any], indicator: Indicator) -> List[QualityIssue]:
     """Verify curriculum identity fields match the source indicator."""
     issues = []
@@ -156,14 +198,6 @@ def _check_objectives(lesson: Dict[str, Any]) -> List[QualityIssue]:
     ))
 
     # Check for measurable verbs
-    vague_verbs = {"understand", "know", "appreciate", "learn", "be aware of", "familiarize"}
-    measurable_prefixes = {"identify", "classify", "calculate", "compare", "explain",
-                           "construct", "demonstrate", "analyze", "analyse", "create",
-                           "justify", "describe", "list", "define", "solve", "apply",
-                           "examine", "investigate", "discuss", "design", "evaluate",
-                           "demonstrate", "measure", "record", "draw", "write", "read",
-                           "speak", "listen", "perform", "practise", "practice"}
-
     for obj in objectives:
         if isinstance(obj, dict):
             desc = obj.get("description", "")
@@ -184,9 +218,9 @@ def _check_objectives(lesson: Dict[str, Any]) -> List[QualityIssue]:
                 category="objectives",
             ))
 
-        # Check for vague verbs
-        for vague in vague_verbs:
-            if vague in desc_lower:
+        # Check for vague verbs (whole words only)
+        for pattern, vague in _VAGUE_PATTERNS:
+            if pattern.search(desc_lower):
                 issues.append(QualityIssue(
                     check_name="objectives_measurable",
                     status=QualityStatus.WARN,
@@ -195,8 +229,8 @@ def _check_objectives(lesson: Dict[str, Any]) -> List[QualityIssue]:
                     category="objectives",
                 ))
 
-        # Check for at least one measurable verb
-        has_measurable = any(v in desc_lower for v in measurable_prefixes)
+        # Check for at least one measurable verb (whole words only)
+        has_measurable = any(p.search(desc_lower) for p in _MEASURABLE_PATTERNS)
         if not has_measurable and has_learner_can:
             issues.append(QualityIssue(
                 check_name="objectives_measurable_verb",
@@ -571,8 +605,9 @@ def _check_subject_appropriateness(lesson: Dict[str, Any]) -> List[QualityIssue]
             severity="warning", category="pedagogy")]
     try:
         from .pedagogy import profile_for_subject, SUBJECT_TO_PROFILE
-        profile = profile_for_subject(subject)
-        known = subject.strip().lower() in SUBJECT_TO_PROFILE
+        subject_key = _normalize_subject(subject)
+        profile = profile_for_subject(subject_key)
+        known = subject_key in SUBJECT_TO_PROFILE
     except Exception:
         known, profile = False, None
     if not known:
