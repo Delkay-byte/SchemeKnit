@@ -209,7 +209,7 @@ class TestProviderUnavailableVsRuntimeFailure:
                    content_standard, indicator_code, indicator_text,
                    class_size=35, duration_minutes=60, source_resources=None,
                    previous_lesson_context=None, next_lesson_context=None,
-                   teaching_day=None, week_number=None):
+                   teaching_day=None, week_number=None, term=None, teaching_week=None, period=None):
             return {
                 "learning_objectives": [],
                 "main_learning": {},
@@ -235,7 +235,7 @@ class TestProviderUnavailableVsRuntimeFailure:
                    content_standard, indicator_code, indicator_text,
                    class_size=35, duration_minutes=60, source_resources=None,
                    previous_lesson_context=None, next_lesson_context=None,
-                   teaching_day=None, week_number=None):
+                   teaching_day=None, week_number=None, term=None, teaching_week=None, period=None):
             return {
                 "learning_objectives": [],
                 "main_learning": {},
@@ -382,7 +382,7 @@ class TestDeterministicFallbackExplicit:
                        content_standard, indicator_code, indicator_text,
                        class_size=35, duration_minutes=60, source_resources=None,
                        previous_lesson_context=None, next_lesson_context=None,
-                       teaching_day=None, week_number=None):
+                       teaching_day=None, week_number=None, term=None, teaching_week=None, period=None):
             call_count[0] += 1
             if call_count[0] % 2 == 0:
                 raise RuntimeError("Intermittent failure")

@@ -28,8 +28,12 @@ NAMED_PROVIDERS = frozenset({
 _AUTO_PROVIDER_ORDER = ("gemini", "groq", "openai", "opencode-zen", "ollama")
 
 #: Default model IDs — overridable via environment (never assume obsolete IDs).
-DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
-DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile"
+#: Google's new authorization-key prefix is rejected by :generateContent
+#: (ACCESS_TOKEN_TYPE_UNSUPPORTED); gemini-3.x-flash is the current documented
+#: stable family. Groq retired llama-3.3-70b-versatile (2026-08-16);
+#: openai/gpt-oss-20b is its current replacement.
+DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
+DEFAULT_GROQ_MODEL = "openai/gpt-oss-20b"
 DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
 
 #: Hard timeout for provider HTTP calls (seconds).
@@ -67,25 +71,100 @@ def _strip_fences(text: str) -> str:
     return text
 
 
-def _parse_json_response(text: str) -> dict:
-    """Safely parse JSON from model output, handling markdown fences.
+class AIResponseParseError(RuntimeError):
+    """The AI response could not be parsed into a valid dict.
 
-    Returns {} on malformed/partial JSON so callers can record an explicit
-    ``empty_response`` / ``malformed_json`` diagnostic instead of crashing.
+    Raised by ``_parse_json_response`` so callers can record a structured,
+    secret-free diagnostic (malformed_json / schema_invalid / empty_response)
+    instead of conflating "valid empty object" with "failed to parse".
+    """
+
+
+def _parse_json_response(text: str) -> dict:
+    """Parse JSON from model output, handling markdown fences.
+
+    Raises ``AIResponseParseError`` on empty, malformed, or non-object JSON so
+    callers can distinguish "empty output" from "valid empty object" and never
+    report a false success. Use ``_parse_or_diagnose`` in providers.
     """
     if not text:
-        return {}
+        raise AIResponseParseError("empty_response")
     cleaned = _strip_fences(text)
     try:
-        return json.loads(cleaned)
+        parsed = json.loads(cleaned)
     except Exception:
         m = re.search(r'\{.*\}', cleaned, re.DOTALL)
         if m:
             try:
-                return json.loads(m.group(0))
+                parsed = json.loads(m.group(0))
             except Exception:
-                return {}
+                raise AIResponseParseError("malformed_json")
+        else:
+            raise AIResponseParseError("malformed_json")
+    if not isinstance(parsed, dict):
+        raise AIResponseParseError("schema_invalid")
+    return parsed
+
+
+def _validate_v2_content(content: Any) -> bool:
+    """True if the parsed payload carries the canonical V2 lesson shape."""
+    if not isinstance(content, dict):
+        return False
+    return any(key in content for key in (
+        "learning_objectives", "starter", "main_learning", "assessment", "plenary",
+    ))
+
+
+def _parse_or_diagnose(
+    provider: "AIProvider",
+    text: str,
+    *,
+    require_lesson_schema: bool = False,
+) -> dict:
+    """Parse a provider response into a dict, recording a structured diagnostic.
+
+    Never raises and never reports a false success:
+      * empty text        → {} (transport/availability error already recorded)
+      * malformed JSON    → {} with provider.last_error = "malformed_json"
+      * non-object JSON   → {} with provider.last_error = "schema_invalid"
+      * V2 schema missing → {} with provider.last_error = "schema_invalid"
+    """
+    if not text:
         return {}
+    try:
+        parsed = _parse_json_response(text)
+    except AIResponseParseError:
+        provider.last_error = "malformed_json"
+        return {}
+    if require_lesson_schema and not _validate_v2_content(parsed):
+        provider.last_error = "schema_invalid"
+        return {}
+    return parsed
+
+
+def provider_status(provider: "AIProvider") -> str:
+    """Classify a provider's state (Phase 16I/16C).
+
+    Config availability never implies live success: "CONFIGURED" only means a
+    key is present (or Ollama is reachable). Live calls then resolve to a
+    success/failure state recorded in ``last_error``.
+    """
+    if provider is None:
+        return "NOT_CONFIGURED"
+    if not provider.is_available():
+        return "MISSING_KEY"
+    error = getattr(provider, "last_error", None)
+    if error in ("auth_failed", "auth_key_type_unsupported", "invalid_api_key"):
+        return "LIVE_AUTH_FAILURE"
+    if error in ("model_not_found", "http_404"):
+        return "MODEL_UNAVAILABLE"
+    if error == "rate_limit":
+        return "LIVE_RATE_LIMITED"
+    if error is None:
+        return "CONFIGURED"
+    if error in ("content_refusal", "empty_output"):
+        return "LIVE_EMPTY_OUTPUT"
+    return "LIVE_ERROR"
 
 
 def _record_error(provider: "AIProvider", exc: Exception) -> None:
@@ -114,6 +193,9 @@ def _build_v2_prompt_from_context(
     next_lesson_context: Optional[str] = None,
     teaching_day: Optional[str] = None,
     week_number: Optional[int] = None,
+    term: Optional[str] = None,
+    teaching_week: Optional[int] = None,
+    period: Optional[str] = None,
 ) -> str:
     """Build a V2 prompt directly from context (no indicator interpretation needed)."""
     from ..curriculum.indicator_interpreter import interpret_indicator, Indicator
@@ -144,6 +226,9 @@ def _build_v2_prompt_from_context(
         next_lesson_context=next_lesson_context,
         teaching_day=teaching_day,
         week_number=week_number,
+        term=term,
+        teaching_week=teaching_week,
+        period=period,
     )
 
 
@@ -182,6 +267,9 @@ class AIProvider(ABC):
         next_lesson_context: Optional[str] = None,
         teaching_day: Optional[str] = None,
         week_number: Optional[int] = None,
+        term: Optional[str] = None,
+        teaching_week: Optional[int] = None,
+        period: Optional[str] = None,
     ) -> Dict[str, Any]:
         """V2 structured lesson generation.
 
@@ -267,10 +355,21 @@ class GeminiProvider(AIProvider):
                 self.last_error = "rate_limit"
                 return ""
             if resp.status_code in (401, 403):
-                self.last_error = "auth_failed"
+                # Google now issues its new authorization-key prefix by default,
+                # which :generateContent rejects with ACCESS_TOKEN_TYPE_UNSUPPORTED.
+                # Distinguish that from a mere wrong value so the owner knows to
+                # mint a restricted standard API key instead of guessing.
+                body = resp.text or ""
+                if "ACCESS_TOKEN_TYPE_UNSUPPORTED" in body:
+                    self.last_error = "auth_key_type_unsupported"
+                else:
+                    self.last_error = "auth_failed"
                 return ""
             if resp.status_code == 400 and "API key not valid" in resp.text:
                 self.last_error = "invalid_api_key"
+                return ""
+            if resp.status_code == 404:
+                self.last_error = "model_not_found"
                 return ""
             if resp.status_code >= 500:
                 self.last_error = f"http_{resp.status_code}"
@@ -307,15 +406,17 @@ class GeminiProvider(AIProvider):
             indicator_text=indicator,
         )
         from ..curriculum.generation_prompt import SYSTEM_PROMPT
-        return _parse_json_response(
-            self._generate_text(prompt, json_mode=True, system=SYSTEM_PROMPT)
+        return _parse_or_diagnose(
+            self,
+            self._generate_text(prompt, json_mode=True, system=SYSTEM_PROMPT),
         )
 
     def generate_lesson_v2(self, *, subject, class_level, strand, sub_strand,
                            content_standard, indicator_code, indicator_text,
                            class_size=35, duration_minutes=60, source_resources=None,
                            previous_lesson_context=None, next_lesson_context=None,
-                           teaching_day=None, week_number=None):
+                           teaching_day=None, week_number=None,
+                           term=None, teaching_week=None, period=None):
         prompt = _build_v2_prompt_from_context(
             subject=subject, class_level=class_level, strand=strand,
             sub_strand=sub_strand, content_standard=content_standard,
@@ -325,14 +426,17 @@ class GeminiProvider(AIProvider):
             previous_lesson_context=previous_lesson_context,
             next_lesson_context=next_lesson_context,
             teaching_day=teaching_day, week_number=week_number,
+            term=term, teaching_week=teaching_week, period=period,
         )
         from ..curriculum.generation_prompt import SYSTEM_PROMPT
-        return _parse_json_response(
-            self._generate_text(prompt, json_mode=True, system=SYSTEM_PROMPT)
+        return _parse_or_diagnose(
+            self,
+            self._generate_text(prompt, json_mode=True, system=SYSTEM_PROMPT),
+            require_lesson_schema=True,
         )
 
     def generate_structured(self, prompt: str) -> dict:
-        return _parse_json_response(self._generate_text(prompt, json_mode=True))
+        return _parse_or_diagnose(self, self._generate_text(prompt, json_mode=True))
 
     def is_available(self) -> bool:
         return bool(self.api_key)
@@ -443,15 +547,17 @@ class GroqProvider(AIProvider):
             indicator_text=indicator,
         )
         from ..curriculum.generation_prompt import SYSTEM_PROMPT
-        return _parse_json_response(
-            self._chat(prompt, json_mode=True, system=SYSTEM_PROMPT)
+        return _parse_or_diagnose(
+            self,
+            self._chat(prompt, json_mode=True, system=SYSTEM_PROMPT),
         )
 
     def generate_lesson_v2(self, *, subject, class_level, strand, sub_strand,
                            content_standard, indicator_code, indicator_text,
                            class_size=35, duration_minutes=60, source_resources=None,
                            previous_lesson_context=None, next_lesson_context=None,
-                           teaching_day=None, week_number=None):
+                           teaching_day=None, week_number=None,
+                           term=None, teaching_week=None, period=None):
         prompt = _build_v2_prompt_from_context(
             subject=subject, class_level=class_level, strand=strand,
             sub_strand=sub_strand, content_standard=content_standard,
@@ -461,14 +567,17 @@ class GroqProvider(AIProvider):
             previous_lesson_context=previous_lesson_context,
             next_lesson_context=next_lesson_context,
             teaching_day=teaching_day, week_number=week_number,
+            term=term, teaching_week=teaching_week, period=period,
         )
         from ..curriculum.generation_prompt import SYSTEM_PROMPT
-        return _parse_json_response(
-            self._chat(prompt, json_mode=True, system=SYSTEM_PROMPT)
+        return _parse_or_diagnose(
+            self,
+            self._chat(prompt, json_mode=True, system=SYSTEM_PROMPT),
+            require_lesson_schema=True,
         )
 
     def generate_structured(self, prompt: str) -> dict:
-        return _parse_json_response(self._chat(prompt, json_mode=True))
+        return _parse_or_diagnose(self, self._chat(prompt, json_mode=True))
 
     def is_available(self) -> bool:
         return bool(self.api_key)
@@ -539,13 +648,14 @@ class OpenAIProvider(AIProvider):
             indicator_code=context.get("indicator_code", "") if context else "",
             indicator_text=indicator,
         )
-        return _parse_json_response(self._chat(prompt, json_mode=True))
+        return _parse_or_diagnose(self, self._chat(prompt, json_mode=True))
 
     def generate_lesson_v2(self, *, subject, class_level, strand, sub_strand,
                            content_standard, indicator_code, indicator_text,
                            class_size=35, duration_minutes=60, source_resources=None,
                            previous_lesson_context=None, next_lesson_context=None,
-                           teaching_day=None, week_number=None):
+                           teaching_day=None, week_number=None,
+                           term=None, teaching_week=None, period=None):
         prompt = _build_v2_prompt_from_context(
             subject=subject, class_level=class_level, strand=strand,
             sub_strand=sub_strand, content_standard=content_standard,
@@ -555,14 +665,17 @@ class OpenAIProvider(AIProvider):
             previous_lesson_context=previous_lesson_context,
             next_lesson_context=next_lesson_context,
             teaching_day=teaching_day, week_number=week_number,
+            term=term, teaching_week=teaching_week, period=period,
         )
         from ..curriculum.generation_prompt import SYSTEM_PROMPT
-        return _parse_json_response(
-            self._chat(prompt, json_mode=True, system=SYSTEM_PROMPT)
+        return _parse_or_diagnose(
+            self,
+            self._chat(prompt, json_mode=True, system=SYSTEM_PROMPT),
+            require_lesson_schema=True,
         )
 
     def generate_structured(self, prompt: str) -> dict:
-        return _parse_json_response(self._chat(prompt, json_mode=True))
+        return _parse_or_diagnose(self, self._chat(prompt, json_mode=True))
 
     def is_available(self) -> bool:
         return bool(self.api_key)
@@ -640,13 +753,14 @@ class OpenCodeZenProvider(AIProvider):
             indicator_code=context.get("indicator_code", "") if context else "",
             indicator_text=indicator,
         )
-        return _parse_json_response(self._chat(prompt, json_mode=True))
+        return _parse_or_diagnose(self, self._chat(prompt, json_mode=True))
 
     def generate_lesson_v2(self, *, subject, class_level, strand, sub_strand,
                            content_standard, indicator_code, indicator_text,
                            class_size=35, duration_minutes=60, source_resources=None,
                            previous_lesson_context=None, next_lesson_context=None,
-                           teaching_day=None, week_number=None):
+                           teaching_day=None, week_number=None,
+                           term=None, teaching_week=None, period=None):
         prompt = _build_v2_prompt_from_context(
             subject=subject, class_level=class_level, strand=strand,
             sub_strand=sub_strand, content_standard=content_standard,
@@ -656,14 +770,17 @@ class OpenCodeZenProvider(AIProvider):
             previous_lesson_context=previous_lesson_context,
             next_lesson_context=next_lesson_context,
             teaching_day=teaching_day, week_number=week_number,
+            term=term, teaching_week=teaching_week, period=period,
         )
         from ..curriculum.generation_prompt import SYSTEM_PROMPT
-        return _parse_json_response(
-            self._chat(prompt, json_mode=True, system=SYSTEM_PROMPT)
+        return _parse_or_diagnose(
+            self,
+            self._chat(prompt, json_mode=True, system=SYSTEM_PROMPT),
+            require_lesson_schema=True,
         )
 
     def generate_structured(self, prompt: str) -> dict:
-        return _parse_json_response(self._chat(prompt, json_mode=True))
+        return _parse_or_diagnose(self, self._chat(prompt, json_mode=True))
 
     def is_available(self) -> bool:
         return bool(self.api_key)
@@ -691,11 +808,12 @@ class OllamaProvider(AIProvider):
             # Full V2 lesson JSON regularly exceeds 800 tokens and was
             # truncated mid-object on real-doc runs (unparseable → empty).
             # 2048 covers the schema with headroom for differentiation/notes.
+            timeout = _env("OLLAMA_TIMEOUT_SECONDS", "180")
             resp = requests.post(
                 f"{self.base_url}/api/generate",
                 json={"model": self.model, "prompt": prompt, "stream": False,
                       "options": {"num_predict": 2048}},
-                timeout=180,
+                timeout=int(timeout) if str(timeout).isdigit() else 180,
             )
             if resp.status_code != 200:
                 self.last_error = f"http_{resp.status_code}"
@@ -731,13 +849,14 @@ class OllamaProvider(AIProvider):
                 indicator_code=context.get("indicator_code", "") if context else "",
                 indicator_text=indicator,
             )
-        return _parse_json_response(self._generate(prompt))
+        return _parse_or_diagnose(self, self._generate(prompt))
 
     def generate_lesson_v2(self, *, subject, class_level, strand, sub_strand,
                            content_standard, indicator_code, indicator_text,
                            class_size=35, duration_minutes=60, source_resources=None,
                            previous_lesson_context=None, next_lesson_context=None,
-                           teaching_day=None, week_number=None):
+                           teaching_day=None, week_number=None,
+                           term=None, teaching_week=None, period=None):
         if not self.is_available():
             self.last_error = "unavailable"
             return {}
@@ -747,17 +866,18 @@ class OllamaProvider(AIProvider):
             indicator_code=indicator_code, indicator_text=indicator_text,
             class_size=class_size, duration_minutes=duration_minutes,
             source_resources=source_resources,
-            previous_lesson_context=previous_lesson_context,
+previous_lesson_context=previous_lesson_context,
             next_lesson_context=next_lesson_context,
             teaching_day=teaching_day, week_number=week_number,
+            term=term, teaching_week=teaching_week, period=period,
         )
-        return _parse_json_response(self._generate(prompt))
+        return _parse_or_diagnose(self, self._generate(prompt), require_lesson_schema=True)
 
     def generate_structured(self, prompt: str) -> dict:
         if not self.is_available():
             self.last_error = "unavailable"
             return {}
-        return _parse_json_response(self._generate(prompt))
+        return _parse_or_diagnose(self, self._generate(prompt))
 
     def is_available(self) -> bool:
         try:

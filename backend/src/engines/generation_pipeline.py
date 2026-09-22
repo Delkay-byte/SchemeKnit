@@ -326,6 +326,9 @@ class GenerationPipeline:
                     previous_lesson_context=prev_context,
                     next_lesson_context=next_context,
                     week_number=lp.week_number,
+                    term=(config.term if config else None),
+                    teaching_week=lp.teaching_week,
+                    period=lp.period,
                 )
 
                 if not content:
@@ -506,9 +509,13 @@ class GenerationPipeline:
 
     def _lesson_to_dict(self, lp: LessonPlan) -> dict:
         """Convert a LessonPlan to a dict for the quality gate."""
+        def _label(value):
+            if isinstance(value, (Subject, ClassLevel)):
+                return value.value if value.value else ""
+            return value or ""
         return {
-            "subject": lp.subject or "",
-            "class_level": lp.class_level or "",
+            "subject": _label(lp.subject),
+            "class_level": _label(lp.class_level),
             "strand": lp.strand or "",
             # Source strand from the allocation — used by strand_match so the
             # check is a real comparison, not a self-comparison no-op.

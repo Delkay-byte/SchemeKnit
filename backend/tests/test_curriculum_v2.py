@@ -388,6 +388,44 @@ class TestQualityGate:
         report = validate_lesson_quality(lesson, indicator)
         assert any(i.check_name == "objectives_measurable" and i.status == QualityStatus.WARN for i in report.issues)
 
+    def test_learners_can_prefix_is_not_flagged_as_vague_learn(self):
+        # Regression: 'learn' is a substring of 'learners' — word-boundary
+        # matching must NOT flag a measurable objective that merely starts
+        # with "Learners can".
+        lesson = self._make_lesson(learning_objectives=[
+            {"description": "Learners can model number quantities more than 1,000,000,000 using graph sheets"}
+        ])
+        indicator = self._make_indicator()
+        report = validate_lesson_quality(lesson, indicator)
+        assert not any(i.check_name == "objectives_measurable" and i.status == QualityStatus.WARN for i in report.issues)
+
+    def test_measureable_verbs_round_express_model_are_counted(self):
+        # Real B7/B9 indicators use round/express/model — these must satisfy
+        # the measurable-verb check instead of warning.
+        for desc in [
+            "Learners can round whole numbers more than 1,000,000,000 to the nearest ten",
+            "Learners can express integers to a given number of significant figures",
+            "Learners can model number quantities using multi-base blocks",
+        ]:
+            lesson = self._make_lesson(learning_objectives=[{"description": desc}])
+            report = validate_lesson_quality(lesson, self._make_indicator())
+            assert not any(
+                i.check_name == "objectives_measurable_verb" and i.status == QualityStatus.WARN
+                for i in report.issues
+            ), f"measurable verb under-counted for: {desc}"
+
+    def test_subject_enum_render_resolves_to_pedagogy_profile(self):
+        # Regression: LessonPlans serialized subject as the enum repr like
+        # 'Subject.SCIENCE' — the pedagogy profile registry exact lookup then
+        # emitted a spurious "no profile" warning despite profiles existing.
+        for subject in ("Subject.SCIENCE", "Subject.MATHEMATICS", "SCIENCE", "Mathematics"):
+            lesson = self._make_lesson(subject=subject)
+            report = validate_lesson_quality(lesson, self._make_indicator())
+            assert not any(
+                i.check_name == "subject_appropriateness" and i.status == QualityStatus.WARN
+                for i in report.issues
+            ), f"spurious subject-appropriateness warning for {subject!r}"
+
     def test_generic_assessment_warns(self):
         lesson = self._make_lesson(assessment="What did we learn today?")
         indicator = self._make_indicator()

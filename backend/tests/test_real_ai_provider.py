@@ -14,7 +14,7 @@ from datetime import date
 
 from src.parsers.pdf_parser import PDFParser
 from src.models import TermConfig, AIMode, Holiday, Week
-from src.engines.ai_provider import _build_v2_prompt_from_context, _parse_json_response
+from src.engines.ai_provider import _build_v2_prompt_from_context, _parse_json_response, AIResponseParseError
 from src.curriculum import Indicator
 from src.curriculum.quality_gate import validate_lesson_quality
 
@@ -63,7 +63,11 @@ def call_openrouter(system_msg: str, user_msg: str, max_tokens: int = 2000) -> d
         return {}
     content = data["choices"][0]["message"]["content"]
     print(f"  Raw response length: {len(content)} chars")
-    result = _parse_json_response(content)
+    try:
+        result = _parse_json_response(content)
+    except AIResponseParseError as e:
+        print(f"  PARSE FAILED ({e}). Raw content (first 500):\n{content[:500]}")
+        return {}
     if not result:
         print(f"  PARSE FAILED. Raw content (first 500):\n{content[:500]}")
     return result
