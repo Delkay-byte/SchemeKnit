@@ -31,6 +31,7 @@ export default function GeneratePage() {
   const [allocationPreview, setAllocationPreview] = useState<any>(null)
   const [previewing, setPreviewing] = useState(false)
   const [allocationConfirmed, setAllocationConfirmed] = useState(false)
+  const [selectedCodes, setSelectedCodes] = useState<string[]>([])
 
   const levelForClass = (classLevel: string): string | undefined => {
     const c = (classLevel || '').toLowerCase()
@@ -65,6 +66,7 @@ export default function GeneratePage() {
     teaching_learning_resources: [],
     core_competencies: [],
     references: [],
+    selected_indicator_codes: [],
   })
 
   useEffect(() => {
@@ -136,11 +138,52 @@ export default function GeneratePage() {
       setAllocationConfirmed(false)
       const preview = await api.getAllocationPreview(schemeId, config)
       setAllocationPreview(preview)
+      // Seed the indicator selection: when the Free Tier quota is enforced,
+      // pre-select up to the remaining allowance so the teacher can generate
+      // immediately, while every other indicator stays visible and selectable.
+      const selectable: string[] = (preview.selectable_indicators || [])
+        .map((s: any) => s.indicator_code)
+        .filter(Boolean)
+      const remaining: number | null = preview.lesson_quota?.enforced
+        ? (preview.lesson_quota.remaining ?? 0)
+        : null
+      if (remaining !== null && selectable.length > 0) {
+        setSelectedCodes(selectable.slice(0, Math.max(remaining, 0)))
+        setConfig(prev => ({
+          ...prev,
+          selected_indicator_codes: selectable.slice(0, Math.max(remaining, 0)),
+        }))
+      } else {
+        setSelectedCodes([])
+        setConfig(prev => ({ ...prev, selected_indicator_codes: [] }))
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to preview allocation')
     } finally {
       setPreviewing(false)
     }
+  }
+
+  const toggleIndicator = (code: string) => {
+    const quotaEnforced = !!allocationPreview?.lesson_quota?.enforced
+    const remaining: number = allocationPreview?.lesson_quota?.remaining ?? 0
+    const selectable: string[] = (allocationPreview?.selectable_indicators || [])
+      .map((s: any) => s.indicator_code)
+      .filter(Boolean)
+    let next: string[]
+    if (selectedCodes.includes(code)) {
+      next = selectedCodes.filter(c => c !== code)
+    } else {
+      if (quotaEnforced && selectedCodes.length >= remaining) {
+        // Hard cap: cannot spend more than this month's remaining allowance.
+        return
+      }
+      next = [...selectedCodes, code]
+    }
+    // Preserve curriculum order regardless of click order.
+    next = selectable.filter(c => next.includes(c))
+    setSelectedCodes(next)
+    setConfig(prev => ({ ...prev, selected_indicator_codes: next }))
   }
 
   const handleConfirmAndGenerate = async () => {
@@ -588,6 +631,92 @@ export default function GeneratePage() {
                     </div>
                   )}
 
+                  {/* Free Tier monthly allowance (PART C): plain, non-technical
+                      language, with the scheme's indicator count and the
+                      remaining allowance so the teacher can choose a subset. */}
+                  {allocationPreview.lesson_quota?.enforced && (
+                    <div className="p-3 rounded-md bg-blue-50 border border-blue-200 text-xs text-blue-800 space-y-1">
+                      <p className="font-semibold">
+                        {allocationPreview.lesson_quota.used} of {allocationPreview.lesson_quota.limit} Free Tier lesson plans used this month ·{' '}
+                        {allocationPreview.lesson_quota.remaining} remaining
+                      </p>
+                      {allocationPreview.selectable_indicators?.length > 0 && (
+                        <p>
+                          This scheme contains {allocationPreview.selectable_indicators.length} instructional indicator
+                          {allocationPreview.selectable_indicators.length === 1 ? '' : 's'}. You can generate up to{' '}
+                          {allocationPreview.lesson_quota.remaining} now; Teacher Pro removes this limit.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Indicator selection: one indicator = one lesson plan.
+                      When the Free Tier quota is enforced the teacher chooses
+                      which indicators to spend this month; the rest stay in the
+                      scheme for later. Unlimited plans see every indicator
+                      pre-selected with no cap. */}
+                  {allocationPreview.selectable_indicators?.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-semibold text-muted-foreground">
+                          Choose indicators to generate
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {selectedCodes.length}
+                          {allocationPreview.lesson_quota?.enforced
+                            ? ` of ${allocationPreview.lesson_quota.remaining} remaining`
+                            : ` selected`}
+                        </p>
+                      </div>
+                      <div className="space-y-1.5 max-h-56 overflow-y-auto border rounded-md p-2">
+                        {allocationPreview.selectable_indicators.map((ind: any) => {
+                          const checked = selectedCodes.includes(ind.indicator_code)
+                          const capped =
+                            allocationPreview.lesson_quota?.enforced &&
+                            !checked &&
+                            selectedCodes.length >= (allocationPreview.lesson_quota.remaining ?? 0)
+                          return (
+                            <label
+                              key={ind.indicator_code}
+                              className={`flex items-start gap-2 text-xs p-1.5 rounded ${
+                                capped ? 'opacity-50' : 'hover:bg-muted cursor-pointer'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                disabled={capped}
+                                onChange={() => toggleIndicator(ind.indicator_code)}
+                                className="mt-0.5"
+                              />
+                              <span>
+                                <span className="font-mono">{ind.indicator_code}</span>
+                                {' — '}
+                                {ind.indicator_description}
+                                <span className="text-muted-foreground ml-1">
+                                  (Week {ind.source_week})
+                                </span>
+                              </span>
+                            </label>
+                          )
+                        })}
+                      </div>
+                      {allocationPreview.lesson_quota?.enforced &&
+                        selectedCodes.length === 0 && (
+                          <p className="text-xs text-yellow-700">
+                            Select at least one indicator to generate.
+                          </p>
+                        )}
+                      {allocationPreview.lesson_quota?.enforced &&
+                        selectedCodes.length < (allocationPreview.selectable_indicators?.length ?? 0) && (
+                          <p className="text-xs text-muted-foreground">
+                            Unselected indicators stay in your scheme and can be
+                            generated next month.
+                          </p>
+                        )}
+                    </div>
+                  )}
+
                   {/* Allocation preview, grouped by ACTUAL teaching week. A lesson
                       carried forward from an earlier curriculum week says so in
                       plain language. */}
@@ -721,7 +850,17 @@ export default function GeneratePage() {
                     )}
                     {allocationPreview && !allocationConfirmed && (
                       <>
-                        <Button onClick={handleConfirmAndGenerate} disabled={generating} className="w-full" size="lg">
+                        <Button
+                          onClick={handleConfirmAndGenerate}
+                          disabled={
+                            generating ||
+                            (allocationPreview.lesson_quota?.enforced &&
+                              (allocationPreview.selectable_indicators?.length || 0) > 0 &&
+                              selectedCodes.length === 0)
+                          }
+                          className="w-full"
+                          size="lg"
+                        >
                           {generating ? (
                             <>
                               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -783,7 +922,12 @@ export default function GeneratePage() {
                       {exporting === 'zip' ? 'Exporting...' : 'Export ZIP'}
                     </Button>
                     <Button
-                      onClick={() => { setJobId(null); setCoverage(null); setGenProgress(''); setAllocationPreview(null); setAllocationConfirmed(false) }}
+                      onClick={() => {
+                        setJobId(null); setCoverage(null); setGenProgress('');
+                        setAllocationPreview(null); setAllocationConfirmed(false);
+                        setSelectedCodes([]);
+                        setConfig(prev => ({ ...prev, selected_indicator_codes: [] }))
+                      }}
                       className="w-full"
                       variant="outline"
                     >

@@ -139,7 +139,8 @@ class TestIndividualTeacherRegistration:
         assert ent is not None
         assert ent.edition == "free"
         assert ent.subscription_type == "individual"
-        assert ent.generation_limit == 3
+        # Free Tier lesson plans: 5 per calendar month.
+        assert ent.generation_limit == 5
         assert ent.batch_generation is False
         assert ent.zip_export is False
         assert ent.ai_enabled is True
@@ -210,8 +211,12 @@ class TestFreePlanEntitlements:
     def test_free_teacher_has_limited_generation(self, db):
         u, ent = _make_individual_teacher(db, "free-gen@test.com")
         resolved = resolve_entitlement(db, u)
-        assert resolved["generation_limit"] == 3
+        # Free Tier lesson plans are a CALENDAR-MONTH allowance of 5.
+        assert resolved["generation_limit"] == 5
         assert resolved["generations_used"] == 0
+        assert resolved["lesson_quota_period"] == "calendar_month"
+        assert resolved["lesson_quota_unlimited"] is False
+        assert resolved["lesson_quota_remaining"] == 5
 
     def test_free_teacher_cannot_batch(self, db):
         u, _ = _make_individual_teacher(db, "free-batch@test.com")
@@ -253,14 +258,23 @@ class TestFreePlanEntitlements:
         assert ent.generations_used == 1
 
     def test_generation_quota_enforcement(self, db):
+        from src.usage_quota import reserve_lesson_units
         u, ent = _make_individual_teacher(db, "free-quota@test.com")
-        ent.generations_used = 3
-        db.commit()
+        # Consume the full monthly allowance, one unit per indicator.
+        r = reserve_lesson_units(
+            db, u.id, "scheme-quota",
+            [f"B9.1.1.1.{i}" for i in range(1, 6)], 5)
+        assert r.allowed
+        assert r.consumed == 5
+        assert r.remaining == 0
+        # The sixth is refused.
+        r2 = reserve_lesson_units(db, u.id, "scheme-quota", ["B9.1.1.1.6"], 5)
+        assert not r2.allowed
+        assert r2.reason == "quota_exceeded"
         resolved = resolve_entitlement(db, u)
-        assert resolved["generation_limit"] == 3
-        assert resolved["generations_used"] == 3
-        # Generation should be blocked
-        assert resolved["generation_limit"] > 0 and resolved["generations_used"] >= resolved["generation_limit"]
+        assert resolved["generation_limit"] == 5
+        assert resolved["generations_used"] == 5
+        assert resolved["lesson_quota_remaining"] == 0
 
     def test_ai_credits_decrement(self, db):
         u, ent = _make_individual_teacher(db, "free-aidec@test.com")
@@ -469,15 +483,19 @@ class TestSecurity:
         assert ent.edition == "free"
 
     def test_teacher_cannot_bypass_quota_via_api(self, db):
-        """Generation quota is enforced server-side."""
+        """Generation quota is enforced server-side from the monthly ledger."""
+        from src.usage_quota import reserve_lesson_units
         u, ent = _make_individual_teacher(db, "quota-bypass@test.com")
-        ent.generations_used = 3
+        # Legacy stored counter is ignored; only the calendar-month ledger counts.
+        ent.generations_used = 999
         db.commit()
-
-        # The generation endpoint checks entitlement before generating
         resolved = resolve_entitlement(db, u)
-        assert resolved["generation_limit"] == 3
-        assert resolved["generations_used"] == 3
+        assert resolved["generation_limit"] == 5
+        assert resolved["generations_used"] == 0
+        reserve_lesson_units(db, u.id, "s", [f"C{i}" for i in range(5)], 5)
+        resolved = resolve_entitlement(db, u)
+        assert resolved["generations_used"] == 5
+        assert resolved["lesson_quota_remaining"] == 0
 
     def test_teacher_cannot_access_platform_admin(self, db):
         """Individual teachers cannot access platform admin endpoints."""

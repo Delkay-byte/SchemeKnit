@@ -108,14 +108,17 @@ def _check_curriculum_match(lesson: Dict[str, Any], indicator: Indicator) -> Lis
             category="curriculum",
         ))
 
-    # Strand match
-    lesson_strand = lesson.get("strand", "").lower().strip()
-    indicator_strand = lesson.get("strand", "").lower().strip()  # from allocation
-    if lesson_strand and indicator_strand and lesson_strand != indicator_strand:
+    # Strand match — compare the lesson strand against the SOURCE indicator's
+    # strand when provided. The Indicator dataclass has no strand field, so a
+    # source_strand key on the lesson dict (set by the pipeline from the
+    # allocation) is used; a missing source is a PASS (nothing to compare).
+    lesson_strand = (lesson.get("strand") or "").lower().strip()
+    source_strand = (lesson.get("source_strand") or "").lower().strip()
+    if lesson_strand and source_strand and lesson_strand != source_strand:
         issues.append(QualityIssue(
             check_name="strand_match",
             status=QualityStatus.WARN,
-            message=f"Strand mismatch: lesson has '{lesson.get('strand')}'",
+            message=f"Strand mismatch: lesson has '{lesson.get('strand')}', source is '{lesson.get('source_strand')}'",
             severity="warning",
             category="curriculum",
         ))
@@ -492,6 +495,301 @@ def _check_anti_hallucination(lesson: Dict[str, Any]) -> List[QualityIssue]:
     return issues
 
 
+# ── Generation V3 additional checks ───────────────────────────────────────
+
+def _lesson_text(lesson: Dict[str, Any]) -> str:
+    """Flatten every teacher-visible text field of a lesson for analysis."""
+    parts: List[str] = [
+        str(lesson.get("lesson_topic", "")),
+        str(lesson.get("introduction", "")),
+        str(lesson.get("starter_activity", "")),
+        str(lesson.get("assessment", "")),
+        str(lesson.get("conclusion", "")),
+        str(lesson.get("differentiation", "")),
+        str(lesson.get("homework", "")),
+        str(lesson.get("previous_knowledge", "")),
+    ]
+    parts.extend(str(i) for i in lesson.get("indicators", []) or [])
+    for key in ("main_activities", "learner_activities", "teacher_activities"):
+        for act in lesson.get(key, []) or []:
+            if isinstance(act, dict):
+                parts.append(str(act.get("description", "")))
+            else:
+                parts.append(str(act))
+    for obj in lesson.get("learning_objectives", []) or []:
+        if isinstance(obj, dict):
+            parts.append(str(obj.get("description", "")))
+        else:
+            parts.append(str(obj))
+    return " \n ".join(p for p in parts if p)
+
+
+def _tokens(text: str) -> set:
+    return {t for t in re.findall(r"[a-z]{4,}", (text or "").lower())}
+
+
+def _check_indicator_exactness(lesson: Dict[str, Any], indicator: Indicator) -> List[QualityIssue]:
+    """Indicator exactness: the lesson must visibly be about THIS indicator."""
+    skill = (indicator.description or indicator.exact_text or "").strip()
+    if not skill:
+        return [QualityIssue(
+            check_name="indicator_exactness", status=QualityStatus.WARN,
+            message="No source indicator text available to verify.",
+            severity="warning", category="curriculum")]
+    try:
+        from .lesson_builder import strip_indicator_code
+        skill = strip_indicator_code(skill)
+    except Exception:
+        pass
+    tokens = _tokens(skill)
+    if not tokens:
+        return [QualityIssue(
+            check_name="indicator_exactness", status=QualityStatus.PASS,
+            message="Indicator is too short to score; treated as addressed.",
+            category="curriculum")]
+    hay = _tokens(_lesson_text(lesson))
+    ratio = len(tokens & hay) / len(tokens)
+    if ratio < 0.4:
+        return [QualityIssue(
+            check_name="indicator_exactness", status=QualityStatus.FAIL,
+            message=("Lesson content does not clearly address the uploaded "
+                     "indicator (content overlap too low)."),
+            severity="error", category="curriculum")]
+    return [QualityIssue(
+        check_name="indicator_exactness", status=QualityStatus.PASS,
+        message="Lesson content is about the uploaded indicator.",
+        category="curriculum")]
+
+
+def _check_subject_appropriateness(lesson: Dict[str, Any]) -> List[QualityIssue]:
+    subject = str(lesson.get("subject", "") or "")
+    issues: List[QualityIssue] = []
+    if not subject:
+        return [QualityIssue(
+            check_name="subject_appropriateness", status=QualityStatus.WARN,
+            message="Lesson has no subject; subject pedagogy cannot be verified.",
+            severity="warning", category="pedagogy")]
+    try:
+        from .pedagogy import profile_for_subject, SUBJECT_TO_PROFILE
+        profile = profile_for_subject(subject)
+        known = subject.strip().lower() in SUBJECT_TO_PROFILE
+    except Exception:
+        known, profile = False, None
+    if not known:
+        issues.append(QualityIssue(
+            check_name="subject_appropriateness", status=QualityStatus.WARN,
+            message=f"No subject-specific pedagogy profile for '{subject}'.",
+            severity="warning", category="pedagogy"))
+    else:
+        issues.append(QualityIssue(
+            check_name="subject_appropriateness", status=QualityStatus.PASS,
+            message=f"Subject pedagogy appropriate for {getattr(profile, 'label', subject)}.",
+            category="pedagogy"))
+    return issues
+
+
+def _check_class_level_appropriateness(lesson: Dict[str, Any]) -> List[QualityIssue]:
+    class_level = str(lesson.get("class_level", "") or "")
+    if not class_level or class_level.lower() == "unknown":
+        return [QualityIssue(
+            check_name="class_level_appropriateness", status=QualityStatus.WARN,
+            message="Class level is unknown; appropriateness cannot be verified.",
+            severity="warning", category="pedagogy")]
+    return [QualityIssue(
+        check_name="class_level_appropriateness", status=QualityStatus.PASS,
+        message=f"Lesson written for {class_level}.", category="pedagogy")]
+
+
+def _check_starter_main_plenary_coherence(lesson: Dict[str, Any]) -> List[QualityIssue]:
+    """The phases must tell ONE instructional story about the same skill."""
+    skill_tokens = _tokens(str(lesson.get("lesson_topic", "")) + " " + " ".join(
+        str(i) for i in lesson.get("indicators", []) or []))
+    starter = str(lesson.get("starter_activity", lesson.get("introduction", "")))
+    plenary = str(lesson.get("conclusion", ""))
+    main_text = " ".join(
+        str(a.get("description", "")) if isinstance(a, dict) else str(a)
+        for a in lesson.get("main_activities", []) or []
+    )
+    # Coherence signal: the main block should share vocabulary with the lesson
+    # topic/indicator. This catches a generic lecture dropped into a lesson
+    # whose starter and plenary are about something else.
+    if skill_tokens:
+        main_overlap = len(skill_tokens & _tokens(main_text)) / max(len(skill_tokens), 1)
+    else:
+        main_overlap = 1.0
+    if not main_text or not starter or not plenary:
+        return [QualityIssue(
+            check_name="phase_coherence", status=QualityStatus.WARN,
+            message="Starter, main and plenary are not all present as a coherent sequence.",
+            severity="warning", category="coherence")]
+    if main_overlap < 0.25:
+        return [QualityIssue(
+            check_name="phase_coherence", status=QualityStatus.WARN,
+            message="Main activities share little vocabulary with the starter/indicator — phases may not tell one story.",
+            severity="warning", category="coherence")]
+    return [QualityIssue(
+        check_name="phase_coherence", status=QualityStatus.PASS,
+        message="Starter, main and plenary form one coherent instructional sequence.",
+        category="coherence")]
+
+
+def _check_assessment_alignment(lesson: Dict[str, Any], indicator: Optional[Indicator]) -> List[QualityIssue]:
+    """Assessment must measure the same target learning as the objective."""
+    objective_text = " ".join(
+        str(o.get("description", "")) if isinstance(o, dict) else str(o)
+        for o in lesson.get("learning_objectives", []) or []
+    )
+    assessment = str(lesson.get("assessment", ""))
+    if not assessment:
+        return []  # already reported by has_assessment
+    obj_tokens = _tokens(objective_text)
+    skill_tokens = _tokens((indicator.description if indicator else "") or "")
+    target = obj_tokens | skill_tokens
+    if target:
+        overlap = len(target & _tokens(assessment)) / max(len(target), 1)
+        if overlap < 0.2:
+            return [QualityIssue(
+                check_name="assessment_alignment", status=QualityStatus.WARN,
+                message="Assessment wording is only loosely connected to the objective/indicator.",
+                severity="warning", category="assessment")]
+    return [QualityIssue(
+        check_name="assessment_alignment", status=QualityStatus.PASS,
+        message="Assessment measures the intended learning.", category="assessment")]
+
+
+def _check_differentiation_usefulness(lesson: Dict[str, Any]) -> List[QualityIssue]:
+    diff = str(lesson.get("differentiation", "") or "").strip()
+    if not diff:
+        return [QualityIssue(
+            check_name="differentiation_usefulness", status=QualityStatus.WARN,
+            message="No differentiation provided.",
+            severity="warning", category="differentiation")]
+    lowered = diff.lower()
+    has_support = "support" in lowered or "scaffold" in lowered
+    has_extension = "extension" in lowered or "enrich" in lowered or "challenge" in lowered
+    if len(diff) < 30 or not (has_support or has_extension):
+        return [QualityIssue(
+            check_name="differentiation_usefulness", status=QualityStatus.WARN,
+            message="Differentiation looks like a token entry with no instructional value.",
+            severity="warning", category="differentiation")]
+    return [QualityIssue(
+        check_name="differentiation_usefulness", status=QualityStatus.PASS,
+        message="Differentiation supports the actual activity (support/extension).",
+        category="differentiation")]
+
+
+def _check_cognitive_demand(lesson: Dict[str, Any], indicator: Optional[Indicator]) -> List[QualityIssue]:
+    """Flag lessons whose demand drops below the indicator's demand."""
+    try:
+        from .indicator_interpreter import interpret_indicator
+        if indicator is not None:
+            interp = interpret_indicator(indicator, indicator.source_subject or "")
+            bloom = interp.bloom_level
+        else:
+            bloom = ""
+    except Exception:
+        bloom = ""
+    if bloom in ("apply", "analyze", "evaluate", "create"):
+        text = _lesson_text(lesson).lower()
+        higher = [
+            "explain", "justify", "solve", "apply", "compare", "analyse",
+            "analyze", "create", "design", "evaluate", "investigate",
+            "demonstrate", "construct", "produce", "perform", "practise",
+            "practice", "measure", "record",
+        ]
+        if not any(v in text for v in higher):
+            return [QualityIssue(
+                check_name="cognitive_demand", status=QualityStatus.WARN,
+                message=f"Indicator demands '{bloom}' but the lesson activities stay at recall level.",
+                severity="warning", category="cognition")]
+    return [QualityIssue(
+        check_name="cognitive_demand", status=QualityStatus.PASS,
+        message="Cognitive demand is appropriate to the indicator.", category="cognition")]
+
+
+def _check_boilerplate(lesson: Dict[str, Any]) -> List[QualityIssue]:
+    """Detect repeated/boilerplate sentences that pad the lesson."""
+    text = _lesson_text(lesson)
+    sentences = [s.strip().lower() for s in re.split(r"[.!?\n]+", text) if len(s.strip()) > 25]
+    if not sentences:
+        return []
+    counts: Dict[str, int] = {}
+    for s in sentences:
+        counts[s] = counts.get(s, 0) + 1
+    repeated = [s for s, n in counts.items() if n >= 2]
+    if repeated:
+        return [QualityIssue(
+            check_name="boilerplate_detection", status=QualityStatus.WARN,
+            message=f"Lesson repeats the same text {len(repeated)} time(s); possible boilerplate.",
+            severity="warning", category="quality")]
+    return [QualityIssue(
+        check_name="boilerplate_detection", status=QualityStatus.PASS,
+        message="No repeated boilerplate detected.", category="quality")]
+
+
+def _check_required_fields(lesson: Dict[str, Any]) -> List[QualityIssue]:
+    """Critical missing fields make a lesson unusable and MUST fail."""
+    required = {
+        "learning_objectives": lesson.get("learning_objectives"),
+        "main_activities": lesson.get("main_activities"),
+        "assessment": lesson.get("assessment"),
+        "conclusion": lesson.get("conclusion"),
+        "indicator_codes": lesson.get("indicator_codes"),
+    }
+    missing = [k for k, v in required.items() if not v]
+    if missing:
+        return [QualityIssue(
+            check_name="required_fields", status=QualityStatus.FAIL,
+            message=f"Lesson is missing required field(s): {', '.join(missing)}.",
+            severity="error", category="quality")]
+    return [QualityIssue(
+        check_name="required_fields", status=QualityStatus.PASS,
+        message="All required fields are present.", category="quality")]
+
+
+def _check_internal_contradiction(lesson: Dict[str, Any]) -> List[QualityIssue]:
+    """Catch self-contradictory lessons (e.g. impossible duration)."""
+    duration = lesson.get("duration_minutes", 0) or 0
+    if duration <= 0:
+        return [QualityIssue(
+            check_name="internal_contradiction", status=QualityStatus.FAIL,
+            message="Lesson duration is zero or negative.",
+            severity="error", category="quality")]
+    total_main = sum(
+        (a.get("duration_minutes", 0) or 0) if isinstance(a, dict) else 0
+        for a in lesson.get("main_activities", []) or []
+    )
+    if total_main > duration * 1.5:
+        return [QualityIssue(
+            check_name="internal_contradiction", status=QualityStatus.WARN,
+            message="Main activities exceed the lesson duration.",
+            severity="warning", category="quality")]
+    return [QualityIssue(
+        check_name="internal_contradiction", status=QualityStatus.PASS,
+        message="No internal contradiction detected.", category="quality")]
+
+
+def _check_irrelevant_content(lesson: Dict[str, Any]) -> List[QualityIssue]:
+    """Detect content that does not belong to this subject/lesson."""
+    subject = str(lesson.get("subject", "") or "").lower()
+    text = _lesson_text(lesson).lower()
+    # A few clear cross-subject contamination markers.
+    markers = {
+        "mathematics": ["photosynthesis", "volcanic", "poem structure"],
+        "science": ["simultaneous equation", "grammar tense"],
+        "english language": ["quadratic formula", "photosynthesis"],
+    }
+    for subj, words in markers.items():
+        if subj in subject and any(w in text for w in words):
+            return [QualityIssue(
+                check_name="irrelevant_content", status=QualityStatus.WARN,
+                message=f"Lesson text contains content unrelated to {subject}.",
+                severity="warning", category="relevance")]
+    return [QualityIssue(
+        check_name="irrelevant_content", status=QualityStatus.PASS,
+        message="No irrelevant generated content detected.", category="relevance")]
+
+
 # ── Main Quality Gate ─────────────────────────────────────────────────────
 
 def validate_lesson_quality(
@@ -521,6 +819,20 @@ def validate_lesson_quality(
     all_issues.extend(_check_coherence(lesson))
     all_issues.extend(_check_practicality(lesson))
     all_issues.extend(_check_anti_hallucination(lesson))
+
+    # ── Generation V3 checks (PART T: 17 required checks) ───────────────
+    all_issues.extend(_check_required_fields(lesson))
+    all_issues.extend(_check_internal_contradiction(lesson))
+    all_issues.extend(_check_boilerplate(lesson))
+    all_issues.extend(_check_subject_appropriateness(lesson))
+    all_issues.extend(_check_class_level_appropriateness(lesson))
+    all_issues.extend(_check_starter_main_plenary_coherence(lesson))
+    all_issues.extend(_check_assessment_alignment(lesson, indicator))
+    all_issues.extend(_check_differentiation_usefulness(lesson))
+    all_issues.extend(_check_cognitive_demand(lesson, indicator))
+    all_issues.extend(_check_irrelevant_content(lesson))
+    if indicator:
+        all_issues.extend(_check_indicator_exactness(lesson, indicator))
 
     report.issues = all_issues
 

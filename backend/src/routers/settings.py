@@ -158,11 +158,24 @@ async def list_template_types():
 
 @router.get("/ai-modes")
 async def list_ai_modes():
+    """AI mode choices for the generate screen.
+
+    OFF/BASIC/ENHANCED are the teacher-facing switches. Named providers are
+    included so section regeneration / enrichment can target a specific
+    backend without exposing secrets or model IDs.
+    """
+    named = [
+        {"value": "gemini", "label": "Gemini"},
+        {"value": "groq", "label": "Groq"},
+        {"value": "ollama", "label": "Ollama (local)"},
+        {"value": "openai", "label": "OpenAI"},
+        {"value": "opencode-zen", "label": "OpenCode Zen"},
+    ]
     return {
         "ai_modes": [
             {"value": m.value, "label": m.value.replace("_", " ").title()}
             for m in AIMode
-        ]
+        ] + named,
     }
 
 

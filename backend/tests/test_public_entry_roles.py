@@ -115,7 +115,9 @@ class TestIndividualRegistration:
         res = await register_individual_teacher(req, db)
         plan = await _resolve(db, res["user"]["id"])
         assert plan["edition"] == "free"
-        assert plan["generation_limit"] == 3
+        assert plan["generation_limit"] == 5
+        assert plan["lesson_quota_period"] == "calendar_month"
+        assert plan["lesson_quota_remaining"] == 5
         assert plan["batch_generation"] is False
         assert plan["zip_export"] is False
 

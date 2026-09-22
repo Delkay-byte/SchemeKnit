@@ -126,8 +126,8 @@ export default function IndividualSignupPage() {
 
           <div className="mt-6 p-4 bg-muted rounded-lg">
             <p className="text-sm text-muted-foreground text-center">
-              Free Tier includes 3 lesson generations, individual DOCX and PDF export,
-              1 custom template and 5 lifetime AI generations.
+              Free Tier includes 5 lesson plans per calendar month, individual DOCX and PDF export,
+              1 custom template and 5 lifetime AI credits.
             </p>
           </div>
 

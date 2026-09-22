@@ -18,7 +18,7 @@ from ..database import get_db
 from ..auth import get_current_user, get_optional_user, require_teacher_workflow
 from ..database import User
 from ..service import data_service
-from ..entitlements import require_ai_entitlement
+from ..entitlements import require_ai_entitlement, consume_ai_generation
 from ..models import TermConfig, LessonPlan, Subject, ClassLevel, TemplateType, AIMode
 from ..engines.generation_pipeline import GenerationPipeline
 from ..logging_config import get_logger, log_event, log_error
@@ -120,7 +120,36 @@ async def preview_allocation(
     )
     report = pipeline.coverage_validator.generate_report(scheme.weeks, coverage)
 
+    # Free Tier context for the allocation screen (PART C): how many lesson-plan
+    # units remain this calendar month and how many indicators this scheme has.
+    from ..entitlements import resolve_entitlement, lesson_quota_status
+    quota = lesson_quota_status(db, user, resolve_entitlement(db, user))
+    report["lesson_quota"] = quota
+    report["selectable_indicators"] = [
+        {
+            "indicator_code": a.indicator_code,
+            "indicator_description": a.indicator_description,
+            "source_week": a.week_number,
+            "teaching_week": a.teaching_week or a.week_number,
+        }
+        for a in sorted(coverage.allocations, key=lambda x: x.lesson_sequence)
+    ] if quota.get("enforced") else []
     return report
+
+
+@router.get("/quota")
+async def get_lesson_quota(
+    user: User = Depends(get_current_user),
+    db=Depends(get_db),
+):
+    """Server-authoritative lesson-plan quota for the current calendar month.
+
+    The month is always derived from the server clock; the browser never
+    supplies it. Used by the dashboard/generation screens to show the Free Tier
+    allowance in user-facing language ("N of M used this month").
+    """
+    from ..entitlements import resolve_entitlement, lesson_quota_status
+    return lesson_quota_status(db, user, resolve_entitlement(db, user))
 
 
 @router.post("/{scheme_id}/generate")
@@ -146,6 +175,28 @@ async def generate_lesson_plans(
             ),
         )
 
+    # ── Extraction / classification safety gate (PART E/J) ────────────────
+    # A document whose subject/class could not be detected, or whose content
+    # could not be reliably extracted, must NOT be presented as a usable
+    # curriculum. Require explicit teacher confirmation first.
+    if getattr(scheme_db, "detection_status", "") == "extraction_failed":
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "This scheme could not be reliably extracted. Review the "
+                "detected structure or upload a clearer copy."
+            ),
+        )
+    if (scheme_db.subject in ("Unknown", "", None)
+            or scheme_db.class_level in ("Unknown", "", None)):
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "The subject or class could not be determined from this scheme "
+                "and needs confirmation before lesson plans can be generated."
+            ),
+        )
+
     # Server-authoritative identity (PART 14/15/32). School and teacher names are
     # derived from the authenticated user's real school relationship and profile —
     # never from the request body — so a client cannot generate another school's
@@ -154,55 +205,100 @@ async def generate_lesson_plans(
     config.school_name = _resolve_school_name(db, user)
     config.teacher_name = _resolve_teacher_name(db, user)
 
-    # ── Entitlement gate: generation quota (individual free teachers) ──────
-    from ..entitlements import resolve_entitlement, increment_generation_count
+    # ── AI commercial gate (checked BEFORE any generation work) ──────────
+    # Commercial entitlement is enforced before any provider is constructed: an
+    # installed local provider (e.g. Ollama) never grants access by itself. AI
+    # OFF still generates a full deterministic lesson plan.
+    if config.ai_mode != AIMode.OFF:
+        require_ai_entitlement(user, db)
+
+    # ── Server-side calendar-month lesson-plan quota (Free Tier) ─────────
+    # Enforcement lives entirely on the server. The browser never supplies the
+    # month. Reservation is atomic and idempotent per indicator.
+    from ..entitlements import (
+        resolve_entitlement, lesson_quota_status, free_tier_lesson_quota_message,
+    )
+    from ..usage_quota import reserve_lesson_units, release_lesson_units
+    from ..models import WeekType
+
     resolved = resolve_entitlement(db, user)
-    gen_limit = resolved.get("generation_limit", 0)
-    gen_used = resolved.get("generations_used", 0)
-    if gen_limit > 0 and gen_used >= gen_limit:
+    quota_before = lesson_quota_status(db, user, resolved)
+    gen_limit = quota_before["limit"] if quota_before["enforced"] else 0
+
+    scheme = data_service.scheme_to_model(scheme_db)
+
+    # The full curriculum indicator list, in curriculum order (never reordered).
+    ae = pipeline.allocation_engine
+    include_special = bool(config.include_special_weeks)
+    available_codes: list = []
+    for w in sorted(scheme.weeks, key=lambda x: x.week_number):
+        if not include_special and w.week_type != WeekType.INSTRUCTION:
+            continue
+        for text in ae._split_indicators(w.indicators):
+            code = ae._extract_indicator_code(text)
+            if code not in available_codes:
+                available_codes.append(code)
+
+    supplied_selection = list(config.selected_indicator_codes or [])
+    selected_set = set(supplied_selection)
+    if supplied_selection and not (selected_set & set(available_codes)):
         raise HTTPException(
-            status_code=403,
-            detail=f"You have reached the generation limit ({gen_limit}) for your current plan. "
-                   "Upgrade to Teacher Pro for unlimited generations.",
+            status_code=400,
+            detail="None of the selected indicators could be found in this scheme.",
         )
 
-    # ── Pre-generation lesson estimate ──────────────────────────────────
-    # In the indicator→period model, each indicator becomes one lesson.
-    # Estimate the count BEFORE generation so a free teacher cannot exceed
-    # their quota mid-generation.
-    scheme = data_service.scheme_to_model(scheme_db)
-    if gen_limit > 0:
-        from ..models import WeekType
-        estimated_lessons = sum(
-            len(w.indicators)
-            for w in scheme.weeks
-            if w.week_type == WeekType.INSTRUCTION
+    # Preserve curriculum order regardless of the teacher's click order.
+    if selected_set:
+        requested_codes = [c for c in available_codes if c in selected_set]
+    else:
+        requested_codes = list(available_codes)
+
+    if not requested_codes:
+        raise HTTPException(
+            status_code=422,
+            detail="This scheme contains no instructional indicators to generate.",
         )
-        remaining = gen_limit - gen_used
-        if estimated_lessons > remaining:
+
+    reservation = None
+    if gen_limit > 0:
+        remaining = quota_before["remaining"] or 0
+        if len(requested_codes) > remaining:
+            # Never silently select or drop indicators — ask the teacher to
+            # choose a subset no larger than the remaining allowance.
             raise HTTPException(
                 status_code=403,
                 detail=(
-                    f"This scheme will generate {estimated_lessons} individual lesson plans "
-                    f"(one per indicator), but your current plan has only {remaining} "
-                    f"generation{'' if remaining == 1 else 's'} remaining. "
-                    "Upgrade to Teacher Pro for unlimited generations."
+                    "This scheme contains "
+                    f"{len(available_codes)} instructional indicator"
+                    f"{'s' if len(available_codes) != 1 else ''}. "
+                    f"You have {remaining} Free Tier lesson plan"
+                    f"{'s' if remaining != 1 else ''} remaining this month. "
+                    f"Select up to {remaining} indicator"
+                    f"{'s' if remaining != 1 else ''} to generate now, or "
+                    "upgrade to Teacher Pro for unlimited generation."
                 ),
             )
-
-    if config.ai_mode != AIMode.OFF:
-        # Commercial entitlement is enforced before any provider is constructed:
-        # an installed local provider (e.g. Ollama) never grants access by
-        # itself. AI OFF still generates a full deterministic lesson plan.
-        require_ai_entitlement(user, db)
+        reservation = reserve_lesson_units(
+            db, user.id, scheme_id, requested_codes, gen_limit
+        )
+        if not reservation.allowed:
+            raise HTTPException(
+                status_code=403,
+                detail=free_tier_lesson_quota_message(0),
+            )
 
     existing_job = data_service.get_term_config(db, scheme_id, user.id)
     if existing_job:
-        # Previous generation for this scheme exists: replace its lessons (regeneration must not duplicate)
+        # Previous generation for this scheme exists: replace its lessons
+        # (regeneration must not duplicate). Regenerating already-counted
+        # indicators consumes zero additional units (idempotent reservation).
         data_service.delete_lesson_plans_for_scheme(db, scheme_id, user.id)
 
     job_db = data_service.create_job(db, user.id, scheme_id, config)
     config.scheme_of_work_id = scheme_id
+    # Generate exactly the requested indicators (all of them when no explicit
+    # selection was made). The allocation engine keeps every original field.
+    config.selected_indicator_codes = requested_codes
 
     try:
         job = pipeline.generate_all(
@@ -221,25 +317,57 @@ async def generate_lesson_plans(
             for lp in job._lesson_plans:
                 data_service.create_lesson_plan(db, user.id, job_db.id, scheme_id, lp)
 
-        # Increment generation count for entitlement tracking.
-        # Usage counts INDIVIDUAL LESSONS (one per indicator), not one per
-        # generation request. A week with 3 indicators = 3 lessons = 3 credits.
         actual_lesson_count = (
             len(job._lesson_plans) if hasattr(job, '_lesson_plans') else job.completed_lessons
         )
-        increment_generation_count(user, db, count=max(actual_lesson_count, 1))
 
+        # Release any reserved unit that did not become a lesson (defensive: a
+        # selected indicator that had no allocation must not consume quota).
+        if reservation and reservation.consumed:
+            produced = set()
+            for lp in (getattr(job, '_lesson_plans', None) or []):
+                for c in (lp.indicator_codes or []):
+                    produced.add(f"{scheme_id}:{c}")
+            unused = [k for k in reservation.reserved_keys if k not in produced]
+            if unused:
+                release_lesson_units(db, user.id, unused, reservation.period_key)
+
+        quota_after = lesson_quota_status(db, user)
         log_event("generation_completed", user_id=user.id, scheme_id=scheme_id, job_id=job_db.id,
-                   total_lessons=job.total_lessons, lessons_billed=actual_lesson_count)
+                   total_lessons=job.total_lessons, lessons_billed=actual_lesson_count,
+                   quota_used=quota_after.get("used"))
+
+        # ── AI lifetime credits (separate from the lesson-plan quota) ────
+        # Batch AI enrichment that actually produced AI content consumes ONE
+        # lifetime AI generation per successful request (idempotent on the
+        # job id). Failed generation, AI OFF, or a fully deterministic
+        # fallback never consumes AI credits. Local Ollama cannot bypass this.
+        ai_credit_remaining = None
+        if config.ai_mode != AIMode.OFF and getattr(job, "ai_enrichment_succeeded", 0) > 0:
+            ai_credit_remaining = consume_ai_generation(
+                user, db, request_id=job_db.id,
+            )
+            log_event("ai_generation_consumed", user_id=user.id, job_id=job_db.id,
+                      provider_batch=True, remaining=ai_credit_remaining)
 
         return {
             "job_id": job_db.id,
             "status": job.status.value,
             "total_lessons": job.total_lessons,
             "completed_lessons": job.completed_lessons,
+            "generated_indicator_codes": requested_codes,
+            "quota": quota_after,
+            "ai_credits_remaining": ai_credit_remaining,
         }
 
+    except HTTPException:
+        if reservation and reservation.consumed:
+            release_lesson_units(db, user.id, reservation.reserved_keys, reservation.period_key)
+        raise
     except Exception as e:
+        # A failed generation must not consume quota.
+        if reservation and reservation.consumed:
+            release_lesson_units(db, user.id, reservation.reserved_keys, reservation.period_key)
         data_service.update_job(db, job_db.id, status="failed", error_message=str(e))
         log_error("generation_failed", user_id=user.id, scheme_id=scheme_id, error=str(e))
         raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
@@ -964,8 +1092,10 @@ def _db_to_lesson_model(lp) -> LessonPlan:
         lesson_date=lp.lesson_date,
         lesson_number=lp.lesson_number,
         period=getattr(lp, "period", "") or "",
-        class_level=ClassLevel(lp.class_level) if lp.class_level in [c.value for c in ClassLevel] else ClassLevel.BASIC_9,
-        subject=Subject(lp.subject) if lp.subject in [s.value for s in Subject] else Subject.SCIENCE,
+        # Honest fallbacks only: an unknown stored class/subject must not be
+        # silently relabelled as Basic 9 / Science (PART E/Y).
+        class_level=ClassLevel(lp.class_level) if lp.class_level in [c.value for c in ClassLevel] else ClassLevel.UNKNOWN,
+        subject=Subject(lp.subject) if lp.subject in [s.value for s in Subject] else Subject.UNKNOWN,
         class_size=lp.class_size,
         duration_minutes=lp.duration_minutes,
         school_name=lp.school_name,

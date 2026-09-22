@@ -48,6 +48,10 @@ class Subject(str, Enum):
     COST_ACCOUNTING = "Cost Accounting"
     GENERAL_AGRICULTURE = "General Agriculture"
     GENERAL_KNOWLEDGE_IN_ART = "General Knowledge in Art"
+    #: Explicit, honest "we could not detect this" value. It is NEVER a real
+    #: subject and must never be presented as one — it exists so uncertainty is
+    #: represented rather than fabricated as Mathematics.
+    UNKNOWN = "Unknown"
 
 
 class EducationalLevel(str, Enum):
@@ -73,6 +77,8 @@ class ClassLevel(str, Enum):
     SHS_1 = "SHS 1"
     SHS_2 = "SHS 2"
     SHS_3 = "SHS 3"
+    #: Explicit "could not detect" value — never a real class level.
+    UNKNOWN = "Unknown"
 
 
 CLASS_LEVEL_TO_EDUCATIONAL_LEVEL = {
@@ -181,8 +187,9 @@ CLASS_LEVEL_SUBJECTS: Dict["ClassLevel", List["Subject"]] = {
 }
 
 #: The subjects that have ever been generally available (used as a safe
-#: fallback and for global checks).
-ALL_SUBJECTS: List["Subject"] = list(Subject)
+#: fallback and for global checks). The explicit UNKNOWN sentinel is excluded:
+#: it is a "needs confirmation" state, not an offered subject.
+ALL_SUBJECTS: List["Subject"] = [s for s in Subject if s is not Subject.UNKNOWN]
 
 
 def _coerce_class_level(level) -> "Optional[ClassLevel]":
@@ -477,8 +484,10 @@ class TermConfig(BaseModel):
     scheme_of_work_id: str
     academic_year: str = "2026/2027"
     term: str = "First Term"
-    class_level: ClassLevel = ClassLevel.BASIC_9
-    subject: Subject = Subject.SCIENCE
+    # Defaults are explicitly UNKNOWN: a config missing a level/subject must
+    # never silently become Basic 9 / Science (PART E/Y).
+    class_level: ClassLevel = ClassLevel.UNKNOWN
+    subject: Subject = Subject.UNKNOWN
     class_size: int = 24
     lesson_duration_minutes: int = 60
     lessons_per_week: int = 3
@@ -491,6 +500,12 @@ class TermConfig(BaseModel):
     template_id: Optional[str] = None
     ai_mode: AIMode = AIMode.OFF
     include_special_weeks: bool = False
+    #: Free-Tier selection: the exact indicator codes the teacher chose to
+    #: generate this month. Empty means "everything in curriculum order".
+    #: Selecting a subset NEVER reorders the curriculum — the allocation keeps
+    #: source week, teaching week, indicator code/text, sequence and
+    #: carry-forward state; only the chosen indicators are generated.
+    selected_indicator_codes: List[str] = []
     # Teacher-supplied lesson metadata (PART 11-24). Each is optional and blanks
     # are preserved as blank — the generator never invents values for them.
     period: str = ""
@@ -610,8 +625,8 @@ class LessonPlan(BaseModel):
     period: str = ""
 
     educational_level: EducationalLevel = EducationalLevel.JHS
-    class_level: ClassLevel = ClassLevel.BASIC_9
-    subject: Subject = Subject.SCIENCE
+    class_level: ClassLevel = ClassLevel.UNKNOWN
+    subject: Subject = Subject.UNKNOWN
     class_size: int = 24
     duration_minutes: int = 60
     school_name: Optional[str] = None

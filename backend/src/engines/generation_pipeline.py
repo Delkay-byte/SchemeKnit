@@ -16,7 +16,8 @@ from ..models import (
     SchemeOfWork, Week, WeekType, TermConfig, TeachingCalendar,
     CurriculumCoverage, LessonPlan, GenerationJob, JobStatus,
     LessonStatus, TemplateType, AIMode, ValidationIssue, ValidationSeverity,
-    Holiday, EducationalLevel, CLASS_LEVEL_TO_EDUCATIONAL_LEVEL
+    Holiday, EducationalLevel, CLASS_LEVEL_TO_EDUCATIONAL_LEVEL,
+    Subject, ClassLevel,
 )
 from .calendar_engine import CalendarEngine
 from .allocation_engine import AllocationEngine
@@ -29,7 +30,7 @@ from .template_engine import (
     get_visible_sections,
     get_template_by_id, get_templates_for_level, get_profile_for_class_level,
 )
-from .ai_provider import get_provider
+from .ai_provider import get_provider, resolve_provider_mode
 
 
 class GenerationPipeline:
@@ -72,12 +73,38 @@ class GenerationPipeline:
                 weeks_to_use, calendar, config, include_special_weeks
             )
 
+            # ── Free Tier indicator selection ─────────────────────────────
+            # When the teacher selected a subset of indicators, generate ONLY
+            # those. The allocation itself is unchanged, so source week,
+            # teaching week, indicator code/text, lesson sequence and
+            # carry-forward state are all preserved — the curriculum is never
+            # reordered or dropped. Unselected indicators simply remain in the
+            # scheme for the next generation.
+            selected = list(getattr(config, "selected_indicator_codes", []) or [])
+            selection_applied = bool(selected)
+            if selection_applied:
+                sel_set = set(selected)
+                kept = [a for a in coverage.allocations if a.indicator_code in sel_set]
+                coverage.allocations = kept
+                coverage.total_generated_lessons = len(kept)
+                coverage.total_periods_allocated = len(kept)
+                coverage.total_indicators = len(kept)
+                coverage.indicators_allocated = len(kept)
+                coverage.indicators_unallocated = 0
+                coverage.coverage_percentage = 100.0 if kept else 0.0
+
             # total_lessons = actual lessons to generate = number of allocated
             # indicators (one indicator → one teaching period → one lesson).
             # This replaces the old calendar-slot estimate.
             job.total_lessons = coverage.total_generated_lessons
 
-            validation_issues = self.coverage_validator.validate(scheme.weeks, coverage)
+            # A deliberate subset selection is not a coverage failure: skip the
+            # full-scheme missing-indicator validation so the teacher is not
+            # warned that unselected indicators "disappeared".
+            validation_issues = (
+                [] if selection_applied
+                else self.coverage_validator.validate(scheme.weeks, coverage)
+            )
             job.progress = 30
 
             lesson_plans = self.allocation_engine.generate_lesson_plans(
@@ -87,9 +114,17 @@ class GenerationPipeline:
             educational_level = CLASS_LEVEL_TO_EDUCATIONAL_LEVEL.get(
                 scheme.class_level, EducationalLevel.JHS
             )
+            # Propagate the scheme's detected subject/class_level onto lessons
+            # when the TermConfig left them UNKNOWN (the default). The scheme
+            # is the source of truth for metadata — config defaults must never
+            # override a real detected value.
             for lp in lesson_plans:
                 lp.educational_level = educational_level.value
                 lp.template_id = template_id
+                if lp.subject is Subject.UNKNOWN or lp.subject is None:
+                    lp.subject = scheme.subject
+                if lp.class_level is ClassLevel.UNKNOWN or lp.class_level is None:
+                    lp.class_level = scheme.class_level
 
             job.progress = 60
 
@@ -228,13 +263,28 @@ class GenerationPipeline:
         from ..curriculum.quality_gate import validate_lesson_quality, QualityStatus
         from ..curriculum.indicator_interpreter import Indicator as CurriculumIndicator
 
-        provider = get_provider(config.ai_mode.value)
-        if not provider.is_available():
+        # Resolve OFF/BASIC/ENHANCED onto a real named provider when one is
+        # configured (Gemini/Groq/Ollama/…). OFF never reaches a provider.
+        # Provider choice does not change curriculum authority, quota, quality
+        # gate, lesson structure, or allocation — only the content source.
+        mode_key = resolve_provider_mode(config.ai_mode)
+        if mode_key == "OFF":
             logger.info(
-                "AI provider unavailable (mode=%s) — deterministic generation for job %s",
-                config.ai_mode.value, job.id,
+                "AI OFF — deterministic generation for job %s", job.id,
             )
             return
+        provider = get_provider(mode_key)
+        if not provider.is_available():
+            logger.info(
+                "AI provider unavailable (resolved=%s, ai_mode=%s) — "
+                "deterministic generation for job %s",
+                mode_key, config.ai_mode.value, job.id,
+            )
+            return
+        logger.info(
+            "AI enrichment using provider=%s (ai_mode=%s) for job %s",
+            provider.get_name(), config.ai_mode.value, job.id,
+        )
 
         # Build previous/next context for lesson sequence continuity
         sorted_plans = sorted(lesson_plans, key=lambda lp: lp.lesson_sequence)
@@ -460,8 +510,15 @@ class GenerationPipeline:
             "subject": lp.subject or "",
             "class_level": lp.class_level or "",
             "strand": lp.strand or "",
+            # Source strand from the allocation — used by strand_match so the
+            # check is a real comparison, not a self-comparison no-op.
+            "source_strand": lp.strand or "",
             "sub_strand": lp.sub_strand or "",
+            "sub_strand": lp.sub_strand or "",
+            "lesson_topic": lp.lesson_topic or "",
+            "indicators": lp.indicators or [],
             "indicator_codes": lp.indicator_codes or [],
+            "homework": lp.homework or "",
             "learning_objectives": [
                 {"description": obj.description} for obj in (lp.learning_objectives or [])
             ],

@@ -102,9 +102,13 @@ class TestDocxDetection:
         assert info["detected_subjects"] == ["Science"]
 
     def test_low_confidence_docx(self, tmp_path):
+        # Weeks exist but no subject heading was recognised: the file is
+        # extractable, yet the subject is unconfirmed. Part E/H report this
+        # honestly as "needs_confirmation" (previously "low_confidence").
         path = build_docx(tmp_path / "plain.docx", [(None, [(1, "B7.3.1.1")])])
         info = DOCXParser().analyze(path)
-        assert info["detection_status"] == "low_confidence"
+        assert info["detection_status"] == "needs_confirmation"
+        assert info["needs_confirmation"] is True
 
     def test_document_title_detected(self, tmp_path):
         path = build_docx(tmp_path / "titled.docx", MULTI)
@@ -164,4 +168,6 @@ class TestPdfDetection:
         doc.save(str(out))
         doc.close()
         info = PDFParser().analyze(out)
-        assert info["detection_status"] == "low_confidence"
+        # A prose-only PDF with no extractable curriculum table is an honest
+        # extraction failure (Part J) — never presented as a usable scheme.
+        assert info["detection_status"] == "extraction_failed"
