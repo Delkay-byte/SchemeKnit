@@ -667,6 +667,14 @@ class ApiService {
     return this.request('/api/settings/ai-modes')
   }
 
+  /** Actual AI mode/provider resolution for a requested mode (secret-free). */
+  async getAiStatus(aiMode: string): Promise<{
+    mode: string; active: boolean; provider: string | null;
+    provider_key: string | null; state: string; reason: string | null;
+  }> {
+    return this.request(`/api/settings/ai-status?ai_mode=${encodeURIComponent(aiMode)}`)
+  }
+
   async listTeachingDays(): Promise<{ teaching_days: any[] }> {
     return this.request('/api/settings/teaching-days')
   }

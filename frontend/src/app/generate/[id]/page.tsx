@@ -32,6 +32,15 @@ export default function GeneratePage() {
   const [previewing, setPreviewing] = useState(false)
   const [allocationConfirmed, setAllocationConfirmed] = useState(false)
   const [selectedCodes, setSelectedCodes] = useState<string[]>([])
+  //: Actual AI resolution (mode/provider/available) reported by the backend —
+  //: so the UI never shows a mode that disagrees with real behaviour.
+  const [aiStatus, setAiStatus] = useState<{
+    mode: string; active: boolean; provider: string | null; state: string; reason: string | null;
+  } | null>(null)
+  const [aiResult, setAiResult] = useState<{
+    mode: string; active: boolean; provider: string | null;
+    lessons_ai: number; lessons_deterministic: number; reason: string | null;
+  } | null>(null)
 
   const levelForClass = (classLevel: string): string | undefined => {
     const c = (classLevel || '').toLowerCase()
@@ -70,8 +79,23 @@ export default function GeneratePage() {
   })
 
   useEffect(() => {
+    // Restore the teacher's last AI mode choice so it persists across visits.
+    try {
+      const saved = window.localStorage.getItem('schemeknit.ai_mode')
+      if (saved) setConfig(prev => ({ ...prev, ai_mode: saved as any }))
+    } catch { /* storage unavailable */ }
     loadData()
   }, [schemeId])
+
+  // The displayed AI status must always reflect what the backend will actually
+  // do for the currently selected mode.
+  useEffect(() => {
+    let cancelled = false
+    api.getAiStatus(config.ai_mode || 'OFF')
+      .then((s) => { if (!cancelled) setAiStatus(s) })
+      .catch(() => { if (!cancelled) setAiStatus(null) })
+    return () => { cancelled = true }
+  }, [config.ai_mode])
 
   const loadData = async () => {
     try {
@@ -232,6 +256,7 @@ export default function GeneratePage() {
 
       const response = await api.generateLessonPlans(schemeId, config)
       setJobId(response.job_id)
+      setAiResult(response.ai || null)
       setGenProgress('Lesson plans generated successfully!')
 
       const coverageData = await api.getCurriculumCoverage(response.job_id)
@@ -455,13 +480,26 @@ export default function GeneratePage() {
                     <label className="block text-sm font-medium mb-2">AI Mode</label>
                     <select
                       value={config.ai_mode}
-                      onChange={(e) => setConfig({ ...config, ai_mode: e.target.value })}
+                      onChange={(e) => {
+                        const mode = e.target.value
+                        setConfig({ ...config, ai_mode: mode as any })
+                        try { window.localStorage.setItem('schemeknit.ai_mode', mode) } catch { /* ignore */ }
+                      }}
                       className="w-full px-3 py-2 border rounded-md"
                     >
                       <option value="OFF">OFF - Deterministic only</option>
                       <option value="BASIC">BASIC - AI suggestions</option>
                       <option value="ENHANCED">ENHANCED - Full AI</option>
                     </select>
+                    {aiStatus && (
+                      <p className={`text-xs mt-1 ${aiStatus.active ? 'text-green-600' : 'text-muted-foreground'}`}>
+                        {aiStatus.active
+                          ? `AI active · provider: ${aiStatus.provider}`
+                          : config.ai_mode === 'OFF'
+                            ? 'Deterministic engine · AI provider active: No'
+                            : 'No AI provider available — lessons will be deterministic.'}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -899,6 +937,15 @@ export default function GeneratePage() {
                         {coverage?.total_generated_lessons || 0} lesson plans generated
                       </span>
                     </div>
+                    {aiResult && (
+                      <p className="text-xs text-muted-foreground mb-2 text-center">
+                        {aiResult.active && aiResult.lessons_ai > 0
+                          ? `AI (${aiResult.provider}) enriched ${aiResult.lessons_ai} lesson${aiResult.lessons_ai === 1 ? '' : 's'}; ${aiResult.lessons_deterministic} used the deterministic engine.`
+                          : aiResult.mode === 'OFF'
+                            ? 'All lessons generated deterministically (AI OFF).'
+                            : 'No AI provider was available — all lessons generated deterministically.'}
+                      </p>
+                    )}
                     <Link href="/lessons" className="block">
                       <Button className="w-full">
                         <Eye className="h-4 w-4 mr-2" />

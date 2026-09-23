@@ -49,9 +49,19 @@ export default function LessonDetailPage() {
   // Optional AI section regeneration (existing /api/ai/regenerate-section)
   const [regenBusy, setRegenBusy] = useState<string | null>(null)
   const [regenNote, setRegenNote] = useState<string | null>(null)
+  //: What AI would actually do for this teacher's selected mode.
+  const [aiStatus, setAiStatus] = useState<{
+    active: boolean; provider: string | null; mode: string; reason: string | null;
+  } | null>(null)
 
   useEffect(() => {
     load()
+    let mode = 'BASIC'
+    try {
+      const saved = window.localStorage.getItem('schemeknit.ai_mode')
+      if (saved && saved !== 'OFF') mode = saved
+    } catch { /* storage unavailable */ }
+    api.getAiStatus(mode).then(setAiStatus).catch(() => setAiStatus(null))
   }, [lessonId])
 
   const load = async () => {
@@ -79,12 +89,24 @@ export default function LessonDetailPage() {
       // Stable idempotency key for this user action so a retried submission
       // cannot consume a second lifetime AI generation.
       const requestId = `${lesson.id}:${section}:${Date.now()}`
-      const res = await api.regenerateSection(lesson.id, section, 'ollama', '', requestId)
+      // Use the teacher's last chosen AI mode. This is NOT hard-coded to a
+      // single provider: OFF (or unset) resolves to BASIC, which lets the
+      // backend auto-select whichever real provider is configured, and report
+      // an accurate diagnostic when none is.
+      let mode = 'BASIC'
+      try {
+        const saved = window.localStorage.getItem('schemeknit.ai_mode')
+        if (saved && saved !== 'OFF') mode = saved
+      } catch { /* storage unavailable */ }
+      const res = await api.regenerateSection(lesson.id, section, mode, '', requestId)
       const text = res.new_content || ''
       if (section === 'introduction') setIntroduction(text)
       if (section === 'assessment') setAssessment(text)
       if (section === 'conclusion') setConclusion(text)
-      setRegenNote(`AI suggestion inserted (${res.provider || 'provider'}). Review and Save to keep it.`)
+      setRegenNote(
+        `AI suggestion inserted by ${res.provider || 'provider'} (mode: ${res.mode || mode}). ` +
+        'Review and Save to keep it.'
+      )
     } catch (err) {
       setError(err instanceof Error ? err.message : 'AI regeneration unavailable')
     } finally {
@@ -221,6 +243,13 @@ export default function LessonDetailPage() {
                 </Button>
               ))}
             </div>
+            <span className="text-xs text-muted-foreground">
+              {aiStatus
+                ? aiStatus.active
+                  ? `AI active · provider: ${aiStatus.provider}`
+                  : 'No AI provider available — suggestions are disabled until one is configured.'
+                : ''}
+            </span>
             {regenNote && <p className="text-sm text-green-600">{regenNote}</p>}
             <div>
               <label className="block text-sm font-medium mb-2">Lesson Topic</label>

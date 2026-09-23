@@ -103,9 +103,18 @@ async def regenerate_section(
         provider = get_provider(resolve_provider_mode(ai_mode))
 
     if not provider or not provider.is_available():
+        from ..engines.ai_provider import provider_status
+        state = provider_status(provider)
+        resolved = provider.get_name() if provider else "none"
         raise HTTPException(
             status_code=503,
-            detail="AI provider not available. Please try again later or use AI OFF mode."
+            detail=(
+                f"AI provider '{resolved}' is not available (state: {state}). "
+                "No real AI provider is configured on the server. Lessons and "
+                "their deterministic content are unchanged — configure a "
+                "provider (Gemini, Groq, OpenAI) or start local Ollama to use "
+                "AI suggestions."
+            ),
         )
 
     try:
@@ -145,7 +154,7 @@ async def regenerate_section(
             section=req.section,
             previous_content=previous_content,
             new_content=new_content,
-            provider=provider.__class__.__name__,
+            provider=provider.get_name(),
             model=getattr(provider, 'model', 'unknown'),
             mode=mode_label,
             timestamp=datetime.utcnow().isoformat(),
@@ -357,9 +366,15 @@ async def enrich_lesson(
             )
     provider = get_provider(mode)
     if not provider or not provider.is_available():
+        from ..engines.ai_provider import provider_status
+        state = provider_status(provider)
         raise HTTPException(
             status_code=503,
-            detail="AI provider not available. Deterministic lesson data is unchanged.",
+            detail=(
+                f"AI provider '{mode}' is not available (state: {state}). "
+                "Deterministic lesson data is unchanged — configure a provider "
+                "or start local Ollama to enable AI enrichment."
+            ),
         )
     gen = getattr(provider, "generate_structured", None)
     if gen is None:
@@ -472,7 +487,7 @@ async def enrich_lesson(
     db.commit()
     db.refresh(lp)
     return {"lesson_plan_id": lp.id, "written": written,
-            "provider": provider.__class__.__name__, "mode": mode}
+            "provider": provider.get_name(), "mode": mode}
 
 
 def _save_enrichment_cache(db, lesson_plan_id: str, section: str, content: str, provider: str, mode: str):

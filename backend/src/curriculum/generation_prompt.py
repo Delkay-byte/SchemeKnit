@@ -209,6 +209,7 @@ def build_generation_prompt(
     term: Optional[str] = None,
     teaching_week: Optional[int] = None,
     period: Optional[str] = None,
+    teacher_keywords: Optional[List[str]] = None,
 ) -> str:
     """Build a structured, indicator-grounded generation prompt.
 
@@ -273,6 +274,15 @@ Suggested Phases: {', '.join(strategy.get('phases', []))}""")
     else:
         sections.append("SOURCE RESOURCES: None specified in scheme — suggest realistic alternatives.")
 
+    # Teacher-supplied vocabulary: MUST be preserved verbatim and used in the lesson.
+    if teacher_keywords:
+        sections.append(f"""TEACHER-SUPPLIED VOCABULARY (REQUIRED)
+{chr(10).join(f'- {k}' for k in teacher_keywords)}
+
+These terms were entered by the teacher for this term and MUST ALL appear in
+key_vocabulary exactly as written, and be used naturally in the activities,
+assessment or examples where pedagogically appropriate.""")
+
     # Output requirements
     sections.append(f"""OUTPUT REQUIREMENTS
 Return a JSON object matching this schema:
@@ -311,6 +321,7 @@ def build_section_regeneration_prompt(
     indicator_text: str,
     interpretation: Optional[IndicatorInterpretation] = None,
     additional_context: str = "",
+    teacher_keywords: Optional[List[str]] = None,
 ) -> str:
     """Build a prompt for regenerating a single lesson section."""
     strategy = _get_strategy_context(subject)

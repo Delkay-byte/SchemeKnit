@@ -99,6 +99,20 @@ export default function UploadPage() {
     result?.detection?.sections?.length
       ? result.detection.sections
       : (result?.detection?.subjects || []).map((s: string) => ({ subject: s }))
+  // A genuinely unreadable document (e.g. a scanned/image-only PDF) is a
+  // distinct state from "multiple subjects". It must give the teacher an
+  // actionable reason instead of a subject picker with no options.
+  const isExtractionFailure =
+    result?.detection?.status === 'extraction_failed' ||
+    result?.extraction?.status === 'extraction_failed' ||
+    (result?.weeks_count === 0 && needsSubjectConfirmation && detectedSections.length === 0)
+  const extractionReason: string = result?.extraction?.reason || ''
+  const extractionFailureMessage =
+    extractionReason === 'no_text_layer'
+      ? 'This looks like a scanned or image-only PDF, so there is no machine-readable text to read. Export or print it as a text PDF (or run it through OCR such as Adobe Scan), then upload again.'
+      : extractionReason === 'no_curriculum_table'
+        ? 'No curriculum table could be found in this document. Check that it is the scheme of learning (not a cover page) and that the week/indicator columns are present.'
+        : 'We could not reliably read the curriculum content from this document. Review it or upload a clearer copy.'
 
   const handleConfirmSubject = async (subject: string) => {
     if (!result?.scheme_id) return
@@ -121,7 +135,40 @@ export default function UploadPage() {
         <div className="max-w-2xl mx-auto">
           {/* Success State */}
           {success && result ? (
-            needsSubjectConfirmation ? (
+            isExtractionFailure ? (
+              /* Extraction failure: honest, actionable, never a dead-end and
+                 never a subject picker with nothing to choose from. */
+              <Card className="border-red-200 bg-red-50">
+                <CardContent className="p-8">
+                  <div className="text-center">
+                    <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-3" />
+                    <h2 className="text-xl font-bold mb-2">We could not read this scheme</h2>
+                    <p className="text-sm font-medium mb-1">
+                      {result.filename || file?.name}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {extractionFailureMessage}
+                    </p>
+                  </div>
+                  <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
+                    <Button
+                      onClick={() => {
+                        setSuccess(false)
+                        setResult(null)
+                        setFile(null)
+                        setError(null)
+                        if (fileInputRef.current) fileInputRef.current.value = ''
+                      }}
+                    >
+                      Upload a different file
+                    </Button>
+                    <Link href="/dashboard">
+                      <Button variant="outline" className="w-full">Back to Dashboard</Button>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : needsSubjectConfirmation ? (
               /* STEP 4 — multi-subject detection: the teacher must confirm which
                  subject section to use before anything is generated. */
               <Card className="border-amber-200 bg-amber-50">
@@ -139,6 +186,12 @@ export default function UploadPage() {
                     </p>
                   </div>
                   <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {detectedSections.length === 0 && (
+                      <p className="col-span-full text-sm text-muted-foreground text-center">
+                        We could not identify a subject heading in this document.
+                        Please review the extracted content, or use a clearer copy.
+                      </p>
+                    )}
                     {detectedSections.map((s, i) => (
                       <Button
                         key={`${s.subject}-${i}`}
