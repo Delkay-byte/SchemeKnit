@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Download, Settings, Play, CheckCircle, FileText, FileSpreadsheet, FileArchive, Loader2, Eye } from 'lucide-react'
+import { Download, Settings, Play, CheckCircle, FileText, FileSpreadsheet, FileArchive, Loader2, Eye, Save } from 'lucide-react'
 import { api } from '@/lib/api'
 import { resolveRouteId } from '@/lib/route-params'
 import { Header } from '@/components/header'
@@ -32,6 +32,25 @@ export default function GeneratePage() {
   const [previewing, setPreviewing] = useState(false)
   const [allocationConfirmed, setAllocationConfirmed] = useState(false)
   const [selectedCodes, setSelectedCodes] = useState<string[]>([])
+  // Per-lesson review drafts (keywords / Other TLRs / competencies / refs)
+  // edited BEFORE generation and applied when lessons are built.
+  const [lessonReview, setLessonReview] = useState<any[]>([])
+  const [reviewSaving, setReviewSaving] = useState(false)
+  const [reviewSaved, setReviewSaved] = useState(false)
+  const NACCA_COMPETENCIES = [
+    'Critical Thinking and Problem Solving',
+    'Creativity and Innovation',
+    'Communication and Collaboration',
+    'Cultural Identity and Global Citizenship',
+    'Personal Development and Leadership',
+    'Digital Literacy',
+  ]
+  const REFERENCE_TYPES = [
+    'Subject Curriculum',
+    'Teacher\'s Handbook / Teacher\'s Guide',
+    'Textbook',
+    'Other',
+  ]
   //: Actual AI resolution (mode/provider/available) reported by the backend —
   //: so the UI never shows a mode that disagrees with real behaviour.
   const [aiStatus, setAiStatus] = useState<{
@@ -55,8 +74,10 @@ export default function GeneratePage() {
     scheme_of_work_id: schemeId,
     academic_year: '2026/2027',
     term: 'First Term',
-    class_level: 'Basic 9',
-    subject: 'Science',
+    // Class/subject come from the parsed scheme — never a hardcoded default
+    // (an unknown class must stay unknown, not become Basic 9).
+    class_level: '',
+    subject: '',
     term_start_date: '2026-09-11',
     term_end_date: '2026-12-18',
     lessons_per_week: 3,
@@ -145,8 +166,16 @@ export default function GeneratePage() {
         // The backend requires these fields; seed them from the parsed scheme.
         academic_year: schemeData.academic_year || prev.academic_year,
         term: schemeData.term || prev.term,
-        class_level: schemeData.class_level || prev.class_level,
-        subject: schemeData.subject || prev.subject,
+        // Prefer the scheme's own identity; only keep a previous value when
+        // the scheme field is missing — never substitute a default level.
+        class_level:
+          schemeData.class_level && schemeData.class_level !== 'Unknown'
+            ? schemeData.class_level
+            : '',
+        subject:
+          schemeData.subject && schemeData.subject !== 'Unknown'
+            ? schemeData.subject
+            : '',
       }))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load data')
@@ -162,6 +191,8 @@ export default function GeneratePage() {
       setAllocationConfirmed(false)
       const preview = await api.getAllocationPreview(schemeId, config)
       setAllocationPreview(preview)
+      setLessonReview(Array.isArray(preview.lesson_review) ? preview.lesson_review : [])
+      setReviewSaved(false)
       // Seed the indicator selection: when the Free Tier quota is enforced,
       // pre-select up to the remaining allowance so the teacher can generate
       // immediately, while every other indicator stays visible and selectable.
@@ -212,7 +243,55 @@ export default function GeneratePage() {
 
   const handleConfirmAndGenerate = async () => {
     setAllocationConfirmed(true)
+    // Persist any unsaved per-lesson review edits before generation so the
+    // backend applies them when building each LessonPlan (Section H).
+    if (lessonReview.length > 0) {
+      try {
+        await saveLessonReviewDrafts()
+      } catch {
+        // Non-fatal: generation still uses last saved drafts / builder defaults.
+      }
+    }
     await handleGenerate()
+  }
+
+  const saveLessonReviewDrafts = async () => {
+    if (!lessonReview.length) return
+    setReviewSaving(true)
+    setReviewSaved(false)
+    try {
+      const drafts: Record<string, any> = {}
+      for (const row of lessonReview) {
+        drafts[String(row.lesson_sequence)] = {
+          keywords: row.keywords || [],
+          other_tlrs: row.other_tlrs || [],
+          core_competencies: row.core_competencies || [],
+          structured_references: row.structured_references || [],
+        }
+      }
+      await api.saveLessonReview(schemeId, drafts)
+      setReviewSaved(true)
+      setTimeout(() => setReviewSaved(false), 3000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save lesson review')
+    } finally {
+      setReviewSaving(false)
+    }
+  }
+
+  const updateLessonReviewRow = (seq: number, patch: Partial<any>) => {
+    setLessonReview(rows => rows.map(r => (r.lesson_sequence === seq ? { ...r, ...patch } : r)))
+    setReviewSaved(false)
+  }
+
+  const updateStructuredRef = (seq: number, index: number, patch: Partial<any>) => {
+    setLessonReview(rows => rows.map(r => {
+      if (r.lesson_sequence !== seq) return r
+      const refs = [...(r.structured_references || [])]
+      refs[index] = { ...(refs[index] || { type: 'Other', title: '' }), ...patch }
+      return { ...r, structured_references: refs }
+    }))
+    setReviewSaved(false)
   }
 
   // Allocation preview grouped by ACTUAL teaching week, with carried-forward
@@ -226,11 +305,14 @@ export default function GeneratePage() {
         lesson_count: tw.lessons?.length || 0,
         periods: (tw.lessons || []).map((l: any) => ({
           period_index: l.period_index,
+          lesson_sequence: l.lesson_sequence,
           lesson_date: l.lesson_date,
           indicator_code: l.indicator_code,
           indicator_description: l.indicator_description,
           status: l.status || 'scheduled',
           source_week: l.source_week,
+          week_ending: l.week_ending,
+          source_tlrs: l.source_tlrs,
         })),
       }))
     }
@@ -538,12 +620,16 @@ export default function GeneratePage() {
                 </div>
 
                 {/* Lesson metadata the teacher supplies once (PART 11-24).
-                    Each is optional; blanks stay blank and are never invented. */}
+                    Each is optional; blanks stay blank and are never invented.
+                    Keywords / TLRs / Competencies / References here are SEEDS
+                    for every lesson — source TLRs and per-lesson review data
+                    stay authoritative in the per-lesson panel below. */}
                 <div className="border-t pt-6">
                   <h3 className="text-sm font-semibold mb-1">Lesson Plan Details</h3>
                   <p className="text-xs text-muted-foreground mb-4">
-                    These appear in the generated plan. Leave blank to keep them empty;
-                    nothing is invented for you.
+                    These seed every lesson as a starting point. Source TLRs from
+                    your scheme and per-lesson edits in Allocation Preview override
+                    them for that lesson. Leave blank to keep them empty.
                   </p>
                   <div className="space-y-4">
                     <div className="grid md:grid-cols-2 gap-4">
@@ -572,7 +658,7 @@ export default function GeneratePage() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium mb-2">
-                        Keywords / Vocabulary
+                        Keywords / Vocabulary <span className="font-normal text-muted-foreground">(seed for all lessons)</span>
                       </label>
                       <textarea
                         value={(config.keywords || []).join(', ')}
@@ -587,7 +673,7 @@ export default function GeneratePage() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium mb-2">
-                        Teaching &amp; Learning Resources (TLRs)
+                        Other Teaching &amp; Learning Resources (TLRs) <span className="font-normal text-muted-foreground">(seed — not source)</span>
                       </label>
                       <textarea
                         value={(config.teaching_learning_resources || []).join(', ')}
@@ -602,7 +688,7 @@ export default function GeneratePage() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium mb-2">
-                        Core Competencies
+                        Core Competencies <span className="font-normal text-muted-foreground">(seed for all lessons)</span>
                       </label>
                       <textarea
                         value={(config.core_competencies || []).join(', ')}
@@ -616,7 +702,9 @@ export default function GeneratePage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-2">Reference</label>
+                      <label className="block text-sm font-medium mb-2">
+                        Reference <span className="font-normal text-muted-foreground">(seed for all lessons)</span>
+                      </label>
                       <textarea
                         value={(config.references || []).join(', ')}
                         onChange={(e) => setConfig({
@@ -817,6 +905,203 @@ export default function GeneratePage() {
                       </div>
                     ))}
                   </div>
+
+                  {/* Per-lesson review data (Section H): source fields are
+                      read-only; keywords / Other TLRs / competencies /
+                      references are editable and applied on generate. */}
+                  {lessonReview.length > 0 && (
+                    <div className="border-t pt-4 space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <h4 className="text-xs font-semibold text-muted-foreground">
+                            Lesson Review Data
+                          </h4>
+                          <p className="text-[11px] text-muted-foreground">
+                            Review each lesson before generating. Source TLRs and
+                            week-ending stay from your scheme document.
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={saveLessonReviewDrafts}
+                          disabled={reviewSaving}
+                        >
+                          {reviewSaving ? (
+                            <>
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="h-3 w-3 mr-1" />
+                              Save review
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      {reviewSaved && (
+                        <p className="text-xs text-green-600">Lesson review saved.</p>
+                      )}
+                      <div className="space-y-4 max-h-96 overflow-y-auto pr-1">
+                        {lessonReview.map((row) => (
+                          <div
+                            key={`review-${row.lesson_sequence}`}
+                            className="border rounded-md p-3 space-y-2 bg-muted/30"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="text-xs font-semibold">
+                                  Lesson {row.lesson_sequence + 1} ·{' '}
+                                  <span className="font-mono">{row.indicator_code}</span>
+                                </p>
+                                <p className="text-[11px] text-muted-foreground">
+                                  Source Week {row.source_week}
+                                  {row.week_ending
+                                    ? ` · Week ending ${new Date(row.week_ending).toLocaleDateString('en-GB')}`
+                                    : ''}
+                                  {row.week_ending_derived ? ' (derived)' : ''}
+                                  {' · '}Teaching Week {row.teaching_week}
+                                </p>
+                              </div>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground leading-snug">
+                              {row.indicator_description}
+                            </p>
+                            {(row.content_standard || row.strand) && (
+                              <p className="text-[11px] text-muted-foreground">
+                                {row.strand}{row.sub_strand ? ` › ${row.sub_strand}` : ''}
+                                {row.content_standard ? ` · ${row.content_standard}` : ''}
+                              </p>
+                            )}
+                            <div>
+                              <p className="text-[11px] font-medium text-muted-foreground mb-1">
+                                Source TLRs (from scheme — read only)
+                              </p>
+                              {row.source_tlrs?.length ? (
+                                <ul className="list-disc list-inside text-[11px] text-muted-foreground">
+                                  {row.source_tlrs.map((r: string, i: number) => (
+                                    <li key={i}>{r}</li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <p className="text-[11px] italic text-muted-foreground">
+                                  No source TLRs for this week
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <label className="text-[11px] font-medium text-muted-foreground block mb-1">
+                                Keywords for this lesson
+                              </label>
+                              <input
+                                type="text"
+                                value={(row.keywords || []).join(', ')}
+                                onChange={(e) => updateLessonReviewRow(row.lesson_sequence, {
+                                  keywords: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
+                                })}
+                                placeholder="Comma-separated"
+                                className="w-full px-2 py-1.5 text-xs border rounded-md"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[11px] font-medium text-muted-foreground block mb-1">
+                                Other TLRs for this lesson (not source)
+                              </label>
+                              <input
+                                type="text"
+                                value={(row.other_tlrs || []).join(', ')}
+                                onChange={(e) => updateLessonReviewRow(row.lesson_sequence, {
+                                  other_tlrs: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
+                                })}
+                                placeholder="Comma-separated teacher additions"
+                                className="w-full px-2 py-1.5 text-xs border rounded-md"
+                              />
+                            </div>
+                            <div>
+                              <p className="text-[11px] font-medium text-muted-foreground mb-1">
+                                Core competencies
+                              </p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {NACCA_COMPETENCIES.map((label) => {
+                                  const selected = (row.core_competencies || []).includes(label)
+                                  return (
+                                    <button
+                                      key={label}
+                                      type="button"
+                                      onClick={() => {
+                                        const cur = row.core_competencies || []
+                                        const next = selected
+                                          ? cur.filter((c: string) => c !== label)
+                                          : [...cur, label]
+                                        updateLessonReviewRow(row.lesson_sequence, {
+                                          core_competencies: next,
+                                        })
+                                      }}
+                                      className={`text-[10px] px-1.5 py-0.5 rounded border ${
+                                        selected
+                                          ? 'bg-primary text-primary-foreground border-primary'
+                                          : 'bg-background text-muted-foreground'
+                                      }`}
+                                    >
+                                      {label}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <p className="text-[11px] font-medium text-muted-foreground">
+                                  References
+                                </p>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 text-[10px] px-2"
+                                  onClick={() => updateLessonReviewRow(row.lesson_sequence, {
+                                    structured_references: [
+                                      ...(row.structured_references || []),
+                                      { type: 'Other', title: '', page: '' },
+                                    ],
+                                  })}
+                                >
+                                  + Add
+                                </Button>
+                              </div>
+                              {(row.structured_references || []).map((ref: any, idx: number) => (
+                                <div key={idx} className="grid grid-cols-12 gap-1 mb-1">
+                                  <select
+                                    value={ref.type || 'Other'}
+                                    onChange={(e) => updateStructuredRef(row.lesson_sequence, idx, { type: e.target.value })}
+                                    className="col-span-4 text-[10px] px-1 py-1 border rounded"
+                                  >
+                                    {REFERENCE_TYPES.map(t => (
+                                      <option key={t} value={t}>{t}</option>
+                                    ))}
+                                  </select>
+                                  <input
+                                    type="text"
+                                    value={ref.title || ''}
+                                    onChange={(e) => updateStructuredRef(row.lesson_sequence, idx, { title: e.target.value })}
+                                    placeholder="Title"
+                                    className="col-span-5 text-[10px] px-1 py-1 border rounded"
+                                  />
+                                  <input
+                                    type="text"
+                                    value={ref.page || ''}
+                                    onChange={(e) => updateStructuredRef(row.lesson_sequence, idx, { page: e.target.value })}
+                                    placeholder="Page (optional)"
+                                    className="col-span-3 text-[10px] px-1 py-1 border rounded"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <p className="text-xs text-muted-foreground border-t pt-3">
                     {allocationPreview.total_generated_lessons || 0} lessons will be generated ·{' '}

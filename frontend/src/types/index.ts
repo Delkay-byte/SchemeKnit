@@ -57,11 +57,40 @@ export interface Week {
   week_type: string
   start_date: string
   end_date: string
+  week_ending_derived?: boolean
   strand: string
   sub_strand: string
   content_standards: string[]
   indicators: string[]
   resources: string[]
+}
+
+export interface ReferenceEntry {
+  type: string
+  title: string
+  author_publisher?: string
+  page?: string
+  notes?: string
+}
+
+/** Pre-generation per-lesson review row (source fields read-only). */
+export interface LessonReviewSeed {
+  lesson_sequence: number
+  indicator_code: string
+  indicator_description: string
+  content_standard_code?: string
+  content_standard?: string
+  strand?: string
+  sub_strand?: string
+  source_week: number
+  week_ending?: string | null
+  week_ending_derived?: boolean
+  teaching_week: number
+  source_tlrs: string[]
+  keywords: string[]
+  other_tlrs: string[]
+  core_competencies: string[]
+  structured_references: ReferenceEntry[]
 }
 
 export interface TermConfig {

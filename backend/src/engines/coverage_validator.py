@@ -179,15 +179,23 @@ class CoverageValidator:
                 "lesson_count": n_lessons,
                 "periods": [
                     {
+                        "lesson_sequence": a.lesson_sequence,
                         "period_index": a.period_index,
                         "indicator_code": a.indicator_code,
                         "indicator_description": a.indicator_description,
+                        "content_standard_code": a.content_standard_code,
+                        "content_standard": a.content_standard_description,
+                        "strand": a.strand,
+                        "sub_strand": a.sub_strand,
                         "lesson_date": a.lesson_date.isoformat() if a.lesson_date else None,
                         # Source curriculum week is week_number; the actual
                         # teaching week is preserved separately so the preview
                         # can show carry-forward without losing curriculum origin.
                         "source_week": a.week_number,
+                        "week_ending": a.week_ending.isoformat() if a.week_ending else None,
+                        "week_ending_derived": bool(a.week_ending_derived),
                         "teaching_week": a.teaching_week or a.week_number,
+                        "source_tlrs": list(a.source_resources or []),
                         "carry_forward": bool(a.carry_forward),
                         "needs_review": bool(a.needs_review),
                     }
@@ -211,11 +219,20 @@ class CoverageValidator:
                 "teaching_week": tw,
                 "lessons": [
                     {
+                        "lesson_sequence": a.lesson_sequence,
                         "period_index": a.period_index,
                         "indicator_code": a.indicator_code,
                         "indicator_description": a.indicator_description,
+                        "content_standard_code": a.content_standard_code,
+                        "content_standard": a.content_standard_description,
+                        "strand": a.strand,
+                        "sub_strand": a.sub_strand,
                         "lesson_date": a.lesson_date.isoformat() if a.lesson_date else None,
                         "source_week": a.week_number,
+                        "week_ending": a.week_ending.isoformat() if a.week_ending else None,
+                        "week_ending_derived": bool(a.week_ending_derived),
+                        "teaching_week": a.teaching_week or a.week_number,
+                        "source_tlrs": list(a.source_resources or []),
                         "status": (
                             "needs_review" if a.needs_review
                             else "carried_forward" if a.carry_forward

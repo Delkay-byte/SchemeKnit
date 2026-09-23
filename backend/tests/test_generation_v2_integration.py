@@ -161,7 +161,7 @@ class TestV2PromptBuilder:
         )
         assert "First Term" in prompt
         assert "Teaching Week: 4" in prompt
-        assert "Curriculum Week: 3" in prompt
+        assert "Source Week: 3" in prompt
         assert "Period 1" in prompt
 
     def test_build_generation_prompt_directly(self):

@@ -287,6 +287,9 @@ def _resolve(field: Optional[str], lesson, ctx: Dict[str, Any]) -> str:
     if not field:
         return ""
     if field == "week_ending":
+        source = _get(lesson, "week_ending")
+        if source is not None:
+            return format_long_date(source)
         return week_ending_for(_get(lesson, "lesson_date"))
     if field == "lesson_date":
         return format_long_date(_get(lesson, "lesson_date"))

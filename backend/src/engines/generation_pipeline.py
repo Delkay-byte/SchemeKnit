@@ -365,8 +365,14 @@ class GenerationPipeline:
                         f"Indicator: {next_lp.indicators[0] if next_lp.indicators else 'N/A'}"
                     )
 
-                # Get source resources from the lesson plan
-                source_resources = list(lp.teaching_learning_resources or [])
+                # Get source resources from the lesson's SOURCE TLRs (scheme provenance).
+                # Falls back to the display union only when source fields are empty
+                # (legacy lessons). Never uses another subject/week's resources.
+                source_resources = list(
+                    getattr(lp, "source_tlrs", None)
+                    or lp.teaching_learning_resources
+                    or []
+                )
 
                 # V2 structured generation. ``teacher_keywords`` is only sent
                 # when the provider's signature supports it, so third-party or
@@ -390,7 +396,18 @@ class GenerationPipeline:
                     period=lp.period,
                 )
                 if supports_kwarg(provider.generate_lesson_v2, "teacher_keywords"):
-                    v2_kwargs["teacher_keywords"] = list(getattr(config, "keywords", []) or [])
+                    v2_kwargs["teacher_keywords"] = list(lp.keywords or [])
+                if supports_kwarg(provider.generate_lesson_v2, "source_week_ending"):
+                    v2_kwargs["source_week_ending"] = (
+                        lp.week_ending.isoformat() if lp.week_ending else None
+                    )
+                if supports_kwarg(provider.generate_lesson_v2, "other_tlrs"):
+                    v2_kwargs["other_tlrs"] = list(
+                        getattr(lp, "other_tlrs", None) or [])
+                if supports_kwarg(provider.generate_lesson_v2, "core_competencies"):
+                    v2_kwargs["core_competencies"] = list(lp.core_competencies or [])
+                if supports_kwarg(provider.generate_lesson_v2, "references"):
+                    v2_kwargs["references"] = list(lp.references or [])
                 content = provider.generate_lesson_v2(**v2_kwargs)
 
                 if not content:
@@ -471,10 +488,42 @@ class GenerationPipeline:
                     seen.add(key)
             return out
 
-        teacher_keywords = list(getattr(config, "keywords", []) or []) if config else []
-        teacher_resources = list(getattr(config, "teaching_learning_resources", []) or []) if config else []
-        teacher_competencies = list(getattr(config, "core_competencies", []) or []) if config else []
-        teacher_references = list(getattr(config, "references", []) or []) if config else []
+        # ── AI overwrite guards (Section P) ────────────────────────────────
+        # Precedence: AUTHORITATIVE SOURCE > TEACHER > AI.
+        # Snapshot teacher-owned fields so AI cannot replace them.
+        teacher_keywords = list(lp.keywords or [])
+        if config:
+            for k in (getattr(config, "keywords", []) or []):
+                if k and k.lower() not in {x.lower() for x in teacher_keywords}:
+                    teacher_keywords.append(k)
+        lesson_source_tlrs = list(getattr(lp, "source_tlrs", None) or [])
+        lesson_other_tlrs = list(getattr(lp, "other_tlrs", None) or [])
+        if config:
+            for r in (getattr(config, "teaching_learning_resources", []) or []):
+                if r and r.lower() not in {x.lower() for x in lesson_other_tlrs}:
+                    lesson_other_tlrs.append(r)
+        lesson_competencies = list(lp.core_competencies or [])
+        if config:
+            for c in (getattr(config, "core_competencies", []) or []):
+                if c and c.lower() not in {x.lower() for x in lesson_competencies}:
+                    lesson_competencies.append(c)
+        lesson_references = list(lp.references or [])
+        if config:
+            for r in (getattr(config, "references", []) or []):
+                if r and r.lower() not in {x.lower() for x in lesson_references}:
+                    lesson_references.append(r)
+        lesson_structured_refs = list(getattr(lp, "structured_references", None) or [])
+        # Authoritative curriculum facts — AI must never change these.
+        authoritative = {
+            "indicator_codes": list(lp.indicator_codes or []),
+            "indicators": list(lp.indicators or []),
+            "content_standard": lp.content_standard,
+            "content_standard_code": lp.content_standard_code,
+            "week_number": lp.week_number,
+            "week_ending": lp.week_ending,
+            "strand": lp.strand,
+            "sub_strand": lp.sub_strand,
+        }
         # Learning objectives
         if "learning_objectives" in content and content["learning_objectives"]:
             from ..models import LearningObjective
@@ -494,7 +543,7 @@ class GenerationPipeline:
                 lp.learning_objectives = objectives
 
         # Key vocabulary: teacher-supplied terms FIRST and always retained, then
-        # AI-suggested indicator vocabulary added on top.
+        # AI-suggested indicator vocabulary added on top. AI never replaces.
         if "key_vocabulary" in content and content["key_vocabulary"]:
             lp.keywords = _merge_unique(teacher_keywords or lp.keywords,
                                         content["key_vocabulary"])
@@ -601,18 +650,31 @@ class GenerationPipeline:
 
         # Teacher-supplied metadata must survive AI enrichment (merge, never
         # replace). AI suggestions are appended after the teacher's own values.
+        # source_tlrs / other_tlrs are NEVER written by AI.
         if teacher_keywords:
-            lp.keywords = _merge_unique(lp.keywords, teacher_keywords)
-        if teacher_resources:
-            lp.teaching_learning_resources = _merge_unique(
-                lp.teaching_learning_resources, teacher_resources)
-        if teacher_competencies:
-            lp.core_competencies = _merge_unique(lp.core_competencies, teacher_competencies)
-        if teacher_references:
-            lp.references = _merge_unique(lp.references, teacher_references)
+            lp.keywords = _merge_unique(teacher_keywords, lp.keywords)
+        if lesson_competencies:
+            lp.core_competencies = _merge_unique(
+                lesson_competencies, lp.core_competencies)
+        if lesson_references:
+            lp.references = _merge_unique(lesson_references, lp.references)
+        # Restore authoritative curriculum fields if anything mutated them.
+        lp.indicator_codes = authoritative["indicator_codes"]
+        lp.indicators = authoritative["indicators"]
+        lp.content_standard = authoritative["content_standard"]
+        lp.content_standard_code = authoritative["content_standard_code"]
+        lp.week_number = authoritative["week_number"]
+        lp.week_ending = authoritative["week_ending"]
+        lp.strand = authoritative["strand"]
+        lp.sub_strand = authoritative["sub_strand"]
+        # SOURCE TLRs stay source-only; OTHER TLRs stay teacher-only.
+        lp.source_tlrs = lesson_source_tlrs
+        lp.other_tlrs = lesson_other_tlrs
+        if lesson_structured_refs:
+            lp.structured_references = lesson_structured_refs
 
-        # Resources suggested by the AI for the phases support this lesson's
-        # actual activities — fold them into the lesson TLRs.
+        # Resources suggested by the AI for the phases may only enrich the
+        # DISPLAY union and never mutate source_tlrs or other_tlrs.
         ai_resources = []
         main = content.get("main_learning", {})
         if isinstance(main, dict):
@@ -622,10 +684,12 @@ class GenerationPipeline:
         resources_block = content.get("resources", {})
         if isinstance(resources_block, dict):
             ai_resources.extend(resources_block.get("suggested_alternatives", []) or [])
-            ai_resources.extend(resources_block.get("source_resources", []) or [])
+        # Do NOT pull "source_resources" from AI — source comes from the scheme.
         if ai_resources:
             lp.teaching_learning_resources = _merge_unique(
-                lp.teaching_learning_resources, ai_resources)
+                list(lp.source_tlrs or []) + list(lp.other_tlrs or []),
+                _merge_unique(lp.teaching_learning_resources, ai_resources),
+            )
 
     def _lesson_to_dict(self, lp: LessonPlan) -> dict:
         """Convert a LessonPlan to a dict for the quality gate."""

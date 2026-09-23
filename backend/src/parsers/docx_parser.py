@@ -27,7 +27,8 @@ from ..models import (
     ValidationIssue, ValidationSeverity
 )
 from .subject_keywords import (
-    SUBJECT_KEYWORDS, canonical_subject_from_heading, detect_document_title,
+    SUBJECT_KEYWORDS, MAX_HEADING_LENGTH, canonical_subject_from_heading,
+    detect_document_title,
 )
 
 
@@ -106,12 +107,33 @@ SPECIAL_WEEK_KEYWORDS = [
     "exam",
 ]
 
-WEEK_NUMBER_PATTERN = re.compile(r'^(\d{1,2})\s*[\|\n\r]+\s*(\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2,4})')
+WEEK_NUMBER_PATTERN = re.compile(
+    r'^(\d{1,2})\s*[\|\n\r]+\s*(.+)$', re.DOTALL
+)
 WEEK_ONLY_PATTERN = re.compile(r'^(\d{1,2})$')
 DATE_SLASH_PATTERN = re.compile(r'(\d{1,2})/(\d{1,2})/(\d{2,4})')
 DATE_DASH_PATTERN = re.compile(r'(\d{1,2})-(\d{1,2})-(\d{2,4})')
 INDICATOR_CODE_PATTERN = re.compile(r'[Bb]?\d+\.\d+\.\d+\.\d+(\.\d+)?')
 CONTENT_STANDARD_CODE_PATTERN = re.compile(r'[Bb]?\d+\.\d+\.\d+\.\d+')
+
+#: Month name → number (full and common abbreviations), lowercased keys.
+_MONTHS = {
+    "january": 1, "jan": 1, "february": 2, "feb": 2, "march": 3, "mar": 3,
+    "april": 4, "apr": 4, "may": 5, "june": 6, "jun": 6, "july": 7,
+    "jul": 7, "august": 8, "aug": 8, "september": 9, "sep": 9, "sept": 9,
+    "october": 10, "oct": 10, "november": 11, "nov": 11, "december": 12,
+    "dec": 12,
+}
+
+#: "11 September 2026" / "11 Sep 2026" / "11 September, 2026"
+_TEXT_DATE_RE = re.compile(
+    r'\b(\d{1,2})\s+([A-Za-z]{3,9})\.?,?\s+(\d{4})\b'
+)
+#: "September 11, 2026" / "Sep 11 2026"
+_TEXT_DATE_RE_US = re.compile(
+    r'\b([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})\b'
+)
+
 
 
 class DOCXParser:
@@ -165,6 +187,11 @@ class DOCXParser:
             if selected:
                 tables_data = [t for s in selected for t in s["tables"]]
                 forced_subject = selected[0]["subject"]
+            else:
+                # The requested section does not exist. Never fall back to
+                # parsing every subject table — that would silently mix
+                # Week N from French with Week N from ICT.
+                tables_data = []
 
         filename_for_detection = original_filename or file_path.name
         parsed_scheme = self._parse_scheme(tables_data, raw_text, filename_for_detection)
@@ -358,31 +385,118 @@ class DOCXParser:
                 blocks.append(("table", rows))
         return blocks
 
+    #: Data rows must never open a subject section (week no, dates, indicator codes).
+    _DATA_ROW_PATTERN = re.compile(
+        r"(?<!\w)week\s*\d|"
+        r"\b\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}\b|"
+        r"\b[a-z]\d+\.\d+\.\d+",
+        re.IGNORECASE,
+    )
+
+    @classmethod
+    def _heading_row_subject(cls, row: List[str]) -> Optional[Subject]:
+        """Subject named by a table row that acts as an in-table section heading.
+
+        Real district packs sometimes put the subject title in a cell instead
+        of a paragraph. Only short, non-data rows qualify — ordinary curriculum
+        cells such as "Earth Science" or "Introduction to Computing" inside a
+        week row must not open a new section.
+        """
+        texts = [(c or "").strip() for c in row]
+        non_empty = [t for t in texts if t]
+        if not non_empty:
+            return None
+        joined = " | ".join(non_empty)
+        if len(joined) > 200:
+            return None
+        if cls._DATA_ROW_PATTERN.search(joined):
+            return None
+        # Long cells are curriculum prose (indicators, content standards).
+        if any(len(t) > MAX_HEADING_LENGTH for t in non_empty):
+            return None
+        for t in non_empty:
+            subject = canonical_subject_from_heading(t)
+            if subject is None:
+                continue
+            low = t.lower()
+            if (
+                len(non_empty) == 1
+                or "scheme" in low
+                or "learning" in low
+                or t is non_empty[0]
+            ):
+                return subject
+        return None
+
+    @staticmethod
+    def _row_title(row: List[str]) -> str:
+        for c in row:
+            text = (c or "").strip()
+            if text and canonical_subject_from_heading(text) is not None:
+                return text
+        return ""
+
     def _detect_sections(self, blocks: List[Tuple[str, Any]]) -> List[Dict[str, Any]]:
-        """Split ordered blocks into subject sections at subject headings."""
+        """Split ordered blocks into subject sections at subject headings.
+
+        Headings may be paragraph text or a short non-data table row; both
+        preserve document order. Consecutive sections that share a subject
+        (repeated headings) are merged.
+        """
         sections: List[Dict[str, Any]] = []
         current: Optional[Dict[str, Any]] = None
+
+        def _flush():
+            nonlocal current
+            if current and current["tables"]:
+                sections.append(current)
+            current = None
 
         for kind, payload in blocks:
             if kind == "paragraph":
                 subject = canonical_subject_from_heading(payload)
                 if subject is not None:
-                    if current and current["tables"]:
-                        sections.append(current)
+                    _flush()
                     current = {"subject": subject, "title": payload, "tables": []}
-            else:  # table
+                continue
+
+            # table — look for an in-table heading row that splits this table
+            split_at = None
+            heading_subject = None
+            for ri, row in enumerate(payload):
+                subject = self._heading_row_subject(row)
+                if subject is not None:
+                    split_at = ri
+                    heading_subject = subject
+                    break
+
+            if split_at is None:
                 if current is None:
                     current = {"subject": None, "title": "", "tables": []}
                 current["tables"].append(payload)
+            else:
+                before = payload[:split_at]
+                after = payload[split_at:]
+                if before:
+                    if current is None:
+                        current = {"subject": None, "title": "", "tables": []}
+                    current["tables"].append(before)
+                _flush()
+                current = {
+                    "subject": heading_subject,
+                    "title": self._row_title(after[0]) if after else "",
+                    "tables": [after] if after else [],
+                }
 
-        if current and current["tables"]:
-            sections.append(current)
+        _flush()
 
         # Merge consecutive sections that share a subject (repeated headings).
         merged: List[Dict[str, Any]] = []
         for s in sections:
             if merged and merged[-1]["subject"] == s["subject"]:
                 merged[-1]["tables"].extend(s["tables"])
+                if not merged[-1]["title"] and s["title"]:
+                    merged[-1]["title"] = s["title"]
             else:
                 merged.append(s)
         return merged
@@ -505,6 +619,9 @@ class DOCXParser:
             week_text = normalized.get("week_ending", "")
             week_info = self._extract_week_info(week_text)
             extraction_method = "primary"
+            # The WEEK ENDING column may hold only the date ("11 September 2026")
+            # while the WEEK column holds "Week 1" — keep both signals.
+            date_from_week_col = self._date_anywhere_in(week_text)
 
             # Fallback: if header-based extraction failed, scan ALL cells in the row
             # for week-like content. This handles cases where:
@@ -518,6 +635,17 @@ class DOCXParser:
                         week_info = fallback_info
                         extraction_method = "fallback"
                         break
+
+            if week_info and week_info.get("date") is None:
+                # Week number known but date not in that cell — take the
+                # authoritative source date from the WEEK ENDING column or
+                # any other cell in the row (never invent one later).
+                row_date = date_from_week_col or self._date_anywhere_in(*row)
+                if row_date:
+                    week_info = {
+                        "week_number": week_info["week_number"],
+                        "date": row_date,
+                    }
 
             if week_info:
                 current_week = week_info["week_number"]
@@ -656,11 +784,10 @@ class DOCXParser:
         match = WEEK_NUMBER_PATTERN.search(cleaned)
         if match:
             week_num = int(match.group(1))
-            date_str = match.group(2)
-            parsed_date = self._parse_date(date_str)
+            rest = " ".join(match.group(2).split())
             return {
                 "week_number": week_num,
-                "date": parsed_date
+                "date": self._parse_date(rest),
             }
 
         match = WEEK_ONLY_PATTERN.match(cleaned)
@@ -671,13 +798,17 @@ class DOCXParser:
                 "date": None
             }
 
-        # Handle "Week N" format (e.g., "Week 1", "Week 2", "WEEK 1")
-        week_text_pattern = re.match(r'^week\s+(\d{1,2})\b', cleaned, re.IGNORECASE)
+        # Handle "Week N" format (e.g., "Week 1", "Week 2", "WEEK 1") and
+        # "Week 1 11 September 2026" / "Week 1\n11 September 2026".
+        week_text_pattern = re.match(
+            r'^week\s+(\d{1,2})\b(.*)$', cleaned, re.IGNORECASE | re.DOTALL
+        )
         if week_text_pattern:
             week_num = int(week_text_pattern.group(1))
+            rest = " ".join(week_text_pattern.group(2).split())
             return {
                 "week_number": week_num,
-                "date": None
+                "date": self._parse_date(rest) if rest else None,
             }
 
         # PDF (and some Word) cells separate the week number and date with a
@@ -693,22 +824,46 @@ class DOCXParser:
                 "date": self._parse_date(match.group(2)),
             }
 
+        # "1 11 September 2026" — week number + textual date in one cell.
+        match = re.match(
+            r'^(\d{1,2})\s+(\d{1,2}\s+[A-Za-z]{3,9}\.?,?\s+\d{4})\s*$',
+            cleaned,
+        )
+        if match:
+            return {
+                "week_number": int(match.group(1)),
+                "date": self._parse_date(match.group(2)),
+            }
+
         if any(kw in cleaned.lower() for kw in SPECIAL_WEEK_KEYWORDS):
             pass
 
         return None
 
     def _parse_date(self, date_str: str) -> Optional[date]:
-        date_str = date_str.strip()
+        """Parse a source date. Numeric dates are day-first (DD/MM/YYYY).
 
+        Supports: ``11/09/2026``, ``11-09-2026``, ``11.09.2026``,
+        ``11 September 2026``, ``11 Sep 2026``, ``September 11, 2026``.
+        Returns None when no date can be read — never invents one.
+        """
+        if not date_str:
+            return None
+        text = " ".join(str(date_str).split())
+        if not text:
+            return None
+
+        # Day-first numeric with / - or . separators
         for sep in ['/', '-', '.']:
-            if sep in date_str:
-                parts = date_str.split(sep)
-                if len(parts) == 3:
+            if sep in text:
+                parts = text.split(sep)
+                # Allow trailing junk after the year (e.g. "11/09/2026 (Fri)")
+                if len(parts) >= 3:
                     try:
-                        d = int(parts[0])
-                        m = int(parts[1])
-                        y = int(parts[2])
+                        d = int(re.sub(r'\D.*$', '', parts[0]) or '0')
+                        m = int(re.sub(r'\D.*$', '', parts[1]) or '0')
+                        y_raw = re.sub(r'\D.*$', '', parts[2]) or ''
+                        y = int(y_raw) if y_raw else 0
                         if y < 100:
                             y += 2000
                         if 1 <= d <= 31 and 1 <= m <= 12 and 2020 <= y <= 2030:
@@ -716,6 +871,40 @@ class DOCXParser:
                     except ValueError:
                         continue
 
+        # Textual: "11 September 2026"
+        m = _TEXT_DATE_RE.search(text)
+        if m:
+            day = int(m.group(1))
+            month = _MONTHS.get(m.group(2).lower().rstrip('.'))
+            year = int(m.group(3))
+            if month and 1 <= day <= 31 and 2020 <= year <= 2030:
+                try:
+                    return date(year, month, day)
+                except ValueError:
+                    pass
+
+        # Textual: "September 11, 2026"
+        m = _TEXT_DATE_RE_US.search(text)
+        if m:
+            month = _MONTHS.get(m.group(1).lower().rstrip('.'))
+            day = int(m.group(2))
+            year = int(m.group(3))
+            if month and 1 <= day <= 31 and 2020 <= year <= 2030:
+                try:
+                    return date(year, month, day)
+                except ValueError:
+                    pass
+
+        return None
+
+    def _date_anywhere_in(self, *chunks: str) -> Optional[date]:
+        """First parseable date among the given text chunks."""
+        for chunk in chunks:
+            if not chunk:
+                continue
+            d = self._parse_date(chunk)
+            if d:
+                return d
         return None
 
     def _is_special_week_text(self, text: str) -> bool:
@@ -797,10 +986,27 @@ class DOCXParser:
         return desc if desc else text.strip()
 
     def _convert_to_weeks(self, parsed_scheme: ParsedScheme) -> List[Week]:
+        """Build Week rows. Source week-ending dates are AUTHORITATIVE.
+
+        When the source omits a date the value is derived (previous week + 7
+        days, else today) and flagged ``week_ending_derived=True`` so every
+        downstream consumer can show DERIVED instead of a silent assumption.
+        """
+        from datetime import timedelta
+
         weeks = []
+        prev_end: Optional[date] = None
         for pw in parsed_scheme.weeks:
-            week_ending = pw.week_ending or date.today()
+            if pw.week_ending is not None:
+                week_ending = pw.week_ending
+                derived = False
+            else:
+                derived = True
+                week_ending = (
+                    prev_end + timedelta(days=7) if prev_end else date.today()
+                )
             start = week_ending
+            prev_end = week_ending
 
             content_std_texts = [f"{cs.code} {cs.description}" for cs in pw.content_standards]
             indicator_texts = [f"{ind.code} {ind.description}" for ind in pw.indicators]
@@ -809,6 +1015,7 @@ class DOCXParser:
                 week_number=pw.week_number,
                 start_date=start,
                 end_date=week_ending,
+                week_ending_derived=derived,
                 week_type=pw.week_type,
                 strand=pw.strand,
                 sub_strand=pw.sub_strand,
@@ -966,24 +1173,53 @@ class DOCXParser:
     ]
 
     @staticmethod
-    def _first_signal(text: str) -> Optional[str]:
-        """First class-level signal in text, ignoring indicator-code prefixes.
+    def _level_hits(text: str) -> List[Tuple[int, str]]:
+        """All class-level hits in ``text`` as (position, canonical level).
 
-        Curriculum codes such as ``B7.1.1.1.1`` contain compact level tokens
-        (``b7``/``b8``/``b9``). Those must NOT be read as a class signal — a
-        Basic 8 document full of B7-coded content is still Basic 8. The
-        negative lookahead rejects a token immediately followed by a digit or
-        a dot (i.e. the start of a curriculum code).
+        Indicator-code prefixes (``B7.1.1.1``) are ignored — see `_first_signal`.
         """
         lower = (text or "").lower()
+        hits: List[Tuple[int, str]] = []
         for keyword, level in DOCXParser._LEVEL_SIGNALS:
-            # Require a genuine standalone token: not preceded by an
-            # alphanumeric (so the 'b8' inside a UUID/hash is ignored) and not
-            # followed by a digit/dot/letter (so the 'b9' at the start of the
-            # code 'B9.1.1.1' is ignored).
             pattern = r"(?<![a-z0-9])" + re.escape(keyword) + r"(?![0-9a-z.])"
-            if re.search(pattern, lower):
-                return level
+            for m in re.finditer(pattern, lower):
+                hits.append((m.start(), level))
+        hits.sort(key=lambda h: h[0])
+        return hits
+
+    @staticmethod
+    def _first_signal(text: str) -> Optional[str]:
+        """Class-level signal from document text, ranked by evidence position.
+
+        Evidence order (not `_LEVEL_SIGNALS` list order):
+          1. Earliest hit inside the title zone (first 500 chars — document
+             titles carry the true class: "… FOR BASIC 6 - FRENCH").
+          2. Otherwise the most frequent level across the body (repeated
+             metadata beats a single stray mention).
+          3. Otherwise the earliest body hit.
+
+        Never invents a level: no hits → None (Unknown / needs confirmation).
+        Curriculum codes such as ``B7.1.1.1.1`` are not level tokens — the
+        negative lookahead rejects a token immediately followed by a digit or
+        a dot.
+        """
+        hits = DOCXParser._level_hits(text)
+        if not hits:
+            return None
+        title_hits = [lvl for pos, lvl in hits if pos < 500]
+        if title_hits:
+            return title_hits[0]
+        counts: Dict[str, int] = {}
+        for _, lvl in hits:
+            counts[lvl] = counts.get(lvl, 0) + 1
+        top = max(counts.values())
+        winners = [lvl for lvl, n in counts.items() if n == top]
+        if len(winners) == 1:
+            return winners[0]
+        # Tie → earliest occurrence in the body.
+        for _, lvl in hits:
+            if lvl in winners:
+                return lvl
         return None
 
     def subject_signals(self, raw_text: str, filename: str = "") -> dict:

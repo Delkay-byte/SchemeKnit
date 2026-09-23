@@ -19,7 +19,10 @@ from ..auth import get_current_user, get_optional_user, require_teacher_workflow
 from ..database import User
 from ..service import data_service
 from ..entitlements import require_ai_entitlement, consume_ai_generation
-from ..models import TermConfig, LessonPlan, Subject, ClassLevel, TemplateType, AIMode
+from ..models import (
+    TermConfig, LessonPlan, Subject, ClassLevel, TemplateType, AIMode,
+    ReferenceEntry,
+)
 from ..engines.generation_pipeline import GenerationPipeline
 from ..logging_config import get_logger, log_event, log_error
 
@@ -134,7 +137,93 @@ async def preview_allocation(
         }
         for a in sorted(coverage.allocations, key=lambda x: x.lesson_sequence)
     ] if quota.get("enforced") else []
+
+    # Per-lesson review seeds + any drafts the teacher already saved (Section H).
+    # Source fields are read-only; editable fields start from the draft when one
+    # exists, otherwise empty for the teacher to fill before generation.
+    drafts = data_service.get_lesson_review_drafts(db, scheme_id, user.id) or {}
+    report["lesson_review_drafts"] = drafts
+    report["lesson_review"] = [
+        {
+            "lesson_sequence": a.lesson_sequence,
+            "indicator_code": a.indicator_code,
+            "indicator_description": a.indicator_description,
+            "content_standard_code": a.content_standard_code,
+            "content_standard": a.content_standard_description,
+            "strand": a.strand,
+            "sub_strand": a.sub_strand,
+            "source_week": a.week_number,
+            "week_ending": a.week_ending.isoformat() if a.week_ending else None,
+            "week_ending_derived": bool(a.week_ending_derived),
+            "teaching_week": a.teaching_week or a.week_number,
+            "source_tlrs": list(a.source_resources or []),
+            "keywords": list((drafts.get(str(a.lesson_sequence)) or {}).get("keywords") or []),
+            "other_tlrs": list((drafts.get(str(a.lesson_sequence)) or {}).get("other_tlrs") or []),
+            "core_competencies": list((drafts.get(str(a.lesson_sequence)) or {}).get("core_competencies") or []),
+            "structured_references": list((drafts.get(str(a.lesson_sequence)) or {}).get("structured_references") or []),
+        }
+        for a in sorted(coverage.allocations, key=lambda x: x.lesson_sequence)
+    ]
     return report
+
+
+@router.get("/{scheme_id}/lesson-review")
+async def get_lesson_review_drafts(
+    scheme_id: str,
+    user: User = Depends(require_teacher_workflow),
+    db=Depends(get_db),
+):
+    """Saved pre-generation review drafts for this scheme."""
+    scheme_db = data_service.get_scheme(db, scheme_id, user.id)
+    if not scheme_db:
+        raise HTTPException(status_code=404, detail="Scheme not found")
+    return {"drafts": data_service.get_lesson_review_drafts(db, scheme_id, user.id)}
+
+
+@router.put("/{scheme_id}/lesson-review")
+async def put_lesson_review_drafts(
+    scheme_id: str,
+    payload: dict,
+    user: User = Depends(require_teacher_workflow),
+    db=Depends(get_db),
+):
+    """Save per-lesson review drafts before generation.
+
+    Body: {"drafts": {"<lesson_sequence>": {keywords, other_tlrs, ...}}}
+    or a single {"lesson_sequence": "3", "keywords": [...], ...} merged in.
+    Source fields (source_tlrs, week_ending, indicator, content standard)
+    are rejected — they stay authoritative from the document.
+    """
+    scheme_db = data_service.get_scheme(db, scheme_id, user.id)
+    if not scheme_db:
+        raise HTTPException(status_code=404, detail="Scheme not found")
+
+    blocked = {"source_tlrs", "week_ending", "week_ending_derived", "indicator_code",
+               "content_standard", "strand", "sub_strand", "source_week"}
+    raw = payload.get("drafts") if isinstance(payload.get("drafts"), dict) else payload
+    if not isinstance(raw, dict):
+        raise HTTPException(status_code=400, detail="Invalid lesson review payload")
+
+    # Reject attempts to overwrite source-authoritative fields.
+    for key, draft in raw.items():
+        if isinstance(draft, dict):
+            hit = blocked & set(draft.keys())
+            if hit:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Source fields cannot be edited: {', '.join(sorted(hit))}",
+                )
+
+    if isinstance(payload.get("drafts"), dict):
+        store = data_service.save_lesson_review_drafts(db, scheme_id, user.id, raw)
+    else:
+        lesson_key = str(payload.get("lesson_sequence", payload.get("key", "")))
+        if not lesson_key:
+            raise HTTPException(status_code=400, detail="lesson_sequence is required")
+        store = data_service.save_lesson_review_draft(db, scheme_id, user.id, lesson_key, payload)
+    log_event("lesson_review_saved", user_id=user.id, scheme_id=scheme_id,
+              lessons=len(store))
+    return {"drafts": store}
 
 
 @router.get("/quota")
@@ -314,7 +403,9 @@ async def generate_lesson_plans(
         )
 
         if hasattr(job, '_lesson_plans'):
+            drafts = data_service.get_lesson_review_drafts(db, scheme_id, user.id) or {}
             for lp in job._lesson_plans:
+                _apply_lesson_review_draft(lp, drafts)
                 data_service.create_lesson_plan(db, user.id, job_db.id, scheme_id, lp)
 
         actual_lesson_count = (
@@ -1077,6 +1168,52 @@ def _resolve_teacher_name(db: Session, user: User) -> Optional[str]:
     return local.strip().title() or None
 
 
+def _apply_lesson_review_draft(lp, drafts: dict) -> None:
+    """Apply teacher-saved pre-generation review fields onto a built lesson.
+
+    Only the four editable review fields are written. source_tlrs, indicator,
+    content standard, strand and week_ending remain whatever the deterministic
+    builder produced from the source document (Section P authority).
+    """
+    if not drafts:
+        return
+    draft = drafts.get(str(getattr(lp, "lesson_sequence", "")))
+    if not draft:
+        codes = list(getattr(lp, "indicator_codes", None) or [])
+        draft = drafts.get(codes[0]) if codes else None
+    if not isinstance(draft, dict):
+        return
+    if "keywords" in draft:
+        lp.keywords = list(draft.get("keywords") or [])
+    if "other_tlrs" in draft:
+        lp.other_tlrs = list(draft.get("other_tlrs") or [])
+        # Keep the display union in sync without touching source_tlrs.
+        union = list(getattr(lp, "source_tlrs", None) or [])
+        for r in lp.other_tlrs:
+            if r and r.lower() not in [x.lower() for x in union]:
+                union.append(r)
+        for r in (getattr(lp, "teaching_learning_resources", None) or []):
+            if r.lower() in [x.lower() for x in union]:
+                continue
+            # Activity extras stay; only rewrite when source+other already cover.
+        lp.teaching_learning_resources = union
+    if "core_competencies" in draft:
+        lp.core_competencies = list(draft.get("core_competencies") or [])
+    if "structured_references" in draft:
+        refs = [
+            ReferenceEntry(**r) if isinstance(r, dict) else r
+            for r in (draft.get("structured_references") or [])
+        ]
+        lp.structured_references = refs
+        labels = []
+        for entry in refs:
+            label = entry.title or entry.type
+            if label and label.lower() not in [x.lower() for x in labels]:
+                labels.append(label)
+        if labels:
+            lp.references = labels
+
+
 def _serialize_lesson(lp) -> dict:
     from ..database import LessonPlanDB
     return {
@@ -1085,6 +1222,12 @@ def _serialize_lesson(lp) -> dict:
         "job_id": lp.job_id,
         "week_number": lp.week_number,
         "source_week": lp.week_number,
+        "week_ending": (
+            lp.week_ending.isoformat()
+            if getattr(lp, "week_ending", None)
+            else None
+        ),
+        "week_ending_derived": bool(getattr(lp, "week_ending_derived", False)),
         "teaching_week": getattr(lp, "teaching_week", None) or lp.week_number,
         "carry_forward": bool(getattr(lp, "carry_forward", False)),
         "lesson_sequence": lp.lesson_sequence,
@@ -1107,6 +1250,8 @@ def _serialize_lesson(lp) -> dict:
         "previous_knowledge": lp.previous_knowledge,
         "learning_objectives": lp.learning_objectives or [],
         "core_competencies": lp.core_competencies or [],
+        "source_tlrs": list(getattr(lp, "source_tlrs", None) or []),
+        "other_tlrs": list(getattr(lp, "other_tlrs", None) or []),
         "teaching_learning_resources": lp.teaching_learning_resources or [],
         "introduction": lp.introduction,
         "main_activities": lp.main_activities or [],
@@ -1115,6 +1260,8 @@ def _serialize_lesson(lp) -> dict:
         "assessment": lp.assessment,
         "conclusion": lp.conclusion,
         "references": lp.references or [],
+        "structured_references": list(getattr(lp, "structured_references", None) or []),
+        "keywords": lp.keywords or [],
         "status": lp.status,
         "ai_generated": lp.ai_generated,
         "teacher_edited": lp.teacher_edited,
@@ -1150,6 +1297,8 @@ def _db_to_lesson_model(lp) -> LessonPlan:
         scheme_of_work_id=lp.scheme_id,
         term_config_id=lp.job_id,
         week_number=lp.week_number,
+        week_ending=getattr(lp, "week_ending", None),
+        week_ending_derived=bool(getattr(lp, "week_ending_derived", False)),
         teaching_week=getattr(lp, "teaching_week", None) or lp.week_number,
         carry_forward=bool(getattr(lp, "carry_forward", False)),
         lesson_sequence=lp.lesson_sequence,
@@ -1174,6 +1323,8 @@ def _db_to_lesson_model(lp) -> LessonPlan:
         previous_knowledge=lp.previous_knowledge,
         learning_objectives=_parse_activity_list(lp.learning_objectives, LearningObjective),
         core_competencies=lp.core_competencies or [],
+        source_tlrs=list(getattr(lp, "source_tlrs", None) or []),
+        other_tlrs=list(getattr(lp, "other_tlrs", None) or []),
         teaching_learning_resources=lp.teaching_learning_resources or [],
         introduction=lp.introduction,
         main_activities=_parse_activity_list(lp.main_activities, TeachingActivity),
@@ -1182,4 +1333,9 @@ def _db_to_lesson_model(lp) -> LessonPlan:
         assessment=lp.assessment,
         conclusion=lp.conclusion,
         references=lp.references or [],
+        structured_references=[
+            ReferenceEntry(**r) if isinstance(r, dict) else r
+            for r in (getattr(lp, "structured_references", None) or [])
+        ],
+        keywords=lp.keywords or [],
     )

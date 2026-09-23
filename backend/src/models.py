@@ -445,6 +445,10 @@ class Week(BaseModel):
     week_number: int
     start_date: date
     end_date: date
+    #: True when end_date was NOT present in the source document and had to
+    #: be derived. Source dates are authoritative; derived dates must be
+    #: labelled as such through parse → allocation → generation → export.
+    week_ending_derived: bool = False
     week_type: WeekType = WeekType.INSTRUCTION
     strand: Optional[str] = None
     sub_strand: Optional[str] = None
@@ -551,6 +555,9 @@ class AllocatedIndicator(BaseModel):
     #: Source curriculum week — the week the indicator belongs to in the scheme.
     week_number: int
     week_ending: Optional[date] = None
+    week_ending_derived: bool = False
+    #: TLRs from THIS subject + source week (never another subject/week).
+    source_resources: List[str] = []
     lesson_date: Optional[date] = None
     lesson_sequence: int = 0
     # Position of this indicator within its actual teaching week (1-based).
@@ -605,12 +612,42 @@ class TeachingActivity(BaseModel):
     source: ContentSource = ContentSource.DETERMINISTIC
 
 
+class ReferenceEntry(BaseModel):
+    """One structured, teacher-controlled reference for a single lesson.
+
+    Page numbers and textbook titles are NEVER invented — blank means the
+    teacher has not supplied them.
+    """
+    type: str = "Other"  # Subject Curriculum | Teacher's Handbook / Teacher's Guide | Textbook | Other
+    title: str = ""
+    author_publisher: str = ""
+    page: str = ""
+    notes: str = ""
+
+
+#: Official NaCCA core-competency taxonomy (canonical labels + codes).
+NACCA_CORE_COMPETENCIES: List[Dict[str, str]] = [
+    {"code": "CP", "label": "Critical Thinking and Problem Solving"},
+    {"code": "CI", "label": "Creativity and Innovation"},
+    {"code": "CC", "label": "Communication and Collaboration"},
+    {"code": "CG", "label": "Cultural Identity and Global Citizenship"},
+    {"code": "PL", "label": "Personal Development and Leadership"},
+    {"code": "DL", "label": "Digital Literacy"},
+]
+NACCA_COMPETENCY_LABELS: List[str] = [c["label"] for c in NACCA_CORE_COMPETENCIES]
+
+
 class LessonPlan(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     scheme_of_work_id: str
     term_config_id: str
     #: Source curriculum week the lesson's indicator belongs to.
     week_number: int
+    #: Source week-ending date for that curriculum week. Authoritative when
+    #: the document supplied it; export must not recompute over this value.
+    week_ending: Optional[date] = None
+    #: True when week_ending was derived because the source omitted a date.
+    week_ending_derived: bool = False
     lesson_sequence: int
     lesson_date: date
     lesson_number: int = 0
@@ -642,9 +679,20 @@ class LessonPlan(BaseModel):
     lesson_topic: str = ""
     essential_questions: List[str] = []
     previous_knowledge: str = ""
+    #: Lesson-specific vocabulary. Derived from content standard + exact
+    #: indicator + activity context; teacher-entered terms are authoritative.
     keywords: List[str] = []
     learning_objectives: List[LearningObjective] = []
+    #: Per-lesson multi-select from the official NaCCA taxonomy.
     core_competencies: List[str] = []
+    #: TLRs FROM THE SCHEME for this subject + source week + indicator.
+    #: Authoritative curriculum-source data — never from another subject/week.
+    source_tlrs: List[str] = []
+    #: Teacher-added resources for THIS lesson only. Never merged with source.
+    other_tlrs: List[str] = []
+    #: Display union for templates that expect one TLR list. Built from
+    #: source_tlrs + other_tlrs at render time when source fields are set;
+    #: kept in sync so existing export paths stay green.
     teaching_learning_resources: List[str] = []
 
     introduction: str = ""
@@ -661,6 +709,9 @@ class LessonPlan(BaseModel):
     conclusion: str = ""
     reflection: str = ""
     homework: str = ""
+    #: Structured, per-lesson references (type/title/author/page/notes).
+    structured_references: List[ReferenceEntry] = []
+    #: Flat string form for existing templates/export paths.
     references: List[str] = []
 
     status: LessonStatus = LessonStatus.PENDING

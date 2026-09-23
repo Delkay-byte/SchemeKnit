@@ -150,26 +150,36 @@ async def upload_scheme(
         document_parser = get_document_parser(file_path)
         if document_parser is None:
             raise HTTPException(status_code=400, detail="Unsupported file type")
+
+        # Analyse FIRST so multi-subject documents never persist a mixed
+        # week list (Week N of French merged with Week N of ICT).
+        detection = _analyze_document(document_parser, file_path, file.filename)
+
+        # Parse for class/term/raw metadata. When several subject sections
+        # exist, drop the mixed weeks — the teacher must confirm a subject
+        # before any curriculum rows are stored.
         scheme = await document_parser.parse(file_path, original_filename=file.filename)
+        if detection.get("detection_status") == "multiple":
+            scheme.weeks = []
 
         db_scheme = data_service.create_scheme(db, user.id, scheme, school_id=user.school_id)
         # Track storage location for safe orphan cleanup on delete (server-side only).
         db_scheme.storage_filename = str(file_path)
 
-        # ── Multi-subject document detection (§4) ───────────────────────
+        # ── Multi-subject document detection (§4) ───────────────────────────────
         # Inspect the document for subject sections. When more than one subject
         # is present the teacher MUST confirm which one to use before
         # generation — the system never silently picks a subject.
-        detection = _analyze_document(document_parser, file_path, file.filename)
         db_scheme.document_title = detection.get("title") or ""
         db_scheme.detected_subjects = [
             s["subject"] for s in detection.get("sections", [])
         ]
         db_scheme.detection_status = detection.get("detection_status", "")
         db_scheme.subject_sections = detection.get("sections", [])
-        # A document that yielded no weeks is an extraction FAILURE, never a
-        # usable empty curriculum (PART J).
-        if not scheme.weeks:
+        # A document that yielded no weeks (and is not awaiting subject
+        # confirmation) is an extraction FAILURE, never a usable empty
+        # curriculum (PART J).
+        if not scheme.weeks and db_scheme.detection_status != "multiple":
             db_scheme.detection_status = "extraction_failed"
             db_scheme.status = "extraction_failed"
         db.commit()
@@ -291,6 +301,7 @@ async def get_scheme_weeks(
             "week_type": w.week_type,
             "start_date": w.start_date.isoformat() if w.start_date else None,
             "end_date": w.end_date.isoformat() if w.end_date else None,
+            "week_ending_derived": bool(getattr(w, "week_ending_derived", False)),
             "strand": w.strand,
             "sub_strand": w.sub_strand,
             "content_standards": w.content_standards or [],
@@ -402,6 +413,7 @@ async def confirm_subject_section(
             week_type=w.week_type.value if hasattr(w.week_type, "value") else str(w.week_type),
             start_date=w.start_date,
             end_date=w.end_date,
+            week_ending_derived=bool(getattr(w, "week_ending_derived", False)),
             strand=w.strand or "",
             sub_strand=w.sub_strand or "",
             content_standards=w.content_standards,

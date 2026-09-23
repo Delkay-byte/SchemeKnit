@@ -216,6 +216,7 @@ class PDFParser:
 
         tables = [p for k, p in blocks if k == "table"]
         forced_subject = None
+        section_miss = False
 
         if target_subject:
             sections = self._resolve_sections(blocks, text_sections)
@@ -226,8 +227,13 @@ class PDFParser:
             if selected:
                 tables = [t for s in selected for t in s["tables"]]
                 forced_subject = selected[0]["subject"]
+            else:
+                # Missing section → empty parse, never a cross-subject mix
+                # and never a text fallback that re-reads every heading.
+                tables = []
+                section_miss = True
 
-        if not tables:
+        if not tables and not section_miss:
             non_heading = [
                 p for k, p in blocks
                 if k == "paragraph" and canonical_subject_from_heading(p) is None
