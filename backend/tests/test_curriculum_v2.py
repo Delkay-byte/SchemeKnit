@@ -414,6 +414,28 @@ class TestQualityGate:
                 for i in report.issues
             ), f"measurable verb under-counted for: {desc}"
 
+    def test_dropped_e_and_use_objectives_are_measurable(self):
+        # 17I real acceptance findings: "use ... in solving problems" (a B9
+        # objective) and -ing forms of e-verbs ("investigating") must satisfy
+        # the measurable-verb check instead of warning.
+        for desc in [
+            "Learners can use the distributive property in solving problems",
+            "Learners can use place value to read and write numbers",
+            "Learners can improve by investigating soil types",
+        ]:
+            lesson = self._make_lesson(learning_objectives=[{"description": desc}])
+            report = validate_lesson_quality(lesson, self._make_indicator())
+            assert not any(
+                i.check_name == "objectives_measurable_verb"
+                and i.status == QualityStatus.WARN
+                for i in report.issues
+            ), f"measurable verb under-counted for: {desc}"
+            assert not any(
+                i.check_name == "objectives_measurable"
+                and i.status == QualityStatus.WARN
+                for i in report.issues
+            ), f"vague-verb false positive for: {desc}"
+
     def test_subject_enum_render_resolves_to_pedagogy_profile(self):
         # Regression: LessonPlans serialized subject as the enum repr like
         # 'Subject.SCIENCE' — the pedagogy profile registry exact lookup then

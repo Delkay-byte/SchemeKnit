@@ -87,6 +87,7 @@ _MEASURABLE_VERBS = (
     "experiment", "gather", "choose", "select", "outline", "organize",
     "organise", "relate", "summarise", "summarize", "convert", "translate",
     "substitute", "change", "reorder", "rewrite",
+    "use",
 )
 
 _INFLECTION = r"(?:s|es|ed|ing)?"
@@ -95,7 +96,12 @@ _INFLECTION = r"(?:s|es|ed|ing)?"
 def _verb_pattern(word: str) -> "re.Pattern[str]":
     if " " in word:
         return re.compile(rf"\b{'\\s+'.join(re.escape(p) for p in word.split())}\b")
-    return re.compile(rf"\b{re.escape(word)}{_INFLECTION}\b")
+    esc = re.escape(word)
+    if word.endswith("e"):
+        return re.compile(
+            rf"\b(?:{esc}(?:s|es|ed|ing)?|{esc[:-1]}(?:ing|ed))\b"
+        )
+    return re.compile(rf"\b{esc}{_INFLECTION}\b")
 
 
 _VAGUE_PATTERNS = [(_verb_pattern(v), v) for v in _VAGUE_VERBS]
