@@ -216,6 +216,23 @@ class TestGeminiFailurePaths:
             assert p.generate_structured("{}") == {}
         assert p.last_error == "rate_limit"
 
+    def test_auth_key_rejected_diagnostic_not_format_unsupported(self):
+        # 401 ACCESS_TOKEN_TYPE_UNSUPPORTED is Google's generic "credential
+        # rejected" for the CURRENT AQ authorization-key format (which is the
+        # supported format) — the diagnostic must not imply the format is
+        # unsupported or that a legacy standard key should be minted.
+        p = self._provider()
+        resp = MagicMock(status_code=401)
+        resp.text = ('{"error":{"code":401,"status":"UNAUTHENTICATED",'
+                     '"details":[{"reason":"ACCESS_TOKEN_TYPE_UNSUPPORTED"}]}}')
+        with patch("requests.post", return_value=resp):
+            assert p.generate_structured("{}") == {}
+        assert p.last_error == "auth_key_rejected"
+        assert p.last_error != "auth_key_type_unsupported"
+        # provider_status must still resolve it to a live auth failure.
+        from src.engines.ai_provider import provider_status
+        assert provider_status(p) == "LIVE_AUTH_FAILURE"
+
     def test_content_refusal_empty_candidates(self):
         p = self._provider()
         resp = MagicMock(status_code=200)
@@ -450,7 +467,7 @@ class TestLiveGemini:
             indicator_text="Separate mixtures by filtration and evaporation",
             duration_minutes=40,
         )
-        if not out and p.last_error in ("auth_failed", "auth_key_type_unsupported",
+        if not out and p.last_error in ("auth_failed", "auth_key_rejected",
                                         "invalid_api_key", "missing_api_key"):
             pytest.skip(f"Gemini credentials rejected (last_error={p.last_error}) — update GEMINI_API_KEY")
         assert out, f"Gemini returned empty (last_error={p.last_error})"
@@ -474,7 +491,9 @@ class TestLiveGroq:
             indicator_text="Separate mixtures by filtration and evaporation",
             duration_minutes=40,
         )
-        if not out and p.last_error in ("auth_failed", "invalid_api_key", "missing_api_key"):
-            pytest.skip(f"Groq credentials rejected (last_error={p.last_error}) — update GROQ_API_KEY")
+        if not out and p.last_error in ("auth_failed", "invalid_api_key",
+                                        "missing_api_key", "model_not_found",
+                                        "http_404"):
+            pytest.skip(f"Groq blocked (last_error={p.last_error}) — verify GROQ_API_KEY/GROQ_MODEL")
         assert out, f"Groq returned empty (last_error={p.last_error})"
         assert "learning_objectives" in out or "starter" in out or "assessment" in out

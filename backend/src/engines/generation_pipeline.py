@@ -33,6 +33,49 @@ from .template_engine import (
 from .ai_provider import get_provider, resolve_provider_mode
 
 
+def _dedupe_activities(activities: List[Any]) -> List[Any]:
+    """Drop exact-duplicate activity descriptions (keep first occurrence).
+
+    Models occasionally emit the same instruction in two list entries; the
+    quality gate's boilerplate check then flags the whole lesson. Matching is
+    whitespace- and case-insensitive; distinct texts are never merged.
+    """
+    seen = set()
+    kept = []
+    for act in activities:
+        desc = getattr(act, "description", "") or ""
+        key = " ".join(desc.split()).lower()
+        if key and key in seen:
+            continue
+        if key:
+            seen.add(key)
+        kept.append(act)
+    return kept
+
+
+def _fit_activity_durations(activities: List[Any],
+                            budget_minutes: Optional[int]) -> List[Any]:
+    """Rescale phase durations so their sum fits the lesson duration.
+
+    Models propose phase durations freely (e.g. 80 minutes of activities for
+    a 45-minute lesson), which would print an impossible timetable. Only runs
+    when the sum exceeds the budget; redistribution is proportional and
+    integer-summing via the deterministic builder's _distribute.
+    """
+    if not activities or not budget_minutes or budget_minutes <= 0:
+        return activities
+    durations = [int(getattr(a, "duration_minutes", 0) or 0)
+                 for a in activities]
+    if sum(durations) <= budget_minutes:
+        return activities
+    weights = durations if sum(durations) > 0 else [1] * len(activities)
+    from ..curriculum.lesson_builder import _distribute
+    fitted = _distribute(int(budget_minutes), weights)
+    for act, minutes in zip(activities, fitted):
+        act.duration_minutes = minutes
+    return activities
+
+
 class GenerationPipeline:
     """Production lesson plan generation pipeline."""
 
@@ -432,7 +475,8 @@ class GenerationPipeline:
                         resources=phase.get("resources_used", []),
                     ))
             if activities:
-                lp.main_activities = activities
+                lp.main_activities = _fit_activity_durations(
+                    _dedupe_activities(activities), lp.duration_minutes)
         elif isinstance(main, list):
             from ..models import TeachingActivity
             activities = []
@@ -445,7 +489,8 @@ class GenerationPipeline:
                         resources=item.get("resources_used", []),
                     ))
             if activities:
-                lp.main_activities = activities
+                lp.main_activities = _fit_activity_durations(
+                    _dedupe_activities(activities), lp.duration_minutes)
 
         # Learner activities (from main_learning or dedicated field)
         if "learner_activities" in content:
@@ -467,7 +512,7 @@ class GenerationPipeline:
                             duration_minutes=15,
                         ))
                 if activities:
-                    lp.learner_activities = activities
+                    lp.learner_activities = _dedupe_activities(activities)
 
         # Assessment
         assessment = content.get("assessment", {})

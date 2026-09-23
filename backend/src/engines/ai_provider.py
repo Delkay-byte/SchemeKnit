@@ -154,7 +154,7 @@ def provider_status(provider: "AIProvider") -> str:
     if not provider.is_available():
         return "MISSING_KEY"
     error = getattr(provider, "last_error", None)
-    if error in ("auth_failed", "auth_key_type_unsupported", "invalid_api_key"):
+    if error in ("auth_failed", "auth_key_rejected", "invalid_api_key"):
         return "LIVE_AUTH_FAILURE"
     if error in ("model_not_found", "http_404"):
         return "MODEL_UNAVAILABLE"
@@ -355,13 +355,18 @@ class GeminiProvider(AIProvider):
                 self.last_error = "rate_limit"
                 return ""
             if resp.status_code in (401, 403):
-                # Google now issues its new authorization-key prefix by default,
-                # which :generateContent rejects with ACCESS_TOKEN_TYPE_UNSUPPORTED.
-                # Distinguish that from a mere wrong value so the owner knows to
-                # mint a restricted standard API key instead of guessing.
+                # Google's current auth model: AI Studio issues authorization
+                # keys, which ARE the supported credential format on the native
+                # REST surface via x-goog-api-key (Bearer is only for
+                # /v1beta/openai). A 401 ACCESS_TOKEN_TYPE_UNSUPPORTED
+                # therefore means the specific key string was rejected — invalid,
+                # truncated, expired, or constrained to another Google service —
+                # NOT that the key format is unsupported. The owner must verify
+                # or regenerate the key in AI Studio (restricted to Gemini API),
+                # not downgrade to the legacy standard-key format.
                 body = resp.text or ""
                 if "ACCESS_TOKEN_TYPE_UNSUPPORTED" in body:
-                    self.last_error = "auth_key_type_unsupported"
+                    self.last_error = "auth_key_rejected"
                 else:
                     self.last_error = "auth_failed"
                 return ""

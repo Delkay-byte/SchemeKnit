@@ -762,6 +762,16 @@ async def issue_download_url(
     if fmt not in ("docx", "pdf", "zip", "xlsx"):
         raise HTTPException(status_code=400, detail="Unsupported format")
 
+    # ── Entitlement gate: ZIP export requires Pro or school license ────────
+    # The UI's export buttons all go through this one-time URL path, so the
+    # gate has to live here too — on the legacy /export/zip route alone a
+    # Free Tier teacher received a real zip through the active UI path.
+    if fmt == "zip":
+        from ..entitlements import can_export_zip
+        allowed, reason = can_export_zip(user, db)
+        if not allowed:
+            raise HTTPException(status_code=403, detail=reason)
+
     scheme_db = data_service.get_scheme(db, job.scheme_id, user.id)
     scheme_stem = Path(scheme_db.filename).stem if scheme_db and scheme_db.filename else ""
     scheme_label = re.sub(r'[^A-Za-z0-9]+', '_', scheme_stem).strip('_') or 'lesson_plans'
@@ -769,18 +779,41 @@ async def issue_download_url(
     tt = TemplateType(template_type) if template_type in [t.value for t in TemplateType] else TemplateType.GES_STYLE
 
     if fmt == "docx":
-        out = await _run_pipeline(
-            pipeline.export_docx_combined, "", lp_models, tt,
-            Path(f"exports/{user.id}/{job_id}/lesson_plans.docx"),
-            template_id=template_id)
+        custom_structure = _custom_structure_for(db, user.id, template_id)
+        if custom_structure is not None:
+            log_event("custom_template_export", user_id=user.id, job_id=job_id)
+            prefs = data_service.get_preferences(db, user.id)
+            snapshot = job.config_snapshot or {}
+            render_context = {
+                "term": scheme_db.term if scheme_db and scheme_db.term else None,
+                "academic_term": snapshot.get("term") if snapshot else None,
+                "period": (prefs.default_period if prefs else "")
+                          or snapshot.get("period", "")
+                          or (lp_models[0].period if lp_models else ""),
+            }
+            out = await _run_pipeline(
+                pipeline.export_docx_combined_custom, lp_models, custom_structure,
+                Path(f"exports/{user.id}/{job_id}/lesson_plans.docx"),
+                render_context,
+            )
+        else:
+            out = await _run_pipeline(
+                pipeline.export_docx_combined, "", lp_models, tt,
+                Path(f"exports/{user.id}/{job_id}/lesson_plans.docx"),
+                template_id=template_id)
         media_type = ("application/vnd.openxmlformats-officedocument"
                       ".wordprocessingml.document")
         filename = f"Lesson_Plans_{scheme_label}.docx"
     elif fmt == "zip":
+        custom_structure = _custom_structure_for(db, user.id, template_id)
+        if custom_structure is not None:
+            log_event("custom_template_export", user_id=user.id, job_id=job_id)
+        render_context = {"term": scheme_db.term} if scheme_db and scheme_db.term else {}
         out = await _run_pipeline(
             pipeline.export_zip, lp_models, tt,
             Path(f"exports/{user.id}/{job_id}/lesson_plans.zip"),
-            template_id=template_id)
+            template_id=template_id, structure=custom_structure,
+            context=render_context)
         media_type = "application/zip"
         filename = f"Lesson_Plans_{scheme_label}.zip"
     elif fmt == "xlsx":

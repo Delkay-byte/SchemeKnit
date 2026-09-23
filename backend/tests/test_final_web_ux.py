@@ -32,6 +32,7 @@ from urllib.parse import unquote
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from src.models import TermConfig
+from src.database import EntitlementDB, generate_id
 from src.routers import generation as gen_router
 from src.routers.generation import X_FILENAME_HEADER
 from tests.conftest import make_school, make_user
@@ -213,6 +214,67 @@ class TestOneTimeDownloadUrl:
         assert res["filename"].endswith(".xlsx")
         assert res["media_type"] == \
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+    @pytest.mark.asyncio
+    async def test_zip_download_url_is_pro_gated_for_free_tier(self, db, tmp_path, monkeypatch):
+        """The UI's export buttons all go through /download-url, so the ZIP
+        entitlement gate must live here too: Free Tier gets the controlled 403
+        and the zip is never rendered (the gate fires before any pipeline work).
+        """
+        def _fail_render(*args, **kwargs):
+            raise AssertionError("zip render must not run when the gate denies")
+        monkeypatch.setattr(gen_router.pipeline, "export_zip", _fail_render)
+        monkeypatch.chdir(tmp_path)
+        u = make_user(db, role="teacher", email="dl-zip-free@t.test")
+        _scheme, job = make_job_with_lessons(db, u, lessons=1)
+
+        with pytest.raises(HTTPException) as e:
+            await gen_router.issue_download_url(job.id, "zip", "GES-style", None, u, db)
+
+        assert e.value.status_code == 403
+        assert e.value.detail == "ZIP export is available with Teacher Pro."
+
+    @pytest.mark.asyncio
+    async def test_zip_download_url_issues_token_for_pro_tier(self, db, tmp_path, monkeypatch):
+        """Pro/teacher edition passes the same gate and receives a normal
+        one-time token — the gate narrows entitlement, it doesn't break zip."""
+        def _fake_zip(lessons, tt, out_path, template_id=None,
+                      structure=None, context=None):
+            out_path = Path(out_path)
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path.write_bytes(b"PK\x03\x04stub zip body")
+            return out_path
+        monkeypatch.setattr(gen_router.pipeline, "export_zip", _fake_zip)
+        monkeypatch.chdir(tmp_path)
+        u = make_user(db, role="teacher", email="dl-zip-pro@t.test")
+        u.school_id = None
+        u.subscription_type = "individual"
+        db.commit()
+        ent = EntitlementDB(
+            id=generate_id(),
+            user_id=u.id,
+            edition="teacher",
+            subscription_type="individual",
+            generation_limit=0,
+            generations_used=0,
+            batch_generation=True,
+            zip_export=True,
+            pdf_export=True,
+            custom_template_limit=10,
+            history_limit=100,
+            ai_enabled=True,
+            ai_credits=50,
+            ai_credits_used=0,
+        )
+        db.add(ent)
+        db.commit()
+        _scheme, job = make_job_with_lessons(db, u, lessons=1)
+
+        res = await gen_router.issue_download_url(job.id, "zip", "GES-style", None, u, db)
+
+        assert res["download_url"].startswith("/api/generation/downloads/")
+        assert res["filename"].endswith(".zip")
+        assert res["media_type"] == "application/zip"
 
     @pytest.mark.asyncio
     async def test_token_delivers_an_attachment_download_once(self, db, tmp_path, monkeypatch):

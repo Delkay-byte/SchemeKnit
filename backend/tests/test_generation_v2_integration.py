@@ -532,6 +532,94 @@ class TestV2ContentApplication:
         assert "Summary" in lp.conclusion
         assert "Support" in lp.differentiation
 
+    def _base_lp(self, duration=45):
+        return LessonPlan(
+            id="test-lp",
+            scheme_of_work_id="test",
+            term_config_id="test",
+            week_number=1,
+            lesson_sequence=1,
+            lesson_number=1,
+            lesson_date=date(2026, 9, 7),
+            class_level=ClassLevel.BASIC_9,
+            subject=Subject.SCIENCE,
+            class_size=35,
+            duration_minutes=duration,
+            strand="Energy",
+            sub_strand="Forms",
+            content_standard="Describe energy",
+            indicators=["Identify energy forms"],
+            indicator_codes=["B9.1.1.1"],
+        )
+
+    def test_apply_v2_fits_oversized_durations_to_budget(self):
+        pipeline = GenerationPipeline()
+        lp = self._base_lp(duration=45)
+        v2_content = {
+            "main_learning": {
+                "phase1": {"name": "Explanation",
+                           "activity": "Teacher explains the concept with worked examples on the board.",
+                           "duration_minutes": 40},
+                "phase2": {"name": "Practice",
+                           "activity": "Learners practise in pairs using the worksheet.",
+                           "duration_minutes": 30},
+                "phase3": {"name": "Discussion",
+                           "activity": "Class discusses findings and misconceptions.",
+                           "duration_minutes": 25},
+            },
+        }
+        pipeline._apply_v2_content(lp, v2_content)
+        durs = [a.duration_minutes for a in lp.main_activities]
+        assert len(durs) == 3
+        assert sum(durs) == 45
+        assert all(d >= 1 for d in durs)
+
+    def test_apply_v2_keeps_within_budget_durations_untouched(self):
+        pipeline = GenerationPipeline()
+        lp = self._base_lp(duration=45)
+        v2_content = {
+            "main_learning": {
+                "phase1": {"name": "Explanation",
+                           "activity": "Teacher explains with examples.",
+                           "duration_minutes": 20},
+                "phase2": {"name": "Practice",
+                           "activity": "Learners practise in pairs.",
+                           "duration_minutes": 15},
+            },
+        }
+        pipeline._apply_v2_content(lp, v2_content)
+        durs = [a.duration_minutes for a in lp.main_activities]
+        assert durs == [20, 15]
+
+    def test_apply_v2_dedupes_duplicate_activity_descriptions(self):
+        pipeline = GenerationPipeline()
+        lp = self._base_lp(duration=45)
+        same = "Work with your partner to carry out the task and record observations."
+        v2_content = {
+            "learner_activities": [
+                {"phase": "PRACTICE", "description": same,
+                 "duration_minutes": 10},
+                {"phase": "PRACTICE",
+                 "description": "   " + same.upper() + "   ",
+                 "duration_minutes": 10},
+                {"phase": "EXTENSION",
+                 "description": "Each pair presents findings to the class.",
+                 "duration_minutes": 5},
+            ],
+            "main_learning": {
+                "phase1": {"name": "Explanation",
+                           "activity": "Explain the concept with examples.",
+                           "duration_minutes": 15},
+                "phase2": {"name": "Explanation",
+                           "activity": "explain the concept with examples.",
+                           "duration_minutes": 15},
+            },
+        }
+        pipeline._apply_v2_content(lp, v2_content)
+        assert len(lp.learner_activities) == 2
+        assert len(lp.main_activities) == 1
+        assert lp.main_activities[0].duration_minutes == 15
+
     def test_lesson_to_dict(self):
         pipeline = GenerationPipeline()
         lp = LessonPlan(
