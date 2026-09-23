@@ -9,14 +9,17 @@ import { useAuth } from '@/lib/auth-context'
 import { SchemeKnitMark } from '@/components/scheme-knit-mark'
 import { PublicFooter } from '@/components/public-footer'
 import { WhatsAppButton } from '@/components/whatsapp-button'
+import { LandingHero, scrollToSection } from '@/components/landing/landing-hero'
+import { HowItWorks } from '@/components/landing/how-it-works'
 
 /**
  * Public landing page (§2, §3).
  *
- * This is the single public entry point. It presents the two public audiences
- * SchemeKnit serves — Teachers and School Administration — as distinct,
- * cohesive cards so a visitor immediately knows which door is theirs. It is
- * deliberately NOT an internal dashboard.
+ * This is the single public entry point. It leads with the SchemeKnit hero —
+ * the scheme → curriculum → indicator → lesson story — then explains the
+ * workflow, then presents the two public audiences (Teachers and School
+ * Administration) as distinct cards so a visitor immediately knows which door
+ * is theirs. It is deliberately NOT an internal dashboard.
  *
  * Staff/Platform Admin access is intentionally NOT advertised here. It stays in
  * the same deployment behind its secure direct routes (/login/platform-admin,
@@ -44,37 +47,54 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
-      <header className="border-b bg-background/80 backdrop-blur">
+    <div className="min-h-screen bg-[#f4f7fa]">
+      <header className="bg-[#071826] text-white">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center space-x-2.5">
-            {/* Master brand mark — same symbol as the favicon, PWA icon and
-                future EXE (see docs/PUBLIC_ENTRY_AND_INSTALLATION.md). */}
-            <SchemeKnitMark size={32} className="h-8 w-8 rounded-md" />
-            <h1 className="text-2xl font-bold">SchemeKnit</h1>
+          <div className="flex items-center justify-between gap-4">
+            <Link href="/" className="flex items-center space-x-2.5">
+              {/* Master brand mark — same symbol as the favicon, PWA icon and
+                  future EXE (see docs/PUBLIC_ENTRY_AND_INSTALLATION.md). */}
+              <SchemeKnitMark size={32} className="h-8 w-8 rounded-md" />
+              <span className="text-2xl font-bold">SchemeKnit</span>
+            </Link>
+            <nav className="flex items-center gap-3 sm:gap-5">
+              <button
+                type="button"
+                onClick={() => scrollToSection('how-it-works')}
+                className="hidden text-sm font-medium text-white/75 transition-colors hover:text-white sm:inline"
+              >
+                How it works
+              </button>
+              <Link
+                href="/login"
+                className="inline-flex items-center rounded-full border border-white/25 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7edcf0] focus-visible:ring-offset-2 focus-visible:ring-offset-[#071826]"
+              >
+                Sign in
+              </Link>
+            </nav>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-10 md:py-16">
-        {/* Hero */}
-        <div className="text-center mb-12 md:mb-16">
-          <h2 className="text-3xl md:text-5xl font-bold mb-4">
-            Professional Lesson Plans in Minutes
+      {/* Hero — scheme → curriculum → indicator → lesson */}
+      <LandingHero />
+
+      {/* Below-the-fold: reinforce that the curriculum stays in control */}
+      <HowItWorks />
+
+      {/* Role cards — the two public audiences only. Staff/Platform Admin is
+          deliberately not shown: it is operations, not a public option. */}
+      <section className="container mx-auto px-4 pb-12 md:pb-16">
+        <div className="mx-auto mb-8 max-w-2xl text-center">
+          <h2 className="text-2xl font-bold tracking-tight text-[#102A43] md:text-3xl">
+            Choose how you use SchemeKnit
           </h2>
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-            Upload your scheme of work, configure your preferences, and generate
-            professionally formatted lesson plans aligned with Ghana Education
-            Service standards.
-          </p>
-          <p className="mt-6 text-base text-muted-foreground">
-            Choose how you use SchemeKnit below.
+          <p className="mt-3 text-muted-foreground">
+            Teachers plan and export lessons. Schools activate and manage their staff.
           </p>
         </div>
 
-        {/* Role cards — the two public audiences only. Staff/Platform Admin is
-            deliberately not shown: it is operations, not a public option. */}
-        <div className="grid gap-6 max-w-4xl mx-auto md:grid-cols-2">
+        <div className="mx-auto grid max-w-4xl gap-6 md:grid-cols-2">
           {/* Teacher — blue, the classroom audience */}
           <Card className="flex flex-col border-blue-300 hover:border-blue-400 transition-colors md:order-1">
             <CardHeader>
@@ -151,7 +171,7 @@ export default function Home() {
             </CardContent>
           </Card>
         </div>
-      </main>
+      </section>
 
       <PublicFooter />
       {/* Contact affordance on the public entry point (desktop + mobile). */}
