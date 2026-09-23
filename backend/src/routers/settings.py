@@ -179,6 +179,59 @@ async def list_ai_modes():
     }
 
 
+@router.get("/ai-status")
+async def ai_status(ai_mode: str = "OFF"):
+    """Resolve and report the ACTUAL AI mode / provider for a requested mode.
+
+    The UI must be able to show what will actually happen — never a label that
+    disagrees with backend behaviour. This reports:
+      mode        — the teacher-facing mode that was requested (OFF/BASIC/ENHANCED)
+      active      — whether a real provider will be used
+      provider    — the resolved provider name (or null)
+      provider_key— the provider key (or null)
+      state       — provider_status(): CONFIGURED / MISSING_KEY / …
+      reason      — a short, secret-free explanation when AI is inactive
+    Secrets, keys and model IDs are never returned.
+    """
+    from ..engines.ai_provider import (
+        get_provider, resolve_provider_mode, provider_status, NAMED_PROVIDERS,
+    )
+
+    requested = (ai_mode or "OFF").strip()
+    if requested.upper() == "OFF":
+        return {
+            "mode": "OFF", "active": False, "provider": None,
+            "provider_key": None, "state": "OFF",
+            "reason": "AI is off — lessons come from the deterministic engine.",
+        }
+
+    resolved = resolve_provider_mode(requested)
+    if resolved == "OFF":
+        return {
+            "mode": requested, "active": False, "provider": None,
+            "provider_key": None, "state": "OFF",
+            "reason": "AI is off — lessons come from the deterministic engine.",
+        }
+    provider = get_provider(resolved)
+    available = bool(provider and provider.is_available())
+    state = provider_status(provider)
+    reason = None
+    if not available:
+        reason = (
+            f"No usable AI provider is configured for mode '{requested}'. "
+            "Lessons will be generated deterministically. Configure a provider "
+            "key (Gemini, Groq, OpenAI) or start a local Ollama server to enable AI."
+        )
+    return {
+        "mode": requested,
+        "active": available,
+        "provider": provider.get_name() if provider else None,
+        "provider_key": resolved if resolved in NAMED_PROVIDERS else None,
+        "state": state,
+        "reason": reason,
+    }
+
+
 @router.get("/teaching-days")
 async def list_teaching_days():
     return {

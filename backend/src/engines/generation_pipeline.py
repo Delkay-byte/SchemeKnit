@@ -6,11 +6,25 @@ Validated Scheme → Term Config → Calendar → Allocation → Lesson Plans �
 """
 
 import logging
+import inspect
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+
+def supports_kwarg(fn, name: str) -> bool:
+    """True when a callable's signature accepts keyword ``name``.
+
+    Lets the pipeline pass newer optional arguments (e.g. teacher_keywords) to
+    providers that support them while remaining compatible with providers that
+    do not — without swallowing real errors from inside the call.
+    """
+    try:
+        return name in inspect.signature(fn).parameters
+    except (TypeError, ValueError):
+        return False
 
 from ..models import (
     SchemeOfWork, Week, WeekType, TermConfig, TeachingCalendar,
@@ -354,8 +368,10 @@ class GenerationPipeline:
                 # Get source resources from the lesson plan
                 source_resources = list(lp.teaching_learning_resources or [])
 
-                # V2 structured generation
-                content = provider.generate_lesson_v2(
+                # V2 structured generation. ``teacher_keywords`` is only sent
+                # when the provider's signature supports it, so third-party or
+                # test providers that predate the field keep working.
+                v2_kwargs = dict(
                     subject=lp.subject or "",
                     class_level=lp.class_level or "",
                     strand=lp.strand or "",
@@ -373,6 +389,9 @@ class GenerationPipeline:
                     teaching_week=lp.teaching_week,
                     period=lp.period,
                 )
+                if supports_kwarg(provider.generate_lesson_v2, "teacher_keywords"):
+                    v2_kwargs["teacher_keywords"] = list(getattr(config, "keywords", []) or [])
+                content = provider.generate_lesson_v2(**v2_kwargs)
 
                 if not content:
                     logger.warning(
@@ -383,8 +402,10 @@ class GenerationPipeline:
                     job.ai_enrichment_errors[lp.id] = "empty_response"
                     continue
 
-                # Apply V2 content to the lesson plan
-                self._apply_v2_content(lp, content)
+                # Apply V2 content to the lesson plan. Teacher-supplied metadata
+                # (keywords/TLRs/competencies/references) is MERGED, never
+                # replaced, so explicit teacher input always survives.
+                self._apply_v2_content(lp, content, config)
 
                 # Create a temporary indicator for quality gate
                 indicator_for_gate = CurriculumIndicator(
@@ -426,12 +447,34 @@ class GenerationPipeline:
                 job.ai_enrichment_errors[lp.id] = f"{type(e).__name__}: {e}"
                 # ai_generated remains False — deterministic fallback
 
-    def _apply_v2_content(self, lp: LessonPlan, content: dict):
+    def _apply_v2_content(self, lp: LessonPlan, content: dict, config: TermConfig = None):
         """Apply V2 structured content to a lesson plan.
 
         Maps the V2 output schema to the existing LessonPlan fields.
         Curriculum fields are NEVER overwritten by AI.
+
+        Teacher-supplied metadata (keywords, TLRs, core competencies,
+        references) is MERGED with — never replaced by — the AI output, so the
+        teacher's explicit input survives AI enrichment.
         """
+
+        def _merge_unique(base, extra):
+            out = []
+            seen = {str(x).strip().lower() for x in (base or []) if str(x).strip()}
+            for x in (base or []):
+                if str(x).strip() and str(x).strip() not in out:
+                    out.append(str(x).strip())
+            for x in (extra or []):
+                key = str(x).strip().lower()
+                if key and key not in seen:
+                    out.append(str(x).strip())
+                    seen.add(key)
+            return out
+
+        teacher_keywords = list(getattr(config, "keywords", []) or []) if config else []
+        teacher_resources = list(getattr(config, "teaching_learning_resources", []) or []) if config else []
+        teacher_competencies = list(getattr(config, "core_competencies", []) or []) if config else []
+        teacher_references = list(getattr(config, "references", []) or []) if config else []
         # Learning objectives
         if "learning_objectives" in content and content["learning_objectives"]:
             from ..models import LearningObjective
@@ -450,9 +493,13 @@ class GenerationPipeline:
             if objectives:
                 lp.learning_objectives = objectives
 
-        # Key vocabulary
+        # Key vocabulary: teacher-supplied terms FIRST and always retained, then
+        # AI-suggested indicator vocabulary added on top.
         if "key_vocabulary" in content and content["key_vocabulary"]:
-            lp.keywords = content["key_vocabulary"]
+            lp.keywords = _merge_unique(teacher_keywords or lp.keywords,
+                                        content["key_vocabulary"])
+        elif teacher_keywords:
+            lp.keywords = _merge_unique(lp.keywords, teacher_keywords)
 
         # Starter
         starter = content.get("starter", {})
@@ -551,6 +598,34 @@ class GenerationPipeline:
             # Store in previous_knowledge field (which is underutilized)
             if not lp.previous_knowledge:
                 lp.previous_knowledge = content["teacher_notes"]
+
+        # Teacher-supplied metadata must survive AI enrichment (merge, never
+        # replace). AI suggestions are appended after the teacher's own values.
+        if teacher_keywords:
+            lp.keywords = _merge_unique(lp.keywords, teacher_keywords)
+        if teacher_resources:
+            lp.teaching_learning_resources = _merge_unique(
+                lp.teaching_learning_resources, teacher_resources)
+        if teacher_competencies:
+            lp.core_competencies = _merge_unique(lp.core_competencies, teacher_competencies)
+        if teacher_references:
+            lp.references = _merge_unique(lp.references, teacher_references)
+
+        # Resources suggested by the AI for the phases support this lesson's
+        # actual activities — fold them into the lesson TLRs.
+        ai_resources = []
+        main = content.get("main_learning", {})
+        if isinstance(main, dict):
+            for phase in main.values():
+                if isinstance(phase, dict):
+                    ai_resources.extend(phase.get("resources_used", []) or [])
+        resources_block = content.get("resources", {})
+        if isinstance(resources_block, dict):
+            ai_resources.extend(resources_block.get("suggested_alternatives", []) or [])
+            ai_resources.extend(resources_block.get("source_resources", []) or [])
+        if ai_resources:
+            lp.teaching_learning_resources = _merge_unique(
+                lp.teaching_learning_resources, ai_resources)
 
     def _lesson_to_dict(self, lp: LessonPlan) -> dict:
         """Convert a LessonPlan to a dict for the quality gate."""

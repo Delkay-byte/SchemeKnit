@@ -199,6 +199,11 @@ async def upload_scheme(
             "extraction": {
                 "weeks_count": len(scheme.weeks),
                 "status": db_scheme.detection_status,
+                # Machine-readable reason for an extraction failure (e.g.
+                # "no_text_layer" for a scanned/image-only PDF) so the UI can
+                # tell the teacher exactly what to do instead of dead-ending.
+                "reason": (detection.get("extraction", {}) or {}).get("reason"),
+                "sections": db_scheme.subject_sections or [],
             },
         }
     except HTTPException:
