@@ -21,7 +21,7 @@ def up(db):
     if "week_ending_derived" not in cols:
         db.execute(text(
             "ALTER TABLE lesson_plans ADD COLUMN week_ending_derived "
-            "BOOLEAN NOT NULL DEFAULT 0"
+            "BOOLEAN NOT NULL DEFAULT FALSE"
         ))
     db.commit()
 
