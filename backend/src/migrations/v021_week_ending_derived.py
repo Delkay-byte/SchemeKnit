@@ -18,7 +18,7 @@ def up(db):
     cols = [c["name"] for c in inspector.get_columns("weeks")]
     if "week_ending_derived" not in cols:
         db.execute(text(
-            "ALTER TABLE weeks ADD COLUMN week_ending_derived BOOLEAN NOT NULL DEFAULT 0"
+            "ALTER TABLE weeks ADD COLUMN week_ending_derived BOOLEAN NOT NULL DEFAULT FALSE"
         ))
         db.commit()
 

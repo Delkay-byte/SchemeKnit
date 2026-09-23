@@ -82,17 +82,17 @@ def up(db):
     _add_column(db, "product_plans", "generation_limit",
                 "INTEGER DEFAULT 0", inspector)
     _add_column(db, "product_plans", "batch_generation",
-                "BOOLEAN DEFAULT 0", inspector)
+                "BOOLEAN DEFAULT FALSE", inspector)
     _add_column(db, "product_plans", "zip_export",
-                "BOOLEAN DEFAULT 0", inspector)
+                "BOOLEAN DEFAULT FALSE", inspector)
     _add_column(db, "product_plans", "pdf_export",
-                "BOOLEAN DEFAULT 0", inspector)
+                "BOOLEAN DEFAULT FALSE", inspector)
     _add_column(db, "product_plans", "custom_template_limit",
                 "INTEGER DEFAULT 0", inspector)
     _add_column(db, "product_plans", "history_limit",
                 "INTEGER DEFAULT 0", inspector)
     _add_column(db, "product_plans", "ai_enabled",
-                "BOOLEAN DEFAULT 0", inspector)
+                "BOOLEAN DEFAULT FALSE", inspector)
     _add_column(db, "product_plans", "ai_credits",
                 "INTEGER DEFAULT 0", inspector)
     _add_column(db, "product_plans", "max_generations_per_period",
@@ -106,11 +106,11 @@ def up(db):
     _add_column(db, "entitlements", "generations_used",
                 "INTEGER DEFAULT 0", inspector)
     _add_column(db, "entitlements", "batch_generation",
-                "BOOLEAN DEFAULT 0", inspector)
+                "BOOLEAN DEFAULT FALSE", inspector)
     _add_column(db, "entitlements", "zip_export",
-                "BOOLEAN DEFAULT 0", inspector)
+                "BOOLEAN DEFAULT FALSE", inspector)
     _add_column(db, "entitlements", "pdf_export",
-                "BOOLEAN DEFAULT 0", inspector)
+                "BOOLEAN DEFAULT FALSE", inspector)
     _add_column(db, "entitlements", "custom_template_limit",
                 "INTEGER DEFAULT 0", inspector)
     _add_column(db, "entitlements", "history_limit",
