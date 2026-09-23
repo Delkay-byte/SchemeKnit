@@ -206,10 +206,14 @@ def build_generation_prompt(
     source_resources: Optional[List[str]] = None,
     teaching_day: Optional[str] = None,
     week_number: Optional[int] = None,
+    source_week_ending: Optional[str] = None,
     term: Optional[str] = None,
     teaching_week: Optional[int] = None,
     period: Optional[str] = None,
     teacher_keywords: Optional[List[str]] = None,
+    other_tlrs: Optional[List[str]] = None,
+    core_competencies: Optional[List[str]] = None,
+    references: Optional[List[str]] = None,
 ) -> str:
     """Build a structured, indicator-grounded generation prompt.
 
@@ -245,7 +249,8 @@ Misconception Risks: {interpretation.misconception_risks}""")
 Class Size: {class_size} learners
 Duration: {duration_minutes} minutes
 {f'Term: {term}' if term else ''}
-{f'Curriculum Week: {week_number}' if week_number else ''}
+{f'Source Week: {week_number}' if week_number else ''}
+{f'Source Week-Ending: {source_week_ending}' if source_week_ending else ''}
 {f'Teaching Week: {teaching_week}' if teaching_week else ''}
 {f'Teaching Day: {teaching_day}' if teaching_day else ''}
 {f'Teaching Period: {period}' if period else ''}""")
@@ -269,17 +274,29 @@ Suggested Phases: {', '.join(strategy.get('phases', []))}""")
 
     # Resources
     if source_resources:
-        sections.append(f"""SOURCE RESOURCES (from the scheme)
+        sections.append(f"""SOURCE TLRs (from the scheme for this subject + source week)
 {chr(10).join(f'- {r}' for r in source_resources)}""")
     else:
-        sections.append("SOURCE RESOURCES: None specified in scheme — suggest realistic alternatives.")
+        sections.append("SOURCE TLRs: None specified in scheme — suggest realistic alternatives.")
+
+    if other_tlrs:
+        sections.append(f"""OTHER TLRs (teacher-added for THIS lesson)
+{chr(10).join(f'- {r}' for r in other_tlrs)}""")
+
+    if core_competencies:
+        sections.append(f"""CORE COMPETENCIES (selected for THIS lesson)
+{chr(10).join(f'- {c}' for c in core_competencies)}""")
+
+    if references:
+        sections.append(f"""REFERENCES (teacher-controlled for THIS lesson)
+{chr(10).join(f'- {r}' for r in references)}""")
 
     # Teacher-supplied vocabulary: MUST be preserved verbatim and used in the lesson.
     if teacher_keywords:
         sections.append(f"""TEACHER-SUPPLIED VOCABULARY (REQUIRED)
 {chr(10).join(f'- {k}' for k in teacher_keywords)}
 
-These terms were entered by the teacher for this term and MUST ALL appear in
+These terms were entered by the teacher for THIS lesson and MUST ALL appear in
 key_vocabulary exactly as written, and be used naturally in the activities,
 assessment or examples where pedagogically appropriate.""")
 

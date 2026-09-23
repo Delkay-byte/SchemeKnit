@@ -728,38 +728,53 @@ def build_lesson(
         f"Grouping: {profile.grouping}",
     ])
 
-    # ── Resources — support THIS lesson's actual activities ─────────────
-    resources: List[str] = []
-    # Subject-level resources from the interpretation, activity-specific
-    # additions, profile base, then teacher-supplied TLRs. Teacher values are
-    # always preserved.
-    base_sources: List[str] = []
-    if act_key and interp is not None:
-        base_sources.extend(getattr(interp, "suggested_resources", []) or [])
-        base_sources.extend(_ACTIVITY_RESOURCES.get(act_key, []))
-    base_sources.extend(profile.resources)
-    base_sources.extend(list(getattr(config, "teaching_learning_resources", []) or []))
-    for r in base_sources:
+    # ── Resources — THIS lesson's scheme TLRs first, then activity extras ──
+    # SOURCE TLRs: from the scheme for this subject + source week + indicator.
+    # NEVER from another subject, another week, a static profile, or AI.
+    source_tlrs: List[str] = []
+    for r in list(getattr(alloc, "source_resources", []) or []):
         r = (r or "").strip()
-        if r and r.lower() not in [x.lower() for x in resources]:
-            resources.append(r)
+        if r and r.lower() not in [x.lower() for x in source_tlrs]:
+            source_tlrs.append(r)
 
-    # ── Keywords / vocabulary — indicator terms + subject + teacher ─────
+    # OTHER TLRs: teacher additions for THIS lesson (from config seed on first
+    # build; later owned by the lesson review object). Never merged into source.
+    other_tlrs: List[str] = []
+    for r in list(getattr(config, "teaching_learning_resources", []) or []):
+        r = (r or "").strip()
+        if r and r.lower() not in [x.lower() for x in other_tlrs]:
+            other_tlrs.append(r)
+
+    # Display union for templates that expect one TLR list.
+    resources: List[str] = list(source_tlrs)
+    for r in other_tlrs:
+        if r.lower() not in [x.lower() for x in resources]:
+            resources.append(r)
+    # Subject/activity-specific support materials (deterministic, lesson-scoped).
+    if act_key and interp is not None:
+        for r in list(getattr(interp, "suggested_resources", []) or []) + _ACTIVITY_RESOURCES.get(act_key, []):
+            r = (r or "").strip()
+            if r and r.lower() not in [x.lower() for x in resources]:
+                resources.append(r)
+
+    # ── Keywords / vocabulary — content standard + exact indicator first ─
     keywords: List[str] = []
     kw_sources: List[str] = []
-    # Teacher-supplied vocabulary comes FIRST so it is always present and never
-    # crowded out.
-    kw_sources.extend((getattr(config, "keywords", []) or []))
+    # Primary derivation: content standard + exact indicator + activity context.
+    kw_sources.extend(_content_terms(alloc.content_standard_description or "", limit=3))
     kw_sources.extend(_content_terms(alloc.indicator_description, limit=5))
     if act_key and interp is not None:
         kw_sources.extend(getattr(interp, "activity_keywords", []) or [])
+    # Teacher-supplied terms always survive (added after derived so they stay).
+    kw_sources.extend((getattr(config, "keywords", []) or []))
     kw_sources.extend(profile.keywords)
     for k in kw_sources:
         k = (k or "").strip()
         if k and k.lower() not in [x.lower() for x in keywords]:
             keywords.append(k)
 
-    # ── Core competencies — derived from the actual activity ────────────
+    # ── Core competencies — activity-derived defaults; teacher multi-select
+    # is authoritative once set on the lesson review object. ─────────────
     competencies: List[str] = []
     comp_sources = list(getattr(config, "core_competencies", []) or [])
     comp_sources.extend(_COMPETENCIES_BY_ACTIVITY.get(act_key or "demonstration", []))
@@ -768,19 +783,35 @@ def build_lesson(
         if c and c.lower() not in [x.lower() for x in competencies]:
             competencies.append(c)
 
-    # ── References — curriculum context + teacher-supplied ──────────────
+    # ── References — curriculum context + teacher-supplied (no invented pages)
     references: List[str] = []
-    ref_sources: List[str] = []
+    structured_refs = []
+    from ..models import ReferenceEntry
     if subject_name and subject_name.strip() and subject_name.upper() != "UNKNOWN":
-        ref_sources.append(f"{subject_name} Curriculum, NaCCA")
-        ref_sources.append(f"{class_level} {subject_name} Teacher's Guide")
+        structured_refs.append(ReferenceEntry(
+            type="Subject Curriculum",
+            title=f"{subject_name} Curriculum (NaCCA)",
+            notes=f"{class_level} {subject_name}" if class_level else "",
+        ))
+        structured_refs.append(ReferenceEntry(
+            type="Teacher's Handbook / Teacher's Guide",
+            title=f"{class_level} {subject_name} Teacher's Guide",
+        ))
         if alloc.strand:
-            ref_sources.append(f"{subject_name} Curriculum — {alloc.strand}")
-    ref_sources.extend(list(getattr(config, "references", []) or []))
-    for ref in ref_sources:
+            structured_refs.append(ReferenceEntry(
+                type="Other",
+                title=f"{subject_name} Curriculum — {alloc.strand}",
+            ))
+    # Teacher-supplied flat reference strings become structured Other entries
+    # (pages remain blank unless the teacher supplies them explicitly).
+    for ref in (getattr(config, "references", []) or []):
         ref = (ref or "").strip()
-        if ref and ref.lower() not in [x.lower() for x in references]:
-            references.append(ref)
+        if ref:
+            structured_refs.append(ReferenceEntry(type="Other", title=ref))
+    for entry in structured_refs:
+        label = entry.title or entry.type
+        if label and label.lower() not in [x.lower() for x in references]:
+            references.append(label)
 
     objectives = [LearningObjective(
         description=_learner_phrase(alloc.indicator_description),
@@ -800,6 +831,8 @@ def build_lesson(
         scheme_of_work_id=scheme_id,
         term_config_id=config.id,
         week_number=alloc.week_number,
+        week_ending=alloc.week_ending,
+        week_ending_derived=bool(getattr(alloc, "week_ending_derived", False)),
         teaching_week=alloc.teaching_week or alloc.week_number,
         carry_forward=bool(alloc.carry_forward),
         lesson_sequence=0,  # assigned by the caller (curriculum order)
@@ -824,6 +857,8 @@ def build_lesson(
         keywords=keywords,
         learning_objectives=objectives,
         core_competencies=competencies,
+        source_tlrs=source_tlrs,
+        other_tlrs=other_tlrs,
         teaching_learning_resources=resources,
         introduction=intro,
         starter_activity=starter,
@@ -833,6 +868,7 @@ def build_lesson(
         assessment=assessment,
         differentiation=differentiation,
         conclusion=conclusion,
+        structured_references=structured_refs,
         references=references,
         status=LessonStatus.GENERATED,
         ai_generated=False,

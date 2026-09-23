@@ -27,6 +27,8 @@ SUBJECT_KEYWORDS: List[tuple] = [
     ("cost accounting", Subject.COST_ACCOUNTING),
     ("business management", Subject.BUSINESS_MANAGEMENT),
     ("literature in english", Subject.LITERATURE_IN_ENGLISH),
+    ("english language", Subject.ENGLISH),
+    ("french language", Subject.FRENCH),
     ("language and literacy", Subject.LANGUAGE_AND_LITERACY),
     ("our world our people", Subject.OUR_WORLD_OUR_PEOPLE),
     ("religious and moral education", Subject.RME),
@@ -56,29 +58,80 @@ SUBJECT_KEYWORDS: List[tuple] = [
 ]
 
 # Words that are noise in a heading and are stripped before matching.
+# 'for' appears in real district titles: "… SCHEME OF LEARNING FOR BASIC 6 - ENGLISH LANGUAGE".
 _NOISE_PATTERN = re.compile(
     r"\b(basic|jhs|shs|primary|nursery|kg|class|level|subject|scheme|of|"
-    r"learning|work|term|first|second|third|one|two|three|week|weekly)\b"
+    r"learning|work|term|first|second|third|one|two|three|week|weekly|for|"
+    r"form|academic|year|nine|ten|eleven|twelve)\b"
 )
 _LEVEL_NUM = re.compile(r"\b\d+\b")
+#: Class / form codes common in real headings after noise stripping:
+#: "B9 SCIENCE", "BS9 CREATIVE ARTS…", "BASIC NINE - CAREER…", "FORM 3".
+_CLASS_CODE = re.compile(
+    r"\b(?:b|bs|jhs|shs|p)\s*\d+\b|\bform\s*\d+\b|\bbasic\s+\w+\b",
+    re.IGNORECASE,
+)
 
 #: A heading is short; long paragraphs are prose, not headings.
-MAX_HEADING_LENGTH = 80
+#: Real multi-subject PDFs use full titles such as
+#: "FIRST TERM SCHEME OF LEARNING - 2026/2027 ACADEMIC YEAR - BASIC NINE - CAREER TECHNOLOGY"
+#: (88 chars) which still normalise to a bare subject name.
+MAX_HEADING_LENGTH = 120
+
+#: Leading/trailing tokens that wrap a subject name inside a heading.
+#: Stripped iteratively so "for english language" and "the science" still
+#: resolve, while interior keywords remain required as contiguous words.
+WRAPPER_WORDS = frozenset({
+    "for", "and", "the", "of", "a", "an", "to", "in", "on", "with",
+    "at", "by", "from", "is", "are", "unit", "subject",
+})
 
 
 def _normalize(text: str) -> str:
-    norm = re.sub(r"[^a-z0-9 ]", " ", text.lower())
+    # '&' is part of real titles: "RELIGIOUS & MORAL EDUCATION".
+    norm = text.lower().replace("&", " and ")
+    norm = re.sub(r"[^a-z0-9 ]", " ", norm)
+    norm = _CLASS_CODE.sub(" ", norm)
     norm = _LEVEL_NUM.sub(" ", norm)
     norm = _NOISE_PATTERN.sub(" ", norm)
     return re.sub(r"\s+", " ", norm).strip()
 
 
+def _strip_wrappers(norm: str) -> str:
+    """Remove leading/trailing wrapper tokens (``for``, ``the``, …)."""
+    words = norm.split()
+    while words and words[0] in WRAPPER_WORDS:
+        words = words[1:]
+    while words and words[-1] in WRAPPER_WORDS:
+        words = words[:-1]
+    return " ".join(words)
+
+
+def _matches_keyword(cand: str, keyword: str) -> bool:
+    """True when ``cand`` is the subject keyword with only wrapper tokens around it.
+
+    Any other extra words (prose) disqualify the match —
+    "science measurement is fun" is not a Science heading.
+    """
+    if cand == keyword:
+        return True
+    if cand.startswith(keyword + " "):
+        rest = cand[len(keyword) + 1:].split()
+        return bool(rest) and all(w in WRAPPER_WORDS for w in rest)
+    if cand.endswith(" " + keyword):
+        rest = cand[: len(cand) - len(keyword) - 1].split()
+        return bool(rest) and all(w in WRAPPER_WORDS for w in rest)
+    return False
+
+
 def canonical_subject_from_heading(text: str) -> Optional[Subject]:
     """Return the Subject a heading names, or None when it is not a heading.
 
-    Requires the normalised heading to BE the subject name (optionally with a
-    leading/trailing level word), not merely mention it. This keeps a sentence
-    like "the science of measurement" from being misread as a subject heading.
+    Requires the normalised heading to BE the subject name (optionally with
+    wrapper tokens around it), not merely mention it. This keeps a sentence
+    like "the science of measurement" from being misread as a subject heading
+    while still accepting district titles such as
+    "FIRST TERM SCHEME OF LEARNING FOR BASIC 6 - ENGLISH LANGUAGE".
     """
     if not text:
         return None
@@ -88,9 +141,14 @@ def canonical_subject_from_heading(text: str) -> Optional[Subject]:
     norm = _normalize(stripped)
     if not norm:
         return None
-    for keyword, subject in SUBJECT_KEYWORDS:
-        if norm == keyword or norm.startswith(keyword + " ") or norm.endswith(" " + keyword):
-            return subject
+    candidates = [norm]
+    unwrapped = _strip_wrappers(norm)
+    if unwrapped and unwrapped != norm:
+        candidates.append(unwrapped)
+    for cand in candidates:
+        for keyword, subject in SUBJECT_KEYWORDS:
+            if _matches_keyword(cand, keyword):
+                return subject
     return None
 
 

@@ -376,6 +376,18 @@ class ApiService {
     })
   }
 
+  // Per-lesson review drafts (saved BEFORE generation)
+  async getLessonReview(schemeId: string): Promise<{ drafts: Record<string, any> }> {
+    return this.request(`/api/generation/${schemeId}/lesson-review`)
+  }
+
+  async saveLessonReview(schemeId: string, drafts: Record<string, any>): Promise<{ drafts: Record<string, any> }> {
+    return this.request(`/api/generation/${schemeId}/lesson-review`, {
+      method: 'PUT',
+      body: JSON.stringify({ drafts }),
+    })
+  }
+
   // Generation API
   async generateLessonPlans(schemeId: string, config: any): Promise<any> {
     return this.request(`/api/generation/${schemeId}/generate`, {

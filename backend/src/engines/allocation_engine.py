@@ -99,6 +99,8 @@ class AllocationEngine:
                 sub_strand=item["sub_strand"],
                 week_number=item["source_week"],
                 week_ending=item["week_ending"],
+                week_ending_derived=bool(item.get("week_ending_derived", False)),
+                source_resources=list(item.get("source_resources") or []),
                 lesson_date=lesson_date,
                 period_index=period_index,
                 allocated=True,
@@ -130,6 +132,11 @@ class AllocationEngine:
                     "sub_strand": week.sub_strand or "",
                     "source_week": week.week_number,
                     "week_ending": week.end_date,
+                    "week_ending_derived": bool(
+                        getattr(week, "week_ending_derived", False)
+                    ),
+                    # Source TLRs for THIS subject + source week only.
+                    "source_resources": list(week.resources or []),
                 }
                 for t in week_indicators
             ]

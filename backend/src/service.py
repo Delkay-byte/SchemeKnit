@@ -87,6 +87,7 @@ class DataService:
                 week_type=week.week_type.value,
                 start_date=week.start_date,
                 end_date=week.end_date,
+                week_ending_derived=bool(getattr(week, "week_ending_derived", False)),
                 strand=week.strand or "",
                 sub_strand=week.sub_strand or "",
                 content_standards=week.content_standards,
@@ -167,6 +168,7 @@ class DataService:
                 week_type=WeekType(w.week_type),
                 start_date=w.start_date,
                 end_date=w.end_date,
+                week_ending_derived=bool(getattr(w, "week_ending_derived", False)),
                 strand=w.strand,
                 sub_strand=w.sub_strand,
                 content_standards=w.content_standards or [],
@@ -187,6 +189,59 @@ class DataService:
             raw_text=db_scheme.raw_text,
             status=db_scheme.status,
         )
+
+    # ── Per-lesson review drafts (pre-generation) ─────────────────────────────
+
+    def get_lesson_review_drafts(self, db: Session, scheme_id: str, owner_id: str) -> dict:
+        """Teacher-saved pre-generation review data, keyed by lesson_sequence."""
+        scheme = self.get_scheme(db, scheme_id, owner_id)
+        if not scheme:
+            return {}
+        drafts = getattr(scheme, "lesson_review_drafts", None)
+        if isinstance(drafts, dict):
+            return drafts
+        return {}
+
+    def save_lesson_review_draft(self, db: Session, scheme_id: str, owner_id: str,
+                                 lesson_key: str, draft: dict) -> dict:
+        """Persist (or replace) one lesson's review draft.
+
+        Keys are lesson_sequence strings. Allowed fields only: keywords,
+        other_tlrs, core_competencies, structured_references. Source fields
+        (source_tlrs / week_ending / indicator / content standard) are never
+        written through this path.
+        """
+        scheme = self.get_scheme(db, scheme_id, owner_id)
+        if not scheme:
+            return {}
+        allowed = ("keywords", "other_tlrs", "core_competencies", "structured_references")
+        clean = {k: draft[k] for k in allowed if k in (draft or {})}
+        store = getattr(scheme, "lesson_review_drafts", None)
+        if not isinstance(store, dict):
+            store = {}
+        else:
+            store = dict(store)
+        store[str(lesson_key)] = clean
+        scheme.lesson_review_drafts = store
+        db.commit()
+        db.refresh(scheme)
+        return store
+
+    def save_lesson_review_drafts(self, db: Session, scheme_id: str, owner_id: str,
+                                  drafts: dict) -> dict:
+        """Replace the full draft map (or merge individual keys)."""
+        scheme = self.get_scheme(db, scheme_id, owner_id)
+        if not scheme:
+            return {}
+        allowed = ("keywords", "other_tlrs", "core_competencies", "structured_references")
+        store = {}
+        for key, draft in (drafts or {}).items():
+            if isinstance(draft, dict):
+                store[str(key)] = {k: draft[k] for k in allowed if k in draft}
+        scheme.lesson_review_drafts = store
+        db.commit()
+        db.refresh(scheme)
+        return store
 
     # ── Term Configs ──────────────────────────────────────────────────────────
 
@@ -260,6 +315,8 @@ class DataService:
             owner_id=owner_id,
             scheme_id=scheme_id,
             week_number=lp.week_number,
+            week_ending=getattr(lp, "week_ending", None),
+            week_ending_derived=bool(getattr(lp, "week_ending_derived", False)),
             teaching_week=getattr(lp, "teaching_week", 0) or lp.week_number,
             carry_forward=bool(getattr(lp, "carry_forward", False)),
             lesson_sequence=lp.lesson_sequence,
@@ -282,6 +339,8 @@ class DataService:
             previous_knowledge=lp.previous_knowledge or "",
             learning_objectives=[o.model_dump() for o in lp.learning_objectives],
             core_competencies=lp.core_competencies,
+            source_tlrs=list(getattr(lp, "source_tlrs", []) or []),
+            other_tlrs=list(getattr(lp, "other_tlrs", []) or []),
             teaching_learning_resources=lp.teaching_learning_resources,
             introduction=lp.introduction or "",
             starter_activity=getattr(lp, "starter_activity", "") or "",
@@ -291,6 +350,10 @@ class DataService:
             assessment=lp.assessment or "",
             conclusion=lp.conclusion or "",
             references=lp.references,
+            structured_references=[
+                (r.model_dump() if hasattr(r, "model_dump") else r)
+                for r in (getattr(lp, "structured_references", []) or [])
+            ],
             keywords=lp.keywords,
             homework=getattr(lp, "homework", "") or "",
             differentiation=getattr(lp, "differentiation", "") or "",

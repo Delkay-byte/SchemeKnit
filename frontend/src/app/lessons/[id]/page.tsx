@@ -15,6 +15,10 @@ interface LessonData {
   job_id: string
   scheme_id: string
   week_number: number
+  week_ending?: string | null
+  week_ending_derived?: boolean
+  teaching_week?: number
+  lesson_sequence?: number
   lesson_number: number
   lesson_date: string | null
   class_level: string
@@ -23,10 +27,17 @@ interface LessonData {
   sub_strand: string | null
   content_standard: string | null
   indicators: string[] | null
+  indicator_codes?: string[]
   lesson_topic: string | null
   introduction: string | null
   assessment: string | null
   conclusion: string | null
+  keywords?: string[]
+  source_tlrs?: string[]
+  other_tlrs?: string[]
+  core_competencies?: string[]
+  structured_references?: { type: string; title: string; author_publisher?: string; page?: string; notes?: string }[]
+  references?: string[]
   status: string
   teacher_edited: boolean
 }
@@ -46,6 +57,27 @@ export default function LessonDetailPage() {
   const [introduction, setIntroduction] = useState('')
   const [assessment, setAssessment] = useState('')
   const [conclusion, setConclusion] = useState('')
+  // Per-lesson review fields (Section I)
+  const [keywords, setKeywords] = useState<string[]>([])
+  const [otherTlrs, setOtherTlrs] = useState<string[]>([])
+  const [coreCompetencies, setCoreCompetencies] = useState<string[]>([])
+  const [structuredRefs, setStructuredRefs] = useState<
+    { type: string; title: string; author_publisher?: string; page?: string; notes?: string }[]
+  >([])
+  const NACCA_COMPETENCIES = [
+    'Critical Thinking and Problem Solving',
+    'Creativity and Innovation',
+    'Communication and Collaboration',
+    'Cultural Identity and Global Citizenship',
+    'Personal Development and Leadership',
+    'Digital Literacy',
+  ]
+  const REFERENCE_TYPES = [
+    'Subject Curriculum',
+    "Teacher's Handbook / Teacher's Guide",
+    'Textbook',
+    'Other',
+  ]
   // Optional AI section regeneration (existing /api/ai/regenerate-section)
   const [regenBusy, setRegenBusy] = useState<string | null>(null)
   const [regenNote, setRegenNote] = useState<string | null>(null)
@@ -73,6 +105,18 @@ export default function LessonDetailPage() {
       setIntroduction(data.introduction || '')
       setAssessment(data.assessment || '')
       setConclusion(data.conclusion || '')
+      setKeywords(data.keywords || [])
+      setOtherTlrs(data.other_tlrs || [])
+      setCoreCompetencies(data.core_competencies || [])
+      setStructuredRefs(
+        (data.structured_references || []).map((r: any) => ({
+          type: r.type || 'Other',
+          title: r.title || '',
+          author_publisher: r.author_publisher || '',
+          page: r.page || '',
+          notes: r.notes || '',
+        }))
+      )
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load lesson')
     } finally {
@@ -123,6 +167,11 @@ export default function LessonDetailPage() {
         introduction,
         assessment,
         conclusion,
+        keywords,
+        other_tlrs: otherTlrs,
+        core_competencies: coreCompetencies,
+        structured_references: structuredRefs,
+        references: structuredRefs.map(r => r.title || r.type).filter(Boolean),
       })
       setLesson(updated)
       setSaved(true)
@@ -219,6 +268,21 @@ export default function LessonDetailPage() {
                 </ul>
               </div>
             )}
+            {lesson.week_ending && (
+              <p>
+                <span className="text-muted-foreground">Source week ending:</span>{' '}
+                {lesson.week_ending}
+                {lesson.week_ending_derived ? ' (derived)' : ''}
+              </p>
+            )}
+            {!!(lesson.source_tlrs?.length) && (
+              <div>
+                <p className="text-muted-foreground mb-1">Source TLRs (from scheme):</p>
+                <ul className="list-disc list-inside space-y-0.5">
+                  {lesson.source_tlrs!.map((r, i) => <li key={i}>{r}</li>)}
+                </ul>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -286,6 +350,107 @@ export default function LessonDetailPage() {
                 rows={3}
                 className="w-full px-3 py-2 border rounded-md"
               />
+            </div>
+
+            <div className="border-t pt-4 space-y-3">
+              <div>
+                <h3 className="text-sm font-semibold">Lesson Review Data</h3>
+                <p className="text-xs text-muted-foreground">
+                  Keywords, Other TLRs, competencies and references for THIS lesson.
+                  Source TLRs above stay tied to the scheme document.
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Keywords</label>
+                <input
+                  type="text"
+                  value={keywords.join(', ')}
+                  onChange={(e) => setKeywords(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                  placeholder="Comma-separated"
+                  className="w-full px-3 py-2 border rounded-md"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Other TLRs</label>
+                <input
+                  type="text"
+                  value={otherTlrs.join(', ')}
+                  onChange={(e) => setOtherTlrs(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                  placeholder="Comma-separated teacher additions"
+                  className="w-full px-3 py-2 border rounded-md"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Core Competencies</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {NACCA_COMPETENCIES.map(label => {
+                    const selected = coreCompetencies.includes(label)
+                    return (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => setCoreCompetencies(prev =>
+                          selected ? prev.filter(c => c !== label) : [...prev, label]
+                        )}
+                        className={`text-xs px-2 py-1 rounded border ${
+                          selected
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-background text-muted-foreground'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium">References</label>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    type="button"
+                    onClick={() => setStructuredRefs(prev => [
+                      ...prev,
+                      { type: 'Other', title: '', author_publisher: '', page: '', notes: '' },
+                    ])}
+                  >
+                    + Add reference
+                  </Button>
+                </div>
+                {structuredRefs.map((ref, idx) => (
+                  <div key={idx} className="grid grid-cols-12 gap-2 mb-2">
+                    <select
+                      value={ref.type}
+                      onChange={(e) => setStructuredRefs(prev => prev.map((r, i) =>
+                        i === idx ? { ...r, type: e.target.value } : r
+                      ))}
+                      className="col-span-4 px-2 py-2 border rounded-md text-sm"
+                    >
+                      {REFERENCE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                    <input
+                      type="text"
+                      value={ref.title}
+                      onChange={(e) => setStructuredRefs(prev => prev.map((r, i) =>
+                        i === idx ? { ...r, title: e.target.value } : r
+                      ))}
+                      placeholder="Title"
+                      className="col-span-5 px-2 py-2 border rounded-md text-sm"
+                    />
+                    <input
+                      type="text"
+                      value={ref.page || ''}
+                      onChange={(e) => setStructuredRefs(prev => prev.map((r, i) =>
+                        i === idx ? { ...r, page: e.target.value } : r
+                      ))}
+                      placeholder="Page (optional)"
+                      className="col-span-3 px-2 py-2 border rounded-md text-sm"
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="flex items-center gap-3">

@@ -102,6 +102,10 @@ class SchemeDB(Base):
     detected_subjects = Column(JSON, default=list)
     detection_status = Column(String, default="")
     subject_sections = Column(JSON, default=list)
+    #: Per-lesson review drafts keyed by lesson_sequence (or indicator_code).
+    #: Saved by the teacher BEFORE generation; applied when lessons are built.
+    #: Fields: keywords, other_tlrs, core_competencies, structured_references.
+    lesson_review_drafts = Column(JSON, default=dict)
 
     owner = relationship("User", back_populates="schemes")
     weeks = relationship("WeekDB", back_populates="scheme", cascade="all, delete-orphan")
@@ -116,6 +120,8 @@ class WeekDB(Base):
     week_type = Column(String, default="instruction")
     start_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=False)
+    #: True when end_date was derived (source document had no week-ending date).
+    week_ending_derived = Column(Boolean, default=False, nullable=False)
     strand = Column(String, default="")
     sub_strand = Column(String, default="")
     content_standards = Column(JSON, default=list)
@@ -208,6 +214,9 @@ class LessonPlanDB(Base):
 
     #: Source curriculum week (the scheme week the indicator belongs to).
     week_number = Column(Integer, nullable=False)
+    #: Source week-ending date for that curriculum week (authoritative).
+    week_ending = Column(Date, nullable=True)
+    week_ending_derived = Column(Boolean, default=False, nullable=False)
     #: Actual teaching week the lesson is delivered in. Differs from
     #: week_number only when the indicator carried forward.
     teaching_week = Column(Integer, nullable=True)
@@ -236,6 +245,10 @@ class LessonPlanDB(Base):
     previous_knowledge = Column(Text, default="")
     learning_objectives = Column(JSON, default=list)
     core_competencies = Column(JSON, default=list)
+    #: TLRs from the scheme for this subject + source week (SOURCE provenance).
+    source_tlrs = Column(JSON, default=list)
+    #: Teacher-added resources for this lesson only (TEACHER provenance).
+    other_tlrs = Column(JSON, default=list)
     teaching_learning_resources = Column(JSON, default=list)
 
     introduction = Column(Text, default="")
@@ -246,6 +259,8 @@ class LessonPlanDB(Base):
     assessment = Column(Text, default="")
     conclusion = Column(Text, default="")
     references = Column(JSON, default=list)
+    #: Structured per-lesson references: {type,title,author_publisher,page,notes}.
+    structured_references = Column(JSON, default=list)
     keywords = Column(JSON, default=list)
     homework = Column(Text, default="")
     differentiation = Column(Text, default="")
