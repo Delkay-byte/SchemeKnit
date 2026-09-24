@@ -57,7 +57,11 @@ async function gridSignalCount(page) {
 async function gridSignature(page) {
   return page.evaluate(() => {
     const c = document.querySelector('canvas[data-grid-signal]')
-    if (!c || !c.width || !c.height) return null
+    if (!c) return null
+    // Prefer diagnostic positions (stable across equal-brightness signals).
+    const pos = c.getAttribute('data-signal-positions')
+    if (pos) return pos
+    if (!c.width || !c.height) return null
     const ctx = c.getContext('2d')
     if (!ctx) return null
     const d = ctx.getImageData(0, 0, c.width, c.height).data

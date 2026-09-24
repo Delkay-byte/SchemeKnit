@@ -98,29 +98,29 @@ function TeacherWorkspaceDecor() {
       />
       <div className="absolute right-[8%] top-[18%] hidden w-64 lg:block" style={{ perspective: '800px' }}>
         <div
-          className="rounded-2xl border border-white/15 bg-white/96 p-5 shadow-[0_20px_50px_rgba(0,0,0,0.35)]"
+          className="rounded-2xl border border-white/40 bg-white p-5 shadow-[0_20px_50px_rgba(0,0,0,0.45)]"
           style={{ transform: 'rotateY(-8deg) rotateX(4deg) translateZ(0)' }}
         >
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#04A9CE]">Scheme of Learning</p>
-          <p className="mt-2 text-sm font-semibold text-[#102A43]">Week 4 · Fractions</p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#0389a8]">Scheme of Learning</p>
+          <p className="mt-2 text-base font-bold text-[#102A43]">Week 4 · Fractions</p>
           <div className="mt-3 space-y-1.5">
             {['Indicator 3.1', 'Teaching period 2', 'JHS · Term 2'].map((t) => (
-              <div key={t} className="flex items-center gap-2 text-xs text-[#3D5A75]">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#04A9CE]/70" />
+              <div key={t} className="flex items-center gap-2 text-[13px] font-medium text-[#102A43]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#04A9CE]" />
                 {t}
               </div>
             ))}
           </div>
-          <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-[#102A43]/10">
+          <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-[#102A43]/12">
             <div className="h-full w-2/3 rounded-full bg-gradient-to-r from-[#04A9CE] to-[#7EDCF0]" />
           </div>
         </div>
         <div
-          className="absolute -right-4 -top-4 -z-10 h-full w-full rounded-2xl border border-white/12 bg-white/25 shadow-lg"
+          className="absolute -right-4 -top-4 -z-10 h-full w-full rounded-2xl border border-white/50 bg-white/85 shadow-lg"
           style={{ transform: 'rotateY(-8deg) rotateX(4deg) translateZ(-24px)' }}
         />
         <div
-          className="absolute -right-8 -top-8 -z-20 h-full w-full rounded-2xl border border-white/10 bg-white/10"
+          className="absolute -right-8 -top-8 -z-20 h-full w-full rounded-2xl border border-white/40 bg-white/70"
           style={{ transform: 'rotateY(-8deg) rotateX(4deg) translateZ(-48px)' }}
         />
       </div>
@@ -820,12 +820,15 @@ export function AuthShell({
               </div>
             </DepthCard>
 
-            <p
-              className={`mt-5 text-center text-xs ${
-                isDark ? 'text-white/55' : 'text-muted-foreground'
-              }`}
-            >
-              <Link href="/" className="underline-offset-2 hover:underline">
+            <p className="mt-5 text-center">
+              <Link
+                href="/"
+                className={`inline-flex items-center rounded-lg border px-3.5 py-1.5 text-xs font-semibold shadow-sm transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#04A9CE]/50 ${
+                  isDark
+                    ? 'border-white/25 bg-white/15 text-white'
+                    : 'border-[#102A43]/15 bg-white/90 text-[#102A43]'
+                }`}
+              >
                 Back to SchemeKnit
               </Link>
             </p>
