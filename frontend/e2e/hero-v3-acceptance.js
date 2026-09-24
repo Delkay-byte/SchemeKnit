@@ -85,11 +85,16 @@ async function gridSignature(page) {
   })
 }
 
-/** Login routes expect a role-specific grid signal, not the landing mesh. */
+/** Auth routes expect a role-specific grid signal, not the landing mesh. */
 const LOGIN_SIGNALS = {
   'teacher-login': 'teacher',
   'school-admin-login': 'school',
   'platform-admin-login': 'platform',
+  'signup': 'register',
+  'activate-school': 'school_activate',
+  'activate-teacher': 'teacher_license',
+  'reset-password': 'password_reset',
+  'setup': 'first_run',
 }
 
 async function hasCanvasMesh(page) {
@@ -165,11 +170,11 @@ const ROUTES = [
   { route: '/login', label: 'teacher-login', titleMust: 'Teacher', bg: 'rgb(7, 24, 38)' },
   { route: '/login/school-admin', label: 'school-admin-login', titleMust: 'School Administration', bg: 'rgb(11, 31, 58)' },
   { route: '/login/platform-admin', label: 'platform-admin-login', titleMust: 'Platform Administration', bg: 'rgb(5, 14, 24)' },
-  { route: '/signup', label: 'signup', titleMust: 'Create', bg: 'rgb(255, 255, 255)' },
-  { route: '/activate-school', label: 'activate-school', titleMust: 'Activate', bg: 'rgb(243, 246, 250)' },
-  { route: '/activate', label: 'activate-teacher', titleMust: 'Activate', bg: 'rgb(250, 250, 247)' },
-  { route: '/reset-password', label: 'reset-password', titleMust: 'Reset', bg: 'rgb(244, 247, 250)' },
-  { route: '/setup', label: 'setup', titleMust: 'Initialize', bg: 'rgb(248, 247, 252)' },
+  { route: '/signup', label: 'signup', titleMust: 'Create', bg: 'rgb(10, 31, 53)' },
+  { route: '/activate-school', label: 'activate-school', titleMust: 'Activate', bg: 'rgb(10, 34, 64)' },
+  { route: '/activate', label: 'activate-teacher', titleMust: 'Activate', bg: 'rgb(14, 28, 46)' },
+  { route: '/reset-password', label: 'reset-password', titleMust: 'Reset', bg: 'rgb(10, 22, 40)' },
+  { route: '/setup', label: 'setup', titleMust: 'Initialize', bg: 'rgb(13, 22, 48)' },
 ]
 
 async function main() {
@@ -267,6 +272,11 @@ async function main() {
     if (LOGIN_SIGNALS[r.label]) {
       const gs = await gridSignalCount(page)
       log(gs === 1, `${r.label}: grid signal canvas`, `count=${gs}`)
+      const sc = await page.evaluate(() => {
+        const c = document.querySelector('canvas[data-grid-signal]')
+        return c ? Number(c.getAttribute('data-signal-count') || 0) : 0
+      })
+      log(sc >= 3 && sc <= 4, `${r.label}: 3–4 signals`, `count=${sc}`)
       const g1 = await gridSignature(page)
       await page.waitForTimeout(700)
       const g2 = await gridSignature(page)
@@ -390,6 +400,11 @@ async function main() {
     if (LOGIN_SIGNALS[r.label]) {
       const gs390 = await gridSignalCount(page)
       log(gs390 === 1, `${r.label} @390: grid signal`, `count=${gs390}`)
+      const sc390 = await page.evaluate(() => {
+        const c = document.querySelector('canvas[data-grid-signal]')
+        return c ? Number(c.getAttribute('data-signal-count') || 0) : 0
+      })
+      log(sc390 >= 3 && sc390 <= 4, `${r.label} @390: 3–4 signals`, `count=${sc390}`)
     } else {
       const c390 = await canvasCount(page)
       log(c390 === 0, `${r.label} @390: no canvas`)

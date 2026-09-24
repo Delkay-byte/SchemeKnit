@@ -73,8 +73,8 @@ export default function SetupPage() {
 
   if (authLoading || checking) {
     return (
-      <div className="min-h-screen bg-[#F8F7FC] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-600" role="status" aria-label="Loading" />
+      <div className="min-h-screen bg-[#0D1630] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-400" role="status" aria-label="Loading" />
       </div>
     )
   }
@@ -170,7 +170,7 @@ export default function SetupPage() {
       </form>
 
       <div className="mt-5 rounded-xl border border-violet-200/70 bg-violet-50/60 p-4 shadow-sm">
-        <p className="text-xs leading-relaxed text-muted-foreground text-center">
+        <p className="text-xs leading-relaxed text-[#3D5A75] text-center">
           This is a one-time first-run setup. After the administrator account is
           created, this page redirects to sign-in.
         </p>

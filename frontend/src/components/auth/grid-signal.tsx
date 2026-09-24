@@ -3,19 +3,28 @@
 import { useEffect, useRef } from 'react'
 
 /**
- * Auth grid + continuous moving signal (login interfaces only).
+ * Auth/onboarding grid + multiple continuous signals.
  *
- * Lightweight Canvas 2D technical grid with a single node that travels
- * intersection-to-intersection along grid paths — a live signal through a
- * structured network. Not the landing mesh: no springs, no pointer force,
- * no particle field. Calmer, deterministic, form-first.
+ * Lightweight Canvas 2D technical grid with 3–4 independent nodes that
+ * travel intersection-to-intersection along shared grid paths — live data
+ * signals through one curriculum network. Not the landing mesh: no springs,
+ * no pointer force, no particle field. Calmer, deterministic, form-first.
  *
- * Variants share one construction but differ in cell size, line weight and
- * intensity so Teacher / School / Platform feel like one family with distinct
- * personality. Reduced motion → static polished grid, no signal movement.
+ * Variants share one construction but differ in cell size, line weight,
+ * intensity and accent so Teacher / School / Platform / Signup / Activation
+ * feel like one family with distinct personality.
+ * Reduced motion → static polished grid, signals parked.
  */
 
-export type GridSignalVariant = 'teacher' | 'school' | 'platform'
+export type GridSignalVariant =
+  | 'teacher'
+  | 'school'
+  | 'platform'
+  | 'register'
+  | 'school_activate'
+  | 'teacher_license'
+  | 'password_reset'
+  | 'first_run'
 
 interface VariantCfg {
   /** Base cell size in CSS px (desktop). */
@@ -26,12 +35,14 @@ interface VariantCfg {
   lineRgb: string
   /** Base line alpha — visible network, not graph paper. */
   lineAlpha: number
-  /** Signal core / halo colors. */
+  /** Primary signal core / halo colors. */
   core: string
   halo: string
-  /** Edge travel duration ms → ~50–65 px/s at desktop cell size. */
+  /** Optional secondary accent for signal rotation (e.g. green/blue). */
+  altHalo?: string
+  /** Base edge travel duration ms → ~45–75 px/s at desktop cell size. */
   edgeMs: number
-  /** Extra line brightness near the signal. */
+  /** Extra line brightness near signals. */
   proximityBoost: number
 }
 
@@ -43,6 +54,7 @@ const VARIANTS: Record<GridSignalVariant, VariantCfg> = {
     lineAlpha: 0.2,
     core: '#04A9CE',
     halo: '4, 169, 206',
+    altHalo: '126, 220, 240',
     edgeMs: 750,
     proximityBoost: 0.22,
   },
@@ -53,6 +65,7 @@ const VARIANTS: Record<GridSignalVariant, VariantCfg> = {
     lineAlpha: 0.17,
     core: '#7EDCF0',
     halo: '126, 220, 240',
+    altHalo: '52, 211, 153',
     edgeMs: 720,
     proximityBoost: 0.24,
   },
@@ -63,15 +76,75 @@ const VARIANTS: Record<GridSignalVariant, VariantCfg> = {
     lineAlpha: 0.2,
     core: '#04A9CE',
     halo: '4, 169, 206',
+    altHalo: '96, 165, 250',
     edgeMs: 840,
     proximityBoost: 0.2,
   },
+  register: {
+    cell: 46,
+    minCols: 8,
+    lineRgb: '100, 155, 200',
+    lineAlpha: 0.19,
+    core: '#04A9CE',
+    halo: '4, 169, 206',
+    altHalo: '125, 211, 252',
+    edgeMs: 760,
+    proximityBoost: 0.22,
+  },
+  school_activate: {
+    cell: 52,
+    minCols: 7,
+    lineRgb: '120, 200, 220',
+    lineAlpha: 0.18,
+    core: '#34D399',
+    halo: '52, 211, 153',
+    altHalo: '4, 169, 206',
+    edgeMs: 780,
+    proximityBoost: 0.22,
+  },
+  teacher_license: {
+    cell: 48,
+    minCols: 8,
+    lineRgb: '140, 170, 200',
+    lineAlpha: 0.18,
+    core: '#04A9CE',
+    halo: '4, 169, 206',
+    altHalo: '251, 191, 36',
+    edgeMs: 770,
+    proximityBoost: 0.21,
+  },
+  password_reset: {
+    cell: 50,
+    minCols: 8,
+    lineRgb: '110, 150, 190',
+    lineAlpha: 0.18,
+    core: '#38BDF8',
+    halo: '56, 189, 248',
+    altHalo: '4, 169, 206',
+    edgeMs: 800,
+    proximityBoost: 0.21,
+  },
+  first_run: {
+    cell: 50,
+    minCols: 8,
+    lineRgb: '120, 140, 200',
+    lineAlpha: 0.19,
+    core: '#04A9CE',
+    halo: '4, 169, 206',
+    altHalo: '167, 139, 250',
+    edgeMs: 760,
+    proximityBoost: 0.22,
+  },
 }
 
-/** Short trail samples along the current path (grid-aligned). */
-const TRAIL_MAX = 9
+/** Short trail samples along each signal's current path (grid-aligned). */
+const TRAIL_MAX = 8
 
-/** Mobile multiplies edge duration → slower, calmer signal. */
+/** Desktop default simultaneous signals. */
+const DEFAULT_SIGNALS = 4
+
+/** Mobile default (also multiplies edge duration → calmer). */
+const MOBILE_SIGNALS = 3
 const MOBILE_SPEED_SCALE = 1.28
 
 function prefersReducedMotion(): boolean {
@@ -110,12 +183,32 @@ interface TrailSample {
   y: number
 }
 
+interface SignalState {
+  from: Node
+  to: Node
+  prev: Node | null
+  edgeT: number
+  edgeDur: number
+  /** Per-signal speed multiplier (phase + rate offsets). */
+  speedMul: number
+  /** Halo RGB for this signal (primary or alt accent). */
+  halo: string
+  trail: TrailSample[]
+  rand: () => number
+}
+
 export interface GridSignalProps {
   variant: GridSignalVariant
+  /** Simultaneous signals (default 4 desktop / 3 mobile). */
+  signalCount?: number
   className?: string
 }
 
-export function GridSignal({ variant, className = '' }: GridSignalProps) {
+export function GridSignal({
+  variant,
+  signalCount,
+  className = '',
+}: GridSignalProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
 
@@ -141,17 +234,13 @@ export function GridSignal({ variant, className = '' }: GridSignalProps) {
     let running = true
     let last = performance.now()
     let speedScale = 1
-    const rand = mulberry32(variant === 'teacher' ? 42 : variant === 'school' ? 7 : 99)
+    let activeCount = DEFAULT_SIGNALS
+    let frameNo = 0
 
-    // Signal path state — always on grid intersections.
-    let from: Node = { r: 1, c: 1 }
-    let to: Node = { r: 1, c: 2 }
-    let prev: Node | null = null
-    let edgeT = 0
-    let edgeDur = cfg.edgeMs
-    /** Intersection flash: key `${r},${c}` → intensity 0..1 */
+    const seeds = [42, 7, 99, 17, 61, 23]
+    const signals: SignalState[] = []
+
     const flashes = new Map<string, number>()
-    const trail: TrailSample[] = []
 
     function nodeKey(n: Node): string {
       return `${n.r},${n.c}`
@@ -165,7 +254,11 @@ export function GridSignal({ variant, className = '' }: GridSignalProps) {
       return r >= 0 && c >= 0 && r < rows && c < cols
     }
 
-    function pickNext(cur: Node, incoming: Node | null): Node {
+    function pickNext(
+      cur: Node,
+      incoming: Node | null,
+      rand: () => number,
+    ): Node {
       const dirs: [number, number][] = [
         [0, 1],
         [1, 0],
@@ -181,7 +274,6 @@ export function GridSignal({ variant, className = '' }: GridSignalProps) {
         if (incoming && nr === incoming.r && nc === incoming.c) continue
         const n = { r: nr, c: nc }
         options.push(n)
-        // Prefer continuing in the same direction when available.
         if (incoming) {
           const inDr = cur.r - incoming.r
           const inDc = cur.c - incoming.c
@@ -189,24 +281,68 @@ export function GridSignal({ variant, className = '' }: GridSignalProps) {
         }
       }
       if (options.length === 0) {
-        // Dead end — reverse is the only legal move.
         return incoming ?? { r: cur.r, c: Math.min(cur.c + 1, cols - 1) }
       }
       if (straight && (options.length === 1 || rand() < 0.55)) return straight
       return options[Math.floor(rand() * options.length)]
     }
 
-    function startEdge(immediate = false) {
-      prev = { ...from }
-      to = pickNext(from, prev)
-      // Vary edge duration slightly for organic feel; mobile slows down.
-      edgeDur = cfg.edgeMs * speedScale * (0.9 + rand() * 0.25)
-      edgeT = 0
+    function startEdge(sig: SignalState, immediate = false) {
+      sig.prev = { ...sig.from }
+      sig.to = pickNext(sig.from, sig.prev, sig.rand)
+      sig.edgeDur =
+        cfg.edgeMs * speedScale * sig.speedMul * (0.9 + sig.rand() * 0.28)
+      sig.edgeT = 0
       if (immediate) {
-        // Seed a valid first edge without animation jump.
-        const a = nodeXY(from)
-        trail.length = 0
-        trail.push(a)
+        const a = nodeXY(sig.from)
+        sig.trail.length = 0
+        sig.trail.push(a)
+      }
+    }
+
+    /** Distinct start nodes so signals don't stack. */
+    function startNodeFor(i: number, count: number): Node {
+      const midR = Math.floor(rows / 2)
+      const midC = Math.floor(cols / 2)
+      const anchors: Node[] = [
+        { r: midR, c: Math.max(1, Math.floor(cols * 0.18)) },
+        { r: Math.max(1, Math.floor(rows * 0.72)), c: Math.min(cols - 2, Math.floor(cols * 0.55)) },
+        { r: Math.min(rows - 2, Math.floor(rows * 0.28)), c: Math.min(cols - 2, Math.floor(cols * 0.78)) },
+        { r: midR, c: Math.min(cols - 2, Math.max(2, midC + 2)) },
+        { r: Math.max(1, Math.floor(rows * 0.2)), c: Math.max(1, Math.floor(cols * 0.3)) },
+        { r: Math.min(rows - 2, Math.floor(rows * 0.8)), c: Math.max(1, Math.floor(cols * 0.4)) },
+      ]
+      const base = anchors[i % anchors.length]
+      return {
+        r: Math.min(rows - 1, Math.max(0, base.r)),
+        c: Math.min(cols - 1, Math.max(0, base.c)),
+      }
+    }
+
+    function rebuildSignals() {
+      const requested =
+        signalCount ??
+        (width < 640 ? MOBILE_SIGNALS : DEFAULT_SIGNALS)
+      activeCount = Math.max(2, Math.min(6, requested))
+      signals.length = 0
+      for (let i = 0; i < activeCount; i++) {
+        const rand = mulberry32(seeds[i % seeds.length] + variant.length * 13)
+        // Phase offset so edges don't synchronize.
+        for (let w = 0; w < i * 3; w++) rand()
+        const halo =
+          i > 0 && cfg.altHalo && i % 2 === 1 ? cfg.altHalo! : cfg.halo
+        signals.push({
+          from: startNodeFor(i, activeCount),
+          to: { r: 0, c: 1 },
+          prev: null,
+          edgeT: rand() * 0.85,
+          edgeDur: cfg.edgeMs,
+          speedMul: 0.88 + rand() * 0.35,
+          halo,
+          trail: [],
+          rand,
+        })
+        startEdge(signals[i], true)
       }
     }
 
@@ -221,7 +357,6 @@ export function GridSignal({ variant, className = '' }: GridSignalProps) {
       canvas.style.height = `${height}px`
       ctx!.setTransform(dpr, 0, 0, dpr, 0, 0)
 
-      // Mobile: larger cells → fewer intersections; slower signal.
       const compact = width < 640
       speedScale = compact ? MOBILE_SPEED_SCALE : 1
       cell = compact ? Math.max(cfg.cell, 56) : cfg.cell
@@ -229,82 +364,26 @@ export function GridSignal({ variant, className = '' }: GridSignalProps) {
 
       cols = Math.max(cfg.minCols, Math.round(width / cell) + 1)
       rows = Math.max(4, Math.round(height / cell) + 1)
-      // Re-fit cell so the grid spans the viewport cleanly.
-      cell = Math.min(width / Math.max(1, cols - 1), height / Math.max(1, rows - 1))
-      // Prefer horizontal spacing as primary cell; recompute rows from that.
       cell = width / Math.max(1, cols - 1)
       rows = Math.max(4, Math.ceil(height / cell) + 1)
       ox = 0
       oy = (height - (rows - 1) * cell) / 2
 
       flashes.clear()
-      trail.length = 0
-      // Start in the open left field (clear of centered/split cards).
-      from = { r: Math.floor(rows / 2), c: Math.max(1, Math.floor(cols * 0.18)) }
-      prev = null
-      startEdge(true)
+      rebuildSignals()
+      canvas.setAttribute('data-signal-count', String(activeCount))
+      canvas.setAttribute('data-signal-frame', '0')
     }
 
-    function drawStatic() {
-      ctx!.clearRect(0, 0, width, height)
-      const a = cfg.lineAlpha
-      ctx!.lineWidth = 1
-      // Horizontal lines
-      for (let r = 0; r < rows; r++) {
-        const y = oy + r * cell
-        ctx!.strokeStyle = `rgba(${cfg.lineRgb}, ${a})`
-        ctx!.beginPath()
-        ctx!.moveTo(0, y)
-        ctx!.lineTo(width, y)
-        ctx!.stroke()
-      }
-      // Vertical lines
-      for (let c = 0; c < cols; c++) {
-        const x = ox + c * cell
-        ctx!.strokeStyle = `rgba(${cfg.lineRgb}, ${a * 0.92})`
-        ctx!.beginPath()
-        ctx!.moveTo(x, 0)
-        ctx!.lineTo(x, height)
-        ctx!.stroke()
-      }
-      // Static network nodes at intersections (subtle, every other).
-      ctx!.fillStyle = `rgba(${cfg.lineRgb}, ${Math.min(1, a * 2.4)})`
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-          if ((r + c) % 2 !== 0) continue
-          ctx!.beginPath()
-          ctx!.arc(ox + c * cell, oy + r * cell, 1.3, 0, Math.PI * 2)
-          ctx!.fill()
-        }
-      }
-      // Resting signal node so the motif is still legible without motion.
-      const rest = nodeXY(from)
-      const g = ctx!.createRadialGradient(rest.x, rest.y, 0, rest.x, rest.y, cell * 1.3)
-      g.addColorStop(0, `rgba(${cfg.halo}, 0.45)`)
-      g.addColorStop(1, `rgba(${cfg.halo}, 0)`)
-      ctx!.fillStyle = g
-      ctx!.beginPath()
-      ctx!.arc(rest.x, rest.y, cell * 1.3, 0, Math.PI * 2)
-      ctx!.fill()
-      ctx!.fillStyle = cfg.core
-      ctx!.beginPath()
-      ctx!.arc(rest.x, rest.y, 3.2, 0, Math.PI * 2)
-      ctx!.fill()
-      ctx!.fillStyle = 'rgba(255,255,255,0.9)'
-      ctx!.beginPath()
-      ctx!.arc(rest.x, rest.y, 1.3, 0, Math.PI * 2)
-      ctx!.fill()
-    }
-
-    function signalPos(): { x: number; y: number } {
-      const t = easeMove(Math.min(1, Math.max(0, edgeT)))
-      const a = nodeXY(from)
-      const b = nodeXY(to)
+    function signalPos(sig: SignalState): { x: number; y: number } {
+      const t = easeMove(Math.min(1, Math.max(0, sig.edgeT)))
+      const a = nodeXY(sig.from)
+      const b = nodeXY(sig.to)
       return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }
     }
 
+    /** Chebyshev-ish distance in cell units — brighten lines near signals. */
     function proximity(x: number, y: number, px: number, py: number): number {
-      // Chebyshev-ish distance in cell units — brighten lines near the signal.
       const dx = Math.abs(x - px)
       const dy = Math.abs(y - py)
       const d = Math.min(dx, dy) * 0.65 + Math.max(dx, dy) * 0.35
@@ -314,60 +393,29 @@ export function GridSignal({ variant, className = '' }: GridSignalProps) {
       return t * t
     }
 
-    function frame(now: number) {
-      if (!running) return
-      const dt = Math.min(48, now - last)
-      last = now
-
-      // Advance along the current edge.
-      edgeT += dt / edgeDur
-      let arrived = false
-      if (edgeT >= 1) {
-        edgeT = 0
-        from = { ...to }
-        flashes.set(nodeKey(from), 1)
-        prev = { ...to }
-        to = pickNext(from, prev)
-        edgeDur = cfg.edgeMs * speedScale * (0.9 + rand() * 0.25)
-        arrived = true
+    /** Max proximity across all live signals. */
+    function nearAny(x: number, y: number, positions: { x: number; y: number }[]): number {
+      let m = 0
+      for (const p of positions) {
+        const v = proximity(x, y, p.x, p.y)
+        if (v > m) m = v
       }
+      return m
+    }
 
-      const pos = signalPos()
-
-      // Trail: record grid-aligned samples (follows the edge).
-      if (!arrived) {
-        const lastS = trail[trail.length - 1]
-        if (!lastS || Math.hypot(pos.x - lastS.x, pos.y - lastS.y) > cell * 0.12) {
-          trail.push({ x: pos.x, y: pos.y })
-          if (trail.length > TRAIL_MAX) trail.shift()
-        }
-      } else {
-        trail.push({ ...nodeXY(from) })
-        if (trail.length > TRAIL_MAX) trail.shift()
-      }
-
-      // Decay intersection flashes.
-      for (const [k, v] of Array.from(flashes)) {
-        const nv = v - dt / 700
-        if (nv <= 0) flashes.delete(k)
-        else flashes.set(k, nv)
-      }
-
-      // ---- Draw ----
-      ctx!.clearRect(0, 0, width, height)
+    function drawGridBase(positions: { x: number; y: number }[]) {
       const baseA = cfg.lineAlpha
       const boost = cfg.proximityBoost
-
-      // Grid lines with local illumination near the signal.
       ctx!.lineWidth = 1
+
       for (let r = 0; r < rows; r++) {
         const y = oy + r * cell
-        // Sample brightness at a few x positions along the row (cheap).
         let near = 0
         const steps = Math.max(2, Math.ceil(width / (cell * 2)))
         for (let s = 0; s <= steps; s++) {
           const x = (s / steps) * width
-          near = Math.max(near, proximity(x, y, pos.x, pos.y))
+          const v = nearAny(x, y, positions)
+          if (v > near) near = v
         }
         const a = baseA + near * boost
         ctx!.strokeStyle =
@@ -379,13 +427,15 @@ export function GridSignal({ variant, className = '' }: GridSignalProps) {
         ctx!.lineTo(width, y)
         ctx!.stroke()
       }
+
       for (let c = 0; c < cols; c++) {
         const x = ox + c * cell
         let near = 0
         const steps = Math.max(2, Math.ceil(height / (cell * 2)))
         for (let s = 0; s <= steps; s++) {
           const y = (s / steps) * height
-          near = Math.max(near, proximity(x, y, pos.x, pos.y))
+          const v = nearAny(x, y, positions)
+          if (v > near) near = v
         }
         const a = baseA * 0.92 + near * boost
         ctx!.strokeStyle =
@@ -398,21 +448,24 @@ export function GridSignal({ variant, className = '' }: GridSignalProps) {
         ctx!.stroke()
       }
 
-      // Network nodes at intersections (stable; slight lift near signal).
+      // Network nodes at every other intersection.
+      ctx!.fillStyle = `rgba(${cfg.lineRgb}, ${Math.min(1, baseA * 2.4)})`
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
           if ((r + c) % 2 !== 0) continue
           const x = ox + c * cell
           const y = oy + r * cell
-          const n = proximity(x, y, pos.x, pos.y)
+          const n = nearAny(x, y, positions)
           ctx!.fillStyle = `rgba(${n > 0.2 ? cfg.halo : cfg.lineRgb}, ${Math.min(0.9, baseA * 2.4 + n * 0.5)})`
           ctx!.beginPath()
           ctx!.arc(x, y, 1.25 + n * 0.8, 0, Math.PI * 2)
           ctx!.fill()
         }
       }
+    }
 
-      // Intersection flashes (brief brighten, smooth decay).
+    function drawFlashes() {
+      const baseA = cfg.lineAlpha
       for (const [k, v] of Array.from(flashes)) {
         const [rs, cs] = k.split(',')
         const r = Number(rs)
@@ -421,61 +474,127 @@ export function GridSignal({ variant, className = '' }: GridSignalProps) {
         const y = oy + r * cell
         const rad = 2.5 + v * 4
         const g = ctx!.createRadialGradient(x, y, 0, x, y, rad * 2.8)
-        g.addColorStop(0, `rgba(${cfg.halo}, ${0.55 * v})`)
+        g.addColorStop(0, `rgba(${cfg.halo}, ${0.5 * v})`)
         g.addColorStop(1, `rgba(${cfg.halo}, 0)`)
         ctx!.fillStyle = g
         ctx!.beginPath()
         ctx!.arc(x, y, rad * 2.8, 0, Math.PI * 2)
         ctx!.fill()
-        ctx!.fillStyle = `rgba(${cfg.lineRgb}, ${Math.min(1, baseA * 3.2 + v * 0.55)})`
+        ctx!.fillStyle = `rgba(${cfg.lineRgb}, ${Math.min(1, baseA * 3.2 + v * 0.5)})`
         ctx!.beginPath()
         ctx!.arc(x, y, 1.8, 0, Math.PI * 2)
         ctx!.fill()
       }
+    }
 
-      // Short fading trail along the path (visible motion cue).
-      if (trail.length >= 2) {
-        for (let i = 1; i < trail.length; i++) {
-          const t = i / trail.length
-          const alpha = 0.08 + t * 0.5
-          ctx!.strokeStyle = `rgba(${cfg.halo}, ${alpha})`
-          ctx!.lineWidth = 1.25 + t * 2.2
-          ctx!.lineCap = 'round'
-          ctx!.beginPath()
-          ctx!.moveTo(trail[i - 1].x, trail[i - 1].y)
-          ctx!.lineTo(trail[i].x, trail[i].y)
-          ctx!.stroke()
-        }
-        ctx!.lineWidth = 1
-        ctx!.lineCap = 'butt'
+    function drawTrail(sig: SignalState) {
+      if (sig.trail.length < 2) return
+      for (let i = 1; i < sig.trail.length; i++) {
+        const t = i / sig.trail.length
+        const alpha = 0.08 + t * 0.46
+        ctx!.strokeStyle = `rgba(${sig.halo}, ${alpha})`
+        ctx!.lineWidth = 1.15 + t * 2
+        ctx!.lineCap = 'round'
+        ctx!.beginPath()
+        ctx!.moveTo(sig.trail[i - 1].x, sig.trail[i - 1].y)
+        ctx!.lineTo(sig.trail[i].x, sig.trail[i].y)
+        ctx!.stroke()
       }
+      ctx!.lineWidth = 1
+      ctx!.lineCap = 'butt'
+    }
 
-      // Signal: strong halo + glow + bright core (obvious in screenshots).
-      const haloR = cell * 1.45
+    function drawSignalHead(pos: { x: number; y: number }, halo: string) {
+      const haloR = cell * 1.35
       const hg = ctx!.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, haloR)
-      hg.addColorStop(0, `rgba(${cfg.halo}, 0.42)`)
-      hg.addColorStop(0.4, `rgba(${cfg.halo}, 0.16)`)
-      hg.addColorStop(1, `rgba(${cfg.halo}, 0)`)
+      hg.addColorStop(0, `rgba(${halo}, 0.4)`)
+      hg.addColorStop(0.4, `rgba(${halo}, 0.15)`)
+      hg.addColorStop(1, `rgba(${halo}, 0)`)
       ctx!.fillStyle = hg
       ctx!.beginPath()
       ctx!.arc(pos.x, pos.y, haloR, 0, Math.PI * 2)
       ctx!.fill()
 
-      // Soft local illumination disc.
-      ctx!.fillStyle = `rgba(${cfg.halo}, 0.18)`
+      ctx!.fillStyle = `rgba(${halo}, 0.16)`
       ctx!.beginPath()
-      ctx!.arc(pos.x, pos.y, cell * 0.5, 0, Math.PI * 2)
+      ctx!.arc(pos.x, pos.y, cell * 0.45, 0, Math.PI * 2)
       ctx!.fill()
 
-      // Core.
       ctx!.fillStyle = cfg.core
       ctx!.beginPath()
-      ctx!.arc(pos.x, pos.y, 3.4, 0, Math.PI * 2)
+      ctx!.arc(pos.x, pos.y, 3.2, 0, Math.PI * 2)
       ctx!.fill()
       ctx!.fillStyle = 'rgba(255,255,255,0.92)'
       ctx!.beginPath()
-      ctx!.arc(pos.x, pos.y, 1.5, 0, Math.PI * 2)
+      ctx!.arc(pos.x, pos.y, 1.4, 0, Math.PI * 2)
       ctx!.fill()
+    }
+
+    function updateDiagnostics(positions: { x: number; y: number }[]) {
+      // Test-safe non-sensitive state (positions are CSS px on the decor canvas).
+      canvas!.setAttribute('data-signal-count', String(signals.length))
+      canvas!.setAttribute('data-signal-frame', String(frameNo))
+      canvas!.setAttribute(
+        'data-signal-positions',
+        positions.map((p) => `${Math.round(p.x)},${Math.round(p.y)}`).join(' '),
+      )
+    }
+
+    function drawStatic() {
+      ctx!.clearRect(0, 0, width, height)
+      const positions = signals.map((s) => nodeXY(s.from))
+      drawGridBase(positions)
+      drawFlashes()
+      for (let i = 0; i < signals.length; i++) {
+        drawSignalHead(positions[i], signals[i].halo)
+      }
+      updateDiagnostics(positions)
+    }
+
+    function frame(now: number) {
+      if (!running) return
+      const dt = Math.min(48, now - last)
+      last = now
+      frameNo++
+
+      for (const sig of signals) {
+        sig.edgeT += dt / sig.edgeDur
+        if (sig.edgeT >= 1) {
+          sig.edgeT = 0
+          sig.from = { ...sig.to }
+          flashes.set(nodeKey(sig.from), 1)
+          sig.prev = { ...sig.to }
+          sig.to = pickNext(sig.from, sig.prev, sig.rand)
+          sig.edgeDur =
+            cfg.edgeMs * speedScale * sig.speedMul * (0.9 + sig.rand() * 0.28)
+          sig.trail.push({ ...nodeXY(sig.from) })
+          if (sig.trail.length > TRAIL_MAX) sig.trail.shift()
+        } else {
+          const pos = signalPos(sig)
+          const lastS = sig.trail[sig.trail.length - 1]
+          if (!lastS || Math.hypot(pos.x - lastS.x, pos.y - lastS.y) > cell * 0.14) {
+            sig.trail.push(pos)
+            if (sig.trail.length > TRAIL_MAX) sig.trail.shift()
+          }
+        }
+      }
+
+      for (const [k, v] of Array.from(flashes)) {
+        const nv = v - dt / 700
+        if (nv <= 0) flashes.delete(k)
+        else flashes.set(k, nv)
+      }
+
+      const positions = signals.map((s) => signalPos(s))
+
+      ctx!.clearRect(0, 0, width, height)
+      drawGridBase(positions)
+      drawFlashes()
+      for (const sig of signals) drawTrail(sig)
+      for (let i = 0; i < signals.length; i++) {
+        drawSignalHead(positions[i], signals[i].halo)
+      }
+      if (frameNo % 3 === 0) updateDiagnostics(positions)
 
       raf = requestAnimationFrame(frame)
     }
@@ -506,7 +625,6 @@ export function GridSignal({ variant, className = '' }: GridSignalProps) {
 
     document.addEventListener('visibilitychange', onVisibility)
     const onReduceChange = () => {
-      // If user flips reduce mid-session, stop or restart cleanly.
       cancelAnimationFrame(raf)
       running = false
       if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -527,7 +645,7 @@ export function GridSignal({ variant, className = '' }: GridSignalProps) {
       document.removeEventListener('visibilitychange', onVisibility)
       mq.removeEventListener?.('change', onReduceChange)
     }
-  }, [variant])
+  }, [variant, signalCount])
 
   return (
     <div
@@ -536,7 +654,11 @@ export function GridSignal({ variant, className = '' }: GridSignalProps) {
       aria-hidden="true"
       data-grid-signal-root={variant}
     >
-      <canvas ref={canvasRef} data-grid-signal={variant} className="block h-full w-full" />
+      <canvas
+        ref={canvasRef}
+        data-grid-signal={variant}
+        className="block h-full w-full"
+      />
     </div>
   )
 }

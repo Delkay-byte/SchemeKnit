@@ -66,11 +66,16 @@ async function signalSignature(page) {
   })
 }
 
-/** Login routes expect a role-specific grid signal; others expect no canvas. */
+/** Auth/onboarding routes expect a role-specific grid signal (V3). */
 const LOGIN_SIGNALS = {
   'teacher-login': 'teacher',
   'school-admin-login': 'school',
   'platform-admin-login': 'platform',
+  'signup': 'register',
+  'activate-school': 'school_activate',
+  'activate-teacher': 'teacher_license',
+  'reset-password': 'password_reset',
+  'setup': 'first_run',
 }
 
 async function pageInfo(page) {
@@ -125,11 +130,11 @@ async function main() {
     { name: 'teacher-login', path: '/login', title: /Teacher|Welcome back/i, bg: 'rgb(7, 24, 38)' },
     { name: 'school-admin-login', path: '/login/school-admin', title: /School Administration/i, bg: 'rgb(11, 31, 58)' },
     { name: 'platform-admin-login', path: '/login/platform-admin', title: /Platform Administration/i, bg: 'rgb(5, 14, 24)' },
-    { name: 'signup', path: '/signup', title: /Create your SchemeKnit account/i, bg: 'rgb(255, 255, 255)' },
-    { name: 'activate-school', path: '/activate-school', title: /Activate your school|Activate Your School/i, bg: 'rgb(243, 246, 250)' },
-    { name: 'activate-teacher', path: '/activate', title: /Activate your license|Welcome to SchemeKnit/i, bg: 'rgb(250, 250, 247)' },
-    { name: 'reset-password', path: '/reset-password', title: /Reset your password|Reset Your Password/i, bg: 'rgb(244, 247, 250)' },
-    { name: 'setup', path: '/setup', title: /Initialize SchemeKnit|Set Up SchemeKnit/i, bg: 'rgb(248, 247, 252)' },
+    { name: 'signup', path: '/signup', title: /Create your SchemeKnit account/i, bg: 'rgb(10, 31, 53)' },
+    { name: 'activate-school', path: '/activate-school', title: /Activate your school|Activate Your School/i, bg: 'rgb(10, 34, 64)' },
+    { name: 'activate-teacher', path: '/activate', title: /Activate your license|Welcome to SchemeKnit/i, bg: 'rgb(14, 28, 46)' },
+    { name: 'reset-password', path: '/reset-password', title: /Reset your password|Reset Your Password/i, bg: 'rgb(10, 22, 40)' },
+    { name: 'setup', path: '/setup', title: /Initialize SchemeKnit|Set Up SchemeKnit/i, bg: 'rgb(13, 22, 48)' },
   ]
 
   const bgs = new Set()
@@ -151,6 +156,11 @@ async function main() {
         `${r.name}: grid signal present`,
         JSON.stringify(info.gridSignals),
       )
+      const countAttr = await page.evaluate(() => {
+        const c = document.querySelector('canvas[data-grid-signal]')
+        return c ? Number(c.getAttribute('data-signal-count') || 0) : 0
+      })
+      log(countAttr >= 3 && countAttr <= 4, `${r.name}: 3–4 signals`, `count=${countAttr}`)
       const s1 = await signalSignature(page)
       await page.waitForTimeout(700)
       const s2 = await signalSignature(page)
@@ -236,6 +246,11 @@ async function main() {
     if (expected390) {
       log(info.gridSignals.includes(expected390), `${r.name} @390: grid signal`, JSON.stringify(info.gridSignals))
       log(info.meshCount === 0, `${r.name} @390: no landing mesh`, `mesh=${info.meshCount}`)
+      const c390 = await page.evaluate(() => {
+        const c = document.querySelector('canvas[data-grid-signal]')
+        return c ? Number(c.getAttribute('data-signal-count') || 0) : 0
+      })
+      log(c390 >= 3 && c390 <= 4, `${r.name} @390: 3–4 signals`, `count=${c390}`)
     } else {
       log(info.canvasCount === 0, `${r.name} @390: no canvas`)
       log(info.meshCount === 0, `${r.name} @390: no landing mesh`, `mesh=${info.meshCount}`)
