@@ -4,14 +4,14 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { SurfaceCard } from '@/components/ui/surface-card'
 import { Select } from '@/components/ui/select'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { StatusPill } from '@/components/ui/badge'
-import { FileText, Eye, Download, ArrowLeft, BookOpen } from 'lucide-react'
+import { PageHeader } from '@/components/ui/page-header'
+import { Eye, BookOpen } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import { PageHeader } from '@/components/ui/page-header'
 
 interface LessonPlan {
   id: string
@@ -19,11 +19,17 @@ interface LessonPlan {
   scheme_filename: string
   scheme_subject: string
   week_number: number
+  teaching_week?: number
+  carry_forward?: boolean
   lesson_date: string | null
-  lesson_number: number
+  lesson_number: string | number
+  lesson_sequence?: number
   lesson_topic: string
   strand: string
   sub_strand: string
+  period?: string
+  indicators?: string[]
+  indicator_codes?: string[]
   class_level: string
   subject: string
   status: string
@@ -93,6 +99,11 @@ export default function LessonsPage() {
                 ? 'No lesson plans yet. Generate some from a scheme.'
                 : `${lessons.length} lesson plan${lessons.length !== 1 ? 's' : ''} across ${uniqueSchemes.length} scheme${uniqueSchemes.length !== 1 ? 's' : ''}`
             }
+            actions={
+              <Button variant="outline" asChild>
+                <Link href="/upload">Upload scheme</Link>
+              </Button>
+            }
           />
         </div>
 
@@ -101,22 +112,26 @@ export default function LessonsPage() {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
         ) : error ? (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <p className="text-destructive mb-4">{error}</p>
-              <Button onClick={loadLessons}>Try Again</Button>
-            </CardContent>
-          </Card>
+          <SurfaceCard className="px-6 py-8 text-center">
+            <p className="mb-4 text-destructive">{error}</p>
+            <Button onClick={loadLessons}>Try Again</Button>
+          </SurfaceCard>
         ) : lessons.length === 0 ? (
-          <Card>
-            <CardContent className="p-12 text-center">
-              <BookOpen className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-              <p className="text-lg font-medium mb-2">No lesson plans yet</p>
-              <p className="text-muted-foreground">
-                Upload a scheme, review it, then generate lesson plans to see them here.
-              </p>
-            </CardContent>
-          </Card>
+          <SurfaceCard data-empty className="px-6 py-12 text-center">
+            <BookOpen className="mx-auto mb-4 h-12 w-12 text-slate-300" aria-hidden="true" />
+            <p className="text-lg font-medium text-[#102A43]">No lesson plans yet</p>
+            <p className="mt-1 text-muted-foreground">
+              Upload a scheme, review it, then generate lesson plans to see them here.
+            </p>
+            <div className="mt-5 flex flex-wrap justify-center gap-3">
+              <Button asChild>
+                <Link href="/upload">Upload Scheme</Link>
+              </Button>
+              <Button variant="outline" asChild>
+                <Link href="/dashboard">Go to Dashboard</Link>
+              </Button>
+            </div>
+          </SurfaceCard>
         ) : (
           <>
             {/* Filter by scheme */}
@@ -136,29 +151,54 @@ export default function LessonsPage() {
               </div>
             )}
 
-            {/* Lessons Table */}
-            <Card>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50 hover:bg-muted/50">
-                      <TableHead>Week</TableHead>
-                      <TableHead>Lesson</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Topic</TableHead>
-                      <TableHead>Scheme</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredLessons.map((lesson) => (
+            {/* Lessons table — one row per lesson, status at a glance. */}
+            <SurfaceCard data-lessons-table className="overflow-hidden">
+              <Table className="min-w-[860px]">
+                <TableHeader>
+                  <TableRow className="bg-muted/50 hover:bg-muted/50">
+                    <TableHead>Subject</TableHead>
+                    <TableHead>Indicator</TableHead>
+                    <TableHead>Week</TableHead>
+                    <TableHead>Teaching Period</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredLessons.map((lesson) => {
+                    const teachingWeek = lesson.teaching_week || lesson.week_number
+                    return (
                       <TableRow key={lesson.id} className="hover:bg-muted/30">
-                        <TableCell>Week {lesson.week_number}</TableCell>
-                        <TableCell>{lesson.lesson_number}</TableCell>
-                        <TableCell>{lesson.lesson_date || 'TBD'}</TableCell>
-                        <TableCell className="max-w-[200px] truncate">{lesson.lesson_topic || 'Untitled'}</TableCell>
-                        <TableCell className="max-w-[150px] truncate text-muted-foreground">{lesson.scheme_filename}</TableCell>
+                        <TableCell className="whitespace-nowrap font-medium">
+                          {lesson.subject || lesson.scheme_subject}
+                        </TableCell>
+                        <TableCell className="max-w-[260px]">
+                          <span className="block font-mono text-xs text-[#04769B]">
+                            {lesson.indicator_codes?.[0] ||
+                              (lesson.strand ? lesson.strand.slice(0, 18) : '—')}
+                          </span>
+                          <span
+                            className="block truncate text-xs text-muted-foreground"
+                            title={lesson.indicators?.[0] || lesson.sub_strand || ''}
+                          >
+                            {lesson.indicators?.[0] || lesson.sub_strand || lesson.strand || ''}
+                          </span>
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          W{teachingWeek}
+                          {lesson.carry_forward && lesson.week_number !== teachingWeek && (
+                            <span className="block text-[11px] text-muted-foreground">
+                              from W{lesson.week_number}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          {lesson.period || '—'}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          {lesson.lesson_date || 'TBD'}
+                        </TableCell>
                         <TableCell>
                           <StatusPill
                             tone={
@@ -171,20 +211,20 @@ export default function LessonsPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
-                            <Link href={`/lessons/${lesson.id}`}>
-                              <Button size="sm" variant="ghost">
-                                <Eye className="h-4 w-4 mr-1" />
+                            <Button size="sm" variant="ghost" asChild>
+                              <Link href={`/lessons/${lesson.id}`}>
+                                <Eye className="mr-1 h-4 w-4" />
                                 Open
-                              </Button>
-                            </Link>
+                              </Link>
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </SurfaceCard>
           </>
         )}
       </main>

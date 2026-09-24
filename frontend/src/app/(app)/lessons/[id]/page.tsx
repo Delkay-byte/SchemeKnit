@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { SurfaceCard } from '@/components/ui/surface-card'
 import { Input } from '@/components/ui/input'
 import { Field, TextArea } from '@/components/ui/field'
 import { Select } from '@/components/ui/select'
@@ -36,6 +36,8 @@ interface LessonData {
   introduction: string | null
   assessment: string | null
   conclusion: string | null
+  learning_objectives?: { description: string; indicator_code?: string }[]
+  main_activities?: { description: string; duration_minutes?: number; resources?: string[] }[]
   keywords?: string[]
   source_tlrs?: string[]
   other_tlrs?: string[]
@@ -85,7 +87,7 @@ export default function LessonDetailPage() {
   // Optional AI section regeneration (existing /api/ai/regenerate-section)
   const [regenBusy, setRegenBusy] = useState<string | null>(null)
   const [regenNote, setRegenNote] = useState<string | null>(null)
-  //: What AI would actually do for this teacher's selected mode.
+  // What AI would actually do for this teacher's selected mode.
   const [aiStatus, setAiStatus] = useState<{
     active: boolean; provider: string | null; mode: string; reason: string | null;
   } | null>(null)
@@ -200,62 +202,78 @@ export default function LessonDetailPage() {
 
   if (error && !lesson) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card className="max-w-md">
-          <CardContent className="p-8 text-center">
-            <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
-            <p className="text-destructive mb-4">{error}</p>
-            <Button onClick={load}>Try Again</Button>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+        <SurfaceCard className="w-full max-w-md px-6 py-8 text-center">
+          <AlertCircle className="mx-auto mb-4 h-12 w-12 text-destructive" aria-hidden="true" />
+          <p className="mb-4 text-destructive">{error}</p>
+          <Button onClick={load}>Try Again</Button>
+        </SurfaceCard>
       </div>
     )
   }
 
   if (!lesson) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card className="max-w-md">
-          <CardContent className="p-8 text-center">
-            <p className="text-muted-foreground mb-4">Lesson not found</p>
-            <Link href="/lessons"><Button>Back to Lesson Plans</Button></Link>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+        <SurfaceCard className="w-full max-w-md px-6 py-8 text-center">
+          <p className="mb-4 text-muted-foreground">Lesson not found</p>
+          <Button asChild>
+            <Link href="/lessons">Back to Lesson Plans</Link>
+          </Button>
+        </SurfaceCard>
       </div>
     )
   }
 
+  const objectives = lesson.learning_objectives || []
+  const mainActivities = lesson.main_activities || []
+
+  const suggestButton = (section: 'introduction' | 'assessment' | 'conclusion') => (
+    <Button
+      size="sm"
+      variant="outline"
+      disabled={regenBusy !== null}
+      onClick={() => handleRegenerate(section)}
+    >
+      {regenBusy === section ? 'Generating...' : `Suggest ${section}`}
+    </Button>
+  )
+
+  const sectionHeading = 'text-xs font-semibold uppercase tracking-wider text-slate-500'
+
   return (
     <div className="min-h-screen">
-      <main className="container mx-auto px-4 py-8 max-w-4xl">
-        {/* Header */}
-        <div className="mb-6">
-          <PageHeader
-            title={`Week ${lesson.week_number} • Lesson ${lesson.lesson_number}`}
-            description={
-              <>
-                {lesson.subject} &bull; {lesson.class_level}
-                {lesson.lesson_date ? ` &bull; ${lesson.lesson_date}` : ''}
-                {lesson.teacher_edited ? ' &bull; Edited' : ''}
-              </>
-            }
-            actions={
+      <main className="container mx-auto max-w-4xl px-4 py-8">
+        {/* One h1: which lesson this is, at a glance. */}
+        <PageHeader
+          className="mb-6"
+          eyebrow="Lesson"
+          title={`Week ${lesson.teaching_week || lesson.week_number} • Lesson ${lesson.lesson_number}`}
+          description={
+            <>
+              {lesson.subject} &bull; {lesson.class_level}
+              {lesson.lesson_date ? ` &bull; ${lesson.lesson_date}` : ''}
+              {lesson.teacher_edited ? ' &bull; Edited' : ''}
+            </>
+          }
+          actions={
+            <Button variant="outline" asChild>
               <Link href="/lessons">
-                <Button variant="outline">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Lesson Plans
-                </Button>
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Lesson Plans
               </Link>
-            }
-          />
-        </div>
+            </Button>
+          }
+        />
 
-        {/* Curriculum context (read-only) */}
-        <Card className="mb-6">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Curriculum Context</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
+        {/* Lesson context (read-only) */}
+        <SurfaceCard
+          data-lesson-context
+          accent="bg-gradient-to-r from-[#102A43] to-[#04A9CE]"
+          className="mb-6 px-5 py-5 sm:px-6"
+        >
+          <h2 className="text-base font-semibold text-[#102A43]">Lesson context</h2>
+          <div className="mt-3 space-y-2 text-sm">
             {lesson.strand && (
               <p><span className="text-muted-foreground">Strand:</span> {lesson.strand}</p>
             )}
@@ -267,9 +285,17 @@ export default function LessonDetailPage() {
             )}
             {lesson.indicators && lesson.indicators.length > 0 && (
               <div>
-                <p className="text-muted-foreground mb-1">Indicators:</p>
-                <ul className="list-disc list-inside space-y-0.5">
-                  {lesson.indicators.map((ind, i) => <li key={i}>{ind}</li>)}
+                <p className="mb-1 text-muted-foreground">Indicators:</p>
+                <ul className="space-y-1">
+                  {lesson.indicators.map((ind, i) => (
+                    <li key={i} className="flex items-start gap-2.5">
+                      <span
+                        aria-hidden="true"
+                        className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#04A9CE]"
+                      />
+                      <span>{ind}</span>
+                    </li>
+                  ))}
                 </ul>
               </div>
             )}
@@ -280,37 +306,17 @@ export default function LessonDetailPage() {
                 {lesson.week_ending_derived ? ' (derived)' : ''}
               </p>
             )}
-            {!!(lesson.source_tlrs?.length) && (
-              <div>
-                <p className="text-muted-foreground mb-1">Source TLRs (from scheme):</p>
-                <ul className="list-disc list-inside space-y-0.5">
-                  {lesson.source_tlrs!.map((r, i) => <li key={i}>{r}</li>)}
-                </ul>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          </div>
+        </SurfaceCard>
 
-        {/* Editable fields */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Lesson Plan</CardTitle>
-            <CardDescription>Edit the fields below and save your changes</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-wrap items-center gap-2 pb-1">
-              <span className="text-sm text-muted-foreground">Optional AI assist:</span>
-              {(['introduction', 'assessment', 'conclusion'] as const).map((s) => (
-                <Button
-                  key={s}
-                  size="sm"
-                  variant="outline"
-                  disabled={regenBusy !== null}
-                  onClick={() => handleRegenerate(s)}
-                >
-                  {regenBusy === s ? 'Generating...' : `Suggest ${s}`}
-                </Button>
-              ))}
+        {/* The lesson document — phased hierarchy, editable in place. */}
+        <SurfaceCard data-lesson-plan className="px-5 py-5 sm:px-6">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <h2 className="text-base font-semibold text-[#102A43]">Lesson plan</h2>
+              <p className="text-sm text-muted-foreground">
+                Edit the sections below and save your changes
+              </p>
             </div>
             <span className="text-xs text-muted-foreground">
               {aiStatus
@@ -319,7 +325,35 @@ export default function LessonDetailPage() {
                   : 'No AI provider available — suggestions are disabled until one is configured.'
                 : ''}
             </span>
-            {regenNote && <Banner tone="success">{regenNote}</Banner>}
+          </div>
+          {regenNote && <Banner tone="success" className="mt-3">{regenNote}</Banner>}
+
+          {/* Objectives — read-only from the generator. */}
+          {objectives.length > 0 && (
+            <section className="mt-5" aria-label="Objectives">
+              <h3 className={sectionHeading}>Objectives</h3>
+              <ul className="mt-2 space-y-1.5">
+                {objectives.map((obj, i) => (
+                  <li key={i} className="flex items-start gap-2.5 text-sm">
+                    <span
+                      aria-hidden="true"
+                      className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#102A43]"
+                    />
+                    <span>
+                      {obj.description}
+                      {obj.indicator_code && (
+                        <span className="ml-2 font-mono text-xs text-[#04769B]">
+                          {obj.indicator_code}
+                        </span>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          <div className="mt-5">
             <Field label="Lesson Topic" htmlFor="lesson-topic">
               <Input
                 id="lesson-topic"
@@ -328,155 +362,226 @@ export default function LessonDetailPage() {
                 onChange={(e) => setTopic(e.target.value)}
               />
             </Field>
-            <Field label="Introduction / Starter" htmlFor="lesson-introduction">
-              <TextArea
-                id="lesson-introduction"
-                value={introduction}
-                onChange={(e) => setIntroduction(e.target.value)}
-                rows={4}
-              />
-            </Field>
-            <Field label="Assessment" htmlFor="lesson-assessment">
-              <TextArea
-                id="lesson-assessment"
-                value={assessment}
-                onChange={(e) => setAssessment(e.target.value)}
-                rows={3}
-              />
-            </Field>
-            <Field label="Conclusion / Reflection" htmlFor="lesson-conclusion">
-              <TextArea
-                id="lesson-conclusion"
-                value={conclusion}
-                onChange={(e) => setConclusion(e.target.value)}
-                rows={3}
-              />
-            </Field>
+          </div>
 
-            <div className="border-t pt-4 space-y-3">
-              <div>
-                <h3 className="text-sm font-semibold">Lesson Review Data</h3>
-                <p className="text-xs text-muted-foreground">
-                  Keywords, Other TLRs, competencies and references for THIS lesson.
-                  Source TLRs above stay tied to the scheme document.
-                </p>
-              </div>
-              <Field label="Keywords" htmlFor="lesson-keywords">
-                <Input
-                  id="lesson-keywords"
-                  type="text"
-                  value={keywords.join(', ')}
-                  onChange={(e) => setKeywords(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
-                  placeholder="Comma-separated"
-                />
-              </Field>
-              <Field label="Other TLRs" htmlFor="lesson-other-tlrs">
-                <Input
-                  id="lesson-other-tlrs"
-                  type="text"
-                  value={otherTlrs.join(', ')}
-                  onChange={(e) => setOtherTlrs(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
-                  placeholder="Comma-separated teacher additions"
-                />
-              </Field>
-              <div>
-                <label className="block text-sm font-medium mb-2">Core Competencies</label>
-                <div className="flex flex-wrap gap-1.5">
-                  {NACCA_COMPETENCIES.map(label => {
-                    const selected = coreCompetencies.includes(label)
-                    return (
-                      <button
-                        key={label}
-                        type="button"
-                        onClick={() => setCoreCompetencies(prev =>
-                          selected ? prev.filter(c => c !== label) : [...prev, label]
-                        )}
-                        className={`text-xs px-2 py-1 rounded border ${
-                          selected
-                            ? 'bg-primary text-primary-foreground border-primary'
-                            : 'bg-background text-muted-foreground'
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-sm font-medium">References</label>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    type="button"
-                    onClick={() => setStructuredRefs(prev => [
-                      ...prev,
-                      { type: 'Other', title: '', author_publisher: '', page: '', notes: '' },
-                    ])}
-                  >
-                    + Add reference
-                  </Button>
-                </div>
-                {structuredRefs.map((ref, idx) => (
-                  <div key={idx} className="grid grid-cols-12 gap-2 mb-2">
-                    <Select
-                      value={ref.type}
-                      onChange={(e) => setStructuredRefs(prev => prev.map((r, i) =>
-                        i === idx ? { ...r, type: e.target.value } : r
-                      ))}
-                      className="col-span-4 h-9 px-2 text-sm"
-                      aria-label="Reference type"
-                    >
-                      {REFERENCE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                    </Select>
-                    <Input
-                      type="text"
-                      value={ref.title}
-                      onChange={(e) => setStructuredRefs(prev => prev.map((r, i) =>
-                        i === idx ? { ...r, title: e.target.value } : r
-                      ))}
-                      placeholder="Title"
-                      className="col-span-5 h-9 px-2 text-sm"
-                    />
-                    <Input
-                      type="text"
-                      value={ref.page || ''}
-                      onChange={(e) => setStructuredRefs(prev => prev.map((r, i) =>
-                        i === idx ? { ...r, page: e.target.value } : r
-                      ))}
-                      placeholder="Page (optional)"
-                      className="col-span-3 h-9 px-2 text-sm"
-                    />
-                  </div>
+          {/* Phase 1 · Starter */}
+          <section className="mt-5 border-t border-slate-100 pt-5" aria-label="Phase 1 Starter">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-[#102A43]">Phase 1 · Starter</h3>
+              {suggestButton('introduction')}
+            </div>
+            <TextArea
+              id="lesson-introduction"
+              aria-label="Introduction / Starter"
+              value={introduction}
+              onChange={(e) => setIntroduction(e.target.value)}
+              rows={4}
+            />
+          </section>
+
+          {/* Phase 2 · Main Learning — generated content, read-only here. */}
+          {mainActivities.length > 0 && (
+            <section
+              className="mt-5 border-t border-slate-100 pt-5"
+              aria-label="Phase 2 Main Learning"
+            >
+              <h3 className="text-sm font-semibold text-[#102A43]">Phase 2 · Main Learning</h3>
+              <ul className="mt-2 space-y-2">
+                {mainActivities.map((act, i) => (
+                  <li key={i} className="rounded-lg bg-slate-50 px-3 py-2 text-sm">
+                    {act.description}
+                    {typeof act.duration_minutes === 'number' && act.duration_minutes > 0 && (
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        {act.duration_minutes} min
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {/* Assessment */}
+          <section className="mt-5 border-t border-slate-100 pt-5" aria-label="Assessment">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-[#102A43]">Assessment</h3>
+              {suggestButton('assessment')}
+            </div>
+            <TextArea
+              id="lesson-assessment"
+              aria-label="Assessment"
+              value={assessment}
+              onChange={(e) => setAssessment(e.target.value)}
+              rows={3}
+            />
+          </section>
+
+          {/* Phase 3 · Plenary */}
+          <section className="mt-5 border-t border-slate-100 pt-5" aria-label="Phase 3 Plenary">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-[#102A43]">Phase 3 · Plenary</h3>
+              {suggestButton('conclusion')}
+            </div>
+            <TextArea
+              id="lesson-conclusion"
+              aria-label="Conclusion / Reflection"
+              value={conclusion}
+              onChange={(e) => setConclusion(e.target.value)}
+              rows={3}
+            />
+          </section>
+
+          {/* Keywords */}
+          <section className="mt-5 border-t border-slate-100 pt-5" aria-label="Keywords">
+            <h3 className="mb-2 text-sm font-semibold text-[#102A43]">Keywords</h3>
+            <Field label="Keywords / Vocabulary" htmlFor="lesson-keywords">
+              <Input
+                id="lesson-keywords"
+                type="text"
+                value={keywords.join(', ')}
+                onChange={(e) => setKeywords(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                placeholder="Comma-separated"
+              />
+            </Field>
+          </section>
+
+          {/* TLRs — from the scheme of learning, read-only. */}
+          {!!(lesson.source_tlrs?.length) && (
+            <section className="mt-5 border-t border-slate-100 pt-5" aria-label="Teaching and Learning Resources">
+              <h3 className="text-sm font-semibold text-[#102A43]">Teaching &amp; Learning Resources</h3>
+              <p className="mt-1 text-xs text-muted-foreground">From your scheme of learning</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {lesson.source_tlrs!.map((r, i) => (
+                  <span key={i} className="rounded bg-[#102A43]/8 px-2 py-1 text-sm text-[#102A43]">
+                    {r}
+                  </span>
                 ))}
               </div>
-            </div>
+            </section>
+          )}
 
-            <div className="flex items-center gap-3">
-              <Button onClick={handleSave} disabled={saving}>
-                {saving ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Changes
-                  </>
-                )}
-              </Button>
-              {saved && (
-                <span className="text-sm text-green-600 flex items-center">
-                  <CheckCircle className="h-4 w-4 mr-1" />
-                  Saved
-                </span>
-              )}
+          {/* Other TLRs — teacher additions. */}
+          <section className="mt-5 border-t border-slate-100 pt-5" aria-label="Other TLRs">
+            <h3 className="mb-2 text-sm font-semibold text-[#102A43]">Other TLRs</h3>
+            <Field
+              label="Other Teaching & Learning Resources"
+              htmlFor="lesson-other-tlrs"
+              hint="Teacher additions — not from the scheme"
+            >
+              <Input
+                id="lesson-other-tlrs"
+                type="text"
+                value={otherTlrs.join(', ')}
+                onChange={(e) => setOtherTlrs(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                placeholder="Comma-separated teacher additions"
+              />
+            </Field>
+          </section>
+
+          {/* Core Competencies */}
+          <section className="mt-5 border-t border-slate-100 pt-5" aria-label="Core Competencies">
+            <h3 className="mb-2 text-sm font-semibold text-[#102A43]">Core Competencies</h3>
+            <div className="flex flex-wrap gap-1.5">
+              {NACCA_COMPETENCIES.map(label => {
+                const selected = coreCompetencies.includes(label)
+                return (
+                  <button
+                    key={label}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => setCoreCompetencies(prev =>
+                      selected ? prev.filter(c => c !== label) : [...prev, label]
+                    )}
+                    className={`rounded border px-2 py-1 text-xs ${
+                      selected
+                        ? 'border-[#102A43] bg-[#102A43] text-white'
+                        : 'bg-background text-muted-foreground'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
             </div>
-            {error && <Banner tone="danger">{error}</Banner>}
-          </CardContent>
-        </Card>
+          </section>
+
+          {/* References */}
+          <section className="mt-5 border-t border-slate-100 pt-5" aria-label="References">
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-[#102A43]">References</h3>
+              <Button
+                size="sm"
+                variant="outline"
+                type="button"
+                onClick={() => setStructuredRefs(prev => [
+                  ...prev,
+                  { type: 'Other', title: '', author_publisher: '', page: '', notes: '' },
+                ])}
+              >
+                + Add reference
+              </Button>
+            </div>
+            {structuredRefs.length === 0 && (
+              <p className="text-sm text-muted-foreground">No references yet.</p>
+            )}
+            {structuredRefs.map((ref, idx) => (
+              <div key={idx} className="mb-2 grid grid-cols-12 gap-2">
+                <Select
+                  value={ref.type}
+                  onChange={(e) => setStructuredRefs(prev => prev.map((r, i) =>
+                    i === idx ? { ...r, type: e.target.value } : r
+                  ))}
+                  className="col-span-4 h-9 px-2 text-sm"
+                  aria-label="Reference type"
+                >
+                  {REFERENCE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </Select>
+                <Input
+                  type="text"
+                  value={ref.title}
+                  onChange={(e) => setStructuredRefs(prev => prev.map((r, i) =>
+                    i === idx ? { ...r, title: e.target.value } : r
+                  ))}
+                  placeholder="Title"
+                  className="col-span-5 h-9 px-2 text-sm"
+                />
+                <Input
+                  type="text"
+                  value={ref.page || ''}
+                  onChange={(e) => setStructuredRefs(prev => prev.map((r, i) =>
+                    i === idx ? { ...r, page: e.target.value } : r
+                  ))}
+                  placeholder="Page (optional)"
+                  className="col-span-3 h-9 px-2 text-sm"
+                />
+              </div>
+            ))}
+          </section>
+
+          {/* Save */}
+          <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4">
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Changes
+                </>
+              )}
+            </Button>
+            {saved && (
+              <span className="flex items-center text-sm text-green-600">
+                <CheckCircle className="mr-1 h-4 w-4" />
+                Saved
+              </span>
+            )}
+          </div>
+          {error && <Banner tone="danger" className="mt-4">{error}</Banner>}
+        </SurfaceCard>
       </main>
     </div>
   )

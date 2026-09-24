@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { SurfaceCard } from '@/components/ui/surface-card'
+import { Banner } from '@/components/ui/banner'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Field, TextArea } from '@/components/ui/field'
@@ -13,7 +14,6 @@ import { api } from '@/lib/api'
 import { resolveRouteId } from '@/lib/route-params'
 import { PageHeader } from '@/components/ui/page-header'
 import { SchemeOfWork, TermConfig, CurriculumCoverage, Template, CurriculumProfile } from '@/types'
-import { formatCurrency } from '@/lib/utils-display'
 
 export default function GeneratePage() {
   const router = useRouter()
@@ -54,8 +54,8 @@ export default function GeneratePage() {
     'Textbook',
     'Other',
   ]
-  //: Actual AI resolution (mode/provider/available) reported by the backend —
-  //: so the UI never shows a mode that disagrees with real behaviour.
+  // Actual AI resolution (mode/provider/available) reported by the backend —
+  // so the UI never shows a mode that disagrees with real behaviour.
   const [aiStatus, setAiStatus] = useState<{
     mode: string; active: boolean; provider: string | null; state: string; reason: string | null;
   } | null>(null)
@@ -403,26 +403,24 @@ export default function GeneratePage() {
 
   if (error && !scheme) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card className="max-w-md">
-          <CardContent className="p-8 text-center">
-            <p className="text-destructive mb-4">{error}</p>
-            <Button onClick={loadData}>Try Again</Button>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+        <SurfaceCard className="w-full max-w-md px-6 py-8 text-center">
+          <p className="mb-4 text-destructive">{error}</p>
+          <Button onClick={loadData}>Try Again</Button>
+        </SurfaceCard>
       </div>
     )
   }
 
   if (!scheme) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card className="max-w-md">
-          <CardContent className="p-8 text-center">
-            <p className="text-muted-foreground mb-4">Scheme not found</p>
-            <Link href="/dashboard"><Button>Go to Dashboard</Button></Link>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+        <SurfaceCard className="w-full max-w-md px-6 py-8 text-center">
+          <p className="mb-4 text-muted-foreground">Scheme not found</p>
+          <Button asChild>
+            <Link href="/dashboard">Go to Dashboard</Link>
+          </Button>
+        </SurfaceCard>
       </div>
     )
   }
@@ -430,10 +428,22 @@ export default function GeneratePage() {
   const filteredTemplates = getTemplatesForScheme()
   const currentProfile = getProfileForScheme()
 
+  // Why the Generate action is unavailable — never a silent disable.
+  const generateBlockReasons: string[] = []
+  if (
+    allocationPreview &&
+    allocationPreview.lesson_quota?.enforced &&
+    (allocationPreview.selectable_indicators?.length || 0) > 0 &&
+    selectedCodes.length === 0
+  ) {
+    generateBlockReasons.push('Select at least one indicator to generate.')
+  }
+  const generateIsBlocked = generateBlockReasons.length > 0
+
   return (
     <div className="min-h-screen">
       <main className="container mx-auto px-4 py-8">
-        {/* Scheme Info */}
+        {/* One h1: this page generates lesson plans from this scheme. */}
         <PageHeader
           className="mb-6"
           eyebrow="Generate"
@@ -441,189 +451,247 @@ export default function GeneratePage() {
           description={<>{scheme.filename} &bull; {scheme.subject} &bull; {scheme.class_level} &bull; {scheme.term}</>}
         />
 
-        {/* Read-only scheme context (Class / Subject / Term) */}
-        <div className="grid md:grid-cols-3 gap-4 mb-6">
-          <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Class</p><p className="text-lg font-semibold">{scheme.class_level}</p></CardContent></Card>
-          <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Subject</p><p className="text-lg font-semibold">{scheme.subject}</p></CardContent></Card>
-          <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Term</p><p className="text-lg font-semibold">{scheme.term || config.term}</p></CardContent></Card>
-        </div>
-
-        <div className="grid lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Settings className="h-5 w-5 mr-2" />
-                  Configuration
-                </CardTitle>
-                <CardDescription>
-                  Configure your lesson plan generation settings
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid md:grid-cols-3 gap-4">
-                  <Field label="Class Size" htmlFor="cfg-class-size">
-                    <Input
-                      id="cfg-class-size"
-                      type="number"
-                      value={config.class_size}
-                      onChange={(e) => setConfig({ ...config, class_size: parseInt(e.target.value) || 11 })}
-                    />
-                  </Field>
-                  <Field label="Lesson Duration (min)" htmlFor="cfg-duration">
-                    <Input
-                      id="cfg-duration"
-                      type="number"
-                      value={config.lesson_duration_minutes}
-                      onChange={(e) => setConfig({ ...config, lesson_duration_minutes: parseInt(e.target.value) || 60 })}
-                    />
-                  </Field>
-                  <Field label="Lessons/Week" htmlFor="cfg-lessons-per-week">
-                    <Input
-                      id="cfg-lessons-per-week"
-                      type="number"
-                      value={config.lessons_per_week}
-                      onChange={(e) => setConfig({ ...config, lessons_per_week: parseInt(e.target.value) || 3 })}
-                    />
-                  </Field>
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-4">
-                  <Field label="Term Start" htmlFor="cfg-term-start">
-                    <Input
-                      id="cfg-term-start"
-                      type="date"
-                      value={config.term_start_date}
-                      onChange={(e) => setConfig({ ...config, term_start_date: e.target.value })}
-                    />
-                  </Field>
-                  <Field label="Term End" htmlFor="cfg-term-end">
-                    <Input
-                      id="cfg-term-end"
-                      type="date"
-                      value={config.term_end_date}
-                      onChange={(e) => setConfig({ ...config, term_end_date: e.target.value })}
-                    />
-                  </Field>
-                </div>
-
+        <div className="grid gap-6 lg:grid-cols-3">
+          {/* MAIN COLUMN — source facts, configuration, allocation, review. */}
+          <div className="space-y-6 lg:col-span-2">
+            {/* A. What exact lessons am I about to generate? Source facts first. */}
+            <SurfaceCard
+              data-generate-summary
+              accent="bg-gradient-to-r from-[#102A43] to-[#04A9CE]"
+              className="px-5 py-5 sm:px-6"
+            >
+              <h2 className="text-lg font-semibold text-[#102A43]">What you will generate</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Everything here comes from your uploaded scheme — check it matches your class
+                before generating.
+              </p>
+              <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
                 <div>
-                  <label className="block text-sm font-medium mb-2">Teaching Days</label>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      { value: 0, label: 'Monday' },
-                      { value: 1, label: 'Tuesday' },
-                      { value: 2, label: 'Wednesday' },
-                      { value: 3, label: 'Thursday' },
-                      { value: 4, label: 'Friday' },
-                    ].map((day) => (
-                      <button
-                        key={day.value}
-                        onClick={() => {
-                          const newDays = config.teaching_days.includes(day.value)
-                            ? config.teaching_days.filter(d => d !== day.value)
-                            : [...config.teaching_days, day.value]
-                          setConfig({ ...config, teaching_days: newDays.sort() })
-                        }}
-                        className={`px-3 py-1 rounded-full text-sm ${
-                          config.teaching_days.includes(day.value)
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-muted text-muted-foreground'
-                        }`}
-                      >
-                        {day.label}
-                      </button>
-                    ))}
+                  <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Subject</dt>
+                  <dd className="text-sm font-semibold text-[#102A43]">{scheme.subject}</dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Class</dt>
+                  <dd className="text-sm font-semibold text-[#102A43]">{scheme.class_level}</dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Term</dt>
+                  <dd className="text-sm font-semibold text-[#102A43]">{scheme.term || config.term}</dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Academic year</dt>
+                  <dd className="text-sm font-semibold text-[#102A43]">{scheme.academic_year}</dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Weeks in scheme</dt>
+                  <dd className="text-sm font-semibold text-[#102A43]">{scheme.weeks_count}</dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Template profile</dt>
+                  <dd className="text-sm font-semibold text-[#102A43]">
+                    {currentProfile
+                      ? `${currentProfile.lessons_per_week}/week · ${currentProfile.lesson_duration_minutes} min`
+                      : `${config.lessons_per_week}/week · ${config.lesson_duration_minutes} min`}
+                  </dd>
+                </div>
+              </dl>
+              {allocationPreview && (
+                <div className="mt-4 rounded-lg bg-[#102A43]/5 px-4 py-3 text-sm">
+                  <span className="font-semibold text-[#102A43]">
+                    {allocationPreview.total_generated_lessons || 0} lesson plan
+                    {(allocationPreview.total_generated_lessons || 0) === 1 ? '' : 's'}
+                  </span>{' '}
+                  will be generated from{' '}
+                  <span className="font-semibold text-[#102A43]">
+                    {selectedCodes.length} indicator{selectedCodes.length === 1 ? '' : 's'}
+                  </span>{' '}
+                  selected &bull;{' '}
+                  {allocationPreview.coverage_percentage?.toFixed(1) ?? 0}% curriculum coverage
+                </div>
+              )}
+            </SurfaceCard>
+
+            {/* B. Configuration — grouped sections inside one surface. */}
+            <SurfaceCard data-generate-config className="px-5 py-5 sm:px-6">
+              <div className="flex items-center">
+                <Settings className="mr-2 h-5 w-5 text-[#04769B]" aria-hidden="true" />
+                <div>
+                  <h2 className="text-lg font-semibold text-[#102A43]">Configuration</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Configure your lesson plan generation settings
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5 space-y-6">
+                <section aria-label="Teaching setup" className="space-y-6">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    Teaching setup
+                  </h3>
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <Field label="Class Size" htmlFor="cfg-class-size">
+                      <Input
+                        id="cfg-class-size"
+                        type="number"
+                        value={config.class_size}
+                        onChange={(e) => setConfig({ ...config, class_size: parseInt(e.target.value) || 11 })}
+                      />
+                    </Field>
+                    <Field label="Lesson Duration (min)" htmlFor="cfg-duration">
+                      <Input
+                        id="cfg-duration"
+                        type="number"
+                        value={config.lesson_duration_minutes}
+                        onChange={(e) => setConfig({ ...config, lesson_duration_minutes: parseInt(e.target.value) || 60 })}
+                      />
+                    </Field>
+                    <Field label="Lessons/Week" htmlFor="cfg-lessons-per-week">
+                      <Input
+                        id="cfg-lessons-per-week"
+                        type="number"
+                        value={config.lessons_per_week}
+                        onChange={(e) => setConfig({ ...config, lessons_per_week: parseInt(e.target.value) || 3 })}
+                      />
+                    </Field>
                   </div>
-                </div>
 
-                <div className="grid md:grid-cols-2 gap-4">
-                  <Field label="Template" htmlFor="cfg-template">
-                    <Select
-                      id="cfg-template"
-                      value={config.template_id || config.template_type}
-                      onChange={(e) => setConfig({ ...config, template_id: e.target.value })}
-                    >
-                      {filteredTemplates.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.name}{t.is_default ? ' (Default)' : ''}
-                        </option>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Field label="Term Start" htmlFor="cfg-term-start">
+                      <Input
+                        id="cfg-term-start"
+                        type="date"
+                        value={config.term_start_date}
+                        onChange={(e) => setConfig({ ...config, term_start_date: e.target.value })}
+                      />
+                    </Field>
+                    <Field label="Term End" htmlFor="cfg-term-end">
+                      <Input
+                        id="cfg-term-end"
+                        type="date"
+                        value={config.term_end_date}
+                        onChange={(e) => setConfig({ ...config, term_end_date: e.target.value })}
+                      />
+                    </Field>
+                  </div>
+
+                  <div>
+                    <p className="mb-2 text-sm font-medium">Teaching Days</p>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { value: 0, label: 'Monday' },
+                        { value: 1, label: 'Tuesday' },
+                        { value: 2, label: 'Wednesday' },
+                        { value: 3, label: 'Thursday' },
+                        { value: 4, label: 'Friday' },
+                      ].map((day) => (
+                        <button
+                          key={day.value}
+                          onClick={() => {
+                            const newDays = config.teaching_days.includes(day.value)
+                              ? config.teaching_days.filter(d => d !== day.value)
+                              : [...config.teaching_days, day.value]
+                            setConfig({ ...config, teaching_days: newDays.sort() })
+                          }}
+                          className={`rounded-full px-3 py-1 text-sm ${
+                            config.teaching_days.includes(day.value)
+                              ? 'bg-[#102A43] text-white'
+                              : 'bg-muted text-muted-foreground'
+                          }`}
+                        >
+                          {day.label}
+                        </button>
                       ))}
-                    </Select>
-                    {currentProfile && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {currentProfile.name} &bull; {currentProfile.lessons_per_week} lessons/week &bull; {currentProfile.lesson_duration_minutes} min
-                      </p>
-                    )}
-                  </Field>
-                  <Field label="AI Mode" htmlFor="cfg-ai-mode">
-                    <Select
-                      id="cfg-ai-mode"
-                      value={config.ai_mode}
-                      onChange={(e) => {
-                        const mode = e.target.value
-                        setConfig({ ...config, ai_mode: mode as any })
-                        try { window.localStorage.setItem('schemeknit.ai_mode', mode) } catch { /* ignore */ }
-                      }}
-                    >
-                      <option value="OFF">OFF - Deterministic only</option>
-                      <option value="BASIC">BASIC - AI suggestions</option>
-                      <option value="ENHANCED">ENHANCED - Full AI</option>
-                    </Select>
-                    {aiStatus && (
-                      <p className={`text-xs mt-1 ${aiStatus.active ? 'text-green-600' : 'text-muted-foreground'}`}>
-                        {aiStatus.active
-                          ? `AI active · provider: ${aiStatus.provider}`
-                          : config.ai_mode === 'OFF'
-                            ? 'Deterministic engine · AI provider active: No'
-                            : 'No AI provider available — lessons will be deterministic.'}
-                      </p>
-                    )}
-                  </Field>
-                </div>
+                    </div>
+                  </div>
 
-                <div className="grid md:grid-cols-2 gap-4">
-                  {/* School and teacher identity are server-derived from the
-                      authenticated user's school relationship and profile, so
-                      they are shown read-only here (PART 13-15): the teacher
-                      never types a school name, and the client value is not
-                      trusted. */}
-                  <Field label="School Name" htmlFor="cfg-school-name" hint="Derived from your school membership">
-                    <Input
-                      id="cfg-school-name"
-                      type="text"
-                      value={config.school_name || currentUser?.school_name || '—'}
-                      disabled
-                      placeholder="Derived from your school"
-                      className="bg-muted text-muted-foreground"
-                    />
-                  </Field>
-                  <Field label="Teacher Name" htmlFor="cfg-teacher-name" hint="From your profile — update it in Settings">
-                    <Input
-                      id="cfg-teacher-name"
-                      type="text"
-                      value={config.teacher_name || currentUser?.full_name || '—'}
-                      disabled
-                      placeholder="Derived from your profile"
-                      className="bg-muted text-muted-foreground"
-                    />
-                  </Field>
-                </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Field label="Template" htmlFor="cfg-template">
+                      <Select
+                        id="cfg-template"
+                        value={config.template_id || config.template_type}
+                        onChange={(e) => setConfig({ ...config, template_id: e.target.value })}
+                      >
+                        {filteredTemplates.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.name}{t.is_default ? ' (Default)' : ''}
+                          </option>
+                        ))}
+                      </Select>
+                      {currentProfile && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {currentProfile.name} &bull; {currentProfile.lessons_per_week} lessons/week &bull; {currentProfile.lesson_duration_minutes} min
+                        </p>
+                      )}
+                    </Field>
+                    <Field label="AI Mode" htmlFor="cfg-ai-mode">
+                      <Select
+                        id="cfg-ai-mode"
+                        value={config.ai_mode}
+                        onChange={(e) => {
+                          const mode = e.target.value
+                          setConfig({ ...config, ai_mode: mode as any })
+                          try { window.localStorage.setItem('schemeknit.ai_mode', mode) } catch { /* ignore */ }
+                        }}
+                      >
+                        <option value="OFF">OFF - Deterministic only</option>
+                        <option value="BASIC">BASIC - AI suggestions</option>
+                        <option value="ENHANCED">ENHANCED - Full AI</option>
+                      </Select>
+                      {aiStatus && (
+                        <p className={`mt-1 text-xs ${aiStatus.active ? 'text-green-600' : 'text-muted-foreground'}`}>
+                          {aiStatus.active
+                            ? `AI active · provider: ${aiStatus.provider}`
+                            : config.ai_mode === 'OFF'
+                              ? 'Deterministic engine · AI provider active: No'
+                              : 'No AI provider available — lessons will be deterministic.'}
+                        </p>
+                      )}
+                    </Field>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {/* School and teacher identity are server-derived from the
+                        authenticated user's school relationship and profile, so
+                        they are shown read-only here (PART 13-15): the teacher
+                        never types a school name, and the client value is not
+                        trusted. */}
+                    <Field label="School Name" htmlFor="cfg-school-name" hint="Derived from your school membership">
+                      <Input
+                        id="cfg-school-name"
+                        type="text"
+                        value={config.school_name || currentUser?.school_name || '—'}
+                        disabled
+                        placeholder="Derived from your school"
+                        className="bg-muted text-muted-foreground"
+                      />
+                    </Field>
+                    <Field label="Teacher Name" htmlFor="cfg-teacher-name" hint="From your profile — update it in Settings">
+                      <Input
+                        id="cfg-teacher-name"
+                        type="text"
+                        value={config.teacher_name || currentUser?.full_name || '—'}
+                        disabled
+                        placeholder="Derived from your profile"
+                        className="bg-muted text-muted-foreground"
+                      />
+                    </Field>
+                  </div>
+                </section>
 
                 {/* Lesson metadata the teacher supplies once (PART 11-24).
                     Each is optional; blanks stay blank and are never invented.
                     Keywords / TLRs / Competencies / References here are SEEDS
                     for every lesson — source TLRs and per-lesson review data
                     stay authoritative in the per-lesson panel below. */}
-                <div className="border-t pt-6">
-                  <h3 className="text-sm font-semibold mb-1">Lesson Plan Details</h3>
-                  <p className="text-xs text-muted-foreground mb-4">
+                <section aria-label="Lesson plan details" className="border-t pt-6">
+                  <h3 className="text-sm font-semibold">Lesson Plan Details</h3>
+                  <p className="mb-4 text-xs text-muted-foreground">
                     These seed every lesson as a starting point. Source TLRs from
                     your scheme and per-lesson edits in Allocation Preview override
                     them for that lesson. Leave blank to keep them empty.
                   </p>
                   <div className="space-y-4">
-                    <div className="grid md:grid-cols-2 gap-4">
+                    <div className="grid gap-4 md:grid-cols-2">
                       <Field label="Period" htmlFor="cfg-period">
                         <Input
                           id="cfg-period"
@@ -694,51 +762,56 @@ export default function GeneratePage() {
                       />
                     </Field>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                </section>
+              </div>
+            </SurfaceCard>
 
-          <div className="lg:col-span-1 space-y-6">
-            {/* Allocation Preview */}
+            {/* C. Allocation Preview — quotas, indicators, week-by-week periods. */}
             {allocationPreview && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm">Allocation Preview</CardTitle>
-                  <CardDescription>
-                    One indicator → one teaching period → one lesson plan
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
+              <SurfaceCard
+                data-allocation-preview
+                accent="bg-gradient-to-r from-[#102A43] to-[#04A9CE]"
+                className="px-5 py-5 sm:px-6"
+              >
+                <h2 className="text-lg font-semibold text-[#102A43]">Allocation Preview</h2>
+                <p className="text-sm text-muted-foreground">
+                  One indicator → one teaching period → one lesson plan
+                </p>
+
+                <div className="mt-4 space-y-4">
                   {/* Conflicts first — teacher must see these before generating */}
                   {(allocationPreview.allocation_conflicts?.length > 0 ||
                     allocationPreview.indicators_unallocated > 0 ||
                     allocationPreview.indicators_duplicated > 0) && (
-                    <div className="p-3 rounded-md bg-yellow-50 border border-yellow-200 text-xs text-yellow-800 space-y-1">
-                      <p className="font-semibold">Allocation conflicts — review before generating</p>
-                      {allocationPreview.allocation_conflicts?.map((c: string, i: number) => (
-                        <p key={`c-${i}`}>{c}</p>
-                      ))}
-                      {allocationPreview.indicators_unallocated > 0 && (
-                        <p>
-                          {allocationPreview.indicators_unallocated} indicator(s) have no
-                          lesson allocation — they would disappear from the plan.
-                        </p>
-                      )}
-                      {allocationPreview.indicators_duplicated > 0 && (
-                        <p>
-                          Duplicate indicator allocation detected — an indicator is the
-                          primary focus of more than one lesson.
-                        </p>
-                      )}
-                    </div>
+                    <Banner tone="warning" title="Allocation conflicts — review before generating">
+                      <div className="space-y-1">
+                        {allocationPreview.allocation_conflicts?.map((c: string, i: number) => (
+                          <p key={`c-${i}`}>{c}</p>
+                        ))}
+                        {allocationPreview.indicators_unallocated > 0 && (
+                          <p>
+                            {allocationPreview.indicators_unallocated} indicator(s) have no
+                            lesson allocation — they would disappear from the plan.
+                          </p>
+                        )}
+                        {allocationPreview.indicators_duplicated > 0 && (
+                          <p>
+                            Duplicate indicator allocation detected — an indicator is the
+                            primary focus of more than one lesson.
+                          </p>
+                        )}
+                      </div>
+                    </Banner>
                   )}
 
                   {/* Free Tier monthly allowance (PART C): plain, non-technical
                       language, with the scheme's indicator count and the
                       remaining allowance so the teacher can choose a subset. */}
                   {allocationPreview.lesson_quota?.enforced && (
-                    <div className="p-3 rounded-md bg-blue-50 border border-blue-200 text-xs text-blue-800 space-y-1">
+                    <div
+                      data-quota-banner
+                      className="space-y-1 rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800"
+                    >
                       <p className="font-semibold">
                         {allocationPreview.lesson_quota.used} of {allocationPreview.lesson_quota.limit} Free Tier lesson plans used this month ·{' '}
                         {allocationPreview.lesson_quota.remaining} remaining
@@ -759,7 +832,7 @@ export default function GeneratePage() {
                       scheme for later. Unlimited plans see every indicator
                       pre-selected with no cap. */}
                   {allocationPreview.selectable_indicators?.length > 0 && (
-                    <div className="space-y-2">
+                    <div data-indicator-select className="space-y-2">
                       <div className="flex items-center justify-between">
                         <p className="text-xs font-semibold text-muted-foreground">
                           Choose indicators to generate
@@ -771,7 +844,7 @@ export default function GeneratePage() {
                             : ` selected`}
                         </p>
                       </div>
-                      <div className="space-y-1.5 max-h-56 overflow-y-auto border rounded-md p-2">
+                      <div className="max-h-56 space-y-1.5 overflow-y-auto rounded-md border p-2">
                         {allocationPreview.selectable_indicators.map((ind: any) => {
                           const checked = selectedCodes.includes(ind.indicator_code)
                           const capped =
@@ -781,8 +854,8 @@ export default function GeneratePage() {
                           return (
                             <label
                               key={ind.indicator_code}
-                              className={`flex items-start gap-2 text-xs p-1.5 rounded ${
-                                capped ? 'opacity-50' : 'hover:bg-muted cursor-pointer'
+                              className={`flex cursor-pointer items-start gap-2 rounded p-1.5 text-xs ${
+                                capped ? 'opacity-50' : 'hover:bg-muted'
                               }`}
                             >
                               <input
@@ -796,7 +869,7 @@ export default function GeneratePage() {
                                 <span className="font-mono">{ind.indicator_code}</span>
                                 {' — '}
                                 {ind.indicator_description}
-                                <span className="text-muted-foreground ml-1">
+                                <span className="ml-1 text-muted-foreground">
                                   (Week {ind.source_week})
                                 </span>
                               </span>
@@ -823,434 +896,466 @@ export default function GeneratePage() {
                   {/* Allocation preview, grouped by ACTUAL teaching week. A lesson
                       carried forward from an earlier curriculum week says so in
                       plain language. */}
-                  <div className="space-y-3 max-h-72 overflow-y-auto">
+                  <div className="max-h-72 space-y-3 overflow-y-auto" data-allocation-weeks>
                     {previewTeachingWeeks.map((week: any) => (
                       <div key={`tw-${week.teaching_week}`}>
-                        <h4 className="text-xs font-semibold text-muted-foreground mb-1.5 sticky top-0 bg-background">
+                        <h3 className="mb-1.5 sticky top-0 bg-white text-xs font-semibold text-muted-foreground">
                           Week {week.teaching_week}
-                          <span className="font-normal ml-2">
+                          <span className="ml-2 font-normal">
                             ({week.lesson_count} lesson{week.lesson_count === 1 ? '' : 's'})
                           </span>
-                        </h4>
-                        <table className="w-full border-collapse text-xs">
-                          <thead>
-                            <tr className="border-b text-left text-muted-foreground">
-                              <th className="py-1 pr-2 font-medium">Date</th>
-                              <th className="py-1 pr-2 font-medium">Period</th>
-                              <th className="py-1 pr-2 font-medium">Indicator</th>
-                              <th className="py-1 font-medium">Status</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y">
-                            {week.periods?.map((alloc: any) => {
-                              return (
-                                <tr key={`${week.teaching_week}-${alloc.period_index}`}>
-                                  <td className="py-1.5 pr-2 whitespace-nowrap">
-                                    {alloc.lesson_date
-                                      ? new Date(alloc.lesson_date).toLocaleDateString('en-GB')
-                                      : '—'}
-                                  </td>
-                                  <td className="py-1.5 pr-2 font-mono whitespace-nowrap">
-                                    {alloc.period_index}
-                                  </td>
-                                  <td className="py-1.5 pr-2" title={alloc.indicator_description}>
-                                    <span className="font-mono">{alloc.indicator_code}</span>
-                                  </td>
-                                  <td className="py-1.5">
-                                    {alloc.status === 'needs_review' ? (
-                                      <span className="text-yellow-700 font-medium">Needs review</span>
-                                    ) : alloc.status === 'carried_forward' ? (
-                                      <span className="text-blue-700 font-medium">
-                                        Carried forward from Week {alloc.source_week}
-                                      </span>
-                                    ) : (
-                                      <span className="text-green-700 font-medium">Scheduled</span>
-                                    )}
+                        </h3>
+                        <div className="overflow-x-auto">
+                          <table className="w-full border-collapse text-xs">
+                            <thead>
+                              <tr className="border-b text-left text-muted-foreground">
+                                <th className="py-1 pr-2 font-medium">Date</th>
+                                <th className="py-1 pr-2 font-medium">Period</th>
+                                <th className="py-1 pr-2 font-medium">Indicator</th>
+                                <th className="py-1 font-medium">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                              {week.periods?.map((alloc: any) => {
+                                return (
+                                  <tr key={`${week.teaching_week}-${alloc.period_index}`}>
+                                    <td className="whitespace-nowrap py-1.5 pr-2">
+                                      {alloc.lesson_date
+                                        ? new Date(alloc.lesson_date).toLocaleDateString('en-GB')
+                                        : '—'}
+                                    </td>
+                                    <td className="whitespace-nowrap py-1.5 pr-2 font-mono">
+                                      {alloc.period_index}
+                                    </td>
+                                    <td className="py-1.5 pr-2" title={alloc.indicator_description}>
+                                      <span className="font-mono">{alloc.indicator_code}</span>
+                                    </td>
+                                    <td className="py-1.5">
+                                      {alloc.status === 'needs_review' ? (
+                                        <span className="font-medium text-yellow-700">Needs review</span>
+                                      ) : alloc.status === 'carried_forward' ? (
+                                        <span className="font-medium text-blue-700">
+                                          Carried forward from Week {alloc.source_week}
+                                        </span>
+                                      ) : (
+                                        <span className="font-medium text-green-700">Scheduled</span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                              {(!week.periods || week.periods.length === 0) && (
+                                <tr>
+                                  <td colSpan={4} className="py-1.5 italic text-muted-foreground">
+                                    No teaching periods this week
                                   </td>
                                 </tr>
-                              )
-                            })}
-                            {(!week.periods || week.periods.length === 0) && (
-                              <tr>
-                                <td colSpan={4} className="py-1.5 text-muted-foreground italic">
-                                  No teaching periods this week
-                                </td>
-                              </tr>
-                            )}
-                          </tbody>
-                        </table>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     ))}
                   </div>
 
-                  {/* Per-lesson review data (Section H): source fields are
-                      read-only; keywords / Other TLRs / competencies /
-                      references are editable and applied on generate. */}
-                  {lessonReview.length > 0 && (
-                    <div className="border-t pt-4 space-y-3">
-                      <div className="flex items-center justify-between gap-2">
+                  <p className="border-t pt-3 text-xs text-muted-foreground">
+                    {allocationPreview.total_generated_lessons || 0} lessons will be generated ·{' '}
+                    {allocationPreview.coverage_percentage?.toFixed(1) ?? 0}% curriculum coverage
+                  </p>
+                </div>
+              </SurfaceCard>
+            )}
+
+            {/* D. Per-lesson review data (Section H): source fields are
+                read-only; keywords / Other TLRs / competencies /
+                references are editable and applied on generate. */}
+            {lessonReview.length > 0 && (
+              <SurfaceCard data-lesson-review className="px-5 py-5 sm:px-6">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <h2 className="text-base font-semibold text-[#102A43]">Lesson Review Data</h2>
+                    <p className="text-xs text-muted-foreground">
+                      Review each lesson before generating. Source TLRs and
+                      week-ending stay from your scheme document.
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={saveLessonReviewDrafts}
+                    disabled={reviewSaving}
+                  >
+                    {reviewSaving ? (
+                      <>
+                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="mr-1 h-3 w-3" />
+                        Save review
+                      </>
+                    )}
+                  </Button>
+                </div>
+                {reviewSaved && (
+                  <p className="mt-2 text-xs text-green-600">Lesson review saved.</p>
+                )}
+                <div className="mt-4 max-h-96 space-y-4 overflow-y-auto pr-1">
+                  {lessonReview.map((row) => (
+                    <div
+                      key={`review-${row.lesson_sequence}`}
+                      className="space-y-2 rounded-md border bg-muted/30 p-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
                         <div>
-                          <h4 className="text-xs font-semibold text-muted-foreground">
-                            Lesson Review Data
-                          </h4>
+                          <p className="text-xs font-semibold">
+                            Lesson {row.lesson_sequence + 1} ·{' '}
+                            <span className="font-mono">{row.indicator_code}</span>
+                          </p>
                           <p className="text-[11px] text-muted-foreground">
-                            Review each lesson before generating. Source TLRs and
-                            week-ending stay from your scheme document.
+                            Source Week {row.source_week}
+                            {row.week_ending
+                              ? ` · Week ending ${new Date(row.week_ending).toLocaleDateString('en-GB')}`
+                              : ''}
+                            {row.week_ending_derived ? ' (derived)' : ''}
+                            {' · '}Teaching Week {row.teaching_week}
                           </p>
                         </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={saveLessonReviewDrafts}
-                          disabled={reviewSaving}
-                        >
-                          {reviewSaving ? (
-                            <>
-                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                              Saving...
-                            </>
-                          ) : (
-                            <>
-                              <Save className="h-3 w-3 mr-1" />
-                              Save review
-                            </>
-                          )}
-                        </Button>
                       </div>
-                      {reviewSaved && (
-                        <p className="text-xs text-green-600">Lesson review saved.</p>
+                      <p className="text-[11px] leading-snug text-muted-foreground">
+                        {row.indicator_description}
+                      </p>
+                      {(row.content_standard || row.strand) && (
+                        <p className="text-[11px] text-muted-foreground">
+                          {row.strand}{row.sub_strand ? ` › ${row.sub_strand}` : ''}
+                          {row.content_standard ? ` · ${row.content_standard}` : ''}
+                        </p>
                       )}
-                      <div className="space-y-4 max-h-96 overflow-y-auto pr-1">
-                        {lessonReview.map((row) => (
-                          <div
-                            key={`review-${row.lesson_sequence}`}
-                            className="border rounded-md p-3 space-y-2 bg-muted/30"
+                      <div>
+                        <p className="mb-1 text-[11px] font-medium text-muted-foreground">
+                          Source TLRs (from scheme — read only)
+                        </p>
+                        {row.source_tlrs?.length ? (
+                          <ul className="list-inside list-disc text-[11px] text-muted-foreground">
+                            {row.source_tlrs.map((r: string, i: number) => (
+                              <li key={i}>{r}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-[11px] italic text-muted-foreground">
+                            No source TLRs for this week
+                          </p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                          Keywords for this lesson
+                        </label>
+                        <input
+                          type="text"
+                          value={(row.keywords || []).join(', ')}
+                          onChange={(e) => updateLessonReviewRow(row.lesson_sequence, {
+                            keywords: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
+                          })}
+                          placeholder="Comma-separated"
+                          className="w-full rounded-md border px-2 py-1.5 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                          Other TLRs for this lesson (not source)
+                        </label>
+                        <input
+                          type="text"
+                          value={(row.other_tlrs || []).join(', ')}
+                          onChange={(e) => updateLessonReviewRow(row.lesson_sequence, {
+                            other_tlrs: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
+                          })}
+                          placeholder="Comma-separated teacher additions"
+                          className="w-full rounded-md border px-2 py-1.5 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <p className="mb-1 text-[11px] font-medium text-muted-foreground">
+                          Core competencies
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {NACCA_COMPETENCIES.map((label) => {
+                            const selected = (row.core_competencies || []).includes(label)
+                            return (
+                              <button
+                                key={label}
+                                type="button"
+                                onClick={() => {
+                                  const cur = row.core_competencies || []
+                                  const next = selected
+                                    ? cur.filter((c: string) => c !== label)
+                                    : [...cur, label]
+                                  updateLessonReviewRow(row.lesson_sequence, {
+                                    core_competencies: next,
+                                  })
+                                }}
+                                className={`rounded border px-1.5 py-0.5 text-[10px] ${
+                                  selected
+                                    ? 'border-[#102A43] bg-[#102A43] text-white'
+                                    : 'bg-background text-muted-foreground'
+                                }`}
+                              >
+                                {label}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="mb-1 flex items-center justify-between">
+                          <p className="text-[11px] font-medium text-muted-foreground">
+                            References
+                          </p>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 px-2 text-[10px]"
+                            onClick={() => updateLessonReviewRow(row.lesson_sequence, {
+                              structured_references: [
+                                ...(row.structured_references || []),
+                                { type: 'Other', title: '', page: '' },
+                              ],
+                            })}
                           >
-                            <div className="flex items-start justify-between gap-2">
-                              <div>
-                                <p className="text-xs font-semibold">
-                                  Lesson {row.lesson_sequence + 1} ·{' '}
-                                  <span className="font-mono">{row.indicator_code}</span>
-                                </p>
-                                <p className="text-[11px] text-muted-foreground">
-                                  Source Week {row.source_week}
-                                  {row.week_ending
-                                    ? ` · Week ending ${new Date(row.week_ending).toLocaleDateString('en-GB')}`
-                                    : ''}
-                                  {row.week_ending_derived ? ' (derived)' : ''}
-                                  {' · '}Teaching Week {row.teaching_week}
-                                </p>
-                              </div>
-                            </div>
-                            <p className="text-[11px] text-muted-foreground leading-snug">
-                              {row.indicator_description}
-                            </p>
-                            {(row.content_standard || row.strand) && (
-                              <p className="text-[11px] text-muted-foreground">
-                                {row.strand}{row.sub_strand ? ` › ${row.sub_strand}` : ''}
-                                {row.content_standard ? ` · ${row.content_standard}` : ''}
-                              </p>
-                            )}
-                            <div>
-                              <p className="text-[11px] font-medium text-muted-foreground mb-1">
-                                Source TLRs (from scheme — read only)
-                              </p>
-                              {row.source_tlrs?.length ? (
-                                <ul className="list-disc list-inside text-[11px] text-muted-foreground">
-                                  {row.source_tlrs.map((r: string, i: number) => (
-                                    <li key={i}>{r}</li>
-                                  ))}
-                                </ul>
-                              ) : (
-                                <p className="text-[11px] italic text-muted-foreground">
-                                  No source TLRs for this week
-                                </p>
-                              )}
-                            </div>
-                            <div>
-                              <label className="text-[11px] font-medium text-muted-foreground block mb-1">
-                                Keywords for this lesson
-                              </label>
-                              <input
-                                type="text"
-                                value={(row.keywords || []).join(', ')}
-                                onChange={(e) => updateLessonReviewRow(row.lesson_sequence, {
-                                  keywords: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
-                                })}
-                                placeholder="Comma-separated"
-                                className="w-full px-2 py-1.5 text-xs border rounded-md"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-[11px] font-medium text-muted-foreground block mb-1">
-                                Other TLRs for this lesson (not source)
-                              </label>
-                              <input
-                                type="text"
-                                value={(row.other_tlrs || []).join(', ')}
-                                onChange={(e) => updateLessonReviewRow(row.lesson_sequence, {
-                                  other_tlrs: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
-                                })}
-                                placeholder="Comma-separated teacher additions"
-                                className="w-full px-2 py-1.5 text-xs border rounded-md"
-                              />
-                            </div>
-                            <div>
-                              <p className="text-[11px] font-medium text-muted-foreground mb-1">
-                                Core competencies
-                              </p>
-                              <div className="flex flex-wrap gap-1.5">
-                                {NACCA_COMPETENCIES.map((label) => {
-                                  const selected = (row.core_competencies || []).includes(label)
-                                  return (
-                                    <button
-                                      key={label}
-                                      type="button"
-                                      onClick={() => {
-                                        const cur = row.core_competencies || []
-                                        const next = selected
-                                          ? cur.filter((c: string) => c !== label)
-                                          : [...cur, label]
-                                        updateLessonReviewRow(row.lesson_sequence, {
-                                          core_competencies: next,
-                                        })
-                                      }}
-                                      className={`text-[10px] px-1.5 py-0.5 rounded border ${
-                                        selected
-                                          ? 'bg-primary text-primary-foreground border-primary'
-                                          : 'bg-background text-muted-foreground'
-                                      }`}
-                                    >
-                                      {label}
-                                    </button>
-                                  )
-                                })}
-                              </div>
-                            </div>
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <p className="text-[11px] font-medium text-muted-foreground">
-                                  References
-                                </p>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-6 text-[10px] px-2"
-                                  onClick={() => updateLessonReviewRow(row.lesson_sequence, {
-                                    structured_references: [
-                                      ...(row.structured_references || []),
-                                      { type: 'Other', title: '', page: '' },
-                                    ],
-                                  })}
-                                >
-                                  + Add
-                                </Button>
-                              </div>
-                              {(row.structured_references || []).map((ref: any, idx: number) => (
-                                <div key={idx} className="grid grid-cols-12 gap-1 mb-1">
-                                  <Select
-                                    value={ref.type || 'Other'}
-                                    onChange={(e) => updateStructuredRef(row.lesson_sequence, idx, { type: e.target.value })}
-                                    className="col-span-4 h-7 px-1 text-[10px]"
-                                    aria-label="Reference type"
-                                  >
-                                    {REFERENCE_TYPES.map(t => (
-                                      <option key={t} value={t}>{t}</option>
-                                    ))}
-                                  </Select>
-                                  <Input
-                                    type="text"
-                                    value={ref.title || ''}
-                                    onChange={(e) => updateStructuredRef(row.lesson_sequence, idx, { title: e.target.value })}
-                                    placeholder="Title"
-                                    className="col-span-5 h-7 px-1 text-[10px]"
-                                  />
-                                  <Input
-                                    type="text"
-                                    value={ref.page || ''}
-                                    onChange={(e) => updateStructuredRef(row.lesson_sequence, idx, { page: e.target.value })}
-                                    placeholder="Page (optional)"
-                                    className="col-span-3 h-7 px-1 text-[10px]"
-                                  />
-                                </div>
+                            + Add
+                          </Button>
+                        </div>
+                        {(row.structured_references || []).map((ref: any, idx: number) => (
+                          <div key={idx} className="mb-1 grid grid-cols-12 gap-1">
+                            <Select
+                              value={ref.type || 'Other'}
+                              onChange={(e) => updateStructuredRef(row.lesson_sequence, idx, { type: e.target.value })}
+                              className="col-span-4 h-7 px-1 text-[10px]"
+                              aria-label="Reference type"
+                            >
+                              {REFERENCE_TYPES.map(t => (
+                                <option key={t} value={t}>{t}</option>
                               ))}
-                            </div>
+                            </Select>
+                            <Input
+                              type="text"
+                              value={ref.title || ''}
+                              onChange={(e) => updateStructuredRef(row.lesson_sequence, idx, { title: e.target.value })}
+                              placeholder="Title"
+                              className="col-span-5 h-7 px-1 text-[10px]"
+                            />
+                            <Input
+                              type="text"
+                              value={ref.page || ''}
+                              onChange={(e) => updateStructuredRef(row.lesson_sequence, idx, { page: e.target.value })}
+                              placeholder="Page (optional)"
+                              className="col-span-3 h-7 px-1 text-[10px]"
+                            />
                           </div>
                         ))}
                       </div>
                     </div>
+                  ))}
+                </div>
+              </SurfaceCard>
+            )}
+          </div>
+
+          {/* ACTION RAIL — the one unmistakable place to preview and generate. */}
+          <div className="space-y-6 lg:col-span-1 lg:sticky lg:top-20 lg:self-start">
+            <SurfaceCard
+              data-generate-action
+              accent="bg-gradient-to-r from-[#102A43] to-[#04A9CE]"
+              className="px-5 py-5"
+            >
+              <h2 className="text-base font-semibold text-[#102A43]">Generate</h2>
+
+              {/* Export/generation failures surface here. Without this the controlled
+                  server messages (403 licence, 500 conversion, 503 converter missing)
+                  were invisible: the click simply appeared to do nothing. */}
+              {error && scheme && (
+                <Banner tone="danger" className="mt-3" title="Generation problem">
+                  {error}
+                </Banner>
+              )}
+
+              {!jobId ? (
+                <>
+                  {!allocationPreview && !allocationConfirmed && (
+                    <Banner tone="info" className="mt-3" title="Step 1: preview the allocation">
+                      Preview shows exactly which lessons will be generated — dates, periods and
+                      indicators — before anything is created.
+                    </Banner>
                   )}
 
-                  <p className="text-xs text-muted-foreground border-t pt-3">
-                    {allocationPreview.total_generated_lessons || 0} lessons will be generated ·{' '}
-                    {allocationPreview.coverage_percentage?.toFixed(1) ?? 0}% curriculum coverage
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Coverage Summary */}
-            {coverage && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Coverage Summary</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Instructional Weeks</span>
-                    <span className="font-medium">{coverage.total_instructional_weeks}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Curriculum Indicators</span>
-                    <span className="font-medium">{coverage.total_indicators}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Lessons Generated</span>
-                    <span className="font-medium">{coverage.total_generated_lessons}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Coverage</span>
-                    <span className="font-medium">{coverage.coverage_percentage?.toFixed(1)}%</span>
-                  </div>
-                  {coverage.warnings && coverage.warnings.length > 0 && (
-                    <div className="mt-3 p-2 bg-yellow-50 rounded text-xs text-yellow-700">
-                      {coverage.warnings.map((w, i) => <p key={i}>{w}</p>)}
-                    </div>
+                  {!allocationConfirmed && (
+                    <Button onClick={handlePreviewAllocation} disabled={previewing} className="mt-3 w-full" size="lg">
+                      {previewing ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Previewing...
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="mr-2 h-4 w-4" />
+                          Preview Allocation
+                        </>
+                      )}
+                    </Button>
                   )}
-                </CardContent>
-              </Card>
-            )}
 
-            {/* Generate / Export Panel */}
-            <Card>
-              <CardContent className="p-6 space-y-3">
-                {/* Export/generation failures surface here. Without this the controlled
-                    server messages (403 licence, 500 conversion, 503 converter missing)
-                    were invisible: the click simply appeared to do nothing. */}
-                {error && scheme && (
-                  <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm" role="alert">
-                    {error}
-                  </div>
-                )}
-                {!jobId ? (
-                  <>
-                    {!allocationConfirmed && (
-                      <Button onClick={handlePreviewAllocation} disabled={previewing} className="w-full" size="lg">
-                        {previewing ? (
+                  {/* Never a silent disable: state the reason next to the CTA. */}
+                  {allocationPreview && !allocationConfirmed && generateIsBlocked && (
+                    <Banner tone="warning" className="mt-3" title="Before you can generate">
+                      <ul className="list-disc space-y-1 pl-4">
+                        {generateBlockReasons.map((r) => (
+                          <li key={r}>{r}</li>
+                        ))}
+                      </ul>
+                    </Banner>
+                  )}
+                  {allocationPreview && !allocationConfirmed && !generateIsBlocked && (
+                    <p className="mt-3 text-sm font-medium text-green-700">
+                      Ready to generate {allocationPreview.total_generated_lessons || 0} lesson
+                      plan{(allocationPreview.total_generated_lessons || 0) === 1 ? '' : 's'}.
+                    </p>
+                  )}
+
+                  {allocationPreview && !allocationConfirmed && (
+                    <>
+                      <Button
+                        onClick={handleConfirmAndGenerate}
+                        disabled={
+                          generating ||
+                          (allocationPreview.lesson_quota?.enforced &&
+                            (allocationPreview.selectable_indicators?.length || 0) > 0 &&
+                            selectedCodes.length === 0)
+                        }
+                        className="mt-3 w-full bg-gradient-to-r from-[#102A43] to-[#04769B] text-white hover:from-[#0d2136] hover:to-[#04698a]"
+                        size="lg"
+                      >
+                        {generating ? (
                           <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Previewing...
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Generating...
                           </>
                         ) : (
                           <>
-                            <Eye className="h-4 w-4 mr-2" />
-                            Preview Allocation
+                            <Play className="mr-2 h-4 w-4" />
+                            Confirm &amp; Generate
                           </>
                         )}
                       </Button>
-                    )}
-                    {allocationPreview && !allocationConfirmed && (
-                      <>
-                        <Button
-                          onClick={handleConfirmAndGenerate}
-                          disabled={
-                            generating ||
-                            (allocationPreview.lesson_quota?.enforced &&
-                              (allocationPreview.selectable_indicators?.length || 0) > 0 &&
-                              selectedCodes.length === 0)
-                          }
-                          className="w-full"
-                          size="lg"
-                        >
-                          {generating ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Generating...
-                            </>
-                          ) : (
-                            <>
-                              <Play className="h-4 w-4 mr-2" />
-                              Confirm &amp; Generate
-                            </>
-                          )}
-                        </Button>
-                        {(allocationPreview.allocation_conflicts?.length > 0 ||
-                          allocationPreview.indicators_unallocated > 0) && (
-                          <p className="text-xs text-yellow-700 text-center">
-                            Indicators carry forward to the next teaching week — none are dropped
-                            or merged.
-                          </p>
-                        )}
-                      </>
-                    )}
-                    {!allocationPreview && !allocationConfirmed && (
-                      <p className="text-sm text-muted-foreground text-center">
-                        Preview allocation before generating
-                      </p>
-                    )}
-                    {generating && genProgress && (
-                      <p className="text-sm text-muted-foreground text-center">{genProgress}</p>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center text-green-600 mb-3 p-3 bg-green-50 rounded-lg">
-                      <CheckCircle className="h-5 w-5 mr-2 flex-shrink-0" />
-                      <span className="font-medium">
-                        {coverage?.total_generated_lessons || 0} lesson plans generated
-                      </span>
-                    </div>
-                    {aiResult && (
-                      <p className="text-xs text-muted-foreground mb-2 text-center">
-                        {aiResult.active && aiResult.lessons_ai > 0
-                          ? `AI (${aiResult.provider}) enriched ${aiResult.lessons_ai} lesson${aiResult.lessons_ai === 1 ? '' : 's'}; ${aiResult.lessons_deterministic} used the deterministic engine.`
-                          : aiResult.mode === 'OFF'
-                            ? 'All lessons generated deterministically (AI OFF).'
-                            : 'No AI provider was available — all lessons generated deterministically.'}
-                      </p>
-                    )}
-                    <Link href="/lessons" className="block">
-                      <Button className="w-full">
-                        <Eye className="h-4 w-4 mr-2" />
-                        Review Lesson Plans
-                      </Button>
+                      {(allocationPreview.allocation_conflicts?.length > 0 ||
+                        allocationPreview.indicators_unallocated > 0) && (
+                        <p className="mt-2 text-center text-xs text-yellow-700">
+                          Indicators carry forward to the next teaching week — none are dropped
+                          or merged.
+                        </p>
+                      )}
+                    </>
+                  )}
+                  {!allocationPreview && !allocationConfirmed && (
+                    <p className="mt-3 text-center text-sm text-muted-foreground">
+                      Preview allocation before generating
+                    </p>
+                  )}
+                  {generating && genProgress && (
+                    <p className="mt-3 text-center text-sm text-muted-foreground">{genProgress}</p>
+                  )}
+                </>
+              ) : (
+                <div className="mt-3 space-y-3">
+                  <div className="flex items-center rounded-lg bg-green-50 p-3 text-green-700">
+                    <CheckCircle className="mr-2 h-5 w-5 shrink-0" />
+                    <span className="font-medium">
+                      {coverage?.total_generated_lessons || 0} lesson plans generated
+                    </span>
+                  </div>
+                  {aiResult && (
+                    <p className="text-center text-xs text-muted-foreground">
+                      {aiResult.active && aiResult.lessons_ai > 0
+                        ? `AI (${aiResult.provider}) enriched ${aiResult.lessons_ai} lesson${aiResult.lessons_ai === 1 ? '' : 's'}; ${aiResult.lessons_deterministic} used the deterministic engine.`
+                        : aiResult.mode === 'OFF'
+                          ? 'All lessons generated deterministically (AI OFF).'
+                          : 'No AI provider was available — all lessons generated deterministically.'}
+                    </p>
+                  )}
+                  <Button className="w-full" asChild>
+                    <Link href="/lessons">
+                      <Eye className="mr-2 h-4 w-4" />
+                      Review Lesson Plans
                     </Link>
-                    <Button onClick={() => handleExport('docx')} disabled={exporting === 'docx'} className="w-full" variant="outline">
-                      <FileText className="h-4 w-4 mr-2" />
-                      {exporting === 'docx' ? 'Exporting...' : 'Download DOCX'}
-                    </Button>
-                    <Button onClick={() => handleExport('pdf')} disabled={exporting === 'pdf'} className="w-full" variant="outline">
-                      <Download className="h-4 w-4 mr-2" />
-                      {exporting === 'pdf' ? 'Exporting...' : 'Download PDF'}
-                    </Button>
-                    <Button onClick={() => handleExport('xlsx')} disabled={exporting === 'xlsx'} className="w-full" variant="outline">
-                      <FileSpreadsheet className="h-4 w-4 mr-2" />
-                      {exporting === 'xlsx' ? 'Exporting...' : 'Download Register (XLSX)'}
-                    </Button>
-                    <Button onClick={() => handleExport('zip')} disabled={exporting === 'zip'} className="w-full" variant="outline">
-                      <FileArchive className="h-4 w-4 mr-2" />
-                      {exporting === 'zip' ? 'Exporting...' : 'Export ZIP'}
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        setJobId(null); setCoverage(null); setGenProgress('');
-                        setAllocationPreview(null); setAllocationConfirmed(false);
-                        setSelectedCodes([]);
-                        setConfig(prev => ({ ...prev, selected_indicator_codes: [] }))
-                      }}
-                      className="w-full"
-                      variant="outline"
-                    >
-                      <Play className="h-4 w-4 mr-2" />
-                      Start New Generation
-                    </Button>
-                    <Link href="/dashboard" className="block">
-                      <Button variant="ghost" className="w-full">Back to Dashboard</Button>
-                    </Link>
-                  </>
+                  </Button>
+                  <Button onClick={() => handleExport('docx')} disabled={exporting === 'docx'} className="w-full" variant="outline">
+                    <FileText className="mr-2 h-4 w-4" />
+                    {exporting === 'docx' ? 'Exporting...' : 'Download DOCX'}
+                  </Button>
+                  <Button onClick={() => handleExport('pdf')} disabled={exporting === 'pdf'} className="w-full" variant="outline">
+                    <Download className="mr-2 h-4 w-4" />
+                    {exporting === 'pdf' ? 'Exporting...' : 'Download PDF'}
+                  </Button>
+                  <Button onClick={() => handleExport('xlsx')} disabled={exporting === 'xlsx'} className="w-full" variant="outline">
+                    <FileSpreadsheet className="mr-2 h-4 w-4" />
+                    {exporting === 'xlsx' ? 'Exporting...' : 'Download Register (XLSX)'}
+                  </Button>
+                  <Button onClick={() => handleExport('zip')} disabled={exporting === 'zip'} className="w-full" variant="outline">
+                    <FileArchive className="mr-2 h-4 w-4" />
+                    {exporting === 'zip' ? 'Exporting...' : 'Export ZIP'}
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setJobId(null); setCoverage(null); setGenProgress('');
+                      setAllocationPreview(null); setAllocationConfirmed(false);
+                      setSelectedCodes([]);
+                      setConfig(prev => ({ ...prev, selected_indicator_codes: [] }))
+                    }}
+                    className="w-full"
+                    variant="outline"
+                  >
+                    <Play className="mr-2 h-4 w-4" />
+                    Start New Generation
+                  </Button>
+                  <Button variant="ghost" className="w-full" asChild>
+                    <Link href="/dashboard">Back to Dashboard</Link>
+                  </Button>
+                </div>
+              )}
+            </SurfaceCard>
+
+            {/* Coverage Summary */}
+            {coverage && (
+              <SurfaceCard data-coverage className="px-5 py-5">
+                <h2 className="text-base font-semibold text-[#102A43]">Coverage Summary</h2>
+                <dl className="mt-3 space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <dt className="text-muted-foreground">Instructional Weeks</dt>
+                    <dd className="font-medium">{coverage.total_instructional_weeks}</dd>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <dt className="text-muted-foreground">Curriculum Indicators</dt>
+                    <dd className="font-medium">{coverage.total_indicators}</dd>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <dt className="text-muted-foreground">Lessons Generated</dt>
+                    <dd className="font-medium">{coverage.total_generated_lessons}</dd>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <dt className="text-muted-foreground">Coverage</dt>
+                    <dd className="font-medium">{coverage.coverage_percentage?.toFixed(1)}%</dd>
+                  </div>
+                </dl>
+                {coverage.warnings && coverage.warnings.length > 0 && (
+                  <Banner tone="warning" className="mt-3" title="Coverage warnings">
+                    <ul className="list-disc space-y-1 pl-4">
+                      {coverage.warnings.map((w, i) => <li key={i}>{w}</li>)}
+                    </ul>
+                  </Banner>
                 )}
-              </CardContent>
-            </Card>
+              </SurfaceCard>
+            )}
           </div>
         </div>
       </main>

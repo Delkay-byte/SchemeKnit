@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { SurfaceCard } from '@/components/ui/surface-card'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Banner } from '@/components/ui/banner'
-import { StatusPill, type StatusTone } from '@/components/ui/badge'
+import { Badge, StatusPill, type StatusTone } from '@/components/ui/badge'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import {
   Dialog,
   DialogContent,
@@ -92,6 +93,8 @@ export default function TemplatesPage() {
   const [previewTpl, setPreviewTpl] = useState<any>(null)
   const [previewData, setPreviewData] = useState<any>(null)
   const [pendingArchive, setPendingArchive] = useState<{ id: string; name: string } | null>(null)
+  // Version dialog — replaces the raw browser prompt with a real dialog.
+  const [versionDialog, setVersionDialog] = useState<{ id: string; current: string; value: string } | null>(null)
 
   useEffect(() => {
     loadTemplates()
@@ -228,11 +231,13 @@ export default function TemplatesPage() {
     }
   }
 
-  const handleVersion = async (id: string, current: string) => {
-    const v = prompt(`New version for this template (current ${current}). Use X.Y format, e.g. 1.1 or 2.0:`, current)
+  const handleVersion = async () => {
+    if (!versionDialog) return
+    const v = versionDialog.value.trim()
     if (!v) return
     try {
-      await api.versionCustomTemplate(id, v.trim())
+      await api.versionCustomTemplate(versionDialog.id, v)
+      setVersionDialog(null)
       loadTemplates()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update version')
@@ -263,152 +268,175 @@ export default function TemplatesPage() {
   return (
     <div className="min-h-screen">
       <main className="container mx-auto px-4 py-8">
-        <div className="max-w-5xl mx-auto">
-          <div className="mb-6">
-            <PageHeader
-              title="Lesson Plan Templates"
-              description="Built-in SchemeKnit formats plus your own templates created from sample lesson plans."
-            />
-          </div>
+        <div className="mx-auto max-w-5xl">
+          <PageHeader
+            className="mb-6"
+            title="Lesson Plan Templates"
+            description="Built-in SchemeKnit formats plus your own templates created from sample lesson plans."
+            actions={
+              <Button onClick={startWizard}>
+                <Upload className="mr-1.5 h-4 w-4" />
+                Create Template from Sample
+              </Button>
+            }
+          />
 
-          {error && <Banner tone="danger" className="mb-6">{error}</Banner>}
+          {error && !wizardOpen && (
+            <Banner tone="danger" className="mb-6">{error}</Banner>
+          )}
 
-          {/* MY TEMPLATES */}
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">My Templates ({mine.length})</h3>
-            <Button onClick={startWizard}>
-              <Upload className="h-4 w-4 mr-1.5" />
-              Create Template from Sample
-            </Button>
-          </div>
-          {mine.length === 0 ? (
-            <Card className="mb-8">
-              <CardContent className="p-8 text-center">
-                <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="font-medium mb-1">No custom templates yet</p>
-                <p className="text-sm text-muted-foreground mb-4">
+          {/* MY TEMPLATES — a document library table, not a card wall. */}
+          <section aria-labelledby="my-templates-heading" className="mb-8">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <h2 id="my-templates-heading" className="text-lg font-semibold text-[#102A43]">
+                My Templates <span className="text-muted-foreground">({mine.length})</span>
+              </h2>
+            </div>
+            {mine.length === 0 ? (
+              <SurfaceCard data-empty className="px-6 py-10 text-center">
+                <FileText className="mx-auto mb-4 h-12 w-12 text-slate-300" aria-hidden="true" />
+                <p className="font-medium text-[#102A43]">No custom templates yet</p>
+                <p className="mb-4 mt-1 text-sm text-muted-foreground">
                   Upload a sample lesson plan and SchemeKnit will learn its structure.
                 </p>
                 <Button variant="outline" onClick={startWizard}>Create Template from Sample</Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-              {mine.map((t: any) => (
-                <Card key={t.id}>
-                  <CardHeader>
-                    <CardTitle className="text-lg">{t.name}</CardTitle>
-                    <CardDescription className="text-sm">
-                      {formatTemplateFamily(t.family)} &bull; {formatEducationalLevel(t.educational_level)}
-                    </CardDescription>
-                    <div className="flex gap-2 mt-2 text-xs">
-                      <StatusPill tone="accent" className="rounded-full">v{t.version || '1.0'}</StatusPill>
-                      <StatusPill tone="neutral" className="rounded-full">{t.source_type || 'custom'}</StatusPill>
-                      {(t.section_count ?? 0) > 0 && (
-                        <StatusPill tone="neutral" className="rounded-full">{t.section_count} sections</StatusPill>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      {t.description || 'Custom template from sample lesson plan.'}
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <Button size="sm" variant="outline" onClick={() => openPreview(t.id)}>
-                        <Eye className="h-4 w-4 mr-1" /> Preview
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => handleVersion(t.id, t.version || '1.0')}>
-                        <RefreshCw className="h-4 w-4 mr-1" /> Version
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => setPendingArchive({ id: t.id, name: t.name })}>
-                        <Archive className="h-4 w-4 mr-1" /> Archive
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
+              </SurfaceCard>
+            ) : (
+              <SurfaceCard data-my-templates className="overflow-hidden">
+                <Table className="min-w-[760px]">
+                  <TableHeader>
+                    <TableRow className="bg-muted/50 hover:bg-muted/50">
+                      <TableHead>Template</TableHead>
+                      <TableHead>Family</TableHead>
+                      <TableHead>Level</TableHead>
+                      <TableHead>Version</TableHead>
+                      <TableHead>Sections</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {mine.map((t: any) => (
+                      <TableRow key={t.id}>
+                        <TableCell className="max-w-[260px]">
+                          <span className="block font-medium">{t.name}</span>
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {t.description || 'Custom template from sample lesson plan.'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">{formatTemplateFamily(t.family)}</TableCell>
+                        <TableCell className="whitespace-nowrap">{formatEducationalLevel(t.educational_level)}</TableCell>
+                        <TableCell>
+                          <StatusPill tone="accent">v{t.version || '1.0'}</StatusPill>
+                        </TableCell>
+                        <TableCell>
+                          {(t.section_count ?? 0) > 0 ? (
+                            <Badge variant="neutral">{t.section_count} sections</Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex flex-wrap justify-end gap-1">
+                            <Button size="sm" variant="ghost" onClick={() => openPreview(t.id)}>
+                              <Eye className="mr-1 h-4 w-4" /> Preview
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setVersionDialog({ id: t.id, current: t.version || '1.0', value: t.version || '1.0' })}
+                            >
+                              <RefreshCw className="mr-1 h-4 w-4" /> Version
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-muted-foreground hover:text-destructive"
+                              onClick={() => setPendingArchive({ id: t.id, name: t.name })}
+                            >
+                              <Archive className="mr-1 h-4 w-4" /> Archive
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </SurfaceCard>
+            )}
+          </section>
 
-          {/* BUILT-IN TEMPLATES */}
-          <h3 className="text-lg font-semibold mb-4">Approved Templates ({builtin.length})</h3>
-          {Object.entries(approvedGroups).map(([groupName, items]) => (
-            <div key={groupName} className="mb-8">
-              <div className="flex items-center gap-2 mb-3">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  {groupName}
-                </h4>
-              </div>
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {items.map((template) => {
-                  const isSelected = selectedId === template.id
-                  const isDefault = template.is_default
-                  return (
-                    <Card
-                      key={template.id}
-                      className={`cursor-pointer transition-all hover:shadow-lg ${
-                        isSelected ? 'border-primary ring-2 ring-primary/20' :
-                        isDefault ? 'border-primary/50' : ''
-                      }`}
-                      onClick={() => setSelectedId(template.id)}
-                    >
-                      <CardHeader>
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center space-x-3">
-                            <div className="p-2 bg-primary/10 rounded-lg">
-                              <FileText className="h-6 w-6 text-primary" />
-                            </div>
-                            <div>
-                              <CardTitle className="text-lg">{template.name}</CardTitle>
-                              <CardDescription className="text-sm">
-                                {formatTemplateFamily(template.family)} &bull; {formatEducationalLevel(template.educational_level)}
-                              </CardDescription>
-                            </div>
+          {/* APPROVED TEMPLATES — restrained grouped rows, family by family. */}
+          <section aria-labelledby="approved-templates-heading">
+            <h2 id="approved-templates-heading" className="mb-4 text-lg font-semibold text-[#102A43]">
+              Approved Templates <span className="text-muted-foreground">({builtin.length})</span>
+            </h2>
+            {Object.entries(approvedGroups).map(([groupName, items]) => (
+              <div key={groupName} className="mb-6">
+                <div className="mb-2 flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-600" aria-hidden="true" />
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                    {groupName}
+                  </h3>
+                </div>
+                <SurfaceCard data-approved-group className="overflow-hidden">
+                  {items.map((template) => {
+                    const isSelected = selectedId === template.id
+                    const isDefault = template.is_default
+                    return (
+                      <div
+                        key={template.id}
+                        onClick={() => setSelectedId(template.id)}
+                        className={`flex cursor-pointer flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 transition-colors last:border-b-0 hover:bg-slate-50 ${
+                          isSelected ? 'bg-[#04A9CE]/5' : ''
+                        }`}
+                      >
+                        <div className="flex min-w-0 items-center gap-3">
+                          <span className="rounded-lg bg-[#102A43]/8 p-2 text-[#04769B]">
+                            <FileText className="h-5 w-5" aria-hidden="true" />
+                          </span>
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold text-[#102A43]">{template.name}</p>
+                            <p className="truncate text-xs text-muted-foreground">
+                              {formatTemplateFamily(template.family)} &bull; {formatEducationalLevel(template.educational_level)}
+                            </p>
                           </div>
                         </div>
-                        <div className="flex gap-2 mt-2">
+                        <div className="flex shrink-0 flex-wrap items-center gap-2">
                           {isDefault && (
-                            <span className="inline-flex items-center text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                              <CheckCircle className="h-3 w-3 mr-1" />
+                            <Badge variant="info">
+                              <CheckCircle className="mr-1 h-3 w-3" aria-hidden="true" />
                               Default
-                            </span>
+                            </Badge>
                           )}
                           {isSelected && (
-                            <StatusPill tone="success" className="rounded-full">
-                              Selected
-                            </StatusPill>
+                            <StatusPill tone="success">Selected</StatusPill>
                           )}
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-muted-foreground mb-4">
-                          {template.description || 'A professionally designed template for lesson plan formatting.'}
-                        </p>
-                        <div className="mt-4">
-                          <Button variant={isSelected ? 'default' : 'outline'} size="sm" className="w-full">
+                          <Button
+                            size="sm"
+                            variant={isSelected ? 'default' : 'outline'}
+                            aria-pressed={isSelected}
+                          >
                             {isSelected ? 'Selected' : 'Use This Template'}
                           </Button>
                         </div>
-                      </CardContent>
-                    </Card>
-                  )
-                })}
+                      </div>
+                    )
+                  })}
+                </SurfaceCard>
               </div>
-            </div>
-          ))}
+            ))}
+          </section>
 
-          <Card className="mt-8">
-            <CardContent className="p-6">
-              <h3 className="font-semibold mb-2">About Templates</h3>
-              <p className="text-sm text-muted-foreground">
-                Built-in templates are SchemeKnit Standard formats organized by educational level.
-                Your custom templates reproduce the structure of sample lesson plans you upload,
-                and can be selected during lesson generation. Only formats verified against official
-                sources are labelled official; everything else is a SchemeKnit Standard or custom format.
-              </p>
-            </CardContent>
-          </Card>
+          {/* About */}
+          <SurfaceCard className="mt-8 px-5 py-5 sm:px-6">
+            <h2 className="text-sm font-semibold text-[#102A43]">About Templates</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Built-in templates are SchemeKnit Standard formats organized by educational level.
+              Your custom templates reproduce the structure of sample lesson plans you upload,
+              and can be selected during lesson generation. Only formats verified against official
+              sources are labelled official; everything else is a SchemeKnit Standard or custom format.
+            </p>
+          </SurfaceCard>
         </div>
 
         {/* CREATE-FROM-SAMPLE WIZARD */}
@@ -423,11 +451,12 @@ export default function TemplatesPage() {
                   {wizardStep === 'preview' && 'Step 3 of 3 — Preview and save'}
                 </DialogDescription>
               </DialogHeader>
+              {error && <Banner tone="danger">{error}</Banner>}
               <div className="space-y-4">
                 {wizardStep === 'upload' && (
                   <>
                     <div
-                      className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary"
+                      className="cursor-pointer rounded-lg border-2 border-dashed p-8 text-center hover:border-primary"
                       onClick={() => fileRef.current?.click()}
                     >
                       {sampleFile ? (
@@ -449,11 +478,11 @@ export default function TemplatesPage() {
                       value={tplName}
                       onChange={(e) => setTplName(e.target.value)}
                     />
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <Select value={tplLevel} onChange={(e) => setTplLevel(e.target.value)}>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <Select value={tplLevel} onChange={(e) => setTplLevel(e.target.value)} aria-label="Educational level">
                         {LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}
                       </Select>
-                      <Select value={tplFamily} onChange={(e) => setTplFamily(e.target.value)}>
+                      <Select value={tplFamily} onChange={(e) => setTplFamily(e.target.value)} aria-label="Template family">
                         {FAMILIES.map((f) => <option key={f} value={f}>{f}</option>)}
                       </Select>
                     </div>
@@ -479,13 +508,13 @@ export default function TemplatesPage() {
                       from <span className="font-medium">{analysis.original_filename}</span>.
                       Correct any mapping before saving.
                     </p>
-                    <div className="border rounded-lg overflow-hidden">
-                      <table className="w-full text-sm">
+                    <div className="overflow-x-auto rounded-lg border">
+                      <table className="w-full min-w-[520px] text-sm">
                         <thead>
                           <tr className="border-b bg-muted/50">
-                            <th className="text-left p-2">Detected field</th>
-                            <th className="text-left p-2">SchemeKnit field</th>
-                            <th className="text-left p-2">Confidence</th>
+                            <th className="p-2 text-left">Detected field</th>
+                            <th className="p-2 text-left">SchemeKnit field</th>
+                            <th className="p-2 text-left">Confidence</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -505,7 +534,7 @@ export default function TemplatesPage() {
                                 </Select>
                               </td>
                               <td className="p-2">
-                                <StatusPill tone={confidenceTone(m.confidence)} className="rounded-full">
+                                <StatusPill tone={confidenceTone(m.confidence)}>
                                   {m.confidence}
                                 </StatusPill>
                               </td>
@@ -534,15 +563,15 @@ export default function TemplatesPage() {
                       sample, values filled at generation time.
                     </p>
                     {(analysis.structure?.tables || []).slice(0, 3).map((t: any) => (
-                      <div key={t.index} className="border rounded-lg p-3">
-                        <p className="text-xs font-medium mb-2">
+                      <div key={t.index} className="rounded-lg border p-3">
+                        <p className="mb-2 text-xs font-medium">
                           Table {t.index + 1} — {t.rows} rows × {t.cols} columns
                         </p>
                         <div className="space-y-1">
                           {(t.cells || []).slice(0, 12).map((c: any, i: number) => (
-                            <div key={i} className="flex gap-2 text-xs border-b py-1">
-                              <span className="font-semibold min-w-[140px]">{c.label || '(content)'}</span>
-                              <span className="text-muted-foreground flex-1 truncate">
+                            <div key={i} className="flex gap-2 border-b py-1 text-xs">
+                              <span className="min-w-[140px] font-semibold">{c.label || '(content)'}</span>
+                              <span className="flex-1 truncate text-muted-foreground">
                                 {c.field ? `→ ${c.field}` : c.custom ? '(kept as custom field)' : '(structural)'}
                               </span>
                               <StatusPill
@@ -584,13 +613,13 @@ export default function TemplatesPage() {
               </DialogHeader>
               <div className="space-y-4">
                 {(previewData?.tables || []).slice(0, 4).map((t: any) => (
-                  <div key={t.index} className="border rounded-lg p-3">
-                    <p className="text-xs font-medium mb-2">Table {t.index + 1} — {t.rows}×{t.cols}</p>
+                  <div key={t.index} className="rounded-lg border p-3">
+                    <p className="mb-2 text-xs font-medium">Table {t.index + 1} — {t.rows}×{t.cols}</p>
                     <div className="space-y-1">
                       {(t.cells || []).slice(0, 14).map((c: any, i: number) => (
-                        <div key={i} className="flex gap-2 text-xs border-b py-1">
-                          <span className="font-semibold min-w-[140px]">{c.label || '(content)'}</span>
-                          <span className="text-muted-foreground flex-1 truncate">
+                        <div key={i} className="flex gap-2 border-b py-1 text-xs">
+                          <span className="min-w-[140px] font-semibold">{c.label || '(content)'}</span>
+                          <span className="flex-1 truncate text-muted-foreground">
                             {c.sample_value ? `sample: ${c.sample_value.slice(0, 60)}` : c.field ? `→ ${c.field}` : '—'}
                           </span>
                         </div>
@@ -602,8 +631,11 @@ export default function TemplatesPage() {
                   <p className="text-sm text-muted-foreground">No structural preview stored for this template.</p>
                 )}
                 <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => handleVersion(previewTpl.id, previewTpl.version)}>
-                    <Pencil className="h-4 w-4 mr-1" /> New Version
+                  <Button
+                    variant="outline"
+                    onClick={() => setVersionDialog({ id: previewTpl.id, current: previewTpl.version || '1.0', value: previewTpl.version || '1.0' })}
+                  >
+                    <Pencil className="mr-1 h-4 w-4" /> New Version
                   </Button>
                   <Button variant="outline" onClick={() => { setPreviewTpl(null); setPreviewData(null) }}>Close</Button>
                 </div>
@@ -611,6 +643,33 @@ export default function TemplatesPage() {
             </DialogContent>
           </Dialog>
         )}
+
+        {/* VERSION DIALOG — replaces prompt() */}
+        <Dialog open={versionDialog !== null} onOpenChange={(open) => { if (!open) setVersionDialog(null) }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>New version</DialogTitle>
+              <DialogDescription>
+                Current version {versionDialog?.current}. Use X.Y format, e.g. 1.1 or 2.0.
+              </DialogDescription>
+            </DialogHeader>
+            <Input
+              type="text"
+              aria-label="New version"
+              value={versionDialog?.value || ''}
+              onChange={(e) => setVersionDialog(v => (v ? { ...v, value: e.target.value } : v))}
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <Button onClick={handleVersion} disabled={!versionDialog?.value.trim()}>
+                Update Version
+              </Button>
+              <Button variant="outline" onClick={() => setVersionDialog(null)}>
+                Cancel
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <ConfirmDialog
           open={pendingArchive !== null}
