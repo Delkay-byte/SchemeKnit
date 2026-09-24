@@ -3,11 +3,18 @@
 import { useEffect, useRef } from 'react'
 
 /**
- * Interactive curriculum mesh (Hero V3).
+ * Interactive curriculum mesh (Hero V4).
  *
- * Connected flexible surface: grid nodes + neighbour springs + cursor force
- * with strong central lens bulge, elastic return, and subtle depth cues.
+ * Connected flexible surface: grid nodes + neighbour springs + pointer force
+ * with strong central lens bulge, elastic return, touch wake, and depth cues.
  * Canvas 2D only — no WebGL, no React re-renders per frame.
+ *
+ * Pointer model (V4): unified Pointer Events for mouse / pen / touch.
+ *  - Mouse: hover-driven deformation (V3 desktop behaviour preserved).
+ *  - Touch/pen: press-driven — strong bulge on down, interpolated drag with a
+ *    short-lived trail that deforms the same network, velocity-scaled wake,
+ *    and a ~250–700ms decay on release (springs finish the settle).
+ *  - Passive listeners only; never preventDefault — page scroll stays natural.
  *
  * Landing-exclusive: do not mount on auth/activation routes.
  */
@@ -35,7 +42,21 @@ interface Node {
   elevation: number
 }
 
+/** Short-lived previous pointer positions — drives the trailing wake. */
+interface TrailPoint {
+  x: number
+  y: number
+  t: number
+  w: number
+}
+
 const ACCENT_LABELS = ['SCHEME', 'SUBJECT', 'WEEK', 'INDICATOR', 'PERIOD', 'LESSON']
+
+/** Wake history: ~9 samples over ~480ms — enough for a soft elongated trail. */
+const TRAIL_MAX = 9
+const TRAIL_LIFE = 480
+/** Hard clamp on pointer velocity so fast flicks cannot explode the mesh. */
+const VEL_CLAMP = 55
 
 function prefersReducedMotion(): boolean {
   return (
@@ -51,6 +72,12 @@ function isFinePointer(): boolean {
   )
 }
 
+function isCoarsePointer(): boolean {
+  return (
+    typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
+  )
+}
+
 /** 1 at center → 0 at radius edge, smooth, then power-shaped for a strong core. */
 function lensFalloff(dist: number, radius: number, power: number): number {
   if (dist >= radius || radius <= 0) return 0
@@ -59,6 +86,10 @@ function lensFalloff(dist: number, radius: number, power: number): number {
   // smoothstep on inverted t: soft shoulder, strong core
   const s = inv * inv * (3 - 2 * inv)
   return Math.pow(s, power)
+}
+
+function clamp(v: number, min: number, max: number): number {
+  return v < min ? min : v > max ? max : v
 }
 
 export function MeshBackground({
@@ -80,8 +111,11 @@ export function MeshBackground({
     const wrapEl: HTMLDivElement = wrap
 
     const reduce = prefersReducedMotion()
-    const interactive = !reduce && mode === 'hero' && isFinePointer()
+    // V4: interactive on any pointer type (touch included). Reduced motion → static only.
+    const interactive = !reduce && mode === 'hero'
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    // Mobile tune: coarse primary pointer or compact viewport.
+    const mobileTune = isCoarsePointer() || window.innerWidth < 768
 
     let width = 0
     let height = 0
@@ -103,34 +137,64 @@ export function MeshBackground({
       vx: 0,
       vy: 0,
       active: false,
+      /** True while touch/pen is held down (or mouse button held). */
+      pressed: false,
+      pointerType: 'mouse' as string,
       tx: -9999,
       ty: -9999,
       strength: 0,
+      /** Faster strength decay after an explicit release (touch up / cancel). */
+      releaseFast: false,
     }
 
-    // V3 tuning — stronger bulge, membrane cohesion, velocity lag.
+    /** Temporal wake: recent smoothed pointer samples, deforms the network. */
+    const trail: TrailPoint[] = []
+
+    // V3 desktop tuning preserved; V4 mobile variant: lower density, larger
+    // influence radius, stronger local push, softer damping, velocity wake.
     const cfg =
       mode === 'hero'
-        ? {
-            baseSpacing: 42,
-            minCols: 18,
-            maxCols: 42,
-            spring: 0.048,
-            damping: 0.86,
-            neighborBlend: 0.14,
-            influenceRadius: 200,
-            pushStrength: 52,
-            tangential: 0.14,
-            ambientAmp: 1.6,
-            ambientSpeed: 0.00032,
-            lineBase: 0.075,
-            lineBoost: 0.55,
-            nodeBase: 0.18,
-            accentEvery: 13,
-            lensPower: 2.1,
-            velocityGain: 0.55,
-            elevationGain: 1.6,
-          }
+        ? mobileTune
+          ? {
+              baseSpacing: 54,
+              minCols: 12,
+              maxCols: 28,
+              spring: 0.048,
+              damping: 0.89,
+              neighborBlend: 0.14,
+              influenceRadius: 235,
+              pushStrength: 64,
+              tangential: 0.14,
+              ambientAmp: 1.6,
+              ambientSpeed: 0.00032,
+              lineBase: 0.075,
+              lineBoost: 0.55,
+              nodeBase: 0.18,
+              accentEvery: 12,
+              lensPower: 2.1,
+              velocityGain: 0.65,
+              elevationGain: 1.8,
+            }
+          : {
+              baseSpacing: 42,
+              minCols: 18,
+              maxCols: 42,
+              spring: 0.048,
+              damping: 0.86,
+              neighborBlend: 0.14,
+              influenceRadius: 200,
+              pushStrength: 52,
+              tangential: 0.14,
+              ambientAmp: 1.6,
+              ambientSpeed: 0.00032,
+              lineBase: 0.075,
+              lineBoost: 0.55,
+              nodeBase: 0.18,
+              accentEvery: 13,
+              lensPower: 2.1,
+              velocityGain: 0.55,
+              elevationGain: 1.6,
+            }
         : {
             baseSpacing: 56,
             minCols: 10,
@@ -204,31 +268,108 @@ export function MeshBackground({
       pointer.py = pointer.y
       pointer.vx = 0
       pointer.vy = 0
+      trail.length = 0
     }
 
     function idx(r: number, c: number): number {
       return r * cols + c
     }
 
+    function localPoint(e: PointerEvent | MouseEvent): { x: number; y: number; inside: boolean } {
+      const rect = wrapEl.getBoundingClientRect()
+      const x = e.clientX - rect.left
+      const y = e.clientY - rect.top
+      const inside = x >= 0 && y >= 0 && x <= rect.width && y <= rect.height
+      return { x, y, inside }
+    }
+
+    function isTouchLike(type: string): boolean {
+      return type === 'touch' || type === 'pen'
+    }
+
+    /** Touch/pen down: strong controlled local bulge at the touch point. */
+    function onPointerDown(e: PointerEvent) {
+      if (!interactive) return
+      const type = e.pointerType || 'mouse'
+      const { x, y, inside } = localPoint(e)
+      if (!inside) return
+      pointer.pointerType = type
+      pointer.pressed = true
+      pointer.tx = x
+      pointer.ty = y
+      if (pointer.x < -1000) {
+        pointer.x = x
+        pointer.y = y
+        pointer.px = x
+        pointer.py = y
+      }
+      pointer.active = true
+      pointer.releaseFast = false
+      // Obvious but controlled press — not a giant shockwave.
+      pointer.strength = Math.max(pointer.strength, isTouchLike(type) ? 0.62 : 0.5)
+    }
+
     function onPointerMove(e: PointerEvent) {
       if (!interactive) return
-      const rect = wrapEl.getBoundingClientRect()
-      pointer.tx = e.clientX - rect.left
-      pointer.ty = e.clientY - rect.top
-      const inside =
-        pointer.tx >= 0 &&
-        pointer.ty >= 0 &&
-        pointer.tx <= rect.width &&
-        pointer.ty <= rect.height
+      const type = e.pointerType || 'mouse'
+      // Touch/pen has no hover — only track while pressed. Prevents stale
+      // compatibility mouse events from re-arming after lift.
+      if (isTouchLike(type) && !pointer.pressed) return
+      const { x, y, inside } = localPoint(e)
+      pointer.pointerType = type
+      pointer.tx = x
+      pointer.ty = y
+      // Mouse: hover-driven (V3). Touch/pen: active only inside the hero.
       pointer.active = inside
     }
 
-    function onPointerLeave() {
+    /** Release: decay in place — no instant reset; springs finish the settle. */
+    function onPointerUp(e: PointerEvent) {
+      const type = e.pointerType || 'mouse'
+      pointer.pressed = false
+      if (isTouchLike(type)) {
+        pointer.active = false
+        pointer.releaseFast = true
+        pointer.tx = -9999
+        pointer.ty = -9999
+        // Keep velocity — it bleeds off with strength for a natural spring-back.
+        return
+      }
+      // Mouse button up: keep hover influence if still inside.
+      const { inside } = localPoint(e)
+      pointer.active = inside
+      if (!inside) {
+        pointer.tx = -9999
+        pointer.ty = -9999
+      }
+    }
+
+    function onPointerCancel() {
+      pointer.pressed = false
       pointer.active = false
+      pointer.releaseFast = true
+      pointer.tx = -9999
+      pointer.ty = -9999
+    }
+
+    function onPointerLeave() {
+      pointer.pressed = false
+      pointer.active = false
+      pointer.releaseFast = true
+      pointer.tx = -9999
+      pointer.ty = -9999
+    }
+
+    /** Hard release — no stale coordinates after hide / rotate / blur. */
+    function releasePointerHard() {
+      pointer.pressed = false
+      pointer.active = false
+      pointer.releaseFast = true
       pointer.tx = -9999
       pointer.ty = -9999
       pointer.vx = 0
       pointer.vy = 0
+      trail.length = 0
     }
 
     function drawStatic() {
@@ -301,22 +442,56 @@ export function MeshBackground({
         }
         pointer.vx = (pointer.x - prevX) * 0.85 + pointer.vx * 0.15
         pointer.vy = (pointer.y - prevY) * 0.85 + pointer.vy * 0.15
-        pointer.strength += (1 - pointer.strength) * 0.14
+        // Clamp velocity — fast finger/mouse flicks must not explode the mesh.
+        pointer.vx = clamp(pointer.vx, -VEL_CLAMP, VEL_CLAMP)
+        pointer.vy = clamp(pointer.vy, -VEL_CLAMP, VEL_CLAMP)
+
+        const velMag = Math.hypot(pointer.vx, pointer.vy)
+        const still = velMag < 0.45
+        let target = 1
+        if (pointer.pressed && still) {
+          // Finger holding still → slow pulsing/settling feel.
+          target = 1 + 0.05 * Math.sin(elapsed * 0.0045)
+        }
+        // Fast movement → slightly stronger elongated wake energy (clamped).
+        target = Math.min(1.12, target + velMag * 0.0035)
+        pointer.strength += (target - pointer.strength) * 0.16
+
+        // Record trail samples from the smoothed position (wake follows the finger).
+        const lastT = trail[trail.length - 1]
+        if (
+          !lastT ||
+          Math.hypot(pointer.x - lastT.x, pointer.y - lastT.y) > 8 ||
+          now - lastT.t > 55
+        ) {
+          trail.push({ x: pointer.x, y: pointer.y, t: now, w: 1 })
+          if (trail.length > TRAIL_MAX) trail.shift()
+        }
       } else {
-        pointer.strength += (0 - pointer.strength) * 0.055
+        // Release / leave → active influence decays (~250–700ms when fast),
+        // while spring physics returns nodes to rest.
+        const k = pointer.releaseFast ? 0.1 : 0.055
+        pointer.strength += (0 - pointer.strength) * k
         if (pointer.strength < 0.008) {
           pointer.strength = 0
-          pointer.vx *= 0.9
-          pointer.vy *= 0.9
+          pointer.releaseFast = false
+          pointer.vx *= 0.85
+          pointer.vy *= 0.85
         }
       }
+
+      // Prune expired wake samples.
+      while (trail.length > 0 && now - trail[0].t > TRAIL_LIFE) trail.shift()
 
       ctx!.clearRect(0, 0, width, height)
       const a = opacity
       const R = cfg.influenceRadius
       const velMag = Math.min(40, Math.hypot(pointer.vx, pointer.vy))
+      const trailActive =
+        interactive && trail.length > 0 && R > 0 && pointer.strength > 0.01
+      const trailR = R * 0.6
 
-      // Pass 1 — forces: ambient rest + cursor lens + spring
+      // Pass 1 — forces: ambient rest + cursor/finger lens + wake + spring
       for (let i = 0; i < nodes.length; i++) {
         const n = nodes[i]
         const ambX = Math.sin(elapsed * cfg.ambientSpeed + n.phase) * cfg.ambientAmp
@@ -345,10 +520,35 @@ export function MeshBackground({
             // Slight tangential shear for fabric elasticity.
             fx += -ny * push * cfg.tangential
             fy += nx * push * cfg.tangential
-            // Velocity coupling — fast cursor imparts momentum (lag/inertia).
+            // Velocity coupling — fast cursor/finger imparts momentum (lag/inertia).
             fx += pointer.vx * fall * cfg.velocityGain
             fy += pointer.vy * fall * cfg.velocityGain
             n.elevation = fall
+          }
+        }
+
+        // Trailing wake — short-lived previous touch positions bend the SAME
+        // network (not a decorative overlay circle).
+        if (trailActive) {
+          for (let t = 0; t < trail.length; t++) {
+            const tp = trail[t]
+            const age = now - tp.t
+            if (age > TRAIL_LIFE) continue
+            const life = 1 - age / TRAIL_LIFE
+            const w = life * life * 0.4 * tp.w * pointer.strength
+            if (w < 0.03) continue
+            const dx = n.x - tp.x
+            const dy = n.y - tp.y
+            const d = Math.hypot(dx, dy)
+            if (d < trailR && d > 0.001) {
+              const fall = lensFalloff(d, trailR, cfg.lensPower) * w
+              const nx = dx / d
+              const ny = dy / d
+              const push = fall * cfg.pushStrength * 0.45
+              fx += nx * push
+              fy += ny * push
+              if (fall * 0.75 > n.elevation) n.elevation = fall * 0.75
+            }
           }
         }
 
@@ -458,7 +658,7 @@ export function MeshBackground({
             ctx!.stroke()
           }
 
-          // Depth: elevated nodes read larger + brighter near cursor.
+          // Depth: elevated nodes read larger + brighter near cursor/finger.
           const elev = n.elevation * pointer.strength * cfg.elevationGain
           if (boost > 0.15) {
             ctx!.fillStyle = `rgba(4, 169, 206, ${boost * 0.1 * a})`
@@ -494,7 +694,7 @@ export function MeshBackground({
         }
       }
 
-      // Soft lens light under the cursor (depth cue, not a neon ring).
+      // Soft lens light under the cursor/finger (depth cue, not a neon ring).
       if (interactive && pointer.strength > 0.08 && R > 0) {
         const g = ctx!.createRadialGradient(
           pointer.x,
@@ -537,6 +737,7 @@ export function MeshBackground({
 
     function onVisibility() {
       if (document.hidden) {
+        releasePointerHard()
         running = false
         cancelAnimationFrame(raf)
       } else if (!running && !reduce) {
@@ -544,6 +745,12 @@ export function MeshBackground({
         last = performance.now()
         raf = requestAnimationFrame(frame)
       }
+    }
+
+    function onOrientation() {
+      releasePointerHard()
+      buildGrid()
+      if (reduce) drawStatic()
     }
 
     function onDprChange() {
@@ -565,9 +772,14 @@ export function MeshBackground({
     })
     ro.observe(wrapEl)
 
+    // Passive only — never preventDefault; vertical page scroll stays natural.
+    window.addEventListener('pointerdown', onPointerDown, { passive: true })
     window.addEventListener('pointermove', onPointerMove, { passive: true })
+    window.addEventListener('pointerup', onPointerUp, { passive: true })
+    window.addEventListener('pointercancel', onPointerCancel, { passive: true })
     window.addEventListener('pointerleave', onPointerLeave, { passive: true })
     window.addEventListener('blur', onPointerLeave, { passive: true })
+    window.addEventListener('orientationchange', onOrientation, { passive: true })
     document.addEventListener('visibilitychange', onVisibility)
     // DPR / monitor change
     const mqDpr =
@@ -580,9 +792,13 @@ export function MeshBackground({
       running = false
       cancelAnimationFrame(raf)
       ro.disconnect()
+      window.removeEventListener('pointerdown', onPointerDown)
       window.removeEventListener('pointermove', onPointerMove)
+      window.removeEventListener('pointerup', onPointerUp)
+      window.removeEventListener('pointercancel', onPointerCancel)
       window.removeEventListener('pointerleave', onPointerLeave)
       window.removeEventListener('blur', onPointerLeave)
+      window.removeEventListener('orientationchange', onOrientation)
       document.removeEventListener('visibilitychange', onVisibility)
       mqDpr?.removeEventListener?.('change', onDprChange)
     }
