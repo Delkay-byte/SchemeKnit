@@ -20,9 +20,13 @@ export function PublicFooter() {
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 md:grid-cols-4">
           {/* Brand */}
           <div className="space-y-3">
-            <div className="flex items-center space-x-2.5">
-              <SchemeKnitMark size={28} className="h-7 w-7" />
-              <span className="text-lg font-bold">SchemeKnit</span>
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 ring-1 ring-[#04A9CE]/30">
+                <SchemeKnitMark size={26} />
+              </span>
+              <span className="text-lg font-bold">
+                Scheme<span className="text-[#04A9CE]">Knit</span>
+              </span>
             </div>
             <p className="text-sm text-white/70">
               Professional lesson plan generation for Ghanaian teachers and schools.
