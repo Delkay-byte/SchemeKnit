@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Key, CheckCircle, AlertCircle, Building2 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { PasswordInput, PasswordMatchIndicator } from '@/components/password-input'
+import { AuthShell } from '@/components/auth/auth-shell'
 import {
   validatePassword, validateEmail, PASSWORD_POLICY,
 } from '@/lib/password-policy'
@@ -96,19 +97,34 @@ export default function ActivateSchoolPage() {
     router.push('/login/school-admin')
   }
 
+  const stepMeta =
+    step === 'code'
+      ? { title: 'Activate Your School', description: 'Enter the activation code provided by SchemeKnit to set up your school workspace.' }
+      : step === 'details'
+        ? { title: 'Code Valid', description: 'This code activates the following school workspace' }
+        : step === 'account'
+          ? { title: 'Create School Administrator', description: `Administrator for ${info?.school?.name}. This account manages teachers and settings.` }
+          : { title: 'School Activated', description: `${info?.school?.name} is active. Sign in as ${createdEmail} to open your workspace.` }
+
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
+    <AuthShell
+      role="school_activate"
+      title={stepMeta.title}
+      description={stepMeta.description}
+      steps={[
+        { label: 'Activation code', done: step !== 'code', active: step === 'code' },
+        { label: 'Review license', done: step !== 'details' && step !== 'code', active: step === 'details' },
+        { label: 'Admin account', done: step === 'done', active: step === 'account' },
+        { label: 'Done', done: step === 'done', active: step === 'done' },
+      ]}
+    >
+      <Card className="w-full border-0 shadow-none">
         {step === 'code' && (
           <>
-            <CardHeader className="text-center">
+            <CardHeader className="text-center px-0 pt-0">
               <Key className="h-12 w-12 text-primary mx-auto mb-4" />
-              <CardTitle className="text-2xl">Activate Your School</CardTitle>
-              <CardDescription>
-                Enter the activation code provided by SchemeKnit to set up your school workspace.
-              </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-0 pb-0">
               <form onSubmit={handleValidate} className="space-y-4">
                 {error && (
                   <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md flex items-start gap-2">
@@ -137,12 +153,10 @@ export default function ActivateSchoolPage() {
 
         {step === 'details' && info && (
           <>
-            <CardHeader className="text-center">
+            <CardHeader className="text-center px-0 pt-0">
               <Building2 className="h-12 w-12 text-primary mx-auto mb-4" />
-              <CardTitle className="text-2xl">Code Valid</CardTitle>
-              <CardDescription>This code activates the following school workspace</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="px-0 pb-0 space-y-4">
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">School:</span>
@@ -177,13 +191,7 @@ export default function ActivateSchoolPage() {
 
         {step === 'account' && (
           <>
-            <CardHeader className="text-center">
-              <CardTitle className="text-2xl">Create School Administrator</CardTitle>
-              <CardDescription>
-                Administrator for {info?.school?.name}. This account manages teachers and settings.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+            <CardContent className="px-0 pb-0">
               <form onSubmit={handleCreateAdmin} className="space-y-4">
                 {error && (
                   <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">{error}</div>
@@ -220,14 +228,10 @@ export default function ActivateSchoolPage() {
 
         {step === 'done' && (
           <>
-            <CardHeader className="text-center">
+            <CardHeader className="text-center px-0 pt-0">
               <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-              <CardTitle className="text-2xl">School Activated</CardTitle>
-              <CardDescription>
-                {info?.school?.name} is active. Sign in as {createdEmail} to open your workspace.
-              </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-0 pb-0">
               <Button className="w-full" onClick={handleEnter}>
                 Go to Sign In
               </Button>
@@ -235,6 +239,6 @@ export default function ActivateSchoolPage() {
           </>
         )}
       </Card>
-    </div>
+    </AuthShell>
   )
 }
