@@ -1,79 +1,82 @@
-# LOGIN GRID DESIGN — SHARED GRID + MOVING SIGNAL SYSTEM
+# LOGIN GRID DESIGN — DARK PROFESSIONAL GRID + MOVING SIGNAL
 
 **Project:** SchemeKnit (repo folder: `TeachFlow`)  
 **Date:** 2026-09-24  
 **Branch:** `main`  
 **Remote:** `https://github.com/Delkay-byte/SchemeKnit.git`  
 **Scope:** Login interfaces only — Teacher (`/login`), School Administration (`/login/school-admin` = visual benchmark), Platform Administration (`/login/platform-admin`).  
-**Out of scope (untouched):** registration, activation pages, password recovery, setup/bootstrap pages, backend, auth API/logic/permissions, database, generation, curriculum, AI, quota, entitlements, landing mesh design.
+**Out of scope (untouched):** registration, activation pages, password recovery, setup/bootstrap pages, teacher license, backend, auth API/logic/permissions, database, generation, curriculum, AI, quota, entitlements, landing mesh design.
 
 ---
 
-## A. Problem
+## A. Problem (V2)
 
-The three login surfaces shared typography and form controls but had three unrelated static decorations:
+V1 introduced a shared Canvas 2D grid + signal (`GridSignal`) on all three logins, but:
 
-| Surface | Previous decoration | Issue |
-|---|---|---|
-| Teacher | Static SVG pattern `teacher-grid` (32px, navy) | Flat, no sense of a living system |
-| School Admin (benchmark) | Static SVG pattern `school-grid` (48px, cyan) | Benchmark composition good; zero motion |
-| Platform Admin | Static SVG pattern `ops-v` (64px, slate) | Same static grid language, no signal |
+| Issue | Detail |
+|---|---|
+| Near-white teacher field | Teacher login still sat on warm `#F7F5F0` — not a dark professional workspace |
+| Signal too subtle | Small core + weak trail; motion often hard to see in stills |
+| Easing stall | `easeInOut` cubic froze at edge endpoints → platform mobile samples looked static |
+| Teacher start under card | Center-start put the node behind the centered form card |
 
-The brief required one **shared visual language** — a professional grid with a **continuous moving signal node** traveling intersection-to-intersection — while keeping School Admin as the composition benchmark and the form as the dominant element.
+V2 mandate: **dark navy login fields**, a **stronger grid**, a **visibly moving signal**, and a dedicated `login-grid-acceptance` suite proving motion.
 
 ---
 
 ## B. Design decisions
 
-### Shared system (`GridSignal`)
+### Dark fields (distinct per role)
 
-One Canvas 2D component, `frontend/src/components/auth/grid-signal.tsx`, drives all three logins via a `variant` prop. Not the landing mesh: **no springs, no pointer force, no particle field, no WebGL/Three/GSAP.**
+| Surface | Background | Hex |
+|---|---|---|
+| Teacher | Deep SchemeKnit navy | `#071826` (`rgb(7, 24, 38)`) |
+| School Admin (benchmark) | Institutional navy (unchanged) | `#0B1F3A` (`rgb(11, 31, 58)`) |
+| Platform Admin | Near-black ops (unchanged) | `#050E18` (`rgb(5, 14, 24)`) |
+
+Teacher decor (`TeacherWorkspaceDecor`) restyled for dark: gradient wash `#071826 → #0B1F3A`, vignette, light lesson-plan cards / notebook tabs / cyan blurs kept as supporting motifs. `isDark` now includes teacher → dark `DepthCard`, dark badge chip, light `BrandCapsule` with wordmark. Loading state (`role-login`) teacher → `bg-[#071826]`.
+
+### Shared system (`GridSignal`) — V2 variants
 
 | Property | Teacher | School (benchmark) | Platform |
 |---|---|---|---|
-| Cell size (desktop) | 40px | 48px | 56px |
-| Line RGB | `16,42,67` (navy) | `126,220,240` (cyan) | `62,90,120` (slate) |
-| Line alpha | 0.075 | 0.12 | 0.14 |
+| Cell size (desktop) | 44px | 48px | 56px |
+| Line RGB | `110,165,205` (steel blue) | `126,220,240` (cyan) | `90,130,170` (slate) |
+| Line alpha | 0.20 | 0.17 | 0.20 |
 | Signal core | `#04A9CE` | `#7EDCF0` | `#04A9CE` |
-| Edge duration | ~1150ms | ~1050ms | ~1250ms |
-| Proximity boost | 0.10 | 0.14 | 0.12 |
-| Personality | Warm, soft, workspace | Institutional, refined | Darker, structured, restrained |
+| Edge duration | ~750ms | ~720ms | ~840ms |
+| Proximity boost | 0.22 | 0.24 | 0.20 |
+| Personality | Workspace navy, steel grid | Institutional cyan | Dark ops, restrained |
 
-### Motion model
+### Motion model (V2)
 
-- Single signal node; path is always **grid-aligned** (up/down/left/right only — no diagonals, no floating particles).
-- Edge-to-edge travel with **easeInOut cubic**; duration jittered ±15% per edge for organic feel (clamped).
-- `pickNext`: never immediately reverses direction when alternatives exist; **55% preference for going straight** for long, calm runs.
-- Deterministic PRNG (`mulberry32`, fixed seed per variant) — paths vary but stay reproducible.
-- **Intersection flash** on arrival (intensity 1 → decay over 700ms).
-- **Short fading trail** (max 7 samples) along the current path only.
-- **Local line illumination**: grid lines brighten near the signal (halo color) with quadratic falloff over ~2.4 cells.
-- Bounded to the viewport grid; continuous flow; pauses when tab is hidden.
+- Single signal node; path always **grid-aligned** (up/down/left/right only).
+- **`easeMove`**: `0.42·t + 0.58·smoothstep(t)` — smooth corners, **never stalls** at endpoints (fixes platform mobile d=0).
+- Edge duration jittered ~±12% per edge; **mobile ×1.28** (`MOBILE_SPEED_SCALE`) → calmer phone travel.
+- `pickNext`: no immediate reverse when alternatives exist; **55% straight** preference.
+- Deterministic PRNG (`mulberry32`) per variant seed.
+- **Start node** in the **open left field** (`cols × 0.18`) — clear of centered/split cards so early frames show the signal.
+- Intersection flash (1 → 700ms decay), **trail max 9** samples, local line illumination (~2.4 cells), network node dots every other intersection.
+- Core r=3.4 + white center; halo `cell×1.45` at 0.42 alpha — obvious in screenshots.
+- Pauses when tab hidden; DPR ≤ 2; `pointer-events-none` + `aria-hidden`.
 
 ### Reduced motion
 
-`prefers-reduced-motion: reduce` → **static polished grid** + resting signal node at a fixed intersection; no `requestAnimationFrame` loop. Media-query change mid-session restarts/stops cleanly.
-
-### Responsive
-
-- Mobile (<640px): cell floor 56px; <420px: floor 64px → fewer intersections, calmer signal.
-- Grid re-fits on `ResizeObserver`; DPR capped at 2.
-- `pointer-events-none` + `aria-hidden` — form and links never blocked.
+`prefers-reduced-motion: reduce` → static dark grid + resting node; no rAF. Mid-session media-query change restarts/stops cleanly.
 
 ### Composition rules (benchmark preserved)
 
-- **School Admin:** split layout, aside copy, isometric building, vertical indicator — only the static `school-grid` SVG was replaced with `<GridSignal variant="school" />`.
-- **Teacher:** centered card, lesson-plan stack, notebook tabs, wash gradient — static grid replaced only.
-- **Platform:** split layout, shield geometry, horizon line, status ticks, `SECURE ADMIN ACCESS` note — static `ops-v` replaced only in `mode="login"` (setup bootstrap keeps its own static pattern via `decorOverride`).
-- Backgrounds unchanged: teacher `#F7F5F0`, school `#0B1F3A`, platform `#050E18`.
-- Light `BrandCapsule` remains the logo treatment; form card (`DepthCard`) stays above the decor layer (`z-10`).
+- **School Admin:** split layout, aside copy, isometric building, vertical indicator — only the signal layer animates.
+- **Teacher:** centered card, lesson-plan stack, notebook tabs — dark wash + GridSignal; curriculum cues kept, restyled for dark.
+- **Platform:** split layout, shield, horizon, status ticks, `SECURE ADMIN ACCESS` — GridSignal only when `mode="login"` (setup keeps static `ops-v` via `decorOverride`).
+- Light `BrandCapsule` remains; form card (`DepthCard`) stays above decor (`z-10`).
 
 ### What was explicitly avoided
 
-- Landing `MeshBackground` on auth routes (still landing-exclusive).
-- Sci-fi/neon/gaming aesthetics; particles; random diagonal drift.
+- Landing `MeshBackground` on auth routes (still landing-exclusive, tagged `data-mesh="landing"`).
+- Sci-fi/neon/gaming aesthetics; particles; random diagonal drift; WebGL/Three/GSAP.
 - Any change to form logic, labels, a11y, CTA visibility, or route copy.
-- Touch/pointer listeners on the login grid (signal is autonomous, not interactive).
+- Touch/pointer listeners on the login grid (signal is autonomous).
 
 ---
 
@@ -81,11 +84,13 @@ One Canvas 2D component, `frontend/src/components/auth/grid-signal.tsx`, drives 
 
 | File | Change |
 |---|---|
-| `frontend/src/components/auth/grid-signal.tsx` | **New** — shared grid + signal Canvas 2D component |
-| `frontend/src/components/auth/auth-shell.tsx` | Import `GridSignal`; replace static patterns in teacher / school_admin / platform_admin decors |
-| `frontend/src/components/mesh-background.tsx` | Add `data-mesh="landing"` on wrapper (test discrimination only; no visual change) |
-| `frontend/e2e/auth-role-design-acceptance.js` | Canvas assertions split: logins expect role signal + timed motion + no landing mesh; other auth routes still expect zero canvas; reduced-motion static check; landing `data-mesh` check |
-| `frontend/e2e/hero-v3-acceptance.js` | Same discrimination for auth routes; platform-admin end check now asserts grid-signal present + no landing mesh; reduced-motion login static check |
+| `frontend/src/components/auth/grid-signal.tsx` | V2 variants (dark lines, faster edges), `easeMove`, `MOBILE_SPEED_SCALE`, stronger visuals, left-field start |
+| `frontend/src/components/auth/auth-shell.tsx` | Dark `TeacherWorkspaceDecor`, teacher `pageClass` `#071826`, `isDark` includes teacher, dark badge chip |
+| `frontend/src/components/role-login.tsx` | Teacher loading background `bg-[#071826]` |
+| `frontend/src/components/mesh-background.tsx` | `data-mesh="landing"` (V1, retained) |
+| `frontend/e2e/login-grid-acceptance.js` | **New** — 149-check dark grid + motion suite |
+| `frontend/e2e/auth-role-design-acceptance.js` | Teacher bg `rgb(7, 24, 38)`, 3-sample motion, full-canvas probe |
+| `frontend/e2e/hero-v3-acceptance.js` | Same teacher bg + 3-sample motion + full-canvas probe |
 
 ### DOM markers (for tests)
 
@@ -103,35 +108,45 @@ Gates (local production build, `next start -p 3003`):
 |---|---|
 | `npx tsc --noEmit` | Clean |
 | `npm run build` | **35/35** pages |
-| `e2e/auth-role-design-acceptance.js` | **110 pass / 0 fail** (was 89/0) |
-| `e2e/hero-v3-acceptance.js` | **135 pass / 0 fail** (was 115/0) |
+| `e2e/login-grid-acceptance.js` | **149 pass / 0 fail** (new) |
+| `e2e/auth-role-design-acceptance.js` | **110 pass / 0 fail** |
+| `e2e/hero-v3-acceptance.js` | **135 pass / 0 fail** |
 
-New/strengthened checks (both suites):
+`login-grid-acceptance` checks (per login × viewport):
 
-- Each login: role-specific `data-grid-signal` present; `[data-mesh]` absent.
-- Each login: **two timed pixel samples (~950ms apart) differ** → signal is moving.
-- Non-login auth routes (signup, activations, reset, setup): still **zero canvas**, no mesh.
-- Landing: `[data-mesh]` present; mesh still painted/interactive (Hero V3/V4 checks retained).
-- Reduced motion: grid signal present, **two samples identical** → static.
-- No horizontal overflow at 390/430/768/1024/1280/1440 (existing checks retained).
-- Existing titles, backgrounds, logo contrast, form/CTA visibility, keyboard focus, error state, public-CTA prohibitions — all retained.
+- Load, title, dark field, exact bg color, no landing mesh, correct signal variant, light logo + S, readable card, form present, grid painted (>400 px).
+- **3 timed position samples** (800ms gaps): found + moved ≥10px A→B and B→C.
+- **Short-hop axis check** (280ms): path stays grid-edge aligned (no diagonal jumps).
+- Responsive matrix 390/430/768/1024/1280/1440: no overflow, dark, signal, logo, grid visible; movement at 390/430/1440 (≥8px).
+- Reduced motion: grid painted, **exact x/y frozen** across samples.
+- Landing: mesh present, no login signal.
+
+Existing suites retain titles, backgrounds, logo contrast, form/CTA visibility, keyboard focus, error state, public-CTA prohibitions, non-login zero-canvas, landing mesh interactivity.
+
+### Bug fixes during V2
+
+1. **Easing stall** — cubic `easeInOut` froze at endpoints → platform mobile samples identical. Replaced with `easeMove` (linear+smoothstep blend).
+2. **Motion probe** — top-left pixel signature failed (signal starts center/left). All suites now use **full-canvas brightest-cyan position** (`(g+b-r)·a`, score ≥ 8000).
+3. **Axis check false fail** — multi-edge 800ms intervals net-diagonal across corners. Replaced with **dense short hops** (280ms, < one edge).
+4. **Teacher start under card** — center start hid the node behind the form. Start moved to **open left field** (`cols × 0.18`).
 
 ### Screenshot review (manual)
 
-Captured at 390 / 430 / 768 / 1024 / 1280 / 1440 plus motion pairs (A/B ~1.1s apart) and reduced-motion:
+5-frame sequences (600ms apart) at 1440×900 + 390 stills for all three logins:
 
-- Grids legible on all three surfaces; school composition unchanged vs benchmark.
-- Motion pairs show the signal node at different intersections (teacher left rail; school top-right → mid-left; platform left field).
-- Reduced-motion: static grid + resting node, no drift.
-- Form remains dominant; light logo capsule readable on navy and near-black.
-- Mobile: larger cells, no horizontal overflow, CTAs fully visible.
+- **Teacher:** dark navy field, steel grid, signal glow clearly in open left field (not under card); node advances across frames (e.g. ~275,475 → ~305,485).
+- **School:** cyan glow travels the aside field across frames — obvious displacement.
+- **Platform:** restrained signal moves through left ops field; shield/horizon/ticks unchanged.
+- Mobile stills: dark fields, large cells, card readable, no overflow; signal present (programmatic motion checks pass).
+- Reduced motion: static grid + resting node, no drift.
+- Form remains dominant; light logo capsule readable on all three dark fields.
 
 ---
 
 ## E. Explicit non-changes
 
 - No backend, API, auth logic, session, or permission changes.
-- No registration / activate / reset / setup visual redesign (setup platform-admin keeps its own static `bootstrap-v` pattern).
+- No registration / activate / reset / setup visual redesign (setup platform-admin keeps its own static pattern).
 - No landing page visual change (`data-mesh` attribute is inert).
 - No new runtime dependencies; Canvas 2D + rAF only.
 - Public Platform Admin CTA still absent; forgot-password still `/contact`; logo geometry frozen.
@@ -147,11 +162,12 @@ npx tsc --noEmit
 Remove-Item -Recurse -Force .next
 npm run build
 node node_modules\next\dist\bin\next start -p 3003   # separate shell
+node e2e/login-grid-acceptance.js http://localhost:3003
 node e2e/auth-role-design-acceptance.js http://localhost:3003
 node e2e/hero-v3-acceptance.js http://localhost:3003
 ```
 
-Manual: open `/login`, `/login/school-admin`, `/login/platform-admin` — expect a fine technical grid and a slow cyan signal walking the intersections; toggle OS reduced-motion and confirm the signal parks.
+Manual: open `/login`, `/login/school-admin`, `/login/platform-admin` — expect a dark navy technical grid and a cyan signal visibly walking the intersections; toggle OS reduced-motion and confirm the signal parks.
 
 ---
 
@@ -159,5 +175,5 @@ Manual: open `/login`, `/login/school-admin`, `/login/platform-admin` — expect
 
 | Type | Message |
 |---|---|
-| feat | `feat: add interactive grid signal to login interfaces` |
-| docs | `docs: document login grid visual system` |
+| feat | `feat: improve login grid visual system and signal animation` |
+| docs | `docs: update login grid visual system report` |
