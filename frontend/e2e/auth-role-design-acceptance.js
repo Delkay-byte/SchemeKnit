@@ -33,19 +33,36 @@ async function overflow(page) {
   }))
 }
 
-/** Pixel signature of the login grid-signal canvas (motion probe). */
+/** Brightest cyan signal position on the full grid canvas (motion probe). */
 async function signalSignature(page) {
   return page.evaluate(() => {
     const c = document.querySelector('canvas[data-grid-signal]')
     if (!c || !c.width || !c.height) return null
     const ctx = c.getContext('2d')
     if (!ctx) return null
-    const w = Math.min(c.width, 320)
-    const h = Math.min(c.height, 240)
-    const d = ctx.getImageData(0, 0, w, h).data
-    let s = 0
-    for (let i = 0; i < d.length; i += 32) s += d[i] + d[i + 3]
-    return s
+    const d = ctx.getImageData(0, 0, c.width, c.height).data
+    let best = 0
+    let bx = 0
+    let by = 0
+    for (let y = 0; y < c.height; y += 4) {
+      for (let x = 0; x < c.width; x += 4) {
+        const i = (y * c.width + x) * 4
+        const a = d[i + 3]
+        if (a < 50) continue
+        const r = d[i]
+        const g = d[i + 1]
+        const b = d[i + 2]
+        const s = (g + b - r) * a
+        if (s > best) {
+          best = s
+          bx = x
+          by = y
+        }
+      }
+    }
+    if (best < 8000) return null
+    // Quantize so tiny AA jitter doesn't false-fail; real travel still differs.
+    return `${Math.round(bx / 6)}:${Math.round(by / 6)}:${best}`
   })
 }
 
@@ -105,7 +122,7 @@ async function main() {
   const page = await context.newPage()
 
   const ROUTES = [
-    { name: 'teacher-login', path: '/login', title: /Teacher|Welcome back/i, bg: 'rgb(247, 245, 240)' },
+    { name: 'teacher-login', path: '/login', title: /Teacher|Welcome back/i, bg: 'rgb(7, 24, 38)' },
     { name: 'school-admin-login', path: '/login/school-admin', title: /School Administration/i, bg: 'rgb(11, 31, 58)' },
     { name: 'platform-admin-login', path: '/login/platform-admin', title: /Platform Administration/i, bg: 'rgb(5, 14, 24)' },
     { name: 'signup', path: '/signup', title: /Create your SchemeKnit account/i, bg: 'rgb(255, 255, 255)' },
@@ -135,9 +152,15 @@ async function main() {
         JSON.stringify(info.gridSignals),
       )
       const s1 = await signalSignature(page)
-      await page.waitForTimeout(950)
+      await page.waitForTimeout(700)
       const s2 = await signalSignature(page)
-      log(s1 !== null && s2 !== null && s1 !== s2, `${r.name}: signal moves over time`, `${s1} vs ${s2}`)
+      await page.waitForTimeout(700)
+      const s3 = await signalSignature(page)
+      log(
+        s1 !== null && s2 !== null && s3 !== null && s1 !== s2 && s2 !== s3,
+        `${r.name}: signal moves over time (3 samples)`,
+        `${s1} → ${s2} → ${s3}`,
+      )
     } else {
       log(info.canvasCount === 0, `${r.name}: no canvas`, `count=${info.canvasCount}`)
       log(info.meshCount === 0, `${r.name}: no landing mesh`, `mesh=${info.meshCount}`)
