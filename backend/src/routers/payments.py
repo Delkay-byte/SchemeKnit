@@ -130,6 +130,33 @@ async def payment_history(
     }
 
 
+# ── Product Plans ─────────────────────────────────────────────────────────────
+# NOTE: declared BEFORE the /{payment_id} catch-all below so the literal
+# /plans path is never shadowed by the path-parameter route (FastAPI matches
+# routes in declaration order).
+
+@router.get("/plans")
+async def list_product_plans(db=Depends(get_db)):
+    """List available product plans (public)."""
+    plans = payment_service.get_product_plans(db)
+    return {
+        "plans": [
+            {
+                "id": p.id,
+                "name": p.name,
+                "description": p.description,
+                "product_type": p.product_type,
+                "price": p.price,
+                "currency": p.currency,
+                "duration_days": p.duration_days,
+                "features": p.features,
+            }
+            for p in plans
+        ],
+        "total": len(plans),
+    }
+
+
 @router.get("/{payment_id}")
 async def get_payment(
     payment_id: str,
@@ -334,27 +361,3 @@ async def admin_update_payment_config(
 
     payment_service.update_payment_config(db, config)
     return {"message": "Payment configuration updated."}
-
-
-# ── Product Plans ─────────────────────────────────────────────────────────────
-
-@router.get("/plans")
-async def list_product_plans(db=Depends(get_db)):
-    """List available product plans (public)."""
-    plans = payment_service.get_product_plans(db)
-    return {
-        "plans": [
-            {
-                "id": p.id,
-                "name": p.name,
-                "description": p.description,
-                "product_type": p.product_type,
-                "price": p.price,
-                "currency": p.currency,
-                "duration_days": p.duration_days,
-                "features": p.features,
-            }
-            for p in plans
-        ],
-        "total": len(plans),
-    }

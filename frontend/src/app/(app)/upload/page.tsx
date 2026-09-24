@@ -214,7 +214,7 @@ export default function UploadPage() {
                  subject section to use before anything is generated. */
               <SurfaceCard
                 data-multi-subject
-                accent="bg-gradient-to-r from-amber-400 to-orange-400"
+                accent="bg-amber-400"
                 className="px-5 py-6 sm:px-6"
               >
                 <div className="text-center">
@@ -265,7 +265,7 @@ export default function UploadPage() {
             ) : (
               <SurfaceCard
                 data-upload-success
-                accent="bg-gradient-to-r from-green-500 to-emerald-500"
+                accent="bg-green-500"
                 className="px-5 py-6 sm:px-6"
               >
                 <div className="text-center">

@@ -975,7 +975,7 @@ export default function PlatformAdminPage() {
                     <p className="text-muted-foreground">{schoolDetail.contact_email || '\u2014'}</p>
                   </div>
                   <div>
-                    <p className="font-medium mb-1">Licence</p>
+                    <p className="font-medium mb-1">License</p>
                     {schoolDetail.license ? (
                       <>
                         <p className="text-muted-foreground">License: {schoolDetail.license.license_code}</p>
@@ -993,7 +993,7 @@ export default function PlatformAdminPage() {
                         </p>
                       </>
                     ) : (
-                      <p className="text-orange-600">No active licence</p>
+                      <p className="text-orange-600">No active license</p>
                     )}
                   </div>
                 </div>

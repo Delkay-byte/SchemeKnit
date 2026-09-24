@@ -456,8 +456,17 @@ export default function TemplatesPage() {
                 {wizardStep === 'upload' && (
                   <>
                     <div
-                      className="cursor-pointer rounded-lg border-2 border-dashed p-8 text-center hover:border-primary"
+                      role="button"
+                      tabIndex={0}
+                      aria-label={sampleFile ? `Selected sample: ${sampleFile.name}` : 'Choose a sample DOCX file (max 10 MB)'}
+                      className="cursor-pointer rounded-lg border-2 border-dashed p-8 text-center hover:border-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#04A9CE]"
                       onClick={() => fileRef.current?.click()}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          fileRef.current?.click()
+                        }
+                      }}
                     >
                       {sampleFile ? (
                         <p className="font-semibold">{sampleFile.name}</p>
