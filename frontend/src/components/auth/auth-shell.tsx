@@ -5,6 +5,7 @@ import { ReactNode } from 'react'
 
 import { SchemeKnitMark } from '@/components/scheme-knit-mark'
 import { RoleBadge } from '@/components/auth/auth-field'
+import { GridSignal } from '@/components/auth/grid-signal'
 
 /**
  * Role-specific authentication shells (V2 remediation).
@@ -85,16 +86,9 @@ export function BrandCapsule({
 function TeacherWorkspaceDecor() {
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-      {/* Ivory wash + grid paper */}
+      {/* Ivory wash + grid paper with traveling signal */}
       <div className="absolute inset-0 bg-[linear-gradient(180deg,#F7F5F0_0%,#F3F1EB_100%)]" />
-      <svg className="absolute inset-0 h-full w-full opacity-[0.07]" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <pattern id="teacher-grid" width="32" height="32" patternUnits="userSpaceOnUse">
-            <path d="M32 0H0V32" fill="none" stroke="#102A43" strokeWidth="0.8" />
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#teacher-grid)" />
-      </svg>
+      <GridSignal variant="teacher" />
       {/* Layered lesson-plan cards (3D stack) */}
       <div className="absolute right-[8%] top-[18%] hidden w-64 lg:block" style={{ perspective: '800px' }}>
         <div
@@ -224,15 +218,18 @@ function PlatformOpsDecor({ mode }: { mode: 'login' | 'bootstrap' }) {
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
       <div className="absolute inset-0 bg-[#050E18]" />
-      {/* Vertical ops grid */}
-      <svg className="absolute inset-0 h-full w-full opacity-[0.14]" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <pattern id="ops-v" width="64" height="64" patternUnits="userSpaceOnUse">
-            <path d="M64 0H0V64" fill="none" stroke="#3E5A78" strokeWidth="0.5" />
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#ops-v)" />
-      </svg>
+      {/* Structured ops grid with restrained signal (login mode only) */}
+      {mode === 'login' && <GridSignal variant="platform" />}
+      {mode !== 'login' && (
+        <svg className="absolute inset-0 h-full w-full opacity-[0.14]" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="ops-v" width="64" height="64" patternUnits="userSpaceOnUse">
+              <path d="M64 0H0V64" fill="none" stroke="#3E5A78" strokeWidth="0.5" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#ops-v)" />
+        </svg>
+      )}
       {/* Scanning horizon line */}
       <div className="absolute inset-x-0 top-[28%] h-px bg-gradient-to-r from-transparent via-[#04A9CE]/40 to-transparent" />
       <div className="absolute inset-x-0 top-[28%] h-24 bg-gradient-to-b from-[#04A9CE]/6 to-transparent" />
@@ -502,14 +499,7 @@ const THEMES: Record<AuthShellRole, RoleTheme> = {
     pageClass: 'bg-[#0B1F3A] text-white',
     decor: (
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-        <svg className="absolute inset-0 h-full w-full opacity-[0.12]" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <pattern id="school-grid" width="48" height="48" patternUnits="userSpaceOnUse">
-              <path d="M48 0H0V48" fill="none" stroke="#7EDCF0" strokeWidth="0.6" />
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#school-grid)" />
-        </svg>
+        <GridSignal variant="school" />
         <svg className="absolute left-10 bottom-12 h-48 w-56 text-white/20" viewBox="0 0 200 160" fill="none">
           <rect x="30" y="50" width="140" height="90" stroke="currentColor" strokeWidth="2" />
           <path d="M30 50 L100 15 L170 50" stroke="currentColor" strokeWidth="2" />
