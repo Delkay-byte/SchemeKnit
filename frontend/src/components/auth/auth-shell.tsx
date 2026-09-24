@@ -6,6 +6,7 @@ import { ReactNode } from 'react'
 import { SchemeKnitMark } from '@/components/scheme-knit-mark'
 import { RoleBadge } from '@/components/auth/auth-field'
 import { GridSignal } from '@/components/auth/grid-signal'
+import { SchoolBuildingScene } from '@/components/auth/school-building'
 
 /**
  * Role-specific authentication shells (V2 remediation + V3 onboarding grid).
@@ -191,15 +192,10 @@ function SchoolInstitutionDecor() {
         </defs>
         <rect width="100%" height="100%" fill="url(#school-bp)" />
       </svg>
-      <div className="absolute left-[6%] top-1/2 hidden -translate-y-1/2 xl:block" style={{ perspective: '700px' }}>
-        <svg width="180" height="140" viewBox="0 0 180 140" fill="none" style={{ transform: 'rotateX(18deg) rotateY(-12deg)' }}>
-          <rect x="30" y="45" width="120" height="80" rx="4" stroke="#7EDCF0" strokeOpacity="0.45" strokeWidth="1.5" fill="rgba(255,255,255,0.06)" />
-          <path d="M30 45 L90 12 L150 45" stroke="#7EDCF0" strokeOpacity="0.5" strokeWidth="1.5" fill="rgba(255,255,255,0.05)" />
-          <rect x="50" y="68" width="24" height="30" rx="2" stroke="#7EDCF0" strokeOpacity="0.4" strokeWidth="1.2" fill="none" />
-          <rect x="106" y="68" width="24" height="30" rx="2" stroke="#7EDCF0" strokeOpacity="0.4" strokeWidth="1.2" fill="none" />
-          <rect x="78" y="82" width="24" height="43" rx="2" stroke="#34D399" strokeOpacity="0.75" strokeWidth="1.5" fill="rgba(52,211,153,0.1)" />
-          <circle cx="90" cy="36" r="6" fill="#34D399" fillOpacity="0.4" />
-        </svg>
+      <div className="absolute left-[4%] top-1/2 hidden w-[320px] -translate-y-1/2 lg:block" style={{ perspective: '900px' }}>
+        <div style={{ transform: 'rotateX(12deg) rotateY(-8deg)' }}>
+          <SchoolBuildingScene />
+        </div>
       </div>
       <div className="absolute right-8 top-1/2 hidden -translate-y-1/2 flex-col items-end gap-5 lg:flex">
         {['Code', 'License', 'Admin', 'Live'].map((t, i) => (
@@ -489,13 +485,11 @@ const THEMES: Record<AuthShellRole, RoleTheme> = {
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute inset-0 bg-[#0B1F3A]" />
         <GridSignal variant="school" />
-        <svg className="absolute left-10 bottom-12 h-48 w-56 text-white/25" viewBox="0 0 200 160" fill="none">
-          <rect x="30" y="50" width="140" height="90" stroke="currentColor" strokeWidth="2" />
-          <path d="M30 50 L100 15 L170 50" stroke="currentColor" strokeWidth="2" />
-          <rect x="55" y="80" width="28" height="36" stroke="currentColor" strokeWidth="1.5" />
-          <rect x="117" y="80" width="28" height="36" stroke="currentColor" strokeWidth="1.5" />
-          <rect x="88" y="95" width="24" height="45" stroke="#04A9CE" strokeOpacity="0.7" strokeWidth="1.5" />
-        </svg>
+        <div className="absolute bottom-24 left-8 hidden w-[300px] xl:block" style={{ perspective: '900px' }}>
+          <div style={{ transform: 'rotateX(10deg) rotateY(6deg)' }}>
+            <SchoolBuildingScene />
+          </div>
+        </div>
         <div className="absolute right-16 top-24 hidden h-40 w-px bg-gradient-to-b from-transparent via-[#04A9CE]/50 to-transparent lg:block" />
         <div className="absolute right-12 top-24 hidden h-2 w-2 rounded-full bg-[#04A9CE]/70 lg:block" />
       </div>
