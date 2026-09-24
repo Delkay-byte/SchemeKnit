@@ -203,13 +203,20 @@ async function pageInfo(page) {
       return lum > 200
     })
     for (const el of lightDecor) {
-      const texts = Array.from(el.querySelectorAll('p, span, div')).slice(0, 12)
+      const texts = Array.from(el.querySelectorAll('p, span, div')).filter((t) => {
+        if (!t.textContent || !t.textContent.trim()) return false
+        // Leaf text owners only — wrappers inherit page text color.
+        return !Array.from(t.children).some(
+          (c) => c.textContent && c.textContent.trim(),
+        )
+      })
       for (const t of texts) {
         const tc = getComputedStyle(t).color
         const m = tc.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/)
         if (!m) continue
         const lum = 0.2126 * +m[1] + 0.7152 * +m[2] + 0.0722 * +m[3]
-        if (lum < 40) decorTextOk = false
+        // Light card: text must be dark enough to read (fail near-white text).
+        if (lum > 200) decorTextOk = false
       }
     }
     const forms = document.querySelectorAll('form').length
