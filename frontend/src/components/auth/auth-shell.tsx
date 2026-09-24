@@ -485,7 +485,7 @@ const THEMES: Record<AuthShellRole, RoleTheme> = {
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute inset-0 bg-[#0B1F3A]" />
         <GridSignal variant="school" />
-        <div className="absolute bottom-24 left-8 hidden w-[300px] xl:block" style={{ perspective: '900px' }}>
+        <div className="absolute bottom-14 left-10 hidden w-[280px] xl:block" style={{ perspective: '900px' }}>
           <div style={{ transform: 'rotateX(10deg) rotateY(6deg)' }}>
             <SchoolBuildingScene />
           </div>
@@ -496,7 +496,7 @@ const THEMES: Record<AuthShellRole, RoleTheme> = {
     ),
     accentBar: 'bg-gradient-to-r from-emerald-600 to-[#04A9CE]',
     aside: (
-      <div className="hidden max-w-md py-12 lg:block">
+      <div className="hidden max-w-md pt-2 lg:ml-auto lg:mr-6 lg:block">
         <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7EDCF0]">
           Institutional workspace
         </p>
@@ -505,11 +505,11 @@ const THEMES: Record<AuthShellRole, RoleTheme> = {
           <br />
           with clarity.
         </h2>
-        <p className="mt-5 text-[15px] leading-relaxed text-white/75">
+        <p className="mt-4 text-[15px] leading-relaxed text-white/75">
           Seats, teachers, license status and school settings — structured for
           headteachers and administrators.
         </p>
-        <ul className="mt-8 space-y-3 text-sm text-white/70">
+        <ul className="mt-6 space-y-3 text-sm text-white/70">
           <li className="flex gap-2.5">
             <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#04A9CE]" />
             License and seat visibility
@@ -706,12 +706,12 @@ export function AuthShell({
 
       <div
         className={`relative z-10 min-h-screen ${
-          showAside ? 'lg:grid lg:grid-cols-[1.05fr_1fr] xl:grid-cols-[1.15fr_1fr]' : ''
+          showAside ? 'lg:grid lg:grid-cols-[1fr_1fr] xl:grid-cols-[1.05fr_1fr]' : ''
         }`}
       >
         {showAside ? (
-          <aside className="flex flex-col justify-between px-6 py-8 sm:px-10 lg:min-h-screen lg:px-14 lg:py-12">
-            <BrandCapsule dark showWordmark />
+          <aside className="flex flex-col justify-between px-6 py-8 sm:px-10 lg:min-h-screen lg:px-12 lg:py-10">
+            {role !== 'school_admin' && <BrandCapsule dark showWordmark />}
             {theme.aside}
             <p
               className={`hidden text-xs lg:block ${
@@ -725,11 +725,11 @@ export function AuthShell({
           <aside className="relative hidden lg:block" aria-hidden="true" />
         )}
 
-        <main className="flex items-center justify-center px-4 pb-14 pt-6 sm:px-6 lg:px-10 lg:py-12">
+        <main className="flex items-center justify-center px-4 pb-14 pt-6 sm:px-6 lg:px-8 lg:py-12">
           <div className={isWide ? 'w-full max-w-lg' : 'w-full max-w-md'}>
             <div className="mb-6 flex items-center justify-between gap-3">
               <BrandCapsule dark={isDark} href="/" size={44} mark={28} showWordmark />
-              {!showAside && (
+              {!showAside && !isWide && (
                 <span
                   className={`rounded-full px-2.5 py-1 text-[11px] font-semibold shadow-sm backdrop-blur ${
                     isDark
@@ -742,32 +742,31 @@ export function AuthShell({
               )}
             </div>
 
-            {isWide && (
-              <div className="mb-5">
-                <RoleBadge className="border-white/25 bg-white/12 text-white/90">
-                  {theme.badge}
-                </RoleBadge>
-                <h1 className="mt-3 text-[1.65rem] font-bold leading-tight tracking-tight text-white sm:text-3xl">
-                  {title || theme.title}
-                </h1>
-                <p className="mt-2 text-sm leading-relaxed text-white/70">{description}</p>
-                {steps && steps.length > 0 && (
-                  <div className="mt-4">
-                    <StepRail steps={steps} onDark />
-                  </div>
-                )}
-                {securityNote && (
-                  <p className="mt-3 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-xs text-white/70 shadow-sm">
-                    {securityNote}
-                  </p>
-                )}
-              </div>
-            )}
-
             {!isWide && steps && steps.length > 0 && <StepRail steps={steps} onDark={isDark} />}
 
             <DepthCard dark={isDark} accent={theme.accentBar}>
               <div className="px-6 py-7 sm:px-8">
+                {isWide && (
+                  <div className="mb-5 border-b border-border pb-5">
+                    <RoleBadge className={theme.badgeClass}>{theme.badge}</RoleBadge>
+                    <h1 className="mt-3 text-2xl font-bold leading-tight tracking-tight text-[#102A43] sm:text-[1.65rem]">
+                      {title || theme.title}
+                    </h1>
+                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                      {description}
+                    </p>
+                    {steps && steps.length > 0 && (
+                      <div className="mt-4">
+                        <StepRail steps={steps} />
+                      </div>
+                    )}
+                    {securityNote && (
+                      <p className="mt-3 rounded-lg border border-border bg-[#F4F7FA] px-3 py-2 text-xs text-muted-foreground">
+                        {securityNote}
+                      </p>
+                    )}
+                  </div>
+                )}
                 {!isWide && (
                   <>
                     <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
