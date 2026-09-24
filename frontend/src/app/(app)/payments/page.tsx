@@ -3,13 +3,14 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { SurfaceCard } from '@/components/ui/surface-card'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Field, TextArea } from '@/components/ui/field'
 import { Banner } from '@/components/ui/banner'
 import { StatusPill } from '@/components/ui/badge'
-import { CreditCard, Phone, Building, CheckCircle, Clock, XCircle } from 'lucide-react'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
+import { Phone, Building, CheckCircle, Clock, XCircle } from 'lucide-react'
 import { api } from '@/lib/api'
 import { PageHeader } from '@/components/ui/page-header'
 import { formatCurrency } from '@/lib/utils-display'
@@ -123,9 +124,9 @@ export default function PaymentsPage() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'verified': return <CheckCircle className="h-4 w-4 text-green-600" />
-      case 'rejected': return <XCircle className="h-4 w-4 text-red-600" />
-      case 'pending': return <Clock className="h-4 w-4 text-yellow-600" />
+      case 'verified': return <CheckCircle className="h-4 w-4 text-green-600" aria-hidden="true" />
+      case 'rejected': return <XCircle className="h-4 w-4 text-red-600" aria-hidden="true" />
+      case 'pending': return <Clock className="h-4 w-4 text-yellow-600" aria-hidden="true" />
       default: return null
     }
   }
@@ -138,11 +139,14 @@ export default function PaymentsPage() {
     )
   }
 
+  const sectionHeading = 'text-xl font-semibold text-[#102A43]'
+
   return (
     <div className="min-h-screen">
       <main className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="mb-6">
           <PageHeader
+            eyebrow="Billing"
             title="Payments & Subscriptions"
             description="Manage your SchemeKnit subscription"
           />
@@ -156,33 +160,35 @@ export default function PaymentsPage() {
 
         {/* Plans */}
         <section className="mb-8">
-          <h3 className="text-xl font-semibold mb-4">Available Plans</h3>
-          <div className="grid md:grid-cols-3 gap-4">
+          <h3 className={`${sectionHeading} mb-1`}>Available Plans</h3>
+          <p className="mb-4 text-sm text-muted-foreground">Choose a plan, submit payment, and get verified.</p>
+          <div className="grid gap-4 md:grid-cols-3">
             {plans.map((plan) => (
-              <Card key={plan.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <CardTitle className="text-lg">{plan.name}</CardTitle>
-                  <CardDescription>{plan.description}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-primary mb-2">
-                    {formatCurrency(plan.price)}
-                  </div>
-                  {plan.duration_days && (
-                    <p className="text-sm text-muted-foreground mb-4">
-                      {plan.duration_days} days access
-                    </p>
-                  )}
-                  <ul className="text-xs text-muted-foreground space-y-1 mb-4">
-                    {plan.features.map((f, i) => (
-                      <li key={i}>&#10003; {f.replace(/_/g, ' ')}</li>
-                    ))}
-                  </ul>
-                  <Button onClick={() => handleSelectPlan(plan)} className="w-full">
-                    Purchase
-                  </Button>
-                </CardContent>
-              </Card>
+              <SurfaceCard
+                key={plan.id}
+                data-plan-card
+                accent="bg-gradient-to-r from-[#102A43] to-[#04A9CE]"
+                className="flex flex-col px-5 py-5"
+              >
+                <h4 className="text-lg font-semibold text-[#102A43]">{plan.name}</h4>
+                <p className="mt-1 text-sm text-muted-foreground">{plan.description}</p>
+                <div className="mt-3 text-3xl font-bold text-[#04769B]">
+                  {formatCurrency(plan.price)}
+                </div>
+                {plan.duration_days && (
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {plan.duration_days} days access
+                  </p>
+                )}
+                <ul className="mt-3 mb-4 space-y-1 text-xs text-muted-foreground">
+                  {plan.features.map((f, i) => (
+                    <li key={i}>&#10003; {f.replace(/_/g, ' ')}</li>
+                  ))}
+                </ul>
+                <Button onClick={() => handleSelectPlan(plan)} className="mt-auto w-full">
+                  Purchase
+                </Button>
+              </SurfaceCard>
             ))}
           </div>
         </section>
@@ -190,43 +196,39 @@ export default function PaymentsPage() {
         {/* Payment Methods */}
         {config && (
           <section className="mb-8">
-            <h3 className="text-xl font-semibold mb-4">Payment Methods</h3>
-            <div className="grid md:grid-cols-2 gap-4">
+            <h3 className={`${sectionHeading} mb-4`}>Payment Methods</h3>
+            <div className="grid gap-4 md:grid-cols-2">
               {config.mtn_momo.enabled && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center text-lg">
-                      <Phone className="h-5 w-5 mr-2" />
-                      MTN Mobile Money
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    <p className="text-2xl font-bold">{config.mtn_momo.phone}</p>
+                <SurfaceCard data-mtn-method className="px-5 py-5">
+                  <h4 className="flex items-center text-lg font-semibold text-[#102A43]">
+                    <Phone className="mr-2 h-5 w-5 text-[#04A9CE]" aria-hidden="true" />
+                    MTN Mobile Money
+                  </h4>
+                  <div className="mt-3 space-y-2">
+                    <p className="text-2xl font-bold text-[#102A43]">{config.mtn_momo.phone}</p>
                     <p className="text-muted-foreground">{config.mtn_momo.account_name}</p>
                     <p className="text-xs text-muted-foreground">
                       Send money to this number. Use your name as reference.
                     </p>
-                  </CardContent>
-                </Card>
+                  </div>
+                </SurfaceCard>
               )}
               {config.bank_transfer.enabled && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center text-lg">
-                      <Building className="h-5 w-5 mr-2" />
-                      Bank Transfer
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    <p className="font-semibold">{config.bank_transfer.bank}</p>
-                    <p className="text-2xl font-bold">{config.bank_transfer.account_number}</p>
+                <SurfaceCard data-bank-method className="px-5 py-5">
+                  <h4 className="flex items-center text-lg font-semibold text-[#102A43]">
+                    <Building className="mr-2 h-5 w-5 text-[#04A9CE]" aria-hidden="true" />
+                    Bank Transfer
+                  </h4>
+                  <div className="mt-3 space-y-2">
+                    <p className="font-semibold text-[#102A43]">{config.bank_transfer.bank}</p>
+                    <p className="text-2xl font-bold text-[#102A43]">{config.bank_transfer.account_number}</p>
                     <p className="text-muted-foreground">Branch: {config.bank_transfer.branch}</p>
                     <p className="text-muted-foreground">Account Name: {config.bank_transfer.account_name}</p>
                     <p className="text-xs text-muted-foreground">
                       Use your name as payment reference.
                     </p>
-                  </CardContent>
-                </Card>
+                  </div>
+                </SurfaceCard>
               )}
             </div>
           </section>
@@ -235,14 +237,12 @@ export default function PaymentsPage() {
         {/* Submit Payment Form */}
         {showSubmitForm && selectedPlan && (
           <section className="mb-8">
-            <Card>
-              <CardHeader>
-                <CardTitle>Submit Payment</CardTitle>
-                <CardDescription>
-                  You are paying {formatCurrency(selectedPlan.price)} for {selectedPlan.name}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
+            <SurfaceCard data-submit-payment accent="bg-gradient-to-r from-[#102A43] to-[#04A9CE]" className="px-5 py-5 sm:px-6">
+              <h4 className="text-lg font-semibold text-[#102A43]">Submit Payment</h4>
+              <p className="text-sm text-muted-foreground">
+                You are paying {formatCurrency(selectedPlan.price)} for {selectedPlan.name}
+              </p>
+              <div className="mt-4 space-y-4">
                 <Field label="Payment Method" htmlFor="payment-method">
                   <Select
                     id="payment-method"
@@ -299,48 +299,59 @@ export default function PaymentsPage() {
                 <p className="text-xs text-muted-foreground">
                   Access will be activated only after admin verification. This may take up to 24 hours.
                 </p>
-              </CardContent>
-            </Card>
+              </div>
+            </SurfaceCard>
           </section>
         )}
 
         {/* Payment History */}
         <section>
-          <h3 className="text-xl font-semibold mb-4">Payment History</h3>
+          <h3 className={`${sectionHeading} mb-4`}>Payment History</h3>
           {history.length === 0 ? (
-            <Card>
-              <CardContent className="p-8 text-center text-muted-foreground">
-                No payment history yet.
-              </CardContent>
-            </Card>
+            <SurfaceCard className="px-6 py-8 text-center text-muted-foreground">
+              No payment history yet.
+            </SurfaceCard>
           ) : (
-            <div className="space-y-3">
-              {history.map((p) => (
-                <Card key={p.id}>
-                  <CardContent className="p-4 flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">{p.product_name || p.product_type}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {p.payment_method === 'mtn_momo' ? 'MTN MoMo' : 'Bank Transfer'} &bull;
-                        {formatCurrency(p.amount)} &bull;
+            <SurfaceCard className="overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50 hover:bg-muted/50">
+                    <TableHead>Payment</TableHead>
+                    <TableHead>Submitted</TableHead>
+                    <TableHead className="text-right">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {history.map((p) => (
+                    <TableRow key={p.id}>
+                      <TableCell>
+                        <p className="font-medium text-[#102A43]">{p.product_name || p.product_type}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {p.payment_method === 'mtn_momo' ? 'MTN MoMo' : 'Bank Transfer'} &bull;
+                          {' '}{formatCurrency(p.amount)}
+                        </p>
+                        {p.rejection_reason && (
+                          <p className="mt-1 text-xs text-red-600">Reason: {p.rejection_reason}</p>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
                         {new Date(p.submitted_at).toLocaleDateString()}
-                      </p>
-                      {p.rejection_reason && (
-                        <p className="text-xs text-red-600 mt-1">Reason: {p.rejection_reason}</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {getStatusIcon(p.status)}
-                      <StatusPill
-                        tone={p.status === 'verified' ? 'success' : p.status === 'rejected' ? 'danger' : 'warning'}
-                      >
-                        {p.status.charAt(0).toUpperCase() + p.status.slice(1)}
-                      </StatusPill>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span className="inline-flex items-center gap-2">
+                          {getStatusIcon(p.status)}
+                          <StatusPill
+                            tone={p.status === 'verified' ? 'success' : p.status === 'rejected' ? 'danger' : 'warning'}
+                          >
+                            {p.status.charAt(0).toUpperCase() + p.status.slice(1)}
+                          </StatusPill>
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </SurfaceCard>
           )}
         </section>
       </main>
