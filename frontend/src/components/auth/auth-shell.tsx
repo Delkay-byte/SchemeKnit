@@ -485,18 +485,13 @@ const THEMES: Record<AuthShellRole, RoleTheme> = {
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute inset-0 bg-[#0B1F3A]" />
         <GridSignal variant="school" />
-        <div className="absolute bottom-14 left-10 hidden w-[280px] xl:block" style={{ perspective: '900px' }}>
-          <div style={{ transform: 'rotateX(10deg) rotateY(6deg)' }}>
-            <SchoolBuildingScene />
-          </div>
-        </div>
         <div className="absolute right-16 top-24 hidden h-40 w-px bg-gradient-to-b from-transparent via-[#04A9CE]/50 to-transparent lg:block" />
         <div className="absolute right-12 top-24 hidden h-2 w-2 rounded-full bg-[#04A9CE]/70 lg:block" />
       </div>
     ),
     accentBar: 'bg-gradient-to-r from-emerald-600 to-[#04A9CE]',
     aside: (
-      <div className="hidden max-w-md pt-2 lg:ml-auto lg:mr-6 lg:block">
+      <div className="hidden max-w-md pt-16 lg:ml-auto lg:mr-6 lg:block">
         <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7EDCF0]">
           Institutional workspace
         </p>
@@ -523,6 +518,14 @@ const THEMES: Record<AuthShellRole, RoleTheme> = {
             School-level workflow control
           </li>
         </ul>
+        <div
+          className="mt-8 w-[300px] max-w-full"
+          style={{ perspective: '900px' }}
+        >
+          <div style={{ transform: 'rotateX(10deg) rotateY(6deg)' }}>
+            <SchoolBuildingScene />
+          </div>
+        </div>
       </div>
     ),
     asideClass: '',
