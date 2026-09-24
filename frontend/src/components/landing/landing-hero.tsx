@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { ReactNode } from 'react'
 import { CurriculumPipeline } from './curriculum-pipeline'
 import { MeshBackground } from '@/components/mesh-background'
 import styles from './landing-hero.module.css'
@@ -12,11 +13,12 @@ export function scrollToSection(id: string) {
   target.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
 }
 
-export function LandingHero() {
+export function LandingHero({ children }: { children?: ReactNode }) {
   return (
     <section className={styles.hero} aria-labelledby="hero-heading">
-      {/* Interactive curriculum mesh — behind copy + pipeline, never overpowering */}
+      {/* Interactive curriculum mesh — spans header + hero so hover works across both */}
       <MeshBackground mode="hero" className={styles.meshLayer} opacity={0.95} />
+      {children}
       <div className={styles.heroInner}>
         <div className={styles.copy}>
           <p className={styles.eyebrow}>Ghana&apos;s curriculum-grounded lesson planner</p>

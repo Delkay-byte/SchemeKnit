@@ -48,48 +48,48 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#f4f7fa]">
-      <header className="bg-[#071826] text-white">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between gap-4">
-            <Link href="/" className="flex items-center gap-3">
-              {/* Canonical navy S on a light capsule — required for contrast
-                  against the dark header (mark fills are #102A43 + #04A9CE). */}
-              <span
-                className="flex h-11 w-11 items-center justify-center rounded-xl border"
-                style={{
-                  background: '#F4F7FA',
-                  borderColor: 'rgba(16,42,67,0.12)',
-                  boxShadow:
-                    '0 0 0 1px rgba(4,169,206,0.3), 0 6px 18px rgba(0,0,0,0.28)',
-                }}
-              >
-                <SchemeKnitMark size={28} className="h-7 w-7" />
-              </span>
-              <span className="text-2xl font-bold tracking-tight">
-                Scheme<span className="text-[#04A9CE]">Knit</span>
-              </span>
-            </Link>
-            <nav className="flex items-center gap-3 sm:gap-5">
-              <button
-                type="button"
-                onClick={() => scrollToSection('how-it-works')}
-                className="hidden text-sm font-medium text-white/75 transition-colors hover:text-white sm:inline"
-              >
-                How it works
-              </button>
-              <Link
-                href="/login"
-                className="inline-flex items-center rounded-full border border-white/25 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7edcf0] focus-visible:ring-offset-2 focus-visible:ring-offset-[#071826]"
-              >
-                Sign in
+      {/* Hero — header sits inside the mesh shell so hover works across both */}
+      <LandingHero>
+        <header className="relative z-10 bg-transparent text-white">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex items-center justify-between gap-4">
+              <Link href="/" className="flex items-center gap-3">
+                {/* Canonical navy S on a light capsule — required for contrast
+                    against the dark header (mark fills are #102A43 + #04A9CE). */}
+                <span
+                  className="flex h-11 w-11 items-center justify-center rounded-xl border"
+                  style={{
+                    background: '#F4F7FA',
+                    borderColor: 'rgba(16,42,67,0.12)',
+                    boxShadow:
+                      '0 0 0 1px rgba(4,169,206,0.3), 0 6px 18px rgba(0,0,0,0.28)',
+                  }}
+                >
+                  <SchemeKnitMark size={28} className="h-7 w-7" />
+                </span>
+                <span className="text-2xl font-bold tracking-tight">
+                  Scheme<span className="text-[#04A9CE]">Knit</span>
+                </span>
               </Link>
-            </nav>
+              <nav className="flex items-center gap-3 sm:gap-5">
+                <button
+                  type="button"
+                  onClick={() => scrollToSection('how-it-works')}
+                  className="hidden text-sm font-medium text-white/75 transition-colors hover:text-white sm:inline"
+                >
+                  How it works
+                </button>
+                <Link
+                  href="/login"
+                  className="inline-flex items-center rounded-full border border-white/25 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7edcf0] focus-visible:ring-offset-2 focus-visible:ring-offset-[#071826]"
+                >
+                  Sign in
+                </Link>
+              </nav>
+            </div>
           </div>
-        </div>
-      </header>
-
-      {/* Hero — scheme → curriculum → indicator → lesson */}
-      <LandingHero />
+        </header>
+      </LandingHero>
 
       {/* Below-the-fold: reinforce that the curriculum stays in control */}
       <HowItWorks />

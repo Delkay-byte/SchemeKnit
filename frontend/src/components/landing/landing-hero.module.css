@@ -1,12 +1,14 @@
 .hero {
   position: relative;
   isolation: isolate;
+  display: flex;
+  flex-direction: column;
   background:
     radial-gradient(880px 460px at 78% 42%, rgba(4, 169, 206, 0.14), transparent 62%),
     #071826;
   color: #f4f7fb;
   overflow: hidden;
-  padding: 2.75rem 1.25rem 4.5rem;
+  padding: 0;
 }
 
 /* Mesh canvas sits behind content; pointer-events pass through to copy/pipeline. */
@@ -31,11 +33,14 @@
 .heroInner {
   position: relative;
   z-index: 1;
+  flex: 1;
+  width: 100%;
   max-width: 1120px;
   margin: 0 auto;
   display: grid;
   gap: 2.25rem;
   align-items: center;
+  padding: 2.75rem 1.25rem 4.5rem;
 }
 
 .copy {
@@ -472,16 +477,14 @@
 
 @media (min-width: 1024px) {
   .hero {
-    min-height: calc(92vh - 4.25rem);
-    display: flex;
-    align-items: center;
-    padding: 2.5rem 2rem 4.5rem;
+    min-height: 92vh;
   }
 
   .heroInner {
     grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.92fr);
     gap: 2.5rem;
     width: 100%;
+    padding: 2.5rem 2rem 4.5rem;
   }
 
   .board {
