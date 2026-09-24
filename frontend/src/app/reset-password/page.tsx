@@ -1,25 +1,22 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { PasswordInput, PasswordMatchIndicator, passwordMatchStatus } from '@/components/password-input'
 import { AuthShell } from '@/components/auth/auth-shell'
+import { AuthField, AuthError } from '@/components/auth/auth-field'
 import { validatePassword, PASSWORD_POLICY } from '@/lib/password-policy'
 import { api } from '@/lib/api'
 import { useSearchParams } from 'next/navigation'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, ShieldCheck, CheckCircle2 } from 'lucide-react'
 
 /**
  * Public password-reset completion page.
- *
- * The user arrives here with a one-time reset token (delivered out-of-band by
- * an admin or the CLI break-glass tool). This page validates the token against
- * the target account, then lets the user set a new password.
+ * Token arrives out-of-band (admin / CLI break-glass). Flow unchanged.
  */
 export default function ResetPasswordPage() {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const [token, setToken] = useState('')
   const [targetEmail, setTargetEmail] = useState('')
@@ -33,7 +30,6 @@ export default function ResetPasswordPage() {
 
   const match = passwordMatchStatus(newPassword, confirmPassword)
 
-  // Auto-fill token from ?token= query param (convenience link).
   useEffect(() => {
     const t = searchParams.get('token')
     if (t) {
@@ -41,7 +37,6 @@ export default function ResetPasswordPage() {
     }
   }, [searchParams])
 
-  // Validate the token whenever it changes (shows the target account).
   const handleValidate = async () => {
     if (!token.trim()) {
       setError('Please enter your reset token.')
@@ -62,7 +57,6 @@ export default function ResetPasswordPage() {
     }
   }
 
-  // Auto-validate when a token is present from the URL.
   useEffect(() => {
     if (token && !targetEmail && !validating && !success) {
       handleValidate()
@@ -107,14 +101,22 @@ export default function ResetPasswordPage() {
     return (
       <AuthShell
         role="password_reset"
-        title="Password Reset"
+        title="Password reset complete"
         description="Your password has been reset successfully. Sign in with your new password."
       >
-        <Link href="/login">
-          <Button className="w-full">
-            Sign In <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
-        </Link>
+        <div className="space-y-4 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 shadow-inner">
+            <CheckCircle2 className="h-8 w-8 text-emerald-600" aria-hidden="true" />
+          </div>
+          <Link href="/login">
+            <Button className="h-11 w-full rounded-lg bg-[#102A43] text-white font-semibold shadow-[0_4px_14px_rgba(16,42,67,0.25)] hover:bg-[#0d2740] active:scale-[0.98] transition">
+              <span className="inline-flex items-center gap-2">
+                Sign in
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </span>
+            </Button>
+          </Link>
+        </div>
       </AuthShell>
     )
   }
@@ -122,16 +124,14 @@ export default function ResetPasswordPage() {
   return (
     <AuthShell
       role="password_reset"
-      title="Reset Your Password"
-      description="Enter the one-time reset token you received, then choose a new password."
+      title="Reset your password"
+      description="Let's get you back into your SchemeKnit workspace. Enter the one-time token, then choose a new password."
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            Reset Token
-          </label>
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        <AuthField id="reset-token" label="Reset token">
           <div className="flex gap-2">
-            <input
+            <Input
+              id="reset-token"
               type="text"
               value={token}
               onChange={(e) => {
@@ -140,38 +140,51 @@ export default function ResetPasswordPage() {
               }}
               required
               autoComplete="off"
-              placeholder="Paste your reset token here"
-              className="w-full px-3 py-2 border rounded-md font-mono text-sm"
+              placeholder="Paste your reset token"
+              className="font-mono text-sm"
+              aria-invalid={error ? true : undefined}
             />
             <Button
               type="button"
               variant="outline"
               onClick={handleValidate}
               disabled={validating || !token.trim()}
+              className="shrink-0 rounded-lg border-[#102A43]/20 bg-white px-4 font-semibold hover:border-[#04A9CE]/50 hover:text-[#0389a8]"
             >
-              {validating ? 'Checking...' : 'Verify'}
+              {validating ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[#102A43]/20 border-t-[#102A43]" />
+                  Checking…
+                </span>
+              ) : (
+                'Verify'
+              )}
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            The token is single-use and expires 30 minutes after it was
-            issued.
-          </p>
-        </div>
+        </AuthField>
+        <p className="text-xs text-muted-foreground -mt-2">
+          The token is single-use and expires 30 minutes after it was issued.
+        </p>
 
         {targetEmail && (
-          <div className="p-3 rounded-lg border border-blue-200 bg-blue-50">
-            <p className="text-sm text-blue-700">
-              Token verified for{' '}
-              <strong>{targetName}</strong> ({targetEmail}).
+          <div
+            className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50/80 px-3 py-2.5 text-xs shadow-sm"
+            role="status"
+          >
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />
+            <p className="leading-relaxed text-emerald-800">
+              Token verified for <strong>{targetName}</strong> ({targetEmail}).
             </p>
           </div>
         )}
 
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            New Password
-          </label>
+        <AuthField
+          id="reset-new-password"
+          label="New password"
+          hint={PASSWORD_POLICY.description}
+        >
           <PasswordInput
+            id="reset-new-password"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             required
@@ -180,15 +193,11 @@ export default function ResetPasswordPage() {
             placeholder="Create a new password"
             toggleLabel="Show password"
           />
-          <p className="text-xs text-muted-foreground mt-1">
-            {PASSWORD_POLICY.description}
-          </p>
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            Confirm New Password
-          </label>
+        </AuthField>
+
+        <AuthField id="reset-confirm-password" label="Confirm new password">
           <PasswordInput
+            id="reset-confirm-password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             required
@@ -197,31 +206,31 @@ export default function ResetPasswordPage() {
             placeholder="Confirm your new password"
             toggleLabel="Show password"
           />
-          <PasswordMatchIndicator
-            password={newPassword}
-            confirm={confirmPassword}
-          />
-        </div>
+        </AuthField>
+        <PasswordMatchIndicator password={newPassword} confirm={confirmPassword} />
 
-        {error && (
-          <p className="text-sm text-destructive bg-destructive/10 p-2 rounded">
-            {error}
-          </p>
-        )}
+        <AuthError message={error} />
 
         <Button
           type="submit"
           disabled={loading || (!match.matched && confirmPassword.length > 0)}
-          className="w-full"
+          className="h-11 w-full rounded-lg bg-[#102A43] text-white font-semibold shadow-[0_4px_14px_rgba(16,42,67,0.25)] hover:bg-[#0d2740] active:scale-[0.98] transition focus-visible:ring-2 focus-visible:ring-[#04A9CE] focus-visible:ring-offset-2 disabled:opacity-60"
         >
-          {loading ? 'Please wait...' : 'Reset Password'}
+          {loading ? (
+            <span className="inline-flex items-center gap-2">
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+              Please wait…
+            </span>
+          ) : (
+            'Reset password'
+          )}
         </Button>
       </form>
 
       <div className="mt-4 text-center">
         <Link
           href="/login"
-          className="text-xs text-muted-foreground hover:text-foreground underline"
+          className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
         >
           Back to sign in
         </Link>

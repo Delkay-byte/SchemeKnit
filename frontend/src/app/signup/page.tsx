@@ -15,8 +15,8 @@ import { validateEmail, validatePassword, PASSWORD_POLICY } from '@/lib/password
 export default function IndividualSignupPage() {
   const router = useRouter()
   const { login } = useAuth()
-  const [email, setEmail] = useState('')
   const [fullName, setFullName] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState('')
@@ -64,7 +64,7 @@ export default function IndividualSignupPage() {
     <AuthShell
       role="register"
       title="Create your SchemeKnit account"
-      description="Create your account — no school required. Start on the Free Tier and upgrade to Pro anytime."
+      description="Start your professional lesson-planning workspace — no school required. Free Tier includes 5 lesson plans per month."
       steps={[
         { label: 'Your details', active: true },
         { label: 'Secure password' },
@@ -83,12 +83,6 @@ export default function IndividualSignupPage() {
       }
     >
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-        <div className="rounded-lg border border-border bg-[#F4F7FA] px-3 py-2">
-          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#04A9CE]">
-            Create your account
-          </p>
-        </div>
-
         <AuthField id="signup-name" label="Full name">
           <Input
             id="signup-name"
@@ -99,6 +93,7 @@ export default function IndividualSignupPage() {
             placeholder="Ama Mensah"
             autoComplete="name"
             autoFocus
+            aria-invalid={error ? true : undefined}
           />
         </AuthField>
 
@@ -111,6 +106,7 @@ export default function IndividualSignupPage() {
             required
             placeholder="name@gmail.com"
             autoComplete="email"
+            aria-invalid={error ? true : undefined}
           />
         </AuthField>
 
@@ -153,7 +149,7 @@ export default function IndividualSignupPage() {
         <Button
           type="submit"
           disabled={loading}
-          className="h-11 w-full rounded-lg bg-[#102A43] text-white font-semibold hover:bg-[#0d2740] active:scale-[0.99] transition focus-visible:ring-2 focus-visible:ring-[#04A9CE] focus-visible:ring-offset-2 disabled:opacity-60"
+          className="h-11 w-full rounded-lg bg-[#102A43] text-white font-semibold shadow-[0_4px_14px_rgba(16,42,67,0.25)] hover:bg-[#0d2740] active:scale-[0.98] transition focus-visible:ring-2 focus-visible:ring-[#04A9CE] focus-visible:ring-offset-2 disabled:opacity-60"
         >
           {loading ? (
             <span className="inline-flex items-center gap-2">
@@ -166,7 +162,7 @@ export default function IndividualSignupPage() {
         </Button>
       </form>
 
-      <div className="mt-5 rounded-xl border border-border bg-[#F4F7FA] p-4">
+      <div className="mt-5 rounded-xl border border-border bg-[#F4F7FA] p-4 shadow-sm">
         <p className="text-xs leading-relaxed text-muted-foreground text-center">
           Free Tier includes 5 lesson plans per calendar month, individual DOCX and
           PDF export, 1 custom template and 5 lifetime AI credits.

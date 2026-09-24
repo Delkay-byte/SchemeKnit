@@ -3,12 +3,12 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { BookOpen } from 'lucide-react'
+import { Input } from '@/components/ui/input'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import { PasswordInput, PasswordMatchIndicator } from '@/components/password-input'
 import { AuthShell } from '@/components/auth/auth-shell'
+import { AuthField, AuthError } from '@/components/auth/auth-field'
 import {
   validatePassword, validateEmail, PASSWORD_POLICY,
 } from '@/lib/password-policy'
@@ -73,8 +73,8 @@ export default function SetupPage() {
 
   if (authLoading || checking) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="min-h-screen bg-[#F8F7FC] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-600" role="status" aria-label="Loading" />
       </div>
     )
   }
@@ -82,85 +82,99 @@ export default function SetupPage() {
   return (
     <AuthShell
       role="first_run"
-      title="Set Up SchemeKnit"
-      description="Create your administrator account to get started."
+      title="Initialize SchemeKnit"
+      description="System initialization — create your administrator account to bring this environment online."
       steps={[
         { label: 'Admin details', active: true },
         { label: 'School (optional)' },
         { label: 'Ready' },
       ]}
     >
-      <Card className="w-full border-0 shadow-none">
-        <CardHeader className="text-center px-0 pt-0">
-          <BookOpen className="h-12 w-12 text-primary mx-auto mb-4" />
-        </CardHeader>
-        <CardContent className="px-0 pb-0">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
-                {error}
-              </div>
-            )}
-            <div className="space-y-2">
-              <label className="block text-sm font-medium">Your Name</label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Kwame Asante"
-                required
-                className="w-full px-3 py-2 border rounded-md"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="block text-sm font-medium">Email / Username</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@school.edu.gh"
-                required
-                className="w-full px-3 py-2 border rounded-md"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="block text-sm font-medium">School Name (optional)</label>
-              <input
-                type="text"
-                value={schoolName}
-                onChange={(e) => setSchoolName(e.target.value)}
-                placeholder="Accra Academy"
-                className="w-full px-3 py-2 border rounded-md"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="block text-sm font-medium">Password</label>
-              <PasswordInput
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="At least 8 characters"
-                required
-                toggleLabel="Show password"
-              />
-              <p className="text-xs text-muted-foreground">{PASSWORD_POLICY.description}</p>
-            </div>
-            <div className="space-y-2">
-              <label className="block text-sm font-medium">Confirm Password</label>
-              <PasswordInput
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Confirm password"
-                required
-                toggleLabel="Show password"
-              />
-              <PasswordMatchIndicator password={password} confirm={confirmPassword} />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Creating Account...' : 'Create Admin Account'}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        <AuthField id="setup-name" label="Your name">
+          <Input
+            id="setup-name"
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Kwame Asante"
+            required
+            autoComplete="name"
+            aria-invalid={error ? true : undefined}
+          />
+        </AuthField>
+        <AuthField id="setup-email" label="Email / username">
+          <Input
+            id="setup-email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="admin@school.edu.gh"
+            required
+            autoComplete="email"
+            aria-invalid={error ? true : undefined}
+          />
+        </AuthField>
+        <AuthField id="setup-school" label="School name (optional)">
+          <Input
+            id="setup-school"
+            type="text"
+            value={schoolName}
+            onChange={(e) => setSchoolName(e.target.value)}
+            placeholder="Accra Academy"
+            autoComplete="organization"
+          />
+        </AuthField>
+        <AuthField
+          id="setup-password"
+          label="Password"
+          hint={PASSWORD_POLICY.description}
+        >
+          <PasswordInput
+            id="setup-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="At least 8 characters"
+            required
+            toggleLabel="Show password"
+            autoComplete="new-password"
+          />
+        </AuthField>
+        <AuthField id="setup-confirm" label="Confirm password">
+          <PasswordInput
+            id="setup-confirm"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            placeholder="Confirm password"
+            required
+            toggleLabel="Show password"
+            autoComplete="new-password"
+          />
+        </AuthField>
+        <PasswordMatchIndicator password={password} confirm={confirmPassword} />
+        <AuthError message={error} />
+        <Button
+          type="submit"
+          disabled={loading}
+          className="h-11 w-full rounded-lg bg-[#102A43] text-white font-semibold shadow-[0_4px_14px_rgba(16,42,67,0.25)] hover:bg-[#0d2740] active:scale-[0.98] transition focus-visible:ring-2 focus-visible:ring-[#04A9CE] focus-visible:ring-offset-2 disabled:opacity-60"
+        >
+          {loading ? (
+            <span className="inline-flex items-center gap-2">
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+              Creating account…
+            </span>
+          ) : (
+            'Create admin account'
+          )}
+        </Button>
+      </form>
+
+      <div className="mt-5 rounded-xl border border-violet-200/70 bg-violet-50/60 p-4 shadow-sm">
+        <p className="text-xs leading-relaxed text-muted-foreground text-center">
+          This is a one-time first-run setup. After the administrator account is
+          created, this page redirects to sign-in.
+        </p>
+      </div>
     </AuthShell>
   )
 }
