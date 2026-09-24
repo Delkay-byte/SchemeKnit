@@ -807,6 +807,7 @@ export function MeshBackground({
   return (
     <div
       ref={wrapRef}
+      data-mesh="landing"
       className={`pointer-events-none absolute inset-0 overflow-hidden ${className}`}
       aria-hidden="true"
     >

@@ -45,6 +45,37 @@ async function canvasCount(page) {
   return page.locator('canvas').count()
 }
 
+async function meshCount(page) {
+  return page.locator('[data-mesh]').count()
+}
+
+async function gridSignalCount(page) {
+  return page.locator('canvas[data-grid-signal]').count()
+}
+
+/** Pixel signature of the login grid-signal canvas (motion probe). */
+async function gridSignature(page) {
+  return page.evaluate(() => {
+    const c = document.querySelector('canvas[data-grid-signal]')
+    if (!c || !c.width || !c.height) return null
+    const ctx = c.getContext('2d')
+    if (!ctx) return null
+    const w = Math.min(c.width, 320)
+    const h = Math.min(c.height, 240)
+    const d = ctx.getImageData(0, 0, w, h).data
+    let s = 0
+    for (let i = 0; i < d.length; i += 32) s += d[i] + d[i + 3]
+    return s
+  })
+}
+
+/** Login routes expect a role-specific grid signal, not the landing mesh. */
+const LOGIN_SIGNALS = {
+  'teacher-login': 'teacher',
+  'school-admin-login': 'school',
+  'platform-admin-login': 'platform',
+}
+
 async function hasCanvasMesh(page) {
   return page.evaluate(() => {
     const c = document.querySelector('canvas')
@@ -140,6 +171,8 @@ async function main() {
 
   const landingCanvas = await canvasCount(page)
   log(landingCanvas >= 1, 'landing: mesh canvas present', `count=${landingCanvas}`)
+  const landingMesh = await meshCount(page)
+  log(landingMesh >= 1, 'landing: data-mesh present', `mesh=${landingMesh}`)
 
   const meshPainted = await page.evaluate(() => {
     const canvas = document.querySelector('section[aria-labelledby="hero-heading"] canvas') || document.querySelector('canvas')
@@ -213,11 +246,21 @@ async function main() {
       title.replace(/\s+/g, ' ').trim(),
     )
 
-    const c = await canvasCount(page)
-    log(c === 0, `${r.label}: no canvas/mesh`, `count=${c}`)
-
-    const painted = await hasCanvasMesh(page)
-    log(!painted, `${r.label}: no painted mesh`)
+    const lm = await meshCount(page)
+    log(lm === 0, `${r.label}: no landing mesh`, `mesh=${lm}`)
+    if (LOGIN_SIGNALS[r.label]) {
+      const gs = await gridSignalCount(page)
+      log(gs === 1, `${r.label}: grid signal canvas`, `count=${gs}`)
+      const g1 = await gridSignature(page)
+      await page.waitForTimeout(950)
+      const g2 = await gridSignature(page)
+      log(g1 !== null && g2 !== null && g1 !== g2, `${r.label}: signal moves over time`, `${g1} vs ${g2}`)
+    } else {
+      const c = await canvasCount(page)
+      log(c === 0, `${r.label}: no canvas`, `count=${c}`)
+      const painted = await hasCanvasMesh(page)
+      log(!painted, `${r.label}: no painted mesh`)
+    }
 
     const rootEl = await page.evaluate(() => {
       const el =
@@ -268,6 +311,19 @@ async function main() {
   const rmB = await meshSignature(rmPage)
   log(rmA === rmB, 'reduced-motion: mesh static (no animation loop)', `${rmA} vs ${rmB}`)
 
+  // Reduced motion: login grid signal static
+  await rmPage.goto(BASE + '/login', { waitUntil: 'networkidle', timeout: 45000 })
+  await rmPage.waitForTimeout(500)
+  const rmGs = await gridSignalCount(rmPage)
+  log(rmGs === 1, 'reduced-motion: login grid signal present', `count=${rmGs}`)
+  const rmSig1 = await gridSignature(rmPage)
+  await rmPage.waitForTimeout(950)
+  const rmSig2 = await gridSignature(rmPage)
+  log(rmSig1 !== null && rmSig1 === rmSig2, 'reduced-motion: login signal static', `${rmSig1} vs ${rmSig2}`)
+  await shot(rmPage, 'login-reduced-motion.png')
+  await rmPage.goto(BASE + '/', { waitUntil: 'networkidle', timeout: 45000 })
+  await rmPage.waitForTimeout(400)
+
   // V4: reduced-motion + touch → no deformation
   const rmTouchBefore = await meshSignature(rmPage)
   await rmPage.touchscreen.tap(200, 300).catch(() => {})
@@ -307,8 +363,15 @@ async function main() {
     await page.waitForTimeout(350)
     const o = await overflow(page)
     log(o.scrollW <= o.clientW + 1, `${r.label} @390: no overflow`, `${o.scrollW}/${o.clientW}`)
-    const c = await canvasCount(page)
-    log(c === 0, `${r.label} @390: no canvas`)
+    const lm390 = await meshCount(page)
+    log(lm390 === 0, `${r.label} @390: no landing mesh`, `mesh=${lm390}`)
+    if (LOGIN_SIGNALS[r.label]) {
+      const gs390 = await gridSignalCount(page)
+      log(gs390 === 1, `${r.label} @390: grid signal`, `count=${gs390}`)
+    } else {
+      const c390 = await canvasCount(page)
+      log(c390 === 0, `${r.label} @390: no canvas`)
+    }
   }
 
   // ---- V4: mobile touch interaction (iPhone 13, 390×844) ----
@@ -449,8 +512,10 @@ async function main() {
   await page.goto(BASE + '/login/platform-admin', { waitUntil: 'networkidle', timeout: 45000 })
   const paH1 = await page.locator('h1').first().innerText().catch(() => '')
   log(paH1.toLowerCase().includes('platform'), 'direct platform admin route works', paH1)
-  const paCanvas = await canvasCount(page)
-  log(paCanvas === 0, 'platform admin: no mesh')
+  const paMesh = await meshCount(page)
+  log(paMesh === 0, 'platform admin: no landing mesh', `mesh=${paMesh}`)
+  const paGs = await gridSignalCount(page)
+  log(paGs === 1, 'platform admin: grid signal present', `count=${paGs}`)
 
   // Footer logo
   await page.goto(BASE + '/', { waitUntil: 'networkidle', timeout: 45000 })

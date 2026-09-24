@@ -33,6 +33,29 @@ async function overflow(page) {
   }))
 }
 
+/** Pixel signature of the login grid-signal canvas (motion probe). */
+async function signalSignature(page) {
+  return page.evaluate(() => {
+    const c = document.querySelector('canvas[data-grid-signal]')
+    if (!c || !c.width || !c.height) return null
+    const ctx = c.getContext('2d')
+    if (!ctx) return null
+    const w = Math.min(c.width, 320)
+    const h = Math.min(c.height, 240)
+    const d = ctx.getImageData(0, 0, w, h).data
+    let s = 0
+    for (let i = 0; i < d.length; i += 32) s += d[i] + d[i + 3]
+    return s
+  })
+}
+
+/** Login routes expect a role-specific grid signal; others expect no canvas. */
+const LOGIN_SIGNALS = {
+  'teacher-login': 'teacher',
+  'school-admin-login': 'school',
+  'platform-admin-login': 'platform',
+}
+
 async function pageInfo(page) {
   return page.evaluate(() => {
     const root =
@@ -41,6 +64,10 @@ async function pageInfo(page) {
       document.body
     const bg = getComputedStyle(root).backgroundColor
     const canvasCount = document.querySelectorAll('canvas').length
+    const meshCount = document.querySelectorAll('[data-mesh]').length
+    const gridSignals = Array.from(document.querySelectorAll('canvas[data-grid-signal]')).map((c) =>
+      c.getAttribute('data-grid-signal'),
+    )
     const h1 = document.querySelector('h1')?.textContent?.trim() || ''
     const title = document.title
     // Light logo capsule: look for scheme-knit mark inside a light surface
@@ -68,7 +95,7 @@ async function pageInfo(page) {
       return r.width > 0 && r.height > 0
     })
     const inputs = document.querySelectorAll('input').length
-    return { bg, canvasCount, h1, title, logoOk, logoBg, forms, ctaVisible, inputs }
+    return { bg, canvasCount, meshCount, gridSignals, h1, title, logoOk, logoBg, forms, ctaVisible, inputs }
   })
 }
 
@@ -99,7 +126,22 @@ async function main() {
     log(r.title.test(info.title) || r.title.test(info.h1), `${r.name}: title`, `${info.title} / h1=${info.h1}`)
     log(info.bg === r.bg, `${r.name}: distinct bg`, `${info.bg} expected ${r.bg}`)
     bgs.add(info.bg)
-    log(info.canvasCount === 0, `${r.name}: no mesh`, `count=${info.canvasCount}`)
+    const expectedSignal = LOGIN_SIGNALS[r.name]
+    if (expectedSignal) {
+      log(info.meshCount === 0, `${r.name}: no landing mesh`, `mesh=${info.meshCount}`)
+      log(
+        info.gridSignals.includes(expectedSignal),
+        `${r.name}: grid signal present`,
+        JSON.stringify(info.gridSignals),
+      )
+      const s1 = await signalSignature(page)
+      await page.waitForTimeout(950)
+      const s2 = await signalSignature(page)
+      log(s1 !== null && s2 !== null && s1 !== s2, `${r.name}: signal moves over time`, `${s1} vs ${s2}`)
+    } else {
+      log(info.canvasCount === 0, `${r.name}: no canvas`, `count=${info.canvasCount}`)
+      log(info.meshCount === 0, `${r.name}: no landing mesh`, `mesh=${info.meshCount}`)
+    }
     log(info.logoOk, `${r.name}: light logo capsule`, `bg=${info.logoBg}`)
     log(ov.scrollW <= ov.clientW, `${r.name}: no overflow`, `${ov.scrollW}/${ov.clientW}`)
     log(info.forms >= 1 && info.inputs >= 1, `${r.name}: form visible`, `forms=${info.forms} inputs=${info.inputs}`)
@@ -167,7 +209,14 @@ async function main() {
     const info = await pageInfo(page)
     log(ov.scrollW <= ov.clientW, `${r.name} @390: no overflow`, `${ov.scrollW}/${ov.clientW}`)
     log(info.logoOk || info.logoBg !== '', `${r.name} @390: logo present`, info.logoBg)
-    log(info.canvasCount === 0, `${r.name} @390: no mesh`)
+    const expected390 = LOGIN_SIGNALS[r.name]
+    if (expected390) {
+      log(info.gridSignals.includes(expected390), `${r.name} @390: grid signal`, JSON.stringify(info.gridSignals))
+      log(info.meshCount === 0, `${r.name} @390: no landing mesh`, `mesh=${info.meshCount}`)
+    } else {
+      log(info.canvasCount === 0, `${r.name} @390: no canvas`)
+      log(info.meshCount === 0, `${r.name} @390: no landing mesh`, `mesh=${info.meshCount}`)
+    }
     if (r.name === 'teacher-login' || r.name === 'signup' || r.name === 'platform-admin-login') {
       await shot(page, `${r.name}-mobile.png`)
     }
@@ -177,8 +226,28 @@ async function main() {
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.waitForTimeout(600)
-  const landingCanvas = await page.evaluate(() => document.querySelectorAll('canvas').length)
-  log(landingCanvas >= 1, 'landing: mesh still present', `count=${landingCanvas}`)
+  const landing = await page.evaluate(() => ({
+    canvases: document.querySelectorAll('canvas').length,
+    mesh: document.querySelectorAll('[data-mesh]').length,
+  }))
+  log(landing.mesh >= 1, 'landing: mesh present', `mesh=${landing.mesh} canvas=${landing.canvases}`)
+
+  // Reduced motion: login grid signal is static
+  const rmCtx = await browser.newContext({
+    viewport: { width: 1280, height: 800 },
+    reducedMotion: 'reduce',
+  })
+  const rmPage = await rmCtx.newPage()
+  await rmPage.goto(BASE + '/login', { waitUntil: 'networkidle', timeout: 30000 })
+  await rmPage.waitForTimeout(500)
+  const rmInfo = await pageInfo(rmPage)
+  log(rmInfo.gridSignals.includes('teacher'), 'reduced-motion: grid signal present', JSON.stringify(rmInfo.gridSignals))
+  const rm1 = await signalSignature(rmPage)
+  await rmPage.waitForTimeout(950)
+  const rm2 = await signalSignature(rmPage)
+  log(rm1 !== null && rm1 === rm2, 'reduced-motion: signal static', `${rm1} vs ${rm2}`)
+  await shot(rmPage, 'teacher-login-reduced-motion.png')
+  await rmCtx.close()
 
   // No public platform admin CTA
   const platformLinks = await page.evaluate(() => {
