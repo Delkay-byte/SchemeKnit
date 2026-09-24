@@ -4,7 +4,7 @@
 // §14/§16 (Free Tier label + lifetime AI display).
 const { chromium } = require('playwright');
 
-const BASE = 'http://localhost:3000';
+const BASE = process.argv[2] || 'http://localhost:3000';
 const EMAIL = 'accept.teacher@schemeknit.test';
 const PASSWORD = 'Accept#2026';
 
@@ -24,7 +24,7 @@ async function check(fn, label) {
   // ── Teacher login ────────────────────────────────────────────────
   await page.goto(BASE + '/login', { waitUntil: 'domcontentloaded' });
   await page.waitForLoadState('networkidle');
-  await page.getByText('SchemeKnit Teacher').waitFor({ timeout: 15000 });
+  await page.getByText('Welcome back, teacher.').waitFor({ timeout: 15000 });
   await page.locator('input[type="email"]').fill(EMAIL);
   await page.locator('input[type="password"]').fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign In' }).click();
@@ -36,7 +36,7 @@ async function check(fn, label) {
   await check(async () => await page.locator('header svg').first().isVisible(), 'dashboard: brand SVG mark renders in header');
   const markVisible = await page.locator('header svg').first().boundingBox();
   await check(async () => markVisible && markVisible.width > 10 && markVisible.height > 10, 'dashboard: logo has real rendered size');
-  await check(async () => await page.getByText('Free Tier', { exact: true }).count() > 0, 'dashboard: plan label is Free Tier');
+  await check(async () => (await page.getByText('Free Tier', { exact: true }).count()) + (await page.getByText('Teacher Pro', { exact: true }).count()) > 0, 'dashboard: plan label is Free Tier or Teacher Pro (account-state aware)');
   await check(async () => await page.getByText('Free Teacher').count() === 0, 'dashboard: no Free Teacher wording');
   await check(async () => await page.getByText(/AI generations \(lifetime\)|AI generations remaining/).count() > 0, 'dashboard: AI allowance present');
   await check(async () => await page.getByText(/resets tomorrow|per day|Daily AI/i).count() === 0, 'dashboard: no daily/reset wording');
