@@ -48,9 +48,9 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#f4f7fa]">
-      {/* Hero — header sits inside the mesh shell so hover works across both */}
-      <LandingHero>
-        <header className="relative z-10 bg-transparent text-white">
+      {/* Opaque sticky header overlays the hero top (apmix-style); mesh stays in the hero */}
+      <div className="relative bg-[#071826]" style={{ ['--site-header-h' as string]: '76px' }}>
+        <header className="sticky top-0 z-40 border-b border-white/10 bg-[#071826] text-white">
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center justify-between gap-4">
               <Link href="/" className="flex items-center gap-3">
@@ -89,7 +89,10 @@ export default function Home() {
             </div>
           </div>
         </header>
-      </LandingHero>
+
+        {/* Hero — mesh stays inside this section; header sits on top of it */}
+        <LandingHero />
+      </div>
 
       {/* Below-the-fold: reinforce that the curriculum stays in control */}
       <HowItWorks />

@@ -8,6 +8,8 @@
     #071826;
   color: #f4f7fb;
   overflow: hidden;
+  /* Pull under the opaque sticky header so it covers the hero top edge. */
+  margin-top: calc(var(--site-header-h, 76px) * -1);
   padding: 0;
 }
 
@@ -40,7 +42,8 @@
   display: grid;
   gap: 2.25rem;
   align-items: center;
-  padding: 2.75rem 1.25rem 4.5rem;
+  /* Clear the sticky header that overlays the hero top. */
+  padding: calc(var(--site-header-h, 76px) + 2.75rem) 1.25rem 4.5rem;
 }
 
 .copy {
@@ -484,7 +487,7 @@
     grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.92fr);
     gap: 2.5rem;
     width: 100%;
-    padding: 2.5rem 2rem 4.5rem;
+    padding: calc(var(--site-header-h, 76px) + 2.5rem) 2rem 4.5rem;
   }
 
   .board {
