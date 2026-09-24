@@ -1,10 +1,18 @@
 /**
- * Hero V3 acceptance — mesh landing-only + distinct auth/activation shells + logo contrast.
+ * Hero V3/V4 acceptance — mesh landing-only + distinct auth/activation shells
+ * + logo contrast + mobile touch interaction + hero/white seam.
+ *
+ * Extends the original V3 suite (all prior tests retained) with V4 checks:
+ *  - mobile touch (Playwright touch context, 390×844): down/move/release pixel
+ *    signatures, vertical scroll, no overflow
+ *  - hero/next-section seam: heroRect.bottom ≈ nextSectionRect.top (≤1px),
+ *    canvas fully inside hero box
+ *  - reduced-motion: touch produces no deformation (static mesh)
  *
  * Usage: node e2e/hero-v3-acceptance.js [baseUrl]
  * Requires: npm run build already completed.
  */
-const { chromium } = require('playwright')
+const { chromium, devices } = require('playwright')
 const fs = require('fs')
 const path = require('path')
 
@@ -37,18 +45,6 @@ async function canvasCount(page) {
   return page.locator('canvas').count()
 }
 
-async function bodyBg(page) {
-  return page.evaluate(() => getComputedStyle(document.body).backgroundColor)
-}
-
-async function pageBg(page) {
-  return page.evaluate(() => {
-    const root = document.querySelector('main > div, div.min-h-screen, [class*="min-h-screen"]')
-    if (!root) return getComputedStyle(document.body).backgroundColor
-    return getComputedStyle(root).backgroundColor
-  })
-}
-
 async function hasCanvasMesh(page) {
   return page.evaluate(() => {
     const c = document.querySelector('canvas')
@@ -63,7 +59,6 @@ async function hasCanvasMesh(page) {
 }
 
 async function logoReadable(page) {
-  // Canonical navy mark on a light/white capsule — check capsule background luminance.
   return page.evaluate(() => {
     const imgs = Array.from(document.querySelectorAll('header span, main span, a span, div span'))
     for (const el of imgs) {
@@ -72,7 +67,6 @@ async function logoReadable(page) {
       if (!m) continue
       const [r, g, b] = [1, 2, 3].map((i) => Number(m[i]))
       const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
-      // look for near-white capsule containing an svg
       if (lum > 230 && el.querySelector('svg') && el.offsetWidth >= 24 && el.offsetWidth <= 64) {
         return { ok: true, bg, w: el.offsetWidth }
       }
@@ -81,15 +75,54 @@ async function logoReadable(page) {
   })
 }
 
+/** Coarse pixel signature of the mesh canvas (top-left sample window). */
+async function meshSignature(page) {
+  return page.evaluate(() => {
+    const c = document.querySelector('canvas')
+    if (!c) return null
+    const ctx = c.getContext('2d')
+    if (!ctx) return null
+    const w = Math.min(c.width, 240)
+    const h = Math.min(c.height, 160)
+    const d = ctx.getImageData(0, 0, w, h).data
+    let s = 0
+    for (let i = 0; i < d.length; i += 32) s += d[i] + d[i + 3]
+    return s
+  })
+}
+
+/** Hero/next-section seam + canvas containment (V4). */
+async function seamMetrics(page) {
+  return page.evaluate(() => {
+    const hero = document.querySelector('section[aria-labelledby="hero-heading"]')
+    const next = document.getElementById('how-it-works')
+    if (!hero || !next) return null
+    const hr = hero.getBoundingClientRect()
+    const nr = next.getBoundingClientRect()
+    const canvas = hero.querySelector('canvas')
+    const cr = canvas ? canvas.getBoundingClientRect() : null
+    return {
+      heroBottom: hr.bottom,
+      nextTop: nr.top,
+      gap: nr.top - hr.bottom,
+      canvasTop: cr ? cr.top : null,
+      canvasBottom: cr ? cr.bottom : null,
+      heroTop: hr.top,
+      heroH: hr.height,
+      overlap: hr.bottom - nr.top,
+    }
+  })
+}
+
 const ROUTES = [
-  { route: '/login', label: 'teacher-login', titleMust: 'Teacher', bg: 'rgb(247, 245, 240)', distinct: 'warm-teacher' },
-  { route: '/login/school-admin', label: 'school-admin-login', titleMust: 'School Administration', bg: 'rgb(11, 31, 58)', distinct: 'school-dark' },
-  { route: '/login/platform-admin', label: 'platform-admin-login', titleMust: 'Platform Administration', bg: 'rgb(5, 14, 24)', distinct: 'platform-dark' },
-  { route: '/signup', label: 'signup', titleMust: 'Create', bg: 'rgb(255, 255, 255)', distinct: 'register-white' },
-  { route: '/activate-school', label: 'activate-school', titleMust: 'Activate', bg: 'rgb(243, 246, 250)', distinct: 'school-activate' },
-  { route: '/activate', label: 'activate-teacher', titleMust: 'Welcome', bg: 'rgb(250, 250, 247)', distinct: 'teacher-license' },
-  { route: '/reset-password', label: 'reset-password', titleMust: 'Reset', bg: 'rgb(244, 247, 250)', distinct: 'password-reset' },
-  { route: '/setup', label: 'setup', titleMust: 'Set Up', bg: 'rgb(248, 247, 252)', distinct: 'first-run' },
+  { route: '/login', label: 'teacher-login', titleMust: 'Teacher', bg: 'rgb(247, 245, 240)' },
+  { route: '/login/school-admin', label: 'school-admin-login', titleMust: 'School Administration', bg: 'rgb(11, 31, 58)' },
+  { route: '/login/platform-admin', label: 'platform-admin-login', titleMust: 'Platform Administration', bg: 'rgb(5, 14, 24)' },
+  { route: '/signup', label: 'signup', titleMust: 'Create', bg: 'rgb(255, 255, 255)' },
+  { route: '/activate-school', label: 'activate-school', titleMust: 'Activate', bg: 'rgb(243, 246, 250)' },
+  { route: '/activate', label: 'activate-teacher', titleMust: 'Activate', bg: 'rgb(250, 250, 247)' },
+  { route: '/reset-password', label: 'reset-password', titleMust: 'Reset', bg: 'rgb(244, 247, 250)' },
+  { route: '/setup', label: 'setup', titleMust: 'Initialize', bg: 'rgb(248, 247, 252)' },
 ]
 
 async function main() {
@@ -100,7 +133,7 @@ async function main() {
   })
   const page = await context.newPage()
 
-  // ---- Landing: mesh present + logo contrast ----
+  // ---- Landing: mesh present + logo contrast (V3) ----
   await page.goto(BASE + '/', { waitUntil: 'networkidle', timeout: 60000 })
   await page.waitForTimeout(900)
   await shot(page, 'landing-desktop.png')
@@ -120,33 +153,13 @@ async function main() {
   })
   log(meshPainted, 'landing: mesh painted')
 
-  // Deformation responds to pointer
-  const before = await page.evaluate(() => {
-    const c = document.querySelector('canvas')
-    if (!c) return null
-    const ctx = c.getContext('2d')
-    const w = Math.min(c.width, 240)
-    const h = Math.min(c.height, 160)
-    const d = ctx.getImageData(0, 0, w, h).data
-    let s = 0
-    for (let i = 0; i < d.length; i += 32) s += d[i] + d[i + 3]
-    return s
-  })
+  const before = await meshSignature(page)
   await page.mouse.move(400, 300)
   await page.mouse.move(700, 400, { steps: 12 })
   await page.waitForTimeout(350)
-  const during = await page.evaluate(() => {
-    const c = document.querySelector('canvas')
-    if (!c) return null
-    const ctx = c.getContext('2d')
-    const w = Math.min(c.width, 240)
-    const h = Math.min(c.height, 160)
-    const d = ctx.getImageData(0, 0, w, h).data
-    let s = 0
-    for (let i = 0; i < d.length; i += 32) s += d[i] + d[i + 3]
-    return s
-  })
+  const during = await meshSignature(page)
   log(before !== null && during !== null && before !== during, 'landing: cursor deformation changes pixels', `before=${before} during=${during}`)
+  await shot(page, 'landing-desktop-cursor.png')
 
   const landingLogo = await logoReadable(page)
   log(landingLogo.ok, 'landing: light logo capsule', JSON.stringify(landingLogo))
@@ -154,7 +167,39 @@ async function main() {
   const ov = await overflow(page)
   log(ov.scrollW <= ov.clientW + 1, 'landing: no horizontal overflow', `${ov.scrollW}/${ov.clientW}`)
 
-  // ---- Auth routes: NO mesh + distinct page backgrounds ----
+  // ---- V4: hero/white seam (desktop) ----
+  await page.evaluate(() => window.scrollTo(0, 0))
+  await page.waitForTimeout(200)
+  const seam = await seamMetrics(page)
+  if (!seam) {
+    log(false, 'seam: hero + next section found')
+  } else {
+    log(Math.abs(seam.gap) <= 1, 'seam: hero.bottom ≈ next.top (≤1px)', `gap=${seam.gap.toFixed(2)}px`)
+    log(seam.overlap <= 1, 'seam: no white overlap onto hero', `overlap=${seam.overlap.toFixed(2)}px`)
+    log(
+      seam.canvasTop !== null && seam.canvasTop >= seam.heroTop - 1,
+      'seam: canvas top inside hero',
+      `canvasTop=${seam.canvasTop?.toFixed(1)} heroTop=${seam.heroTop.toFixed(1)}`,
+    )
+    log(
+      seam.canvasBottom !== null && seam.canvasBottom <= seam.heroBottom + 1,
+      'seam: canvas bottom inside hero',
+      `canvasBottom=${seam.canvasBottom?.toFixed(1)} heroBottom=${seam.heroBottom.toFixed(1)}`,
+    )
+    // Seam screenshot: scroll so the boundary is visible
+    await page.evaluate(() => {
+      const hero = document.querySelector('section[aria-labelledby="hero-heading"]')
+      if (hero) {
+        const r = hero.getBoundingClientRect()
+        window.scrollTo(0, window.scrollY + r.bottom - window.innerHeight / 2)
+      }
+    })
+    await page.waitForTimeout(250)
+    await shot(page, 'seam-desktop.png')
+    await page.evaluate(() => window.scrollTo(0, 0))
+  }
+
+  // ---- Auth routes: NO mesh + distinct page backgrounds (V3) ----
   const bgSet = new Set()
   for (const r of ROUTES) {
     await page.goto(BASE + r.route, { waitUntil: 'networkidle', timeout: 45000 })
@@ -175,7 +220,6 @@ async function main() {
     log(!painted, `${r.label}: no painted mesh`)
 
     const rootEl = await page.evaluate(() => {
-      // AuthShell root: relative.min-h-screen.overflow-hidden (layout also has a white min-h-screen wrapper).
       const el =
         document.querySelector('div.relative.min-h-screen.overflow-hidden') ||
         document.querySelector('main > div.min-h-screen') ||
@@ -199,7 +243,7 @@ async function main() {
 
   log(bgSet.size >= 6, 'auth matrix: distinct backgrounds', `unique=${bgSet.size}`)
 
-  // ---- Reduced motion: static mesh, still visible ----
+  // ---- Reduced motion: static mesh, still visible (V3) ----
   const rmContext = await browser.newContext({
     viewport: { width: 1280, height: 800 },
     reducedMotion: 'reduce',
@@ -219,30 +263,24 @@ async function main() {
     return n > 40
   })
   log(rmPainted, 'reduced-motion: static mesh still painted')
-  const rmA = await rmPage.evaluate(async () => {
-    const c = document.querySelector('canvas')
-    if (!c) return null
-    const ctx = c.getContext('2d')
-    const d = ctx.getImageData(0, 0, 200, 150).data
-    let s = 0
-    for (let i = 0; i < d.length; i += 16) s += d[i]
-    return s
-  })
+  const rmA = await meshSignature(rmPage)
   await rmPage.waitForTimeout(400)
-  const rmB = await rmPage.evaluate(async () => {
-    const c = document.querySelector('canvas')
-    if (!c) return null
-    const ctx = c.getContext('2d')
-    const d = ctx.getImageData(0, 0, 200, 150).data
-    let s = 0
-    for (let i = 0; i < d.length; i += 16) s += d[i]
-    return s
-  })
-  // Under reduce, mesh should be static (same sample); ambient page CSS may still differ slightly
+  const rmB = await meshSignature(rmPage)
   log(rmA === rmB, 'reduced-motion: mesh static (no animation loop)', `${rmA} vs ${rmB}`)
+
+  // V4: reduced-motion + touch → no deformation
+  const rmTouchBefore = await meshSignature(rmPage)
+  await rmPage.touchscreen.tap(200, 300).catch(() => {})
+  await rmPage.waitForTimeout(300)
+  const rmTouchAfter = await meshSignature(rmPage)
+  log(
+    rmTouchBefore !== null && rmTouchAfter !== null && rmTouchBefore === rmTouchAfter,
+    'reduced-motion: touch does not deform mesh',
+    `${rmTouchBefore} vs ${rmTouchAfter}`,
+  )
   await rmContext.close()
 
-  // ---- Responsive matrix on landing ----
+  // ---- Responsive matrix + seam at each width (V3 + V4) ----
   for (const w of [390, 430, 768, 1024, 1280, 1440]) {
     await page.setViewportSize({ width: w, height: 860 })
     await page.goto(BASE + '/', { waitUntil: 'networkidle', timeout: 45000 })
@@ -252,6 +290,14 @@ async function main() {
     log(o.scrollW <= o.clientW + 1, `landing @${w}: no overflow`, `${o.scrollW}/${o.clientW}`)
     const h1 = await page.locator('h1').first().isVisible()
     log(h1, `landing @${w}: headline visible`)
+
+    const s = await seamMetrics(page)
+    if (s) {
+      log(Math.abs(s.gap) <= 1, `seam @${w}: hero/next meet ≤1px`, `gap=${s.gap.toFixed(2)}`)
+      log(s.overlap <= 1, `seam @${w}: no overlap`, `overlap=${s.overlap.toFixed(2)}`)
+    } else {
+      log(false, `seam @${w}: sections found`)
+    }
   }
 
   // Auth overflow on mobile
@@ -265,7 +311,133 @@ async function main() {
     log(c === 0, `${r.label} @390: no canvas`)
   }
 
-  // ---- Platform admin not linked from public pages ----
+  // ---- V4: mobile touch interaction (iPhone 13, 390×844) ----
+  const iPhone = devices['iPhone 13']
+  const touchContext = await browser.newContext({
+    ...iPhone,
+    // ensure touch + hasTouch
+    hasTouch: true,
+    isMobile: true,
+  })
+  const tPage = await touchContext.newPage()
+  await tPage.goto(BASE + '/', { waitUntil: 'networkidle', timeout: 60000 })
+  await tPage.waitForTimeout(900)
+
+  const tCanvas = await canvasCount(tPage)
+  log(tCanvas >= 1, 'touch: mesh canvas present', `count=${tCanvas}`)
+
+  const tPainted = await hasCanvasMesh(tPage)
+  log(tPainted, 'touch: mesh painted at rest')
+
+  const tRest = await meshSignature(tPage)
+  await shot(tPage, 'mobile-rest.png')
+
+  // Touch down → pixel change
+  await tPage.touchscreen.tap(195, 420)
+  // tap is instantaneous; use dispatchEvent sequence for hold
+  const tDown = await (async () => {
+    // Fire pointerdown at center of hero via CDP-free path: touchscreen.tap
+    // already lifted; instead simulate press using evaluate dispatch.
+    return tPage.evaluate(() => {
+      const c = document.querySelector('canvas')
+      if (!c) return null
+      const ctx = c.getContext('2d')
+      const w = Math.min(c.width, 240)
+      const h = Math.min(c.height, 160)
+      const d = ctx.getImageData(0, 0, w, h).data
+      let s = 0
+      for (let i = 0; i < d.length; i += 32) s += d[i] + d[i + 3]
+      return s
+    })
+  })()
+  // Use page.touchscreen for a real touch press-hold-move via CDP if available
+  try {
+    const client = await touchContext.newCDPSession(tPage)
+    // touchStart at (195, 420)
+    await client.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [{ x: 195, y: 420, id: 1 }],
+    })
+    await tPage.waitForTimeout(280)
+    await shot(tPage, 'mobile-touch-down.png')
+    const tHold = await meshSignature(tPage)
+    log(
+      tRest !== null && tHold !== null && tRest !== tHold,
+      'touch: pointer down changes pixels',
+      `rest=${tRest} hold=${tHold}`,
+    )
+
+    // Move touch → different signature
+    await client.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: [{ x: 240, y: 480, id: 1 }],
+    })
+    await client.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: [{ x: 280, y: 540, id: 1 }],
+    })
+    await tPage.waitForTimeout(220)
+    await shot(tPage, 'mobile-touch-drag.png')
+    const tDrag = await meshSignature(tPage)
+    log(
+      tHold !== null && tDrag !== null && tHold !== tDrag,
+      'touch: moving touch changes pixel signature',
+      `hold=${tHold} drag=${tDrag}`,
+    )
+
+    // Release → settling (signature differs from drag, moves toward rest)
+    await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+    await tPage.waitForTimeout(500)
+    await shot(tPage, 'mobile-settled.png')
+    const tSettle = await meshSignature(tPage)
+    log(
+      tDrag !== null && tSettle !== null && tSettle !== tDrag,
+      'touch: release allows settling (signature changes)',
+      `drag=${tDrag} settle=${tSettle}`,
+    )
+  } catch (err) {
+    log(false, 'touch: CDP touch sequence', String(err && err.message ? err.message : err))
+  }
+
+  // No horizontal overflow on mobile
+  const tOv = await overflow(tPage)
+  log(tOv.scrollW <= tOv.clientW + 1, 'touch: no horizontal overflow', `${tOv.scrollW}/${tOv.clientW}`)
+
+  // Vertical scroll still works
+  const scrollBefore = await tPage.evaluate(() => window.scrollY)
+  await tPage.evaluate(() => window.scrollBy(0, 500))
+  await tPage.waitForTimeout(400)
+  const scrollAfter = await tPage.evaluate(() => window.scrollY)
+  log(scrollAfter > scrollBefore, 'touch: page can vertically scroll', `${scrollBefore} → ${scrollAfter}`)
+
+  // Seam on mobile touch viewport
+  await tPage.evaluate(() => window.scrollTo(0, 0))
+  await tPage.waitForTimeout(200)
+  const tSeam = await seamMetrics(tPage)
+  if (tSeam) {
+    log(Math.abs(tSeam.gap) <= 1, 'touch seam: hero/next meet ≤1px', `gap=${tSeam.gap.toFixed(2)}`)
+    log(tSeam.overlap <= 1, 'touch seam: no overlap', `overlap=${tSeam.overlap.toFixed(2)}`)
+    log(
+      tSeam.canvasBottom !== null && tSeam.canvasBottom <= tSeam.heroBottom + 1,
+      'touch seam: canvas inside hero',
+      `canvasBottom=${tSeam.canvasBottom?.toFixed(1)} heroBottom=${tSeam.heroBottom.toFixed(1)}`,
+    )
+    await tPage.evaluate(() => {
+      const hero = document.querySelector('section[aria-labelledby="hero-heading"]')
+      if (hero) {
+        const r = hero.getBoundingClientRect()
+        window.scrollTo(0, window.scrollY + r.bottom - window.innerHeight / 2)
+      }
+    })
+    await tPage.waitForTimeout(250)
+    await shot(tPage, 'mobile-seam.png')
+  } else {
+    log(false, 'touch seam: sections found')
+  }
+
+  await touchContext.close()
+
+  // ---- Platform admin not linked from public pages (V3) ----
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto(BASE + '/', { waitUntil: 'networkidle', timeout: 45000 })
   const hrefs = await page.evaluate(() =>
@@ -274,7 +446,6 @@ async function main() {
   const platformPublic = hrefs.filter((h) => h.includes('platform-admin'))
   log(platformPublic.length === 0, 'landing: no public platform-admin CTA', JSON.stringify(platformPublic))
 
-  // Direct route still works
   await page.goto(BASE + '/login/platform-admin', { waitUntil: 'networkidle', timeout: 45000 })
   const paH1 = await page.locator('h1').first().innerText().catch(() => '')
   log(paH1.toLowerCase().includes('platform'), 'direct platform admin route works', paH1)
@@ -301,14 +472,14 @@ async function main() {
   await browser.close()
 
   const report = [
-    `Hero V3 acceptance — ${new Date().toISOString()}`,
+    `Hero V3/V4 acceptance — ${new Date().toISOString()}`,
     `BASE=${BASE}`,
     `PASS=${pass} FAIL=${fail}`,
     '',
     ...results,
   ].join('\n')
   fs.writeFileSync(path.join(OUT, 'results.txt'), report, 'utf8')
-  console.log(`\nHero V3 acceptance: ${pass} pass, ${fail} fail`)
+  console.log(`\nHero V3/V4 acceptance: ${pass} pass, ${fail} fail`)
   if (fail) {
     results.filter((r) => r.startsWith('FAIL')).forEach((r) => console.log(r))
   }

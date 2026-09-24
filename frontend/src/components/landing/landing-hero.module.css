@@ -24,17 +24,9 @@
   pointer-events: none;
 }
 
-.hero::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 72px;
-  background: linear-gradient(to bottom, transparent, #f4f7fa);
-  pointer-events: none;
-  z-index: 2;
-}
+/* Hero/next-section boundary: hero is self-contained. No bottom fade layer —
+   the dark hero background must end exactly at the hero box edge so the white
+   section below meets it with a clean seam (no bleed, no overlap). */
 
 .heroInner {
   position: relative;
