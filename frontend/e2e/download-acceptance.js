@@ -28,10 +28,10 @@ process.on('unhandledRejection', (err) => {
   process.exitCode = 1
 })
 
-const CHANNEL = process.argv[2] || 'chrome'
+const CHANNEL = process.argv[2] || 'chrome'  // 'bundled' = Playwright's Chromium (system Chrome may be hooked by extensions)
 const WEB = process.env.TF_WEB_URL || 'http://localhost:3000'
 const SCHEME_ID = process.env.TF_SCHEME_ID
-const TEACHER = { email: 'teacher@acceptance.test', password: 'TeacherPass123' }
+const TEACHER = { email: process.env.TF_TEACHER_EMAIL || 'teacher@acceptance.test', password: process.env.TF_TEACHER_PASSWORD || 'TeacherPass123' }
 const OUT = path.resolve(process.env.TF_DOWNLOAD_DIR || __dirname, '..', '..', 'backend', 'temp', 'ba', 'downloads')
 
 const DOCX_MIME =
@@ -56,7 +56,7 @@ async function saveDownload(page, label, action, timeout = 30000) {
 
 ;(async () => {
   fs.mkdirSync(OUT, { recursive: true })
-  const browser = await chromium.launch({ channel: CHANNEL, downloadsPath: OUT })
+  const browser = await chromium.launch(CHANNEL === 'bundled' ? { downloadsPath: OUT } : { channel: CHANNEL, downloadsPath: OUT })
   const context = await browser.newContext({ acceptDownloads: true })
   const page = await context.newPage()
 
