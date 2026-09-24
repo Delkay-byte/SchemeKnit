@@ -142,7 +142,7 @@ export function RoleLogin({ entry }: { entry: EntryRole }) {
         ? 'bg-[#0B1F3A]'
         : entry === 'platform_admin'
           ? 'bg-[#050E18]'
-          : 'bg-[#F7F5F0]'
+          : 'bg-[#071826]'
     const spin =
       entry === 'school_admin'
         ? 'border-[#04A9CE]'

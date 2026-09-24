@@ -53,19 +53,35 @@ async function gridSignalCount(page) {
   return page.locator('canvas[data-grid-signal]').count()
 }
 
-/** Pixel signature of the login grid-signal canvas (motion probe). */
+/** Brightest cyan signal position on the full grid canvas (motion probe). */
 async function gridSignature(page) {
   return page.evaluate(() => {
     const c = document.querySelector('canvas[data-grid-signal]')
     if (!c || !c.width || !c.height) return null
     const ctx = c.getContext('2d')
     if (!ctx) return null
-    const w = Math.min(c.width, 320)
-    const h = Math.min(c.height, 240)
-    const d = ctx.getImageData(0, 0, w, h).data
-    let s = 0
-    for (let i = 0; i < d.length; i += 32) s += d[i] + d[i + 3]
-    return s
+    const d = ctx.getImageData(0, 0, c.width, c.height).data
+    let best = 0
+    let bx = 0
+    let by = 0
+    for (let y = 0; y < c.height; y += 4) {
+      for (let x = 0; x < c.width; x += 4) {
+        const i = (y * c.width + x) * 4
+        const a = d[i + 3]
+        if (a < 50) continue
+        const r = d[i]
+        const g = d[i + 1]
+        const b = d[i + 2]
+        const s = (g + b - r) * a
+        if (s > best) {
+          best = s
+          bx = x
+          by = y
+        }
+      }
+    }
+    if (best < 8000) return null
+    return `${Math.round(bx / 6)}:${Math.round(by / 6)}:${best}`
   })
 }
 
@@ -146,7 +162,7 @@ async function seamMetrics(page) {
 }
 
 const ROUTES = [
-  { route: '/login', label: 'teacher-login', titleMust: 'Teacher', bg: 'rgb(247, 245, 240)' },
+  { route: '/login', label: 'teacher-login', titleMust: 'Teacher', bg: 'rgb(7, 24, 38)' },
   { route: '/login/school-admin', label: 'school-admin-login', titleMust: 'School Administration', bg: 'rgb(11, 31, 58)' },
   { route: '/login/platform-admin', label: 'platform-admin-login', titleMust: 'Platform Administration', bg: 'rgb(5, 14, 24)' },
   { route: '/signup', label: 'signup', titleMust: 'Create', bg: 'rgb(255, 255, 255)' },
@@ -252,9 +268,15 @@ async function main() {
       const gs = await gridSignalCount(page)
       log(gs === 1, `${r.label}: grid signal canvas`, `count=${gs}`)
       const g1 = await gridSignature(page)
-      await page.waitForTimeout(950)
+      await page.waitForTimeout(700)
       const g2 = await gridSignature(page)
-      log(g1 !== null && g2 !== null && g1 !== g2, `${r.label}: signal moves over time`, `${g1} vs ${g2}`)
+      await page.waitForTimeout(700)
+      const g3 = await gridSignature(page)
+      log(
+        g1 !== null && g2 !== null && g3 !== null && g1 !== g2 && g2 !== g3,
+        `${r.label}: signal moves over time (3 samples)`,
+        `${g1} → ${g2} → ${g3}`,
+      )
     } else {
       const c = await canvasCount(page)
       log(c === 0, `${r.label}: no canvas`, `count=${c}`)

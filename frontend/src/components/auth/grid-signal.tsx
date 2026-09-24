@@ -22,14 +22,14 @@ interface VariantCfg {
   cell: number
   /** Minimum cells across (keeps mobile from over-density). */
   minCols: number
-  /** Line RGB triple. */
+  /** Line RGB triple (tuned for dark navy fields). */
   lineRgb: string
-  /** Base line alpha. */
+  /** Base line alpha — visible network, not graph paper. */
   lineAlpha: number
   /** Signal core / halo colors. */
   core: string
   halo: string
-  /** Edge travel duration ms (slow, smooth). */
+  /** Edge travel duration ms → ~50–65 px/s at desktop cell size. */
   edgeMs: number
   /** Extra line brightness near the signal. */
   proximityBoost: number
@@ -37,39 +37,42 @@ interface VariantCfg {
 
 const VARIANTS: Record<GridSignalVariant, VariantCfg> = {
   teacher: {
-    cell: 40,
+    cell: 44,
     minCols: 8,
-    lineRgb: '16, 42, 67',
-    lineAlpha: 0.075,
+    lineRgb: '110, 165, 205',
+    lineAlpha: 0.2,
     core: '#04A9CE',
     halo: '4, 169, 206',
-    edgeMs: 1150,
-    proximityBoost: 0.1,
+    edgeMs: 750,
+    proximityBoost: 0.22,
   },
   school: {
     cell: 48,
     minCols: 8,
     lineRgb: '126, 220, 240',
-    lineAlpha: 0.12,
+    lineAlpha: 0.17,
     core: '#7EDCF0',
     halo: '126, 220, 240',
-    edgeMs: 1050,
-    proximityBoost: 0.14,
+    edgeMs: 720,
+    proximityBoost: 0.24,
   },
   platform: {
     cell: 56,
     minCols: 7,
-    lineRgb: '62, 90, 120',
-    lineAlpha: 0.14,
+    lineRgb: '90, 130, 170',
+    lineAlpha: 0.2,
     core: '#04A9CE',
     halo: '4, 169, 206',
-    edgeMs: 1250,
-    proximityBoost: 0.12,
+    edgeMs: 840,
+    proximityBoost: 0.2,
   },
 }
 
 /** Short trail samples along the current path (grid-aligned). */
-const TRAIL_MAX = 7
+const TRAIL_MAX = 9
+
+/** Mobile multiplies edge duration → slower, calmer signal. */
+const MOBILE_SPEED_SCALE = 1.28
 
 function prefersReducedMotion(): boolean {
   return (
@@ -78,8 +81,11 @@ function prefersReducedMotion(): boolean {
   )
 }
 
-function easeInOut(t: number): number {
-  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
+function easeMove(t: number): number {
+  // Mild smoothstep blended with linear — smooth corners, never stalls
+  // at edge endpoints (keeps screenshot samples always showing travel).
+  const smooth = t * t * (3 - 2 * t)
+  return 0.42 * t + 0.58 * smooth
 }
 
 /** Deterministic-ish PRNG so paths vary but stay reproducible per seed. */
@@ -134,6 +140,7 @@ export function GridSignal({ variant, className = '' }: GridSignalProps) {
     let raf = 0
     let running = true
     let last = performance.now()
+    let speedScale = 1
     const rand = mulberry32(variant === 'teacher' ? 42 : variant === 'school' ? 7 : 99)
 
     // Signal path state — always on grid intersections.
@@ -192,9 +199,9 @@ export function GridSignal({ variant, className = '' }: GridSignalProps) {
     function startEdge(immediate = false) {
       prev = { ...from }
       to = pickNext(from, prev)
-      // Vary edge duration slightly for organic feel (clamped).
-      edgeDur = cfg.edgeMs * (0.85 + rand() * 0.35)
-      edgeT = immediate ? 0 : 0
+      // Vary edge duration slightly for organic feel; mobile slows down.
+      edgeDur = cfg.edgeMs * speedScale * (0.9 + rand() * 0.25)
+      edgeT = 0
       if (immediate) {
         // Seed a valid first edge without animation jump.
         const a = nodeXY(from)
@@ -214,8 +221,9 @@ export function GridSignal({ variant, className = '' }: GridSignalProps) {
       canvas.style.height = `${height}px`
       ctx!.setTransform(dpr, 0, 0, dpr, 0, 0)
 
-      // Mobile: larger cells → fewer intersections, calmer signal.
+      // Mobile: larger cells → fewer intersections; slower signal.
       const compact = width < 640
+      speedScale = compact ? MOBILE_SPEED_SCALE : 1
       cell = compact ? Math.max(cfg.cell, 56) : cfg.cell
       if (width < 420) cell = Math.max(cell, 64)
 
@@ -231,7 +239,8 @@ export function GridSignal({ variant, className = '' }: GridSignalProps) {
 
       flashes.clear()
       trail.length = 0
-      from = { r: Math.floor(rows / 2), c: 1 }
+      // Start in the open left field (clear of centered/split cards).
+      from = { r: Math.floor(rows / 2), c: Math.max(1, Math.floor(cols * 0.18)) }
       prev = null
       startEdge(true)
     }
@@ -258,33 +267,37 @@ export function GridSignal({ variant, className = '' }: GridSignalProps) {
         ctx!.lineTo(x, height)
         ctx!.stroke()
       }
-      // Static intersection ticks (subtle node treatment)
-      ctx!.fillStyle = `rgba(${cfg.lineRgb}, ${Math.min(1, a * 2.2)})`
+      // Static network nodes at intersections (subtle, every other).
+      ctx!.fillStyle = `rgba(${cfg.lineRgb}, ${Math.min(1, a * 2.4)})`
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
-          if ((r + c) % 3 !== 0) continue
+          if ((r + c) % 2 !== 0) continue
           ctx!.beginPath()
-          ctx!.arc(ox + c * cell, oy + r * cell, 1.1, 0, Math.PI * 2)
+          ctx!.arc(ox + c * cell, oy + r * cell, 1.3, 0, Math.PI * 2)
           ctx!.fill()
         }
       }
       // Resting signal node so the motif is still legible without motion.
       const rest = nodeXY(from)
-      const g = ctx!.createRadialGradient(rest.x, rest.y, 0, rest.x, rest.y, cell * 0.9)
-      g.addColorStop(0, `rgba(${cfg.halo}, 0.35)`)
+      const g = ctx!.createRadialGradient(rest.x, rest.y, 0, rest.x, rest.y, cell * 1.3)
+      g.addColorStop(0, `rgba(${cfg.halo}, 0.45)`)
       g.addColorStop(1, `rgba(${cfg.halo}, 0)`)
       ctx!.fillStyle = g
       ctx!.beginPath()
-      ctx!.arc(rest.x, rest.y, cell * 0.9, 0, Math.PI * 2)
+      ctx!.arc(rest.x, rest.y, cell * 1.3, 0, Math.PI * 2)
       ctx!.fill()
       ctx!.fillStyle = cfg.core
       ctx!.beginPath()
-      ctx!.arc(rest.x, rest.y, 2.4, 0, Math.PI * 2)
+      ctx!.arc(rest.x, rest.y, 3.2, 0, Math.PI * 2)
+      ctx!.fill()
+      ctx!.fillStyle = 'rgba(255,255,255,0.9)'
+      ctx!.beginPath()
+      ctx!.arc(rest.x, rest.y, 1.3, 0, Math.PI * 2)
       ctx!.fill()
     }
 
     function signalPos(): { x: number; y: number } {
-      const t = easeInOut(Math.min(1, Math.max(0, edgeT)))
+      const t = easeMove(Math.min(1, Math.max(0, edgeT)))
       const a = nodeXY(from)
       const b = nodeXY(to)
       return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }
@@ -315,7 +328,7 @@ export function GridSignal({ variant, className = '' }: GridSignalProps) {
         flashes.set(nodeKey(from), 1)
         prev = { ...to }
         to = pickNext(from, prev)
-        edgeDur = cfg.edgeMs * (0.85 + rand() * 0.35)
+        edgeDur = cfg.edgeMs * speedScale * (0.9 + rand() * 0.25)
         arrived = true
       }
 
@@ -385,6 +398,20 @@ export function GridSignal({ variant, className = '' }: GridSignalProps) {
         ctx!.stroke()
       }
 
+      // Network nodes at intersections (stable; slight lift near signal).
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          if ((r + c) % 2 !== 0) continue
+          const x = ox + c * cell
+          const y = oy + r * cell
+          const n = proximity(x, y, pos.x, pos.y)
+          ctx!.fillStyle = `rgba(${n > 0.2 ? cfg.halo : cfg.lineRgb}, ${Math.min(0.9, baseA * 2.4 + n * 0.5)})`
+          ctx!.beginPath()
+          ctx!.arc(x, y, 1.25 + n * 0.8, 0, Math.PI * 2)
+          ctx!.fill()
+        }
+      }
+
       // Intersection flashes (brief brighten, smooth decay).
       for (const [k, v] of Array.from(flashes)) {
         const [rs, cs] = k.split(',')
@@ -392,40 +419,42 @@ export function GridSignal({ variant, className = '' }: GridSignalProps) {
         const c = Number(cs)
         const x = ox + c * cell
         const y = oy + r * cell
-        const rad = 2 + v * 3
-        const g = ctx!.createRadialGradient(x, y, 0, x, y, rad * 2.5)
-        g.addColorStop(0, `rgba(${cfg.halo}, ${0.45 * v})`)
+        const rad = 2.5 + v * 4
+        const g = ctx!.createRadialGradient(x, y, 0, x, y, rad * 2.8)
+        g.addColorStop(0, `rgba(${cfg.halo}, ${0.55 * v})`)
         g.addColorStop(1, `rgba(${cfg.halo}, 0)`)
         ctx!.fillStyle = g
         ctx!.beginPath()
-        ctx!.arc(x, y, rad * 2.5, 0, Math.PI * 2)
+        ctx!.arc(x, y, rad * 2.8, 0, Math.PI * 2)
         ctx!.fill()
-        ctx!.fillStyle = `rgba(${cfg.lineRgb}, ${Math.min(1, baseA * 3 + v * 0.5)})`
+        ctx!.fillStyle = `rgba(${cfg.lineRgb}, ${Math.min(1, baseA * 3.2 + v * 0.55)})`
         ctx!.beginPath()
-        ctx!.arc(x, y, 1.6, 0, Math.PI * 2)
+        ctx!.arc(x, y, 1.8, 0, Math.PI * 2)
         ctx!.fill()
       }
 
-      // Short fading trail along the path.
+      // Short fading trail along the path (visible motion cue).
       if (trail.length >= 2) {
         for (let i = 1; i < trail.length; i++) {
           const t = i / trail.length
-          const alpha = 0.06 + t * 0.3
+          const alpha = 0.08 + t * 0.5
           ctx!.strokeStyle = `rgba(${cfg.halo}, ${alpha})`
-          ctx!.lineWidth = 1 + t * 1.2
+          ctx!.lineWidth = 1.25 + t * 2.2
+          ctx!.lineCap = 'round'
           ctx!.beginPath()
           ctx!.moveTo(trail[i - 1].x, trail[i - 1].y)
           ctx!.lineTo(trail[i].x, trail[i].y)
           ctx!.stroke()
         }
         ctx!.lineWidth = 1
+        ctx!.lineCap = 'butt'
       }
 
-      // Signal: halo + short glow + bright core.
-      const haloR = cell * 1.1
+      // Signal: strong halo + glow + bright core (obvious in screenshots).
+      const haloR = cell * 1.45
       const hg = ctx!.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, haloR)
-      hg.addColorStop(0, `rgba(${cfg.halo}, 0.28)`)
-      hg.addColorStop(0.45, `rgba(${cfg.halo}, 0.1)`)
+      hg.addColorStop(0, `rgba(${cfg.halo}, 0.42)`)
+      hg.addColorStop(0.4, `rgba(${cfg.halo}, 0.16)`)
       hg.addColorStop(1, `rgba(${cfg.halo}, 0)`)
       ctx!.fillStyle = hg
       ctx!.beginPath()
@@ -433,19 +462,19 @@ export function GridSignal({ variant, className = '' }: GridSignalProps) {
       ctx!.fill()
 
       // Soft local illumination disc.
-      ctx!.fillStyle = `rgba(${cfg.halo}, 0.12)`
+      ctx!.fillStyle = `rgba(${cfg.halo}, 0.18)`
       ctx!.beginPath()
-      ctx!.arc(pos.x, pos.y, cell * 0.45, 0, Math.PI * 2)
+      ctx!.arc(pos.x, pos.y, cell * 0.5, 0, Math.PI * 2)
       ctx!.fill()
 
       // Core.
       ctx!.fillStyle = cfg.core
       ctx!.beginPath()
-      ctx!.arc(pos.x, pos.y, 2.6, 0, Math.PI * 2)
+      ctx!.arc(pos.x, pos.y, 3.4, 0, Math.PI * 2)
       ctx!.fill()
-      ctx!.fillStyle = 'rgba(255,255,255,0.85)'
+      ctx!.fillStyle = 'rgba(255,255,255,0.92)'
       ctx!.beginPath()
-      ctx!.arc(pos.x, pos.y, 1.1, 0, Math.PI * 2)
+      ctx!.arc(pos.x, pos.y, 1.5, 0, Math.PI * 2)
       ctx!.fill()
 
       raf = requestAnimationFrame(frame)

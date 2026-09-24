@@ -86,13 +86,21 @@ export function BrandCapsule({
 function TeacherWorkspaceDecor() {
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-      {/* Ivory wash + grid paper with traveling signal */}
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,#F7F5F0_0%,#F3F1EB_100%)]" />
+      {/* Deep navy workspace wash + live system grid */}
+      <div className="absolute inset-0 bg-[linear-gradient(165deg,#071826_0%,#0B1F3A_58%,#0A1B33_100%)]" />
       <GridSignal variant="teacher" />
-      {/* Layered lesson-plan cards (3D stack) */}
+      {/* Subtle depth vignette */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(1200px 700px at 50% 40%, transparent 40%, rgba(4,12,22,0.45) 100%)',
+        }}
+      />
+      {/* Layered lesson-plan cards (3D stack) — supporting decor on dark field */}
       <div className="absolute right-[8%] top-[18%] hidden w-64 lg:block" style={{ perspective: '800px' }}>
         <div
-          className="rounded-2xl border border-[#102A43]/12 bg-white/95 p-5 shadow-[0_20px_50px_rgba(16,42,67,0.12)]"
+          className="rounded-2xl border border-white/12 bg-white/96 p-5 shadow-[0_20px_50px_rgba(0,0,0,0.35)]"
           style={{ transform: 'rotateY(-8deg) rotateX(4deg) translateZ(0)' }}
         >
           <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#04A9CE]">Scheme of Learning</p>
@@ -110,11 +118,11 @@ function TeacherWorkspaceDecor() {
           </div>
         </div>
         <div
-          className="absolute -right-4 -top-4 -z-10 h-full w-full rounded-2xl border border-[#102A43]/8 bg-white/70 shadow-lg"
+          className="absolute -right-4 -top-4 -z-10 h-full w-full rounded-2xl border border-white/10 bg-white/25 shadow-lg"
           style={{ transform: 'rotateY(-8deg) rotateX(4deg) translateZ(-24px)' }}
         />
         <div
-          className="absolute -right-8 -top-8 -z-20 h-full w-full rounded-2xl border border-[#102A43]/6 bg-white/40"
+          className="absolute -right-8 -top-8 -z-20 h-full w-full rounded-2xl border border-white/8 bg-white/10"
           style={{ transform: 'rotateY(-8deg) rotateX(4deg) translateZ(-48px)' }}
         />
       </div>
@@ -123,14 +131,15 @@ function TeacherWorkspaceDecor() {
         {['Scheme', 'Lesson', 'Teach'].map((t, i) => (
           <div
             key={t}
-            className="rounded-r-lg border border-l-0 border-[#102A43]/10 bg-white/80 px-3 py-1.5 text-[11px] font-semibold text-[#102A43]/70 shadow-sm"
+            className="rounded-r-lg border border-l-0 border-white/12 bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-white/75 shadow-sm backdrop-blur-sm"
             style={{ transform: `translateX(${i * 6}px)` }}
           >
             {t}
           </div>
         ))}
       </div>
-      <div className="absolute -left-20 bottom-10 h-64 w-64 rounded-full bg-[#04A9CE]/8 blur-3xl" />
+      <div className="absolute -left-20 bottom-10 h-64 w-64 rounded-full bg-[#04A9CE]/15 blur-3xl" />
+      <div className="absolute right-0 top-0 h-48 w-48 rounded-full bg-[#7EDCF0]/8 blur-3xl" />
     </div>
   )
 }
@@ -474,7 +483,7 @@ const THEMES: Record<AuthShellRole, RoleTheme> = {
     badge: 'Teacher',
     badgeClass: 'border-[#04A9CE]/40 bg-[#04A9CE]/10 text-[#0389a8]',
     title: 'Teacher Sign In',
-    pageClass: 'bg-[#F7F5F0]',
+    pageClass: 'bg-[#071826]',
     decor: <TeacherWorkspaceDecor />,
     accentBar: 'bg-gradient-to-r from-[#102A43] via-[#04A9CE] to-[#7EDCF0]',
     aside: null,
@@ -689,7 +698,7 @@ export function AuthShell({
   decorOverride,
 }: AuthShellProps) {
   const theme = THEMES[role]
-  const isDark = role === 'school_admin' || role === 'platform_admin'
+  const isDark = role === 'teacher' || role === 'school_admin' || role === 'platform_admin'
   const showAside = theme.layout === 'split'
   const decor = decorOverride ?? theme.decor
   const isWide = theme.layout === 'wide'
@@ -724,8 +733,14 @@ export function AuthShell({
             {/* Brand row */}
             <div className="mb-6 flex items-center justify-between gap-3">
               <BrandCapsule dark={isDark} href="/" size={44} mark={28} showWordmark />
-              {!isDark && !showAside && (
-                <span className="rounded-full border border-[#102A43]/10 bg-white/85 px-2.5 py-1 text-[11px] font-semibold text-muted-foreground shadow-sm backdrop-blur">
+              {!showAside && (
+                <span
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold shadow-sm backdrop-blur ${
+                    isDark
+                      ? 'border border-white/15 bg-white/10 text-white/80'
+                      : 'border border-[#102A43]/10 bg-white/85 text-muted-foreground'
+                  }`}
+                >
                   {theme.badge}
                 </span>
               )}
