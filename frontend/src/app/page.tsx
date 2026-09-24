@@ -51,11 +51,15 @@ export default function Home() {
       <header className="bg-[#071826] text-white">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between gap-4">
-            <Link href="/" className="flex items-center space-x-2.5">
-              {/* Master brand mark — same symbol as the favicon, PWA icon and
-                  future EXE (see docs/PUBLIC_ENTRY_AND_INSTALLATION.md). */}
-              <SchemeKnitMark size={32} className="h-8 w-8 rounded-md" />
-              <span className="text-2xl font-bold">SchemeKnit</span>
+            <Link href="/" className="flex items-center gap-3">
+              {/* Premium logo capsule — raised navy surface so the S mark reads
+                  clearly against the dark header without changing the mark. */}
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-[#0d2740]/95 shadow-[0_8px_24px_rgba(0,0,0,0.35),0_0_0_1px_rgba(4,169,206,0.12)] ring-1 ring-[#04A9CE]/25">
+                <SchemeKnitMark size={28} className="h-7 w-7" />
+              </span>
+              <span className="text-2xl font-bold tracking-tight">
+                Scheme<span className="text-[#04A9CE]">Knit</span>
+              </span>
             </Link>
             <nav className="flex items-center gap-3 sm:gap-5">
               <button

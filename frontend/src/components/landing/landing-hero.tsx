@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { CurriculumPipeline } from './curriculum-pipeline'
+import { MeshBackground } from '@/components/mesh-background'
 import styles from './landing-hero.module.css'
 
 export function scrollToSection(id: string) {
@@ -14,6 +15,8 @@ export function scrollToSection(id: string) {
 export function LandingHero() {
   return (
     <section className={styles.hero} aria-labelledby="hero-heading">
+      {/* Interactive curriculum mesh — behind copy + pipeline, never overpowering */}
+      <MeshBackground mode="hero" className={styles.meshLayer} opacity={0.95} />
       <div className={styles.heroInner}>
         <div className={styles.copy}>
           <p className={styles.eyebrow}>Ghana&apos;s curriculum-grounded lesson planner</p>

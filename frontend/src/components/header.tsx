@@ -25,13 +25,17 @@ export function Header() {
           <div className="flex items-center space-x-6">
             <Link
               href={isPlatformAdmin ? '/platform-admin' : isSchoolAdmin ? '/school-admin' : '/dashboard'}
-              className="flex items-center space-x-2"
+              className="flex items-center gap-2.5"
             >
               {/* Master brand mark — the same canonical SVG used by the
-                  landing page, footer and legal pages. Never a raster path
-                  that may be absent from a given deployment. */}
-              <SchemeKnitMark size={28} className="h-7 w-7 rounded-md" />
-              <span className="text-xl font-bold">SchemeKnit</span>
+                  landing page, footer and legal pages, sitting in a raised
+                  light capsule so it stays visible on the dashboard header. */}
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-[#F4F7FA] ring-1 ring-[#04A9CE]/25">
+                <SchemeKnitMark size={24} />
+              </span>
+              <span className="text-xl font-bold tracking-tight text-[#102A43]">
+                Scheme<span className="text-[#04A9CE]">Knit</span>
+              </span>
             </Link>
             {user && (
               <nav className="hidden md:flex items-center space-x-1">

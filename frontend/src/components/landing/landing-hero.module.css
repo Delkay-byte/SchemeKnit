@@ -9,6 +9,11 @@
   padding: 2.75rem 1.25rem 4.5rem;
 }
 
+/* Mesh canvas sits behind content; pointer-events pass through to copy/pipeline. */
+.meshLayer {
+  z-index: 0;
+}
+
 .hero::before {
   content: "";
   position: absolute;
@@ -28,9 +33,12 @@
   height: 72px;
   background: linear-gradient(to bottom, transparent, #f4f7fa);
   pointer-events: none;
+  z-index: 2;
 }
 
 .heroInner {
+  position: relative;
+  z-index: 1;
   max-width: 1120px;
   margin: 0 auto;
   display: grid;

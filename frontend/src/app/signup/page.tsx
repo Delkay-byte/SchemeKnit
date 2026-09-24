@@ -4,12 +4,13 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { useAuth } from '@/lib/auth-context'
 import { api } from '@/lib/api'
-import { PasswordInput } from '@/components/password-input'
+import { PasswordInput, PasswordMatchIndicator } from '@/components/password-input'
+import { AuthShell } from '@/components/auth/auth-shell'
+import { AuthField, AuthError } from '@/components/auth/auth-field'
 import { validateEmail, validatePassword, PASSWORD_POLICY } from '@/lib/password-policy'
-import { GraduationCap } from 'lucide-react'
 
 export default function IndividualSignupPage() {
   const router = useRouter()
@@ -17,6 +18,7 @@ export default function IndividualSignupPage() {
   const [email, setEmail] = useState('')
   const [fullName, setFullName] = useState('')
   const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -37,13 +39,16 @@ export default function IndividualSignupPage() {
       setError(pwCheck.message)
       return
     }
+    if (password !== confirm) {
+      setError('Passwords do not match.')
+      return
+    }
 
     setError('')
     setLoading(true)
 
     try {
       const res = await api.registerIndividual(email, password, fullName.trim())
-      // The backend returns a token directly; sign the session in.
       if (res.access_token) {
         await login(email, password)
       }
@@ -56,89 +61,112 @@ export default function IndividualSignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="w-full max-w-md overflow-hidden">
-        <div className="h-2 bg-gradient-to-r from-blue-600 to-blue-500" />
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-2">
-            <div className="p-3 rounded-full bg-gradient-to-br from-blue-600 to-blue-500 text-white">
-              <GraduationCap className="h-7 w-7" />
-            </div>
-          </div>
-          <span className="inline-block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-            Individual Teacher
-          </span>
-          <CardTitle className="text-2xl">Create your SchemeKnit account</CardTitle>
-          <CardDescription>
-            Sign up as an individual teacher — no school required. You start on the Free Tier and can upgrade to Pro anytime.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Full name</label>
-              <input
-                type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                required
-                className="w-full px-3 py-2 border rounded-md"
-                placeholder="Ama Mensah"
-                autoComplete="name"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full px-3 py-2 border rounded-md"
-                placeholder="name@gmail.com"
-                autoComplete="email"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Password</label>
-              <PasswordInput
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={8}
-                placeholder="Create a password"
-                autoComplete="new-password"
-                toggleLabel="Show password"
-              />
-              <p className="mt-1 text-xs text-muted-foreground">
-                {PASSWORD_POLICY.description}
-              </p>
-            </div>
-
-            {error && (
-              <p className="text-sm text-destructive bg-destructive/10 p-2 rounded">{error}</p>
-            )}
-
-            <Button type="submit" disabled={loading} className="w-full">
-              {loading ? 'Please wait...' : 'Create Account'}
-            </Button>
-          </form>
-
-          <div className="mt-6 p-4 bg-muted rounded-lg">
-            <p className="text-sm text-muted-foreground text-center">
-              Free Tier includes 5 lesson plans per calendar month, individual DOCX and PDF export,
-              1 custom template and 5 lifetime AI credits.
-            </p>
-          </div>
-
-          <p className="mt-4 text-center text-sm text-muted-foreground">
-            Already have an account?{' '}
-            <Link href="/login" className="text-foreground underline">
-              Sign in
-            </Link>
+    <AuthShell
+      role="register"
+      title="Create your SchemeKnit account"
+      description="Create your account — no school required. Start on the Free Tier and upgrade to Pro anytime."
+      footer={
+        <p className="text-center text-sm text-muted-foreground">
+          Already have an account?{' '}
+          <Link
+            href="/login"
+            className="font-semibold text-[#04A9CE] underline underline-offset-2"
+          >
+            Sign in
+          </Link>
+        </p>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        <div className="rounded-lg border border-border bg-[#F4F7FA] px-3 py-2">
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#04A9CE]">
+            Create your account
           </p>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+
+        <AuthField id="signup-name" label="Full name">
+          <Input
+            id="signup-name"
+            type="text"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            required
+            placeholder="Ama Mensah"
+            autoComplete="name"
+            autoFocus
+          />
+        </AuthField>
+
+        <AuthField id="signup-email" label="Email">
+          <Input
+            id="signup-email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            placeholder="name@gmail.com"
+            autoComplete="email"
+          />
+        </AuthField>
+
+        <AuthField
+          id="signup-password"
+          label="Password"
+          hint={PASSWORD_POLICY.description}
+        >
+          <PasswordInput
+            id="signup-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={8}
+            placeholder="Create a password"
+            autoComplete="new-password"
+            toggleLabel="Show password"
+            className="h-11 rounded-lg border-input bg-white px-3.5 text-sm text-[#102A43] shadow-[0_1px_2px_rgba(16,42,67,0.04)] transition-all hover:border-[#04A9CE]/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#04A9CE]/45"
+          />
+        </AuthField>
+
+        <AuthField id="signup-confirm" label="Confirm password">
+          <PasswordInput
+            id="signup-confirm"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            required
+            minLength={8}
+            placeholder="Re-enter your password"
+            autoComplete="new-password"
+            toggleLabel="Show password"
+            className="h-11 rounded-lg border-input bg-white px-3.5 text-sm text-[#102A43] shadow-[0_1px_2px_rgba(16,42,67,0.04)] transition-all hover:border-[#04A9CE]/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#04A9CE]/45"
+          />
+        </AuthField>
+
+        <PasswordMatchIndicator password={password} confirm={confirm} />
+
+        <AuthError message={error} />
+
+        <Button
+          type="submit"
+          disabled={loading}
+          className="h-11 w-full rounded-lg bg-[#102A43] text-white font-semibold hover:bg-[#0d2740] active:scale-[0.99] transition focus-visible:ring-2 focus-visible:ring-[#04A9CE] focus-visible:ring-offset-2 disabled:opacity-60"
+        >
+          {loading ? (
+            <span className="inline-flex items-center gap-2">
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+              Creating account…
+            </span>
+          ) : (
+            'Create account'
+          )}
+        </Button>
+      </form>
+
+      <div className="mt-5 rounded-xl border border-border bg-[#F4F7FA] p-4">
+        <p className="text-xs leading-relaxed text-muted-foreground text-center">
+          Free Tier includes 5 lesson plans per calendar month, individual DOCX and
+          PDF export, 1 custom template and 5 lifetime AI credits.
+        </p>
+      </div>
+    </AuthShell>
   )
 }
