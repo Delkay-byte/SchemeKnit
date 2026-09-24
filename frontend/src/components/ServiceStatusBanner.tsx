@@ -125,7 +125,10 @@ export function ServiceStatusBanner() {
     : '✅'
 
   return (
-    <div className={`fixed top-0 left-0 right-0 z-50 ${bgColor} border-b ${textColor} px-4 py-3 shadow-sm`}>
+    /* In-flow (Batch 2): sits above the app chrome in document order instead
+       of floating at z-50. It can never cover the sticky header, navigation
+       or page content, and it carries no z-index of its own. */
+    <div className={`relative ${bgColor} border-b ${textColor} px-4 py-3 shadow-sm`} role="status">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="text-lg">{icon}</span>

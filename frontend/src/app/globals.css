@@ -83,3 +83,17 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ── Application workspace background (Batch 2) ─────────────────────────────
+   A quiet, static blueprint grid for authenticated app areas only. Very low
+   contrast navy hairlines on near-white; deliberately NOT the landing mesh
+   and NOT the auth grid signal. Pure CSS — no animation, so it is
+   reduced-motion safe by construction. */
+.app-blueprint {
+  background-color: #f7f9fc;
+  background-image:
+    linear-gradient(to right, rgba(16, 42, 67, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(16, 42, 67, 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  background-position: -1px -1px;
+}
