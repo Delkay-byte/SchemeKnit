@@ -1,0 +1,483 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { useParams } from 'next/navigation'
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Field, TextArea } from '@/components/ui/field'
+import { Select } from '@/components/ui/select'
+import { Banner } from '@/components/ui/banner'
+import { ArrowLeft, CheckCircle, AlertCircle, Save, Loader2 } from 'lucide-react'
+import { api } from '@/lib/api'
+import { resolveRouteId } from '@/lib/route-params'
+import { PageHeader } from '@/components/ui/page-header'
+
+interface LessonData {
+  id: string
+  job_id: string
+  scheme_id: string
+  week_number: number
+  week_ending?: string | null
+  week_ending_derived?: boolean
+  teaching_week?: number
+  lesson_sequence?: number
+  lesson_number: number
+  lesson_date: string | null
+  class_level: string
+  subject: string
+  strand: string | null
+  sub_strand: string | null
+  content_standard: string | null
+  indicators: string[] | null
+  indicator_codes?: string[]
+  lesson_topic: string | null
+  introduction: string | null
+  assessment: string | null
+  conclusion: string | null
+  keywords?: string[]
+  source_tlrs?: string[]
+  other_tlrs?: string[]
+  core_competencies?: string[]
+  structured_references?: { type: string; title: string; author_publisher?: string; page?: string; notes?: string }[]
+  references?: string[]
+  status: string
+  teacher_edited: boolean
+}
+
+export default function LessonDetailPage() {
+  const params = useParams()
+  const lessonId = resolveRouteId(params.id, 'lessons')
+
+  const [lesson, setLesson] = useState<LessonData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Editable fields
+  const [topic, setTopic] = useState('')
+  const [introduction, setIntroduction] = useState('')
+  const [assessment, setAssessment] = useState('')
+  const [conclusion, setConclusion] = useState('')
+  // Per-lesson review fields (Section I)
+  const [keywords, setKeywords] = useState<string[]>([])
+  const [otherTlrs, setOtherTlrs] = useState<string[]>([])
+  const [coreCompetencies, setCoreCompetencies] = useState<string[]>([])
+  const [structuredRefs, setStructuredRefs] = useState<
+    { type: string; title: string; author_publisher?: string; page?: string; notes?: string }[]
+  >([])
+  const NACCA_COMPETENCIES = [
+    'Critical Thinking and Problem Solving',
+    'Creativity and Innovation',
+    'Communication and Collaboration',
+    'Cultural Identity and Global Citizenship',
+    'Personal Development and Leadership',
+    'Digital Literacy',
+  ]
+  const REFERENCE_TYPES = [
+    'Subject Curriculum',
+    "Teacher's Handbook / Teacher's Guide",
+    'Textbook',
+    'Other',
+  ]
+  // Optional AI section regeneration (existing /api/ai/regenerate-section)
+  const [regenBusy, setRegenBusy] = useState<string | null>(null)
+  const [regenNote, setRegenNote] = useState<string | null>(null)
+  //: What AI would actually do for this teacher's selected mode.
+  const [aiStatus, setAiStatus] = useState<{
+    active: boolean; provider: string | null; mode: string; reason: string | null;
+  } | null>(null)
+
+  useEffect(() => {
+    load()
+    let mode = 'BASIC'
+    try {
+      const saved = window.localStorage.getItem('schemeknit.ai_mode')
+      if (saved && saved !== 'OFF') mode = saved
+    } catch { /* storage unavailable */ }
+    api.getAiStatus(mode).then(setAiStatus).catch(() => setAiStatus(null))
+  }, [lessonId])
+
+  const load = async () => {
+    try {
+      setLoading(true)
+      const data = await api.getLesson(lessonId)
+      setLesson(data)
+      setTopic(data.lesson_topic || '')
+      setIntroduction(data.introduction || '')
+      setAssessment(data.assessment || '')
+      setConclusion(data.conclusion || '')
+      setKeywords(data.keywords || [])
+      setOtherTlrs(data.other_tlrs || [])
+      setCoreCompetencies(data.core_competencies || [])
+      setStructuredRefs(
+        (data.structured_references || []).map((r: any) => ({
+          type: r.type || 'Other',
+          title: r.title || '',
+          author_publisher: r.author_publisher || '',
+          page: r.page || '',
+          notes: r.notes || '',
+        }))
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load lesson')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleRegenerate = async (section: 'introduction' | 'assessment' | 'conclusion') => {
+    if (!lesson) return
+    try {
+      setRegenBusy(section)
+      setRegenNote(null)
+      setError(null)
+      // Stable idempotency key for this user action so a retried submission
+      // cannot consume a second lifetime AI generation.
+      const requestId = `${lesson.id}:${section}:${Date.now()}`
+      // Use the teacher's last chosen AI mode. This is NOT hard-coded to a
+      // single provider: OFF (or unset) resolves to BASIC, which lets the
+      // backend auto-select whichever real provider is configured, and report
+      // an accurate diagnostic when none is.
+      let mode = 'BASIC'
+      try {
+        const saved = window.localStorage.getItem('schemeknit.ai_mode')
+        if (saved && saved !== 'OFF') mode = saved
+      } catch { /* storage unavailable */ }
+      const res = await api.regenerateSection(lesson.id, section, mode, '', requestId)
+      const text = res.new_content || ''
+      if (section === 'introduction') setIntroduction(text)
+      if (section === 'assessment') setAssessment(text)
+      if (section === 'conclusion') setConclusion(text)
+      setRegenNote(
+        `AI suggestion inserted by ${res.provider || 'provider'} (mode: ${res.mode || mode}). ` +
+        'Review and Save to keep it.'
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'AI regeneration unavailable')
+    } finally {
+      setRegenBusy(null)
+    }
+  }
+
+  const handleSave = async () => {
+    try {
+      setSaving(true)
+      setSaved(false)
+      const updated = await api.updateLesson(lessonId, {
+        lesson_topic: topic,
+        introduction,
+        assessment,
+        conclusion,
+        keywords,
+        other_tlrs: otherTlrs,
+        core_competencies: coreCompetencies,
+        structured_references: structuredRefs,
+        references: structuredRefs.map(r => r.title || r.type).filter(Boolean),
+      })
+      setLesson(updated)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save lesson')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Loading lesson...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error && !lesson) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="max-w-md">
+          <CardContent className="p-8 text-center">
+            <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+            <p className="text-destructive mb-4">{error}</p>
+            <Button onClick={load}>Try Again</Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (!lesson) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="max-w-md">
+          <CardContent className="p-8 text-center">
+            <p className="text-muted-foreground mb-4">Lesson not found</p>
+            <Link href="/lessons"><Button>Back to Lesson Plans</Button></Link>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen">
+      <main className="container mx-auto px-4 py-8 max-w-4xl">
+        {/* Header */}
+        <div className="mb-6">
+          <PageHeader
+            title={`Week ${lesson.week_number} • Lesson ${lesson.lesson_number}`}
+            description={
+              <>
+                {lesson.subject} &bull; {lesson.class_level}
+                {lesson.lesson_date ? ` &bull; ${lesson.lesson_date}` : ''}
+                {lesson.teacher_edited ? ' &bull; Edited' : ''}
+              </>
+            }
+            actions={
+              <Link href="/lessons">
+                <Button variant="outline">
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back to Lesson Plans
+                </Button>
+              </Link>
+            }
+          />
+        </div>
+
+        {/* Curriculum context (read-only) */}
+        <Card className="mb-6">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Curriculum Context</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            {lesson.strand && (
+              <p><span className="text-muted-foreground">Strand:</span> {lesson.strand}</p>
+            )}
+            {lesson.sub_strand && (
+              <p><span className="text-muted-foreground">Sub-strand:</span> {lesson.sub_strand}</p>
+            )}
+            {lesson.content_standard && (
+              <p><span className="text-muted-foreground">Content Standard:</span> {lesson.content_standard}</p>
+            )}
+            {lesson.indicators && lesson.indicators.length > 0 && (
+              <div>
+                <p className="text-muted-foreground mb-1">Indicators:</p>
+                <ul className="list-disc list-inside space-y-0.5">
+                  {lesson.indicators.map((ind, i) => <li key={i}>{ind}</li>)}
+                </ul>
+              </div>
+            )}
+            {lesson.week_ending && (
+              <p>
+                <span className="text-muted-foreground">Source week ending:</span>{' '}
+                {lesson.week_ending}
+                {lesson.week_ending_derived ? ' (derived)' : ''}
+              </p>
+            )}
+            {!!(lesson.source_tlrs?.length) && (
+              <div>
+                <p className="text-muted-foreground mb-1">Source TLRs (from scheme):</p>
+                <ul className="list-disc list-inside space-y-0.5">
+                  {lesson.source_tlrs!.map((r, i) => <li key={i}>{r}</li>)}
+                </ul>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Editable fields */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Lesson Plan</CardTitle>
+            <CardDescription>Edit the fields below and save your changes</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap items-center gap-2 pb-1">
+              <span className="text-sm text-muted-foreground">Optional AI assist:</span>
+              {(['introduction', 'assessment', 'conclusion'] as const).map((s) => (
+                <Button
+                  key={s}
+                  size="sm"
+                  variant="outline"
+                  disabled={regenBusy !== null}
+                  onClick={() => handleRegenerate(s)}
+                >
+                  {regenBusy === s ? 'Generating...' : `Suggest ${s}`}
+                </Button>
+              ))}
+            </div>
+            <span className="text-xs text-muted-foreground">
+              {aiStatus
+                ? aiStatus.active
+                  ? `AI active · provider: ${aiStatus.provider}`
+                  : 'No AI provider available — suggestions are disabled until one is configured.'
+                : ''}
+            </span>
+            {regenNote && <Banner tone="success">{regenNote}</Banner>}
+            <Field label="Lesson Topic" htmlFor="lesson-topic">
+              <Input
+                id="lesson-topic"
+                type="text"
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+              />
+            </Field>
+            <Field label="Introduction / Starter" htmlFor="lesson-introduction">
+              <TextArea
+                id="lesson-introduction"
+                value={introduction}
+                onChange={(e) => setIntroduction(e.target.value)}
+                rows={4}
+              />
+            </Field>
+            <Field label="Assessment" htmlFor="lesson-assessment">
+              <TextArea
+                id="lesson-assessment"
+                value={assessment}
+                onChange={(e) => setAssessment(e.target.value)}
+                rows={3}
+              />
+            </Field>
+            <Field label="Conclusion / Reflection" htmlFor="lesson-conclusion">
+              <TextArea
+                id="lesson-conclusion"
+                value={conclusion}
+                onChange={(e) => setConclusion(e.target.value)}
+                rows={3}
+              />
+            </Field>
+
+            <div className="border-t pt-4 space-y-3">
+              <div>
+                <h3 className="text-sm font-semibold">Lesson Review Data</h3>
+                <p className="text-xs text-muted-foreground">
+                  Keywords, Other TLRs, competencies and references for THIS lesson.
+                  Source TLRs above stay tied to the scheme document.
+                </p>
+              </div>
+              <Field label="Keywords" htmlFor="lesson-keywords">
+                <Input
+                  id="lesson-keywords"
+                  type="text"
+                  value={keywords.join(', ')}
+                  onChange={(e) => setKeywords(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                  placeholder="Comma-separated"
+                />
+              </Field>
+              <Field label="Other TLRs" htmlFor="lesson-other-tlrs">
+                <Input
+                  id="lesson-other-tlrs"
+                  type="text"
+                  value={otherTlrs.join(', ')}
+                  onChange={(e) => setOtherTlrs(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                  placeholder="Comma-separated teacher additions"
+                />
+              </Field>
+              <div>
+                <label className="block text-sm font-medium mb-2">Core Competencies</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {NACCA_COMPETENCIES.map(label => {
+                    const selected = coreCompetencies.includes(label)
+                    return (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => setCoreCompetencies(prev =>
+                          selected ? prev.filter(c => c !== label) : [...prev, label]
+                        )}
+                        className={`text-xs px-2 py-1 rounded border ${
+                          selected
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-background text-muted-foreground'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium">References</label>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    type="button"
+                    onClick={() => setStructuredRefs(prev => [
+                      ...prev,
+                      { type: 'Other', title: '', author_publisher: '', page: '', notes: '' },
+                    ])}
+                  >
+                    + Add reference
+                  </Button>
+                </div>
+                {structuredRefs.map((ref, idx) => (
+                  <div key={idx} className="grid grid-cols-12 gap-2 mb-2">
+                    <Select
+                      value={ref.type}
+                      onChange={(e) => setStructuredRefs(prev => prev.map((r, i) =>
+                        i === idx ? { ...r, type: e.target.value } : r
+                      ))}
+                      className="col-span-4 h-9 px-2 text-sm"
+                      aria-label="Reference type"
+                    >
+                      {REFERENCE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                    </Select>
+                    <Input
+                      type="text"
+                      value={ref.title}
+                      onChange={(e) => setStructuredRefs(prev => prev.map((r, i) =>
+                        i === idx ? { ...r, title: e.target.value } : r
+                      ))}
+                      placeholder="Title"
+                      className="col-span-5 h-9 px-2 text-sm"
+                    />
+                    <Input
+                      type="text"
+                      value={ref.page || ''}
+                      onChange={(e) => setStructuredRefs(prev => prev.map((r, i) =>
+                        i === idx ? { ...r, page: e.target.value } : r
+                      ))}
+                      placeholder="Page (optional)"
+                      className="col-span-3 h-9 px-2 text-sm"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Button onClick={handleSave} disabled={saving}>
+                {saving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Changes
+                  </>
+                )}
+              </Button>
+              {saved && (
+                <span className="text-sm text-green-600 flex items-center">
+                  <CheckCircle className="h-4 w-4 mr-1" />
+                  Saved
+                </span>
+              )}
+            </div>
+            {error && <Banner tone="danger">{error}</Banner>}
+          </CardContent>
+        </Card>
+      </main>
+    </div>
+  )
+}
