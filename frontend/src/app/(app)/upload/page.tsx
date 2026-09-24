@@ -1,15 +1,20 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { Fragment, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { SurfaceCard } from '@/components/ui/surface-card'
+import { Banner } from '@/components/ui/banner'
 import { PageHeader } from '@/components/ui/page-header'
 import { Upload, FileText, CheckCircle, AlertTriangle } from 'lucide-react'
 import { api } from '@/lib/api'
 import { WhatsAppButton } from '@/components/whatsapp-button'
 import { formatFileSize } from '@/lib/utils-display'
+
+// The three phases the upload screen moves through: the teacher always knows
+// where they are in UPLOAD → DETECT → REVIEW.
+const FLOW_STEPS = ['Upload', 'Detect', 'Review']
 
 export default function UploadPage() {
   const router = useRouter()
@@ -61,7 +66,7 @@ export default function UploadPage() {
       }, 200)
 
       const response = await api.uploadScheme(file)
-      
+
       clearInterval(progressInterval)
       setUploadProgress(100)
       setResult(response)
@@ -128,253 +133,308 @@ export default function UploadPage() {
     }
   }
 
+  const resetToIdle = () => {
+    setSuccess(false)
+    setResult(null)
+    setFile(null)
+    setError(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  // Flow position: idle = at Upload; uploading/failed/confirmation = at
+  // Detect; successful read = at Review.
+  const flowCurrent = success
+    ? (isExtractionFailure || needsSubjectConfirmation ? 1 : 2)
+    : uploading ? 1 : 0
+
   return (
     <div className="min-h-screen">
       <main className="container mx-auto px-4 py-8">
-        <div className="max-w-2xl mx-auto">
+        <div className="mx-auto max-w-2xl">
+          <PageHeader
+            className="mb-4"
+            eyebrow="Upload"
+            title="Upload Your Scheme of Work"
+            description="Upload your scheme of work as Word (.docx) or PDF. SchemeKnit
+              will automatically extract the curriculum data — including
+              documents that contain more than one subject."
+          />
+
+          {/* UPLOAD → DETECT → REVIEW — one glance shows the whole flow. */}
+          <ol
+            data-upload-flow
+            aria-label="Upload flow"
+            className="mb-6 flex items-center gap-2"
+          >
+            {FLOW_STEPS.map((label, i) => {
+              const state = i < flowCurrent ? 'done' : i === flowCurrent ? 'current' : 'upcoming'
+              return (
+                <Fragment key={label}>
+                  {i > 0 && (
+                    <span aria-hidden="true" className="h-0.5 w-6 bg-slate-200 sm:w-10" />
+                  )}
+                  <li
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wider ${
+                      state === 'current'
+                        ? 'border-[#102A43] bg-[#102A43] text-white'
+                        : state === 'done'
+                          ? 'border-[#04A9CE]/40 bg-[#04A9CE]/10 text-[#04769B]'
+                          : 'border-slate-200 bg-white text-slate-400'
+                    }`}
+                  >
+                    {state === 'done' && <CheckCircle className="h-3.5 w-3.5" aria-hidden="true" />}
+                    {label}
+                  </li>
+                </Fragment>
+              )
+            })}
+          </ol>
+
           {/* Success State */}
           {success && result ? (
             isExtractionFailure ? (
               /* Extraction failure: honest, actionable, never a dead-end and
                  never a subject picker with nothing to choose from. */
-              <Card className="border-red-200 bg-red-50">
-                <CardContent className="p-8">
-                  <div className="text-center">
-                    <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-3" />
-                    <h2 className="text-xl font-bold mb-2">We could not read this scheme</h2>
-                    <p className="text-sm font-medium mb-1">
-                      {result.filename || file?.name}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {extractionFailureMessage}
-                    </p>
-                  </div>
-                  <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
-                    <Button
-                      onClick={() => {
-                        setSuccess(false)
-                        setResult(null)
-                        setFile(null)
-                        setError(null)
-                        if (fileInputRef.current) fileInputRef.current.value = ''
-                      }}
-                    >
-                      Upload a different file
-                    </Button>
-                    <Link href="/dashboard">
-                      <Button variant="outline" className="w-full">Back to Dashboard</Button>
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="space-y-4">
+                <Banner tone="danger" title="We could not read this scheme">
+                  <p className="font-medium">{result.filename || file?.name}</p>
+                  <p className="mt-1">{extractionFailureMessage}</p>
+                </Banner>
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <Button className="flex-1" onClick={resetToIdle}>
+                    Upload a different file
+                  </Button>
+                  <Button variant="outline" className="flex-1" asChild>
+                    <Link href="/dashboard">Back to Dashboard</Link>
+                  </Button>
+                </div>
+              </div>
             ) : needsSubjectConfirmation ? (
               /* STEP 4 — multi-subject detection: the teacher must confirm which
                  subject section to use before anything is generated. */
-              <Card className="border-amber-200 bg-amber-50">
-                <CardContent className="p-8">
-                  <div className="text-center">
-                    <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-3" />
-                    <h2 className="text-xl font-bold mb-2">Multiple subjects detected</h2>
-                    <p className="text-sm font-medium mb-1">
-                      {result.detection?.title || result.filename || file?.name}
+              <SurfaceCard
+                data-multi-subject
+                accent="bg-gradient-to-r from-amber-400 to-orange-400"
+                className="px-5 py-6 sm:px-6"
+              >
+                <div className="text-center">
+                  <AlertTriangle className="mx-auto mb-3 h-10 w-10 text-amber-500" aria-hidden="true" />
+                  <h2 className="text-xl font-bold text-[#102A43]">Multiple subjects detected</h2>
+                  <p className="mt-1 text-sm font-medium">
+                    {result.detection?.title || result.filename || file?.name}
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    This document contains more than one subject. Choose the
+                    subject you are teaching — SchemeKnit will use only that
+                    section.
+                  </p>
+                </div>
+                <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {detectedSections.length === 0 && (
+                    <p className="col-span-full text-center text-sm text-muted-foreground">
+                      We could not identify a subject heading in this document.
+                      Please review the extracted content, or use a clearer copy.
                     </p>
-                    <p className="text-sm text-muted-foreground">
-                      This document contains more than one subject. Choose the
-                      subject you are teaching — SchemeKnit will use only that
-                      section.
-                    </p>
-                  </div>
-                  <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {detectedSections.length === 0 && (
-                      <p className="col-span-full text-sm text-muted-foreground text-center">
-                        We could not identify a subject heading in this document.
-                        Please review the extracted content, or use a clearer copy.
+                  )}
+                  {detectedSections.map((s, i) => (
+                    <Button
+                      key={`${s.subject}-${i}`}
+                      variant="outline"
+                      className="h-auto flex-col gap-1 whitespace-normal py-3 text-left"
+                      disabled={confirmingSubject !== null}
+                      onClick={() => handleConfirmSubject(s.subject)}
+                    >
+                      <span className="font-medium">{s.subject}</span>
+                      {typeof s.week_count === 'number' && (
+                        <span className="text-xs text-muted-foreground">
+                          {s.week_count} week{s.week_count === 1 ? '' : 's'}
+                        </span>
+                      )}
+                    </Button>
+                  ))}
+                </div>
+                {confirmingSubject && (
+                  <p className="mt-4 text-center text-sm text-muted-foreground">
+                    Confirming {confirmingSubject}…
+                  </p>
+                )}
+                {error && (
+                  <p className="mt-4 text-center text-sm text-destructive">{error}</p>
+                )}
+              </SurfaceCard>
+            ) : (
+              <SurfaceCard
+                data-upload-success
+                accent="bg-gradient-to-r from-green-500 to-emerald-500"
+                className="px-5 py-6 sm:px-6"
+              >
+                <div className="text-center">
+                  <CheckCircle className="mx-auto mb-3 h-12 w-12 text-green-500" aria-hidden="true" />
+                  <h2 className="text-xl font-bold text-[#102A43]">Upload successful</h2>
+                  <p className="mt-1 text-sm font-medium">{result.filename || file?.name}</p>
+                </div>
+                <Banner tone="success" className="mt-4" title="Curriculum extracted">
+                  <div className="space-y-1 text-sm">
+                    {result.subject && <p><strong>Subject:</strong> {result.subject}</p>}
+                    {result.class_level && <p><strong>Class:</strong> {result.class_level}</p>}
+                    {result.term && <p><strong>Term:</strong> {result.term}</p>}
+                    {result.weeks_count && <p><strong>Weeks detected:</strong> {result.weeks_count}</p>}
+                    {result.detection?.status === 'single' && (
+                      <p className="text-xs">Subject section identified.</p>
+                    )}
+                    {result.detection?.status === 'low_confidence' && (
+                      <p className="text-xs">
+                        We could not confidently identify the subject section —
+                        please review the extracted content.
                       </p>
                     )}
-                    {detectedSections.map((s, i) => (
-                      <Button
-                        key={`${s.subject}-${i}`}
-                        variant="outline"
-                        className="h-auto py-3 flex flex-col gap-1 whitespace-normal text-left"
-                        disabled={confirmingSubject !== null}
-                        onClick={() => handleConfirmSubject(s.subject)}
-                      >
-                        <span className="font-medium">{s.subject}</span>
-                        {typeof s.week_count === 'number' && (
-                          <span className="text-xs text-muted-foreground">
-                            {s.week_count} week{s.week_count === 1 ? '' : 's'}
-                          </span>
-                        )}
-                      </Button>
-                    ))}
                   </div>
-                  {confirmingSubject && (
-                    <p className="mt-4 text-sm text-muted-foreground text-center">
-                      Confirming {confirmingSubject}…
-                    </p>
-                  )}
-                  {error && (
-                    <p className="mt-4 text-sm text-destructive text-center">{error}</p>
-                  )}
-                </CardContent>
-              </Card>
-            ) : (
-            <Card className="border-green-200 bg-green-50">
-              <CardContent className="p-8 text-center">
-                <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-                <h2 className="text-xl font-bold mb-2">Upload successful</h2>
-                <p className="text-sm font-medium mb-4">{result.filename || file?.name}</p>
-                <div className="space-y-1 text-sm text-muted-foreground mb-6">
-                  {result.subject && <p><strong>Subject:</strong> {result.subject}</p>}
-                  {result.class_level && <p><strong>Class:</strong> {result.class_level}</p>}
-                  {result.term && <p><strong>Term:</strong> {result.term}</p>}
-                  {result.weeks_count && <p><strong>Weeks detected:</strong> {result.weeks_count}</p>}
-                  {result.detection?.status === 'single' && (
-                    <p className="text-xs">Subject section identified.</p>
-                  )}
-                  {result.detection?.status === 'low_confidence' && (
-                    <p className="text-xs">
-                      We could not confidently identify the subject section —
-                      please review the extracted content.
-                    </p>
-                  )}
-                </div>
-                <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <Button size="lg" onClick={() => router.push(`/review/${result.scheme_id}`)}>
+                </Banner>
+                <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                  <Button size="lg" className="flex-1" onClick={() => router.push(`/review/${result.scheme_id}`)}>
                     Review Curriculum
                     <span className="ml-2">→</span>
                   </Button>
+                  <Button variant="outline" className="flex-1" asChild>
+                    <Link href="/dashboard">Back to Dashboard</Link>
+                  </Button>
                 </div>
-              </CardContent>
-            </Card>
+              </SurfaceCard>
             )
           ) : (
             <>
-              {/* Upload Area */}
-              <PageHeader
-                className="mb-6"
-                eyebrow="Upload"
-                title="Upload Your Scheme of Work"
-                description="Upload your scheme of work as Word (.docx) or PDF. SchemeKnit
-                  will automatically extract the curriculum data — including
-                  documents that contain more than one subject."
-              />
-              <Card className="mb-6">
-                <CardContent>
-                  <div
-                    className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                      file ? 'border-green-500 bg-green-50' : 'border-gray-300 hover:border-primary cursor-pointer'
-                    }`}
-                    onDragOver={handleDragOver}
-                    onDrop={handleDrop}
-                    onClick={() => !file && fileInputRef.current?.click()}
-                  >
-                    {file ? (
-                      <div className="space-y-4">
-                        <FileText className="h-16 w-16 text-green-500 mx-auto" />
-                        <div>
-                          <p className="text-lg font-semibold">{file.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {formatFileSize(file.size)}
-                          </p>
-                        </div>
-                        <Button
-                          variant="outline"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setFile(null)
-                            if (fileInputRef.current) fileInputRef.current.value = ''
-                          }}
-                        >
-                          Choose Different File
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        <Upload className="h-16 w-16 text-muted-foreground mx-auto" />
-                        <div>
-                          <p className="text-lg font-semibold">
-                            Drag & drop your file here
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            or click to browse
-                          </p>
-                        </div>
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept=".docx,.pdf"
-                          onChange={handleFileSelect}
-                          className="hidden"
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Progress Bar */}
-                  {uploading && (
-                    <div className="mt-4">
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>Uploading and extracting curriculum data...</span>
-                        <span>{uploadProgress}%</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-primary h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${uploadProgress}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  )}
-
-                  {error && (
-                    <div className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-                      <p className="text-destructive text-sm">{error}</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Upload Button */}
-              <div className="flex justify-between">
-                <Link href="/dashboard">
-                  <Button variant="outline">Cancel</Button>
-                </Link>
-                <Button
-                  onClick={handleUpload}
-                  disabled={!file || uploading}
-                  size="lg"
+              {/* Dropzone */}
+              <SurfaceCard data-dropzone accent="bg-gradient-to-r from-[#102A43] to-[#04A9CE]" className="mb-4 p-3">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  aria-label={file ? `Selected file: ${file.name}` : 'Choose a .docx or .pdf file'}
+                  className={`cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#04A9CE] ${
+                    file
+                      ? 'border-[#04A9CE] bg-[#04A9CE]/5'
+                      : 'border-slate-300 hover:border-[#04A9CE] hover:bg-slate-50'
+                  }`}
+                  onDragOver={handleDragOver}
+                  onDrop={handleDrop}
+                  onClick={() => !file && fileInputRef.current?.click()}
+                  onKeyDown={(e) => {
+                    if (!file && (e.key === 'Enter' || e.key === ' ')) {
+                      e.preventDefault()
+                      fileInputRef.current?.click()
+                    }
+                  }}
                 >
+                  {file ? (
+                    <div className="space-y-4">
+                      <FileText className="mx-auto h-12 w-12 text-[#04769B]" aria-hidden="true" />
+                      <div>
+                        <p className="break-all text-lg font-semibold text-[#102A43]">{file.name}</p>
+                        <p className="text-sm text-muted-foreground">{formatFileSize(file.size)}</p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setFile(null)
+                          if (fileInputRef.current) fileInputRef.current.value = ''
+                        }}
+                      >
+                        Choose Different File
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <Upload className="mx-auto h-12 w-12 text-slate-400" aria-hidden="true" />
+                      <div>
+                        <p className="text-lg font-semibold text-[#102A43]">
+                          Drag &amp; drop your file here
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          or click to browse
+                        </p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Word (.docx) or PDF · up to 50 MB
+                      </p>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".docx,.pdf"
+                        onChange={handleFileSelect}
+                        className="hidden"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Progress — deterministic upload progress, announced to AT. */}
+                {uploading && (
+                  <div className="mt-4 px-2 pb-2">
+                    <div className="mb-1 flex justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        Uploading and extracting curriculum data…
+                      </span>
+                      <span className="font-medium text-[#102A43]">{uploadProgress}%</span>
+                    </div>
+                    <div
+                      role="progressbar"
+                      aria-label="Upload progress"
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={uploadProgress}
+                      className="h-2 w-full overflow-hidden rounded-full bg-slate-200"
+                    >
+                      <div
+                        className="h-2 rounded-full bg-gradient-to-r from-[#102A43] to-[#04A9CE] transition-all duration-300"
+                        style={{ width: `${uploadProgress}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                )}
+              </SurfaceCard>
+
+              {error && (
+                <div className="mb-4">
+                  <Banner tone="danger" title="Upload problem">
+                    {error}
+                  </Banner>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
+                <Button variant="outline" className="w-full sm:w-auto" asChild>
+                  <Link href="/dashboard">Cancel</Link>
+                </Button>
+                <Button onClick={handleUpload} disabled={!file || uploading} size="lg" className="w-full sm:w-auto">
                   {uploading ? (
                     <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-b-2 border-white" />
                       Uploading...
                     </>
                   ) : (
                     <>
-                      <Upload className="h-4 w-4 mr-2" />
-                      Upload & Process
+                      <Upload className="mr-2 h-4 w-4" />
+                      Upload &amp; Process
                     </>
                   )}
                 </Button>
               </div>
 
-              {/* Help */}
-              <Card className="mt-8">
-                <CardContent className="p-6">
-                  <h3 className="font-semibold mb-2">What happens next?</h3>
-                  <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
-                    <li>SchemeKnit extracts curriculum data from your document</li>
-                    <li>You review and approve the extracted information</li>
-                    <li>You configure lesson plan settings (duration, template, etc.)</li>
-                    <li>SchemeKnit generates your lesson plans</li>
-                    <li>You review, edit, and export your lesson plans</li>
-                  </ol>
-                  <p className="text-xs text-muted-foreground mt-4">
-                    Supported formats: Word (.docx) and PDF. Maximum file size: 50 MB.
-                  </p>
-                </CardContent>
-              </Card>
+              {/* Help — what happens after the file leaves this page. */}
+              <SurfaceCard className="mt-8 px-5 py-5 sm:px-6">
+                <h2 className="text-base font-semibold text-[#102A43]">What happens next?</h2>
+                <ol className="mt-3 list-decimal space-y-2 pl-1 text-sm text-muted-foreground list-inside">
+                  <li>SchemeKnit extracts curriculum data from your document</li>
+                  <li>You review and approve the extracted information</li>
+                  <li>You configure lesson plan settings (duration, template, etc.)</li>
+                  <li>SchemeKnit generates your lesson plans</li>
+                  <li>You review, edit, and export your lesson plans</li>
+                </ol>
+                <p className="mt-4 text-xs text-muted-foreground">
+                  Supported formats: Word (.docx) and PDF. Maximum file size: 50 MB.
+                </p>
+              </SurfaceCard>
             </>
           )}
         </div>
