@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { SurfaceCard } from '@/components/ui/surface-card'
 import { Input } from '@/components/ui/input'
 import { Field, TextArea } from '@/components/ui/field'
 import { Banner } from '@/components/ui/banner'
@@ -70,13 +70,14 @@ export default function SchoolSettingsPage() {
 
   return (
     <div className="max-w-2xl space-y-4">
-      <PageHeader title="School Settings" />
+      <PageHeader
+        title="School Settings"
+        description="School profile details shown to teachers and used on records."
+      />
       {error && <Banner tone="danger">{error}</Banner>}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">School Profile</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <SurfaceCard data-school-profile className="px-5 py-5 sm:px-6">
+        <h2 className="text-lg font-semibold text-[#102A43]">School Profile</h2>
+        <div className="mt-4 space-y-4">
           <Field label="School Name" htmlFor="school-name">
             <Input id="school-name" type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </Field>
@@ -104,8 +105,8 @@ export default function SchoolSettingsPage() {
             Plan, seat limit, and license dates are managed by SchemeKnit.
             Contact support to change your subscription.
           </p>
-        </CardContent>
-      </Card>
+        </div>
+      </SurfaceCard>
 
       <ChangePasswordCard />
     </div>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { SurfaceCard } from '@/components/ui/surface-card'
 import { Input } from '@/components/ui/input'
 import { Banner } from '@/components/ui/banner'
 import { StatusPill } from '@/components/ui/badge'
@@ -222,19 +222,16 @@ export default function TeachersPage() {
       )}
 
       {teachers.length === 0 ? (
-        <Card>
-          <CardContent className="p-12 text-center">
-            <p className="text-lg font-medium mb-2">No teachers yet</p>
-            <p className="text-muted-foreground mb-4">
-              Add your first teacher so they can start creating lesson plans.
-            </p>
-            <Button onClick={() => setShowCreate(true)}>Add Teacher</Button>
-          </CardContent>
-        </Card>
+        <SurfaceCard className="px-6 py-12 text-center">
+          <p className="mb-2 text-lg font-medium">No teachers yet</p>
+          <p className="mb-4 text-muted-foreground">
+            Add your first teacher so they can start creating lesson plans.
+          </p>
+          <Button onClick={() => setShowCreate(true)}>Add Teacher</Button>
+        </SurfaceCard>
       ) : (
-        <Card>
-          <CardContent className="p-0">
-            <Table>
+        <SurfaceCard className="overflow-hidden">
+          <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50 hover:bg-muted/50">
                   <TableHead>Name</TableHead>
@@ -275,8 +272,7 @@ export default function TeachersPage() {
                 ))}
               </TableBody>
             </Table>
-          </CardContent>
-        </Card>
+        </SurfaceCard>
       )}
 
       {showCreate && (

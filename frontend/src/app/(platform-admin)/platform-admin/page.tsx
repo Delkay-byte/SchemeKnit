@@ -3,11 +3,13 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { SurfaceCard } from '@/components/ui/surface-card'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
+import { Field } from '@/components/ui/field'
 import { Banner } from '@/components/ui/banner'
 import { StatusPill } from '@/components/ui/badge'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import {
   Dialog,
   DialogContent,
@@ -16,7 +18,7 @@ import {
   DialogDescription,
   ConfirmDialog,
 } from '@/components/ui/dialog'
-import { Building2, Key, CreditCard, Users, Package, Shield, Clock, AlertTriangle, Copy, Check, RefreshCw, Eye, KeyRound } from 'lucide-react'
+import { Building2, Key, Shield, Clock, AlertTriangle, Copy, Check, RefreshCw, Eye, KeyRound } from 'lucide-react'
 import { api } from '@/lib/api'
 import { DEV_TOOLS_ENABLED } from '@/lib/dev-tools'
 import { useAuth } from '@/lib/auth-context'
@@ -371,6 +373,7 @@ export default function PlatformAdminPage() {
       <main className="container mx-auto px-4 py-8 max-w-7xl">
         <PageHeader
           className="mb-6"
+          eyebrow="Platform"
           title={
             <span className="flex items-center gap-2">
               <Shield className="h-6 w-6" aria-hidden="true" />
@@ -409,99 +412,75 @@ export default function PlatformAdminPage() {
             {/* Dashboard Tab */}
             {activeTab === 'dashboard' && dashboard && (
               <div className="space-y-6">
-                <div className="grid md:grid-cols-4 gap-4">
-                  <Card>
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-muted-foreground">Active Schools</p>
-                          <p className="text-2xl font-bold">{dashboard.active_schools}</p>
-                        </div>
-                        <Building2 className="h-8 w-8 text-blue-500" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-muted-foreground">Active Licenses</p>
-                          <p className="text-2xl font-bold">{dashboard.active_licenses}</p>
-                        </div>
-                        <Key className="h-8 w-8 text-green-500" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-muted-foreground">Expiring Soon</p>
-                          <p className="text-2xl font-bold text-orange-600">{dashboard.expiring_soon}</p>
-                        </div>
-                        <Clock className="h-8 w-8 text-orange-500" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-muted-foreground">Expired</p>
-                          <p className="text-2xl font-bold text-red-600">{dashboard.expired_licenses}</p>
-                        </div>
-                        <AlertTriangle className="h-8 w-8 text-red-500" />
-                      </div>
-                    </CardContent>
-                  </Card>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <SurfaceCard className="flex items-center justify-between px-5 py-4">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Active Schools</p>
+                      <p className="mt-1.5 text-2xl font-bold text-[#102A43]">{dashboard.active_schools}</p>
+                    </div>
+                    <Building2 className="h-8 w-8 text-[#04A9CE]" aria-hidden="true" />
+                  </SurfaceCard>
+                  <SurfaceCard className="flex items-center justify-between px-5 py-4">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Active Licenses</p>
+                      <p className="mt-1.5 text-2xl font-bold text-[#102A43]">{dashboard.active_licenses}</p>
+                    </div>
+                    <Key className="h-8 w-8 text-green-500" aria-hidden="true" />
+                  </SurfaceCard>
+                  <SurfaceCard className="flex items-center justify-between px-5 py-4">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Expiring Soon</p>
+                      <p className="mt-1.5 text-2xl font-bold text-orange-600">{dashboard.expiring_soon}</p>
+                    </div>
+                    <Clock className="h-8 w-8 text-orange-500" aria-hidden="true" />
+                  </SurfaceCard>
+                  <SurfaceCard className="flex items-center justify-between px-5 py-4">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Expired</p>
+                      <p className="mt-1.5 text-2xl font-bold text-red-600">{dashboard.expired_licenses}</p>
+                    </div>
+                    <AlertTriangle className="h-8 w-8 text-red-500" aria-hidden="true" />
+                  </SurfaceCard>
                 </div>
-                <div className="grid md:grid-cols-3 gap-4">
-                  <Card>
-                    <CardContent className="p-4">
-                      <p className="text-sm text-muted-foreground">Total Teachers</p>
-                      <p className="text-2xl font-bold">{dashboard.total_teachers}</p>
-                      <p className="text-xs text-muted-foreground">{dashboard.seats_available} seats available</p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-4">
-                      <p className="text-sm text-muted-foreground">Pending Payments</p>
-                      <p className="text-2xl font-bold">{dashboard.pending_payments}</p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-4">
-                      <p className="text-sm text-muted-foreground">Verified Revenue</p>
-                      <p className="text-2xl font-bold">{formatCurrency(dashboard.verified_revenue)}</p>
-                    </CardContent>
-                  </Card>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <SurfaceCard className="px-5 py-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total Teachers</p>
+                    <p className="mt-1.5 text-2xl font-bold text-[#102A43]">{dashboard.total_teachers}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{dashboard.seats_available} seats available</p>
+                  </SurfaceCard>
+                  <SurfaceCard className="px-5 py-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Pending Payments</p>
+                    <p className="mt-1.5 text-2xl font-bold text-[#102A43]">{dashboard.pending_payments}</p>
+                  </SurfaceCard>
+                  <SurfaceCard className="px-5 py-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Verified Revenue</p>
+                    <p className="mt-1.5 text-2xl font-bold text-[#102A43]">{formatCurrency(dashboard.verified_revenue)}</p>
+                  </SurfaceCard>
                 </div>
 
                 {/* Development/acceptance-only demo data reset. Compiled out
                     of production builds; backend also 403s unless DEBUG is on. */}
                 {DEV_TOOLS_ENABLED && (
-                <Card className="border-destructive/30">
-                  <CardContent className="p-4 flex items-center justify-between flex-wrap gap-3">
-                    <div>
-                      <p className="font-medium">Reset demo commercial data</p>
-                      <p className="text-xs text-muted-foreground">
-                        Development only. Removes demo schools, licenses, activation codes, payments and
-                        teacher/school-admin accounts. Platform configuration is never deleted.
-                      </p>
-                      {resetResult && <p className="text-xs text-green-600 mt-1">{resetResult}</p>}
-                    </div>
-                    <Button variant="destructive" onClick={() => setPendingConfirm({
-                      title: 'Reset demo commercial data',
-                      message: 'RESET DEMO COMMERCIAL DATA\n\nDeletes demo schools, licenses, activation codes, payments and teacher/school-admin accounts. Platform configuration (platform admins, plans, payment settings) is kept.\n\nContinue?',
-                      destructive: true,
-                      confirmLabel: 'Reset',
-                      onConfirm: handleResetDemo,
-                    })} disabled={resetLoading}>
-                      <RefreshCw className="h-4 w-4 mr-1.5" />
-                      {resetLoading ? 'Resetting...' : 'RESET DEMO COMMERCIAL DATA'}
-                    </Button>
-                  </CardContent>
-                </Card>
+                <SurfaceCard className="flex flex-wrap items-center justify-between gap-3 border-destructive/40 px-5 py-4">
+                  <div className="min-w-0">
+                    <p className="font-medium text-[#102A43]">Reset demo commercial data</p>
+                    <p className="text-xs text-muted-foreground">
+                      Development only. Removes demo schools, licenses, activation codes, payments and
+                      teacher/school-admin accounts. Platform configuration is never deleted.
+                    </p>
+                    {resetResult && <p className="mt-1 text-xs text-green-600">{resetResult}</p>}
+                  </div>
+                  <Button variant="destructive" onClick={() => setPendingConfirm({
+                    title: 'Reset demo commercial data',
+                    message: 'RESET DEMO COMMERCIAL DATA\n\nDeletes demo schools, licenses, activation codes, payments and teacher/school-admin accounts. Platform configuration (platform admins, plans, payment settings) is kept.\n\nContinue?',
+                    destructive: true,
+                    confirmLabel: 'Reset',
+                    onConfirm: handleResetDemo,
+                  })} disabled={resetLoading}>
+                    <RefreshCw className="h-4 w-4 mr-1.5" />
+                    {resetLoading ? 'Resetting...' : 'RESET DEMO COMMERCIAL DATA'}
+                  </Button>
+                </SurfaceCard>
                 )}
               </div>
             )}
@@ -509,44 +488,74 @@ export default function PlatformAdminPage() {
             {/* Schools Tab */}
             {activeTab === 'schools' && (
               <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-lg font-semibold">Schools ({schools.length})</h2>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-semibold text-[#102A43]">Schools ({schools.length})</h2>
+                    <p className="text-sm text-muted-foreground">Registered schools and their license standing.</p>
+                  </div>
                   <Button onClick={() => setShowCreateSchool(true)}>Create School</Button>
                 </div>
-                {schools.map((s) => (
-                  <Card key={s.id}>
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="font-semibold">{s.name}</h3>
-                          <p className="text-sm text-muted-foreground">Code: {s.school_code} &bull; {s.teacher_count} teachers</p>
-                          {s.has_active_license ? (
-                            <p className="text-xs text-green-600">License expires: {s.license_expiry}</p>
-                          ) : (
-                            <p className="text-xs text-orange-600">No active license</p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <StatusPill tone={s.status === 'active' ? 'success' : s.status === 'suspended' ? 'danger' : 'neutral'}>
-                            {s.status}
-                          </StatusPill>
-                          <Button size="sm" variant="outline" onClick={() => viewSchool(s.id)}>
-                            <Eye className="h-4 w-4 mr-1.5" />
-                            View
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                {schools.length === 0 ? (
+                  <SurfaceCard className="px-6 py-10 text-center">
+                    <p className="font-medium text-[#102A43]">No schools yet</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Create the first school to start issuing licenses.
+                    </p>
+                  </SurfaceCard>
+                ) : (
+                <SurfaceCard className="overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50 hover:bg-muted/50">
+                        <TableHead>School</TableHead>
+                        <TableHead>Code</TableHead>
+                        <TableHead>Teachers</TableHead>
+                        <TableHead>License</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {schools.map((s) => (
+                        <TableRow key={s.id}>
+                          <TableCell className="font-medium">{s.name}</TableCell>
+                          <TableCell className="text-muted-foreground">{s.school_code}</TableCell>
+                          <TableCell>{s.teacher_count}</TableCell>
+                          <TableCell>
+                            {s.has_active_license ? (
+                              <span className="text-xs text-green-700">License expires: {s.license_expiry}</span>
+                            ) : (
+                              <span className="text-xs text-orange-600">No active license</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <StatusPill tone={s.status === 'active' ? 'success' : s.status === 'suspended' ? 'danger' : 'neutral'}>
+                              {s.status}
+                            </StatusPill>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button size="sm" variant="outline" onClick={() => viewSchool(s.id)}>
+                              <Eye className="h-4 w-4 mr-1.5" />
+                              View
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </SurfaceCard>
+                )}
               </div>
             )}
 
             {/* Licenses Tab */}
             {activeTab === 'licenses' && (
               <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-lg font-semibold">Licenses ({licenses.length})</h2>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-semibold text-[#102A43]">Licenses ({licenses.length})</h2>
+                    <p className="text-sm text-muted-foreground">School and teacher licenses, seats and activation codes.</p>
+                  </div>
                   <div className="flex gap-2">
                     <Button variant="outline" onClick={() => loadTabData('licenses')}>
                       <RefreshCw className="h-4 w-4 mr-1.5" />
@@ -555,14 +564,22 @@ export default function PlatformAdminPage() {
                     <Button onClick={() => setShowCreateLicense(true)}>Create License</Button>
                   </div>
                 </div>
+                {licenses.length === 0 && (
+                  <SurfaceCard className="px-6 py-10 text-center">
+                    <p className="font-medium text-[#102A43]">No licenses yet</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Create a license for a school or an individual teacher.
+                    </p>
+                  </SurfaceCard>
+                )}
                 {licenses.map((l) => {
                   const eff = l.effective_status || l.status
                   return (
-                  <Card key={l.id}>
-                    <CardContent className="p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="font-semibold">{l.school_name}</h3>
+                  <SurfaceCard key={l.id} className="px-5 py-4">
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h3 className="font-semibold text-[#102A43]">{l.school_name}</h3>
                           <p className="text-sm text-muted-foreground">Code: {l.license_code} &bull; Plan: {l.plan_name}</p>
                           <p className="text-xs text-muted-foreground">
                             Seats: {l.seats_used}/{l.seat_limit} used
@@ -574,7 +591,7 @@ export default function PlatformAdminPage() {
                               : 'Not yet claimed by a school \u2014 activation code not redeemed'}
                           </p>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                           <StatusPill tone={eff === 'active' ? 'success' : eff === 'expired' || eff === 'cancelled' ? 'danger' : eff === 'suspended' ? 'caution' : 'warning'} className="uppercase">
                             {eff}
                           </StatusPill>
@@ -635,8 +652,8 @@ export default function PlatformAdminPage() {
                           )}
                         </div>
                       )}
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </SurfaceCard>
                   )
                 })}
               </div>
@@ -645,187 +662,293 @@ export default function PlatformAdminPage() {
             {/* Plans Tab */}
             {activeTab === 'plans' && (
               <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-lg font-semibold">Product Plans ({plans.length})</h2>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-semibold text-[#102A43]">Product Plans ({plans.length})</h2>
+                    <p className="text-sm text-muted-foreground">Plans available for schools and individual teachers.</p>
+                  </div>
                   <Button onClick={() => setShowCreatePlan(true)}>Create Plan</Button>
                 </div>
-                {plans.map((p) => (
-                  <Card key={p.id}>
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="font-semibold">{p.name}</h3>
-                          <p className="text-sm text-muted-foreground">{p.description}</p>
-                          <p className="text-xs text-muted-foreground">Type: {p.product_type} &bull; Seats: {p.seat_limit} &bull; Duration: {p.duration_days || 'Unlimited'} days</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-lg font-bold">{formatCurrency(p.price)}</p>
-                          <span className={`text-xs ${p.active ? 'text-green-600' : 'text-red-600'}`}>
-                            {p.active ? 'Active' : 'Inactive'}
-                          </span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                {plans.length === 0 ? (
+                  <SurfaceCard className="px-6 py-10 text-center">
+                    <p className="font-medium text-[#102A43]">No product plans yet</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Create a plan before issuing licenses against it.
+                    </p>
+                  </SurfaceCard>
+                ) : (
+                <SurfaceCard className="overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50 hover:bg-muted/50">
+                        <TableHead>Plan</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Seats</TableHead>
+                        <TableHead>Duration</TableHead>
+                        <TableHead className="text-right">Price</TableHead>
+                        <TableHead className="text-right">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {plans.map((p) => (
+                        <TableRow key={p.id}>
+                          <TableCell>
+                            <p className="font-medium text-[#102A43]">{p.name}</p>
+                            <p className="text-xs text-muted-foreground">{p.description}</p>
+                          </TableCell>
+                          <TableCell className="capitalize text-muted-foreground">{p.product_type}</TableCell>
+                          <TableCell>{p.seat_limit}</TableCell>
+                          <TableCell className="text-muted-foreground">{p.duration_days || 'Unlimited'} days</TableCell>
+                          <TableCell className="text-right font-semibold">{formatCurrency(p.price)}</TableCell>
+                          <TableCell className="text-right">
+                            <StatusPill tone={p.active ? 'success' : 'danger'}>
+                              {p.active ? 'Active' : 'Inactive'}
+                            </StatusPill>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </SurfaceCard>
+                )}
               </div>
             )}
 
             {/* Payments Tab */}
             {activeTab === 'payments' && (
               <div className="space-y-4">
-                <h2 className="text-lg font-semibold">Payments ({payments.length})</h2>
-                {payments.map((p) => (
-                  <Card key={p.id}>
-                    <CardContent className="p-4 flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">{p.payer_name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {p.payment_method} &bull; {formatCurrency(p.amount)} &bull; {p.product_name}
-                        </p>
-                      </div>
-                      <div className="flex gap-2">
-                        <StatusPill tone={p.status === 'verified' ? 'success' : p.status === 'rejected' ? 'danger' : 'warning'}>
-                          {p.status}
-                        </StatusPill>
-                        {p.status === 'pending' && (
-                          <>
-                            <Button size="sm" onClick={() => setPendingConfirm({
-                              title: 'Verify payment',
-                              message: `Verify ${p.payment_method} payment of ${formatCurrency(p.amount)} from ${p.payer_name}?`,
-                              onConfirm: () => api.platformVerifyPayment(p.id).then(() => loadTabData('payments')).catch((err) => setError(err.message || 'Failed to verify')),
-                            })}>Verify</Button>
-                            <Button size="sm" variant="destructive" onClick={() => setPendingConfirm({
-                              title: 'Reject payment',
-                              message: `Reject payment from ${p.payer_name}?`,
-                              destructive: true,
-                              confirmLabel: 'Reject',
-                              onConfirm: () => api.platformRejectPayment(p.id, 'Rejected by admin').then(() => loadTabData('payments')).catch((err) => setError(err.message || 'Failed to reject')),
-                            })}>Reject</Button>
-                          </>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                <div>
+                  <h2 className="text-lg font-semibold text-[#102A43]">Payments ({payments.length})</h2>
+                  <p className="text-sm text-muted-foreground">Incoming payments awaiting or holding verification.</p>
+                </div>
+                {payments.length === 0 ? (
+                  <SurfaceCard className="px-6 py-10 text-center">
+                    <p className="font-medium text-[#102A43]">No payments yet</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Payments submitted by schools and teachers will appear here.
+                    </p>
+                  </SurfaceCard>
+                ) : (
+                <SurfaceCard className="overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50 hover:bg-muted/50">
+                        <TableHead>Payer</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {payments.map((p) => (
+                        <TableRow key={p.id}>
+                          <TableCell>
+                            <p className="font-medium text-[#102A43]">{p.payer_name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {p.payment_method} &bull; {p.product_name}
+                            </p>
+                          </TableCell>
+                          <TableCell className="text-right font-semibold">{formatCurrency(p.amount)}</TableCell>
+                          <TableCell>
+                            <StatusPill tone={p.status === 'verified' ? 'success' : p.status === 'rejected' ? 'danger' : 'warning'}>
+                              {p.status}
+                            </StatusPill>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {p.status === 'pending' && (
+                              <div className="flex justify-end gap-2">
+                                <Button size="sm" onClick={() => setPendingConfirm({
+                                  title: 'Verify payment',
+                                  message: `Verify ${p.payment_method} payment of ${formatCurrency(p.amount)} from ${p.payer_name}?`,
+                                  onConfirm: () => api.platformVerifyPayment(p.id).then(() => loadTabData('payments')).catch((err) => setError(err.message || 'Failed to verify')),
+                                })}>Verify</Button>
+                                <Button size="sm" variant="destructive" onClick={() => setPendingConfirm({
+                                  title: 'Reject payment',
+                                  message: `Reject payment from ${p.payer_name}?`,
+                                  destructive: true,
+                                  confirmLabel: 'Reject',
+                                  onConfirm: () => api.platformRejectPayment(p.id, 'Rejected by admin').then(() => loadTabData('payments')).catch((err) => setError(err.message || 'Failed to reject')),
+                                })}>Reject</Button>
+                              </div>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </SurfaceCard>
+                )}
               </div>
             )}
 
             {/* Activations Tab */}
             {activeTab === 'activations' && (
               <div className="space-y-4">
-                <h2 className="text-lg font-semibold">Activation Codes ({activations.length})</h2>
-                {activations.map((a) => (
-                  <Card key={a.id}>
-                    <CardContent className="p-4 flex items-center justify-between">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="font-mono font-semibold">{a.code}</p>
-                          <StatusPill tone={a.type === 'individual' ? 'accent' : 'info'}>
-                            {a.type === 'individual' ? 'Individual' : 'School'}
-                          </StatusPill>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          {a.type === 'individual' ? (a.teacher_email || 'Individual teacher') : (a.license_code || 'N/A')}
-                          &bull; {a.used_by_school || a.used_by_user_id || 'Not used'}
-                        </p>
-                      </div>
-                      <div className="flex gap-2">
-                        <StatusPill tone={a.status === 'active' ? 'success' : a.status === 'used' ? 'info' : 'danger'}>
-                          {a.status}
-                        </StatusPill>
-                        {a.status === 'active' && (
-                          <Button size="sm" variant="outline" onClick={() => setPendingConfirm({
-                            title: 'Revoke activation code',
-                            message: `Revoke activation code ${a.code}?`,
-                            destructive: true,
-                            confirmLabel: 'Revoke',
-                            onConfirm: () => api.revokeActivationCode(a.id).then(() => loadTabData('activations')).catch((err) => setError(err.message || 'Failed to revoke')),
-                          })}>Revoke</Button>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                <div>
+                  <h2 className="text-lg font-semibold text-[#102A43]">Activation Codes ({activations.length})</h2>
+                  <p className="text-sm text-muted-foreground">School and individual activation codes.</p>
+                </div>
+                {activations.length === 0 ? (
+                  <SurfaceCard className="px-6 py-10 text-center">
+                    <p className="font-medium text-[#102A43]">No activation codes yet</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Codes generated from a license will appear here.
+                    </p>
+                  </SurfaceCard>
+                ) : (
+                <SurfaceCard className="overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50 hover:bg-muted/50">
+                        <TableHead>Code</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Issued to</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {activations.map((a) => (
+                        <TableRow key={a.id}>
+                          <TableCell className="font-mono font-semibold">{a.code}</TableCell>
+                          <TableCell>
+                            <StatusPill tone={a.type === 'individual' ? 'accent' : 'info'}>
+                              {a.type === 'individual' ? 'Individual' : 'School'}
+                            </StatusPill>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {a.type === 'individual' ? (a.teacher_email || 'Individual teacher') : (a.license_code || 'N/A')}
+                            &bull; {a.used_by_school || a.used_by_user_id || 'Not used'}
+                          </TableCell>
+                          <TableCell>
+                            <StatusPill tone={a.status === 'active' ? 'success' : a.status === 'used' ? 'info' : 'danger'}>
+                              {a.status}
+                            </StatusPill>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {a.status === 'active' && (
+                              <Button size="sm" variant="outline" onClick={() => setPendingConfirm({
+                                title: 'Revoke activation code',
+                                message: `Revoke activation code ${a.code}?`,
+                                destructive: true,
+                                confirmLabel: 'Revoke',
+                                onConfirm: () => api.revokeActivationCode(a.id).then(() => loadTabData('activations')).catch((err) => setError(err.message || 'Failed to revoke')),
+                              })}>Revoke</Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </SurfaceCard>
+                )}
               </div>
             )}
 
             {/* Audit Tab */}
             {activeTab === 'audit' && (
               <div className="space-y-4">
-                <h2 className="text-lg font-semibold">Audit Log ({auditLogs.length})</h2>
-                {auditLogs.map((l) => (
-                  <Card key={l.id}>
-                    <CardContent className="p-3">
-                      <div className="flex items-center justify-between text-sm">
-                        <div>
-                          <span className="font-medium">{l.action}</span>
-                          <span className="text-muted-foreground ml-2">{l.target_type} {l.target_id ? `#${l.target_id.slice(0, 8)}` : ''}</span>
-                        </div>
-                        <span className="text-muted-foreground">{l.timestamp ? new Date(l.timestamp).toLocaleString() : ''}</span>
+                <div>
+                  <h2 className="text-lg font-semibold text-[#102A43]">Audit Log ({auditLogs.length})</h2>
+                  <p className="text-sm text-muted-foreground">Most recent platform actions, newest first.</p>
+                </div>
+                {auditLogs.length === 0 ? (
+                  <SurfaceCard className="px-6 py-10 text-center">
+                    <p className="font-medium text-[#102A43]">No audit entries yet</p>
+                  </SurfaceCard>
+                ) : (
+                <SurfaceCard className="divide-y divide-[#102A43]/8 px-5 py-1">
+                  {auditLogs.map((l) => (
+                    <div key={l.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm">
+                      <div className="min-w-0">
+                        <span className="font-medium text-[#102A43]">{l.action}</span>
+                        <span className="ml-2 text-muted-foreground">{l.target_type} {l.target_id ? `#${l.target_id.slice(0, 8)}` : ''}</span>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      <span className="text-muted-foreground">{l.timestamp ? new Date(l.timestamp).toLocaleString() : ''}</span>
+                    </div>
+                  ))}
+                </SurfaceCard>
+                )}
               </div>
             )}
 
             {/* Accounts Tab — platform-wide user list + password reset */}
             {activeTab === 'accounts' && (
               <div className="space-y-4">
-                <h2 className="text-lg font-semibold">Platform Accounts ({accounts.length})</h2>
-                <p className="text-sm text-muted-foreground">
-                  Initiate a one-time password reset for any account. The reset
-                  token is shown once — deliver it to the user out-of-band.
-                </p>
-                {accounts.map((u) => (
-                  <Card key={u.id}>
-                    <CardContent className="p-3">
-                      <div className="flex items-center justify-between text-sm flex-wrap gap-2">
-                        <div>
-                          <span className="font-medium">{u.full_name}</span>
-                          <span className="text-muted-foreground ml-2">&lt;{u.email}&gt;</span>
-                          <StatusPill tone="neutral" className="ml-2">
-                            {u.role}
-                          </StatusPill>
-                          {!u.is_active && (
-                            <StatusPill tone="danger" className="ml-2">
-                              disabled
+                <div>
+                  <h2 className="text-lg font-semibold text-[#102A43]">Platform Accounts ({accounts.length})</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Initiate a one-time password reset for any account. The reset
+                    token is shown once — deliver it to the user out-of-band.
+                  </p>
+                </div>
+                {accounts.length === 0 ? (
+                  <SurfaceCard className="px-6 py-10 text-center">
+                    <p className="font-medium text-[#102A43]">No accounts yet</p>
+                  </SurfaceCard>
+                ) : (
+                <SurfaceCard className="overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50 hover:bg-muted/50">
+                        <TableHead>Account</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {accounts.map((u) => (
+                        <TableRow key={u.id}>
+                          <TableCell>
+                            <span className="font-medium text-[#102A43]">{u.full_name}</span>
+                            <span className="ml-2 text-muted-foreground">&lt;{u.email}&gt;</span>
+                            <StatusPill tone="neutral" className="ml-2">
+                              {u.role}
                             </StatusPill>
-                          )}
-                        </div>
-                        {u.id !== user?.id && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={resetLoadingId === u.id || !u.is_active}
-                            onClick={() => setPendingConfirm({
-                              title: 'Initiate password reset',
-                              message: `You are about to initiate a password reset for ${u.full_name} (${u.email}).\n\nA one-time reset token will be generated. Continue?`,
-                              onConfirm: () => handleInitiateReset(u.id, u.full_name, u.email),
-                            })}
-                          >
-                            {resetLoadingId === u.id ? (
-                              'Working...'
-                            ) : (
-                              <>
-                                <KeyRound className="h-4 w-4 mr-1" />
-                                Initiate Password Reset
-                              </>
+                            {!u.is_active && (
+                              <StatusPill tone="danger" className="ml-2">
+                                disabled
+                              </StatusPill>
                             )}
-                          </Button>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {u.id !== user?.id && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={resetLoadingId === u.id || !u.is_active}
+                                onClick={() => setPendingConfirm({
+                                  title: 'Initiate password reset',
+                                  message: `You are about to initiate a password reset for ${u.full_name} (${u.email}).\n\nA one-time reset token will be generated. Continue?`,
+                                  onConfirm: () => handleInitiateReset(u.id, u.full_name, u.email),
+                                })}
+                              >
+                                {resetLoadingId === u.id ? (
+                                  'Working...'
+                                ) : (
+                                  <>
+                                    <KeyRound className="h-4 w-4 mr-1" />
+                                    Initiate Password Reset
+                                  </>
+                                )}
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </SurfaceCard>
+                )}
               </div>
             )}
 
             {/* Settings Tab */}
             {activeTab === 'settings' && (
               <div className="space-y-6 max-w-2xl">
-                <h2 className="text-lg font-semibold">Platform Settings</h2>
+                <div>
+                  <h2 className="text-lg font-semibold text-[#102A43]">Platform Settings</h2>
+                  <p className="text-sm text-muted-foreground">Your admin credentials and site-wide maintenance.</p>
+                </div>
                 <ChangePasswordCard />
                 <MaintenanceControl />
               </div>
@@ -1104,15 +1227,13 @@ function MaintenanceControl() {
   if (loading) return <div className="text-sm text-muted-foreground">Loading...</div>
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Maintenance Mode</CardTitle>
-        <CardDescription>Toggle maintenance mode to show a global notification to all users.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-center justify-between">
+    <SurfaceCard data-maintenance className="px-5 py-5 sm:px-6">
+      <h3 className="text-base font-semibold text-[#102A43]">Maintenance Mode</h3>
+      <p className="text-sm text-muted-foreground">Toggle maintenance mode to show a global notification to all users.</p>
+      <div className="mt-4 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="font-medium">{enabled ? 'Maintenance Mode: ON' : 'Maintenance Mode: OFF'}</p>
+            <p className="font-medium text-[#102A43]">{enabled ? 'Maintenance Mode: ON' : 'Maintenance Mode: OFF'}</p>
             <p className="text-sm text-muted-foreground">
               {enabled ? 'All users see the maintenance banner.' : 'Normal operation.'}
             </p>
@@ -1125,30 +1246,30 @@ function MaintenanceControl() {
             {saving ? 'Saving...' : enabled ? 'Disable Maintenance' : 'Enable Maintenance'}
           </Button>
         </div>
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Maintenance Message</label>
+        <Field label="Maintenance Message" htmlFor="maintenance-message">
           <Input
+            id="maintenance-message"
             type="text"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder="SchemeKnit is currently undergoing maintenance. We'll be back shortly."
             className="text-sm"
           />
-        </div>
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Estimated Restoration Time</label>
+        </Field>
+        <Field label="Estimated Restoration Time" htmlFor="maintenance-restore">
           <Input
+            id="maintenance-restore"
             type="text"
             value={estimatedRestore}
             onChange={(e) => setEstimatedRestore(e.target.value)}
             placeholder="e.g. 2 hours, 30 minutes"
             className="text-sm"
           />
-        </div>
+        </Field>
         <Button variant="outline" onClick={handleSave} disabled={saving}>
           Save Settings
         </Button>
-      </CardContent>
-    </Card>
+      </div>
+    </SurfaceCard>
   )
 }

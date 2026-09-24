@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { SurfaceCard } from '@/components/ui/surface-card'
 import { StatusPill } from '@/components/ui/badge'
-import { Key, AlertTriangle, CheckCircle } from 'lucide-react'
-import { api } from '@/lib/api'
 import { PageHeader } from '@/components/ui/page-header'
+import { AlertTriangle, CheckCircle } from 'lucide-react'
+import { api } from '@/lib/api'
 
 export default function SchoolLicensePage() {
   const [data, setData] = useState<any>(null)
@@ -39,81 +39,76 @@ export default function SchoolLicensePage() {
 
   if (error) {
     return (
-      <Card>
-        <CardContent className="p-8 text-center">
-          <p className="text-destructive mb-4">{error}</p>
-          <Button onClick={load}>Try Again</Button>
-        </CardContent>
-      </Card>
+      <SurfaceCard className="p-8 text-center">
+        <p className="mb-4 text-destructive">{error}</p>
+        <Button onClick={load}>Try Again</Button>
+      </SurfaceCard>
     )
   }
 
   const lic = data?.license
   const active = lic?.status === 'active'
 
+  const detailRow = (label: string, value: ReactNode) => (
+    <div className="flex items-center justify-between border-b border-[#102A43]/8 py-2.5 last:border-b-0">
+      <span className="text-sm text-muted-foreground">{label}</span>
+      <span className="text-sm font-medium text-[#102A43]">{value}</span>
+    </div>
+  )
+
   return (
     <div className="max-w-2xl space-y-4">
       <PageHeader
-        title={
-          <span className="flex items-center gap-2">
-            <Key className="h-6 w-6" aria-hidden="true" />
-            License &amp; Entitlement
-          </span>
-        }
+        eyebrow="School admin"
+        title="License and entitlement"
+        description="Plan, teacher seats and activation status for this school."
       />
 
       {!lic ? (
-        <Card className="border-orange-300 bg-orange-50">
-          <CardContent className="p-6 text-center">
-            <AlertTriangle className="h-10 w-10 text-orange-600 mx-auto mb-3" />
-            <p className="font-medium mb-1">No license found</p>
-            <p className="text-sm text-muted-foreground">
-              This school has no license on record. Contact SchemeKnit to activate
-              your subscription. Existing school data is preserved.
-            </p>
-          </CardContent>
-        </Card>
+        <SurfaceCard accent="bg-amber-400" className="px-6 py-8 text-center">
+          <AlertTriangle className="mx-auto mb-3 h-10 w-10 text-amber-600" aria-hidden="true" />
+          <p className="mb-1 font-medium text-[#102A43]">No license found</p>
+          <p className="text-sm text-muted-foreground">
+            This school has no license on record. Contact SchemeKnit to activate
+            your subscription. Existing school data is preserved.
+          </p>
+        </SurfaceCard>
       ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              {active
-                ? <CheckCircle className="h-5 w-5 text-green-600" />
-                : <AlertTriangle className="h-5 w-5 text-orange-600" />}
-              {lic.plan || 'School License'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            <div className="flex justify-between border-b py-2">
-              <span className="text-muted-foreground">Status</span>
-              <StatusPill tone={active ? 'success' : 'caution'}>
-                {lic.status}
-              </StatusPill>
-            </div>
-            <div className="flex justify-between border-b py-2">
-              <span className="text-muted-foreground">Teacher seats</span>
-              <span className="font-medium">{data?.seats?.used ?? 0} of {lic.seat_limit ?? 0} used</span>
-            </div>
-            <div className="flex justify-between border-b py-2">
-              <span className="text-muted-foreground">Start date</span>
-              <span className="font-medium">{lic.start_date || '—'}</span>
-            </div>
-            <div className="flex justify-between border-b py-2">
-              <span className="text-muted-foreground">Expiry date</span>
-              <span className="font-medium">{lic.expiry_date || '—'}</span>
-            </div>
-            {!active && (
-              <p className="text-sm text-orange-700 bg-orange-50 border border-orange-200 rounded p-3">
-                This license is {lic.status}. Teacher lesson planning and new teacher
-                accounts are restricted until renewal. All school and teacher data is preserved.
-              </p>
+        <SurfaceCard
+          data-license-card
+          accent={active ? 'bg-gradient-to-r from-[#102A43] to-[#04A9CE]' : 'bg-amber-400'}
+          className="px-5 py-5 sm:px-6"
+        >
+          <div className="flex items-center gap-2">
+            {active ? (
+              <CheckCircle className="h-5 w-5 text-green-600" aria-hidden="true" />
+            ) : (
+              <AlertTriangle className="h-5 w-5 text-amber-600" aria-hidden="true" />
             )}
-            <p className="text-xs text-muted-foreground">
-              Only active teachers consume seats. Plan changes and renewals are handled
-              by SchemeKnit — contact support.
+            <h2 className="text-lg font-semibold text-[#102A43]">{lic.plan || 'School License'}</h2>
+          </div>
+
+          <div className="mt-3">
+            {detailRow('Status', (
+              <StatusPill tone={active ? 'success' : 'caution'}>{lic.status}</StatusPill>
+            ))}
+            {detailRow('Teacher seats', `${data?.seats?.used ?? 0} of ${lic.seat_limit ?? 0} used`)}
+            {detailRow('Start date', lic.start_date || '—')}
+            {detailRow('Expiry date', lic.expiry_date || '—')}
+          </div>
+
+          {!active && (
+            <p className="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              This license is {lic.status}. Teacher lesson planning and new teacher
+              accounts are restricted until renewal. All school and teacher data is preserved.
             </p>
-          </CardContent>
-        </Card>
+          )}
+
+          <p className="mt-4 text-xs text-muted-foreground">
+            Only active teachers consume seats. Plan changes and renewals are handled
+            by SchemeKnit — contact support.
+          </p>
+        </SurfaceCard>
       )}
     </div>
   )
