@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { PasswordInput, PasswordMatchIndicator, passwordMatchStatus } from '@/components/password-input'
 import { SchemeKnitMark } from '@/components/scheme-knit-mark'
 import { AuthShell, BrandCapsule } from '@/components/auth/auth-shell'
+import { GridSignal } from '@/components/auth/grid-signal'
 import { AuthField, AuthError } from '@/components/auth/auth-field'
 import { validateEmail, validatePassword, PASSWORD_POLICY } from '@/lib/password-policy'
 import { api } from '@/lib/api'
@@ -105,15 +106,18 @@ export default function SetupPlatformAdminPage() {
   if (!bootstrapRequired) {
     return (
       <div className="relative min-h-screen overflow-hidden bg-[#050E18] text-white">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0"
-          style={{
-            backgroundImage:
-              'linear-gradient(rgba(62,90,120,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(62,90,120,0.15) 1px, transparent 1px)',
-            backgroundSize: '64px 64px',
-          }}
-        />
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+          <div className="absolute inset-0 bg-[#050E18]" />
+          <GridSignal variant="platform" />
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage:
+                'linear-gradient(rgba(62,90,120,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(62,90,120,0.15) 1px, transparent 1px)',
+              backgroundSize: '64px 64px',
+            }}
+          />
+        </div>
         <div className="relative z-10 flex min-h-screen items-center justify-center px-4">
           <div className="w-full max-w-md" style={{ perspective: '1000px' }}>
             <div className="mb-6">
@@ -149,15 +153,18 @@ export default function SetupPlatformAdminPage() {
   if (success) {
     return (
       <div className="relative min-h-screen overflow-hidden bg-[#050E18] text-white">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0"
-          style={{
-            backgroundImage:
-              'linear-gradient(rgba(62,90,120,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(62,90,120,0.15) 1px, transparent 1px)',
-            backgroundSize: '64px 64px',
-          }}
-        />
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+          <div className="absolute inset-0 bg-[#050E18]" />
+          <GridSignal variant="platform" />
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage:
+                'linear-gradient(rgba(62,90,120,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(62,90,120,0.15) 1px, transparent 1px)',
+              backgroundSize: '64px 64px',
+            }}
+          />
+        </div>
         <div className="relative z-10 flex min-h-screen items-center justify-center px-4">
           <div className="w-full max-w-md">
             <div className="mb-6">
@@ -189,14 +196,7 @@ export default function SetupPlatformAdminPage() {
       decorOverride={
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
           <div className="absolute inset-0 bg-[#050E18]" />
-          <svg className="absolute inset-0 h-full w-full opacity-[0.14]" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <pattern id="bootstrap-v" width="64" height="64" patternUnits="userSpaceOnUse">
-                <path d="M64 0H0V64" fill="none" stroke="#3E5A78" strokeWidth="0.5" />
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#bootstrap-v)" />
-          </svg>
+          <GridSignal variant="platform" />
           <div className="absolute inset-x-0 top-[28%] h-px bg-gradient-to-r from-transparent via-[#04A9CE]/40 to-transparent" />
           <div className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 lg:block" style={{ perspective: '800px' }}>
             <svg width="220" height="220" viewBox="0 0 220 220" fill="none" style={{ transform: 'rotateX(20deg) rotateY(-8deg)' }}>
@@ -211,9 +211,9 @@ export default function SetupPlatformAdminPage() {
               ))}
             </svg>
           </div>
-          <div className="absolute left-8 top-8 hidden flex-col gap-2 lg:flex">
+          <div className="absolute bottom-28 left-8 hidden flex-col gap-2 lg:flex">
             {['BOOTSTRAP', 'ONE-TIME', 'PROTECTED'].map((t) => (
-              <div key={t} className="flex items-center gap-2 text-[10px] font-bold tracking-[0.2em] text-slate-500">
+              <div key={t} className="flex items-center gap-2 text-[10px] font-bold tracking-[0.2em] text-slate-400">
                 <span className="h-1.5 w-1.5 rounded-full bg-[#04A9CE]/70" />
                 {t}
               </div>

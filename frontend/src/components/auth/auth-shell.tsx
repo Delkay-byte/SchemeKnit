@@ -8,11 +8,12 @@ import { RoleBadge } from '@/components/auth/auth-field'
 import { GridSignal } from '@/components/auth/grid-signal'
 
 /**
- * Role-specific authentication shells (V2 remediation).
+ * Role-specific authentication shells (V2 remediation + V3 onboarding grid).
  *
- * Mesh backgrounds are landing-only. Every auth / activation surface gets its
- * own composition, visual metaphor and depth treatment — shared typography,
- * form controls, buttons and logo treatment only.
+ * Mesh backgrounds are landing-only. Every auth / activation surface gets a
+ * dark technical grid + multi-signal network, its own composition, visual
+ * metaphor and depth treatment — shared typography, form controls, buttons
+ * and logo treatment only.
  *
  * Role is cosmetic only — backend role checks remain authoritative.
  */
@@ -80,16 +81,14 @@ export function BrandCapsule({
 }
 
 /* ------------------------------------------------------------------ */
-/* Decorative systems — unique per purpose                            */
+/* Decorative systems — unique per purpose, shared grid language      */
 /* ------------------------------------------------------------------ */
 
 function TeacherWorkspaceDecor() {
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-      {/* Deep navy workspace wash + live system grid */}
       <div className="absolute inset-0 bg-[linear-gradient(165deg,#071826_0%,#0B1F3A_58%,#0A1B33_100%)]" />
       <GridSignal variant="teacher" />
-      {/* Subtle depth vignette */}
       <div
         className="absolute inset-0"
         style={{
@@ -97,41 +96,39 @@ function TeacherWorkspaceDecor() {
             'radial-gradient(1200px 700px at 50% 40%, transparent 40%, rgba(4,12,22,0.45) 100%)',
         }}
       />
-      {/* Layered lesson-plan cards (3D stack) — supporting decor on dark field */}
       <div className="absolute right-[8%] top-[18%] hidden w-64 lg:block" style={{ perspective: '800px' }}>
         <div
-          className="rounded-2xl border border-white/12 bg-white/96 p-5 shadow-[0_20px_50px_rgba(0,0,0,0.35)]"
+          className="rounded-2xl border border-white/15 bg-white/96 p-5 shadow-[0_20px_50px_rgba(0,0,0,0.35)]"
           style={{ transform: 'rotateY(-8deg) rotateX(4deg) translateZ(0)' }}
         >
           <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#04A9CE]">Scheme of Learning</p>
           <p className="mt-2 text-sm font-semibold text-[#102A43]">Week 4 · Fractions</p>
           <div className="mt-3 space-y-1.5">
             {['Indicator 3.1', 'Teaching period 2', 'JHS · Term 2'].map((t) => (
-              <div key={t} className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#04A9CE]/60" />
+              <div key={t} className="flex items-center gap-2 text-xs text-[#3D5A75]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#04A9CE]/70" />
                 {t}
               </div>
             ))}
           </div>
-          <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-[#102A43]/8">
+          <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-[#102A43]/10">
             <div className="h-full w-2/3 rounded-full bg-gradient-to-r from-[#04A9CE] to-[#7EDCF0]" />
           </div>
         </div>
         <div
-          className="absolute -right-4 -top-4 -z-10 h-full w-full rounded-2xl border border-white/10 bg-white/25 shadow-lg"
+          className="absolute -right-4 -top-4 -z-10 h-full w-full rounded-2xl border border-white/12 bg-white/25 shadow-lg"
           style={{ transform: 'rotateY(-8deg) rotateX(4deg) translateZ(-24px)' }}
         />
         <div
-          className="absolute -right-8 -top-8 -z-20 h-full w-full rounded-2xl border border-white/8 bg-white/10"
+          className="absolute -right-8 -top-8 -z-20 h-full w-full rounded-2xl border border-white/10 bg-white/10"
           style={{ transform: 'rotateY(-8deg) rotateX(4deg) translateZ(-48px)' }}
         />
       </div>
-      {/* Notebook tabs */}
       <div className="absolute left-0 top-1/4 hidden flex-col gap-3 xl:flex">
         {['Scheme', 'Lesson', 'Teach'].map((t, i) => (
           <div
             key={t}
-            className="rounded-r-lg border border-l-0 border-white/12 bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-white/75 shadow-sm backdrop-blur-sm"
+            className="rounded-r-lg border border-l-0 border-white/20 bg-white/15 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm backdrop-blur-sm"
             style={{ transform: `translateX(${i * 6}px)` }}
           >
             {t}
@@ -147,14 +144,13 @@ function TeacherWorkspaceDecor() {
 function RegisterOnboardingDecor() {
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-      <div className="absolute inset-0 bg-[linear-gradient(135deg,#FFFFFF_0%,#F8FBFD_55%,#F0F9FC_100%)]" />
-      <div className="absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-[#04A9CE]/12 via-[#04A9CE]/5 to-transparent" />
-      {/* Floating curriculum chips (side only — steps live in AuthShell) */}
+      <div className="absolute inset-0 bg-[linear-gradient(135deg,#071826_0%,#0A1F35_55%,#0C2340_100%)]" />
+      <GridSignal variant="register" />
       <div className="absolute right-10 top-1/3 hidden w-52 space-y-2.5 xl:block" style={{ perspective: '600px' }}>
         {['Upload scheme', 'Map indicators', 'Generate lesson'].map((t, i) => (
           <div
             key={t}
-            className="rounded-xl border border-[#102A43]/10 bg-white/95 px-4 py-2.5 text-xs font-medium text-[#102A43] shadow-md backdrop-blur"
+            className="rounded-xl border border-white/15 bg-white/95 px-4 py-2.5 text-xs font-medium text-[#102A43] shadow-md"
             style={{
               transform: `rotateY(${-6 + i * 3}deg) translateX(${i * 8}px)`,
               marginLeft: i * 8,
@@ -167,17 +163,16 @@ function RegisterOnboardingDecor() {
           </div>
         ))}
       </div>
-      {/* Bottom-left soft paper stack */}
       <div className="absolute -left-16 bottom-12 hidden w-56 lg:block" style={{ perspective: '600px' }}>
         <div
-          className="rounded-2xl border border-[#102A43]/10 bg-white/90 p-4 shadow-lg"
+          className="rounded-2xl border border-white/15 bg-white/92 p-4 shadow-lg"
           style={{ transform: 'rotateY(10deg) rotateX(-4deg)' }}
         >
           <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#04A9CE]">Workspace ready</p>
-          <p className="mt-1.5 text-xs text-muted-foreground">Your lesson-planning desk opens after signup.</p>
+          <p className="mt-1.5 text-xs text-[#3D5A75]">Your lesson-planning desk opens after signup.</p>
         </div>
       </div>
-      <div className="absolute -left-24 bottom-0 h-72 w-72 rounded-full bg-[#102A43]/5 blur-3xl" />
+      <div className="absolute -left-24 bottom-0 h-72 w-72 rounded-full bg-[#04A9CE]/10 blur-3xl" />
     </div>
   )
 }
@@ -185,8 +180,9 @@ function RegisterOnboardingDecor() {
 function SchoolInstitutionDecor() {
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-      {/* Architectural blueprint grid */}
-      <svg className="absolute inset-0 h-full w-full" style={{ opacity: 0.1 }} xmlns="http://www.w3.org/2000/svg">
+      <div className="absolute inset-0 bg-[linear-gradient(160deg,#0A2240_0%,#0B1F3A_60%,#081C36_100%)]" />
+      <GridSignal variant="school_activate" />
+      <svg className="absolute inset-0 h-full w-full" style={{ opacity: 0.12 }} xmlns="http://www.w3.org/2000/svg">
         <defs>
           <pattern id="school-bp" width="56" height="56" patternUnits="userSpaceOnUse">
             <path d="M56 0H0V56" fill="none" stroke="#7EDCF0" strokeWidth="0.5" />
@@ -195,30 +191,28 @@ function SchoolInstitutionDecor() {
         </defs>
         <rect width="100%" height="100%" fill="url(#school-bp)" />
       </svg>
-      {/* Isometric building — left of card on wide screens */}
       <div className="absolute left-[6%] top-1/2 hidden -translate-y-1/2 xl:block" style={{ perspective: '700px' }}>
         <svg width="180" height="140" viewBox="0 0 180 140" fill="none" style={{ transform: 'rotateX(18deg) rotateY(-12deg)' }}>
-          <rect x="30" y="45" width="120" height="80" rx="4" stroke="#102A43" strokeOpacity="0.35" strokeWidth="1.5" fill="rgba(255,255,255,0.5)" />
-          <path d="M30 45 L90 12 L150 45" stroke="#102A43" strokeOpacity="0.4" strokeWidth="1.5" fill="rgba(255,255,255,0.3)" />
-          <rect x="50" y="68" width="24" height="30" rx="2" stroke="#102A43" strokeOpacity="0.3" strokeWidth="1.2" fill="none" />
-          <rect x="106" y="68" width="24" height="30" rx="2" stroke="#102A43" strokeOpacity="0.3" strokeWidth="1.2" fill="none" />
-          <rect x="78" y="82" width="24" height="43" rx="2" stroke="#04A9CE" strokeOpacity="0.7" strokeWidth="1.5" fill="rgba(4,169,206,0.08)" />
-          <circle cx="90" cy="36" r="6" fill="#04A9CE" fillOpacity="0.35" />
+          <rect x="30" y="45" width="120" height="80" rx="4" stroke="#7EDCF0" strokeOpacity="0.45" strokeWidth="1.5" fill="rgba(255,255,255,0.06)" />
+          <path d="M30 45 L90 12 L150 45" stroke="#7EDCF0" strokeOpacity="0.5" strokeWidth="1.5" fill="rgba(255,255,255,0.05)" />
+          <rect x="50" y="68" width="24" height="30" rx="2" stroke="#7EDCF0" strokeOpacity="0.4" strokeWidth="1.2" fill="none" />
+          <rect x="106" y="68" width="24" height="30" rx="2" stroke="#7EDCF0" strokeOpacity="0.4" strokeWidth="1.2" fill="none" />
+          <rect x="78" y="82" width="24" height="43" rx="2" stroke="#34D399" strokeOpacity="0.75" strokeWidth="1.5" fill="rgba(52,211,153,0.1)" />
+          <circle cx="90" cy="36" r="6" fill="#34D399" fillOpacity="0.4" />
         </svg>
       </div>
-      {/* Setup step rail — right edge */}
       <div className="absolute right-8 top-1/2 hidden -translate-y-1/2 flex-col items-end gap-5 lg:flex">
         {['Code', 'License', 'Admin', 'Live'].map((t, i) => (
           <div key={t} className="flex items-center gap-3">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-[#102A43]/50">{t}</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-white/80">{t}</span>
             <span
-              className={`h-2.5 w-2.5 rounded-full ${i === 0 ? 'bg-[#04A9CE] shadow-[0_0_0_4px_rgba(4,169,206,0.2)]' : 'bg-[#102A43]/20'}`}
+              className={`h-2.5 w-2.5 rounded-full ${i === 0 ? 'bg-[#34D399] shadow-[0_0_0_4px_rgba(52,211,153,0.22)]' : 'bg-white/35'}`}
             />
           </div>
         ))}
       </div>
-      <div className="absolute -right-16 bottom-8 h-56 w-56 rounded-full bg-[#04A9CE]/8 blur-3xl" />
-      <div className="absolute left-10 top-20 h-48 w-48 rounded-full bg-[#102A43]/5 blur-3xl" />
+      <div className="absolute -right-16 bottom-8 h-56 w-56 rounded-full bg-[#34D399]/10 blur-3xl" />
+      <div className="absolute left-10 top-20 h-48 w-48 rounded-full bg-[#04A9CE]/10 blur-3xl" />
     </div>
   )
 }
@@ -227,22 +221,9 @@ function PlatformOpsDecor({ mode }: { mode: 'login' | 'bootstrap' }) {
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
       <div className="absolute inset-0 bg-[#050E18]" />
-      {/* Structured ops grid with restrained signal (login mode only) */}
-      {mode === 'login' && <GridSignal variant="platform" />}
-      {mode !== 'login' && (
-        <svg className="absolute inset-0 h-full w-full opacity-[0.14]" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <pattern id="ops-v" width="64" height="64" patternUnits="userSpaceOnUse">
-              <path d="M64 0H0V64" fill="none" stroke="#3E5A78" strokeWidth="0.5" />
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#ops-v)" />
-        </svg>
-      )}
-      {/* Scanning horizon line */}
+      <GridSignal variant="platform" />
       <div className="absolute inset-x-0 top-[28%] h-px bg-gradient-to-r from-transparent via-[#04A9CE]/40 to-transparent" />
       <div className="absolute inset-x-0 top-[28%] h-24 bg-gradient-to-b from-[#04A9CE]/6 to-transparent" />
-      {/* Control geometry */}
       <div className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 lg:block" style={{ perspective: '800px' }}>
         <svg width="220" height="220" viewBox="0 0 220 220" fill="none" style={{ transform: 'rotateX(20deg) rotateY(-8deg)' }}>
           <rect x="30" y="30" width="160" height="160" rx="24" stroke="#3E5A78" strokeOpacity="0.5" strokeWidth="1.5" fill="rgba(255,255,255,0.02)" />
@@ -255,7 +236,6 @@ function PlatformOpsDecor({ mode }: { mode: 'login' | 'bootstrap' }) {
             </>
           ) : (
             <>
-              {/* Bootstrap checklist */}
               {[0, 1, 2, 3].map((i) => (
                 <g key={i}>
                   <rect x="82" y={88 + i * 20} width="14" height="14" rx="3" stroke={i === 0 ? '#04A9CE' : '#3E5A78'} strokeWidth="1.5" fill={i === 0 ? 'rgba(4,169,206,0.2)' : 'none'} />
@@ -267,10 +247,12 @@ function PlatformOpsDecor({ mode }: { mode: 'login' | 'bootstrap' }) {
           )}
         </svg>
       </div>
-      {/* Status ticks */}
-      <div className="absolute left-8 top-8 hidden flex-col gap-2 lg:flex">
-        {['ENCRYPTED', 'RESTRICTED', 'AUDITED'].map((t) => (
-          <div key={t} className="flex items-center gap-2 text-[10px] font-bold tracking-[0.2em] text-slate-500">
+      <div className="absolute bottom-28 left-8 hidden flex-col gap-2 lg:flex">
+        {(mode === 'login'
+          ? ['ENCRYPTED', 'RESTRICTED', 'AUDITED']
+          : ['BOOTSTRAP', 'ONE-TIME', 'PROTECTED']
+        ).map((t) => (
+          <div key={t} className="flex items-center gap-2 text-[10px] font-bold tracking-[0.2em] text-slate-400">
             <span className="h-1.5 w-1.5 rounded-full bg-[#04A9CE]/70" />
             {t}
           </div>
@@ -284,21 +266,20 @@ function PlatformOpsDecor({ mode }: { mode: 'login' | 'bootstrap' }) {
 function LicenseUnlockDecor() {
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-      <div className="absolute inset-0 bg-[linear-gradient(160deg,#FAFAF7_0%,#F5F4EF_50%,#F0EDE6_100%)]" />
-      {/* Soft topography lines */}
-      <svg className="absolute inset-0 h-full w-full opacity-[0.06]" xmlns="http://www.w3.org/2000/svg">
+      <div className="absolute inset-0 bg-[linear-gradient(160deg,#0E1C2E_0%,#0C1A2C_50%,#0A1628_100%)]" />
+      <GridSignal variant="teacher_license" />
+      <svg className="absolute inset-0 h-full w-full" style={{ opacity: 0.1 }} xmlns="http://www.w3.org/2000/svg">
         <defs>
           <pattern id="lic-topo" width="80" height="80" patternUnits="userSpaceOnUse">
-            <path d="M0 40 Q40 20 80 40" fill="none" stroke="#102A43" strokeWidth="1" />
-            <path d="M0 60 Q40 40 80 60" fill="none" stroke="#102A43" strokeWidth="1" />
+            <path d="M0 40 Q40 20 80 40" fill="none" stroke="#7EDCF0" strokeWidth="1" />
+            <path d="M0 60 Q40 40 80 60" fill="none" stroke="#7EDCF0" strokeWidth="1" />
           </pattern>
         </defs>
         <rect width="100%" height="100%" fill="url(#lic-topo)" />
       </svg>
-      {/* License card (3D tilted) */}
       <div className="absolute right-[10%] top-[20%] hidden w-72 lg:block" style={{ perspective: '700px' }}>
         <div
-          className="rounded-3xl border border-amber-200/80 bg-gradient-to-br from-white via-[#FFFDF8] to-[#FFF8EC] p-6 shadow-[0_28px_60px_rgba(16,42,67,0.14)]"
+          className="rounded-3xl border border-amber-200/80 bg-gradient-to-br from-white via-[#FFFDF8] to-[#FFF8EC] p-6 shadow-[0_28px_60px_rgba(0,0,0,0.4)]"
           style={{ transform: 'rotateY(-14deg) rotateX(8deg) rotateZ(-2deg)' }}
         >
           <div className="flex items-start justify-between">
@@ -316,7 +297,7 @@ function LicenseUnlockDecor() {
           <div className="mt-5 space-y-2">
             {[['Status', 'Awaiting activation'], ['Tier', 'Free → Pro'], ['Seats', 'Included']].map(([k, v]) => (
               <div key={k} className="flex justify-between text-xs">
-                <span className="text-muted-foreground">{k}</span>
+                <span className="text-[#3D5A75]">{k}</span>
                 <span className="font-semibold text-[#102A43]">{v}</span>
               </div>
             ))}
@@ -325,14 +306,13 @@ function LicenseUnlockDecor() {
             <div className="h-full w-1/3 rounded-full bg-gradient-to-r from-amber-400 to-[#04A9CE]" />
           </div>
         </div>
-        {/* Depth shadow layers */}
         <div
-          className="absolute -right-5 -top-5 -z-10 h-full w-full rounded-3xl border border-amber-100 bg-white/50 shadow-lg"
+          className="absolute -right-5 -top-5 -z-10 h-full w-full rounded-3xl border border-white/12 bg-white/10 shadow-lg"
           style={{ transform: 'rotateY(-14deg) rotateX(8deg) translateZ(-30px)' }}
         />
       </div>
-      <div className="absolute -left-20 top-1/3 h-64 w-64 rounded-full bg-amber-400/8 blur-3xl" />
-      <div className="absolute right-1/4 bottom-16 h-48 w-48 rounded-full bg-[#04A9CE]/8 blur-3xl" />
+      <div className="absolute -left-20 top-1/3 h-64 w-64 rounded-full bg-amber-400/10 blur-3xl" />
+      <div className="absolute right-1/4 bottom-16 h-48 w-48 rounded-full bg-[#04A9CE]/10 blur-3xl" />
     </div>
   )
 }
@@ -340,17 +320,17 @@ function LicenseUnlockDecor() {
 function RecoverySecurityDecor() {
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,#F4F7FA_0%,#EEF3F8_100%)]" />
-      {/* Concentric security rings — upper left, clear of the card */}
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,#0A1628_0%,#0B1A30_100%)]" />
+      <GridSignal variant="password_reset" />
       <div className="absolute left-[8%] top-[14%] hidden lg:block" style={{ perspective: '600px' }}>
         <div
           className="relative flex h-44 w-44 items-center justify-center"
           style={{ transform: 'rotateX(50deg) rotateZ(-12deg)' }}
         >
-          <div className="absolute inset-0 rounded-full border-2 border-[#102A43]/10" />
-          <div className="absolute inset-5 rounded-full border-2 border-[#04A9CE]/30" />
-          <div className="absolute inset-10 rounded-full border border-dashed border-[#102A43]/18" />
-          <div className="absolute inset-14 rounded-full bg-white/90 shadow-lg ring-1 ring-[#102A43]/8" />
+          <div className="absolute inset-0 rounded-full border-2 border-white/15" />
+          <div className="absolute inset-5 rounded-full border-2 border-[#38BDF8]/40" />
+          <div className="absolute inset-10 rounded-full border border-dashed border-white/25" />
+          <div className="absolute inset-14 rounded-full bg-white/92 shadow-lg ring-1 ring-[#102A43]/10" />
           <svg width="36" height="36" viewBox="0 0 36 36" fill="none" className="relative z-10">
             <rect x="8" y="16" width="20" height="14" rx="3" stroke="#102A43" strokeWidth="2" fill="white" />
             <path d="M12 16 V12 a6 6 0 0 1 12 0 v4" stroke="#04A9CE" strokeWidth="2" fill="none" />
@@ -358,20 +338,19 @@ function RecoverySecurityDecor() {
           </svg>
         </div>
       </div>
-      {/* Recovery path — right of card */}
       <div className="absolute right-[8%] top-1/2 hidden -translate-y-1/2 flex-col gap-4 xl:flex">
         {['Token', 'Verify', 'New password'].map((t, i) => (
           <div key={t} className="flex items-center gap-3">
             <span
-              className={`h-2.5 w-2.5 rounded-full ${i === 0 ? 'bg-[#04A9CE] shadow-[0_0_0_4px_rgba(4,169,206,0.18)]' : 'bg-[#102A43]/18'}`}
+              className={`h-2.5 w-2.5 rounded-full ${i === 0 ? 'bg-[#38BDF8] shadow-[0_0_0_4px_rgba(56,189,248,0.2)]' : 'bg-white/35'}`}
             />
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-[#102A43]/50">{t}</span>
-            {i < 2 && <span className="ml-2 h-px w-8 bg-[#102A43]/12" />}
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-white/80">{t}</span>
+            {i < 2 && <span className="ml-2 h-px w-8 bg-white/25" />}
           </div>
         ))}
       </div>
-      <div className="absolute -right-20 bottom-10 h-64 w-64 rounded-full bg-[#102A43]/5 blur-3xl" />
-      <div className="absolute left-16 bottom-24 h-40 w-40 rounded-full bg-[#04A9CE]/8 blur-2xl" />
+      <div className="absolute -right-20 bottom-10 h-64 w-64 rounded-full bg-[#38BDF8]/10 blur-3xl" />
+      <div className="absolute left-16 bottom-24 h-40 w-40 rounded-full bg-[#04A9CE]/10 blur-2xl" />
     </div>
   )
 }
@@ -379,18 +358,19 @@ function RecoverySecurityDecor() {
 function FirstRunInitDecor() {
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-      <div className="absolute inset-0 bg-[linear-gradient(145deg,#F8F7FC_0%,#F3F2F9_55%,#EEF0FA_100%)]" />
-      <svg className="absolute inset-0 h-full w-full" style={{ opacity: 0.08 }} xmlns="http://www.w3.org/2000/svg">
+      <div className="absolute inset-0 bg-[linear-gradient(145deg,#0D1630_0%,#0C1530_55%,#0B1430_100%)]" />
+      <GridSignal variant="first_run" />
+      <svg className="absolute inset-0 h-full w-full" style={{ opacity: 0.1 }} xmlns="http://www.w3.org/2000/svg">
         <defs>
           <pattern id="init-hex" width="60" height="52" patternUnits="userSpaceOnUse">
-            <path d="M30 0 L60 15 V45 L30 60 L0 45 V15 Z" fill="none" stroke="#102A43" strokeWidth="1" />
+            <path d="M30 0 L60 15 V45 L30 60 L0 45 V15 Z" fill="none" stroke="#A78BFA" strokeWidth="1" />
           </pattern>
         </defs>
         <rect width="100%" height="100%" fill="url(#init-hex)" />
       </svg>
       <div className="absolute left-1/2 top-[14%] hidden -translate-x-1/2 lg:block" style={{ perspective: '700px' }}>
         <div
-          className="w-80 rounded-2xl border border-violet-200/70 bg-white/95 p-5 shadow-[0_24px_50px_rgba(16,42,67,0.1)] backdrop-blur"
+          className="w-80 rounded-2xl border border-violet-300/40 bg-white/95 p-5 shadow-[0_24px_50px_rgba(0,0,0,0.35)]"
           style={{ transform: 'rotateX(10deg) rotateY(-6deg)' }}
         >
           <div className="flex items-center gap-2 border-b border-border pb-3">
@@ -415,8 +395,8 @@ function FirstRunInitDecor() {
           </div>
         </div>
       </div>
-      <div className="absolute -left-16 top-1/4 h-56 w-56 rounded-full bg-violet-500/10 blur-3xl" />
-      <div className="absolute right-12 bottom-16 h-48 w-48 rounded-full bg-[#04A9CE]/8 blur-3xl" />
+      <div className="absolute -left-16 top-1/4 h-56 w-56 rounded-full bg-violet-500/15 blur-3xl" />
+      <div className="absolute right-12 bottom-16 h-48 w-48 rounded-full bg-[#04A9CE]/10 blur-3xl" />
     </div>
   )
 }
@@ -438,7 +418,6 @@ function DepthCard({
 }) {
   return (
     <div className={`relative ${className}`} style={{ perspective: '1200px' }}>
-      {/* Back depth plate */}
       <div
         aria-hidden="true"
         className={`absolute inset-x-3 -bottom-2 top-3 rounded-[1.35rem] ${
@@ -494,7 +473,7 @@ const THEMES: Record<AuthShellRole, RoleTheme> = {
     badge: 'Registration',
     badgeClass: 'border-[#04A9CE]/40 bg-[#04A9CE]/10 text-[#0389a8]',
     title: 'Create your account',
-    pageClass: 'bg-white',
+    pageClass: 'bg-[#0A1F35]',
     decor: <RegisterOnboardingDecor />,
     accentBar: 'bg-gradient-to-r from-[#04A9CE] to-[#7EDCF0]',
     aside: null,
@@ -508,8 +487,9 @@ const THEMES: Record<AuthShellRole, RoleTheme> = {
     pageClass: 'bg-[#0B1F3A] text-white',
     decor: (
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute inset-0 bg-[#0B1F3A]" />
         <GridSignal variant="school" />
-        <svg className="absolute left-10 bottom-12 h-48 w-56 text-white/20" viewBox="0 0 200 160" fill="none">
+        <svg className="absolute left-10 bottom-12 h-48 w-56 text-white/25" viewBox="0 0 200 160" fill="none">
           <rect x="30" y="50" width="140" height="90" stroke="currentColor" strokeWidth="2" />
           <path d="M30 50 L100 15 L170 50" stroke="currentColor" strokeWidth="2" />
           <rect x="55" y="80" width="28" height="36" stroke="currentColor" strokeWidth="1.5" />
@@ -531,11 +511,11 @@ const THEMES: Record<AuthShellRole, RoleTheme> = {
           <br />
           with clarity.
         </h2>
-        <p className="mt-5 text-[15px] leading-relaxed text-white/70">
+        <p className="mt-5 text-[15px] leading-relaxed text-white/75">
           Seats, teachers, license status and school settings — structured for
           headteachers and administrators.
         </p>
-        <ul className="mt-8 space-y-3 text-sm text-white/65">
+        <ul className="mt-8 space-y-3 text-sm text-white/70">
           <li className="flex gap-2.5">
             <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#04A9CE]" />
             License and seat visibility
@@ -575,17 +555,17 @@ const THEMES: Record<AuthShellRole, RoleTheme> = {
           Schools, licenses, payments and audit — for authorized SchemeKnit
           platform staff only.
         </p>
-        <ul className="mt-8 space-y-3 text-sm text-slate-500">
+        <ul className="mt-8 space-y-3 text-sm text-slate-400">
           <li className="flex gap-2.5">
-            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-500" />
+            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
             Not listed on public pages
           </li>
           <li className="flex gap-2.5">
-            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-500" />
+            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
             Direct route only
           </li>
           <li className="flex gap-2.5">
-            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-500" />
+            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
             Backend authorization remains authoritative
           </li>
         </ul>
@@ -596,51 +576,60 @@ const THEMES: Record<AuthShellRole, RoleTheme> = {
   },
   school_activate: {
     badge: 'School activation',
-    badgeClass: 'border-[#04A9CE]/40 bg-[#04A9CE]/10 text-[#0389a8]',
+    badgeClass: 'border-[#34D399]/45 bg-[#34D399]/12 text-[#0D7A58]',
     title: 'Activate Your School',
-    pageClass: 'bg-[#F3F6FA]',
+    pageClass: 'bg-[#0A2240] text-white',
     decor: <SchoolInstitutionDecor />,
     accentBar: 'bg-gradient-to-r from-[#04A9CE] to-emerald-500',
     aside: null,
-    asideClass: 'text-[#102A43]',
+    asideClass: 'text-white',
     layout: 'wide',
   },
   teacher_license: {
     badge: 'Teacher license',
     badgeClass: 'border-amber-400/50 bg-amber-500/10 text-amber-700',
     title: 'Activate Teacher License',
-    pageClass: 'bg-[#FAFAF7]',
+    pageClass: 'bg-[#0E1C2E] text-white',
     decor: <LicenseUnlockDecor />,
     accentBar: 'bg-gradient-to-r from-amber-500 to-[#04A9CE]',
     aside: null,
-    asideClass: 'text-[#102A43]',
+    asideClass: 'text-white',
     layout: 'wide',
   },
   password_reset: {
     badge: 'Account recovery',
     badgeClass: 'border-[#102A43]/20 bg-[#102A43]/5 text-[#102A43]',
     title: 'Reset Your Password',
-    pageClass: 'bg-[#F4F7FA]',
+    pageClass: 'bg-[#0A1628] text-white',
     decor: <RecoverySecurityDecor />,
-    accentBar: 'bg-gradient-to-r from-[#102A43] to-[#04A9CE]',
+    accentBar: 'bg-gradient-to-r from-[#102A43] to-[#38BDF8]',
     aside: null,
-    asideClass: 'text-[#102A43]',
+    asideClass: 'text-white',
     layout: 'centered',
   },
   first_run: {
     badge: 'First-run setup',
     badgeClass: 'border-violet-400/40 bg-violet-500/10 text-violet-700',
     title: 'Set Up SchemeKnit',
-    pageClass: 'bg-[#F8F7FC]',
+    pageClass: 'bg-[#0D1630] text-white',
     decor: <FirstRunInitDecor />,
     accentBar: 'bg-gradient-to-r from-violet-600 to-[#04A9CE]',
     aside: null,
-    asideClass: 'text-[#102A43]',
+    asideClass: 'text-white',
     layout: 'centered',
   },
-  // alias used by setup/platform-admin via platform_admin with bootstrap decor
-  // — platform_admin theme is reused; bootstrap page passes securityNote + steps.
 }
+
+const DARK_ROLES = new Set<AuthShellRole>([
+  'teacher',
+  'school_admin',
+  'platform_admin',
+  'register',
+  'school_activate',
+  'teacher_license',
+  'password_reset',
+  'first_run',
+])
 
 export interface AuthShellProps {
   role: AuthShellRole
@@ -655,7 +644,13 @@ export interface AuthShellProps {
   decorOverride?: ReactNode
 }
 
-function StepRail({ steps }: { steps: { label: string; active?: boolean; done?: boolean }[] }) {
+function StepRail({
+  steps,
+  onDark = false,
+}: {
+  steps: { label: string; active?: boolean; done?: boolean }[]
+  onDark?: boolean
+}) {
   return (
     <ol className="mb-5 flex flex-wrap gap-2" aria-label="Progress">
       {steps.map((s, i) => (
@@ -663,10 +658,16 @@ function StepRail({ steps }: { steps: { label: string; active?: boolean; done?: 
           key={s.label}
           className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
             s.active
-              ? 'border-[#04A9CE]/50 bg-[#04A9CE]/12 text-[#0389a8] shadow-[0_0_0_3px_rgba(4,169,206,0.1)]'
+              ? onDark
+                ? 'border-[#04A9CE]/60 bg-[#04A9CE]/18 text-[#7EDCF0] shadow-[0_0_0_3px_rgba(4,169,206,0.12)]'
+                : 'border-[#04A9CE]/50 bg-[#04A9CE]/12 text-[#0389a8] shadow-[0_0_0_3px_rgba(4,169,206,0.1)]'
               : s.done
-                ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-700'
-                : 'border-[#102A43]/10 bg-white/70 text-muted-foreground'
+                ? onDark
+                  ? 'border-emerald-400/45 bg-emerald-500/15 text-emerald-300'
+                  : 'border-emerald-400/40 bg-emerald-500/10 text-emerald-700'
+                : onDark
+                  ? 'border-white/20 bg-white/12 text-white/75'
+                  : 'border-[#102A43]/10 bg-white/70 text-muted-foreground'
           }`}
         >
           <span
@@ -675,7 +676,9 @@ function StepRail({ steps }: { steps: { label: string; active?: boolean; done?: 
                 ? 'bg-[#04A9CE] text-white'
                 : s.done
                   ? 'bg-emerald-500 text-white'
-                  : 'bg-[#102A43]/10'
+                  : onDark
+                    ? 'bg-white/25 text-white'
+                    : 'bg-[#102A43]/10'
             }`}
           >
             {i + 1}
@@ -698,7 +701,7 @@ export function AuthShell({
   decorOverride,
 }: AuthShellProps) {
   const theme = THEMES[role]
-  const isDark = role === 'teacher' || role === 'school_admin' || role === 'platform_admin'
+  const isDark = DARK_ROLES.has(role)
   const showAside = theme.layout === 'split'
   const decor = decorOverride ?? theme.decor
   const isWide = theme.layout === 'wide'
@@ -718,7 +721,7 @@ export function AuthShell({
             {theme.aside}
             <p
               className={`hidden text-xs lg:block ${
-                role === 'platform_admin' ? 'text-slate-500' : 'text-white/40'
+                role === 'platform_admin' ? 'text-slate-400' : 'text-white/50'
               }`}
             >
               © SchemeKnit · Trust · Clarity · Professionalism
@@ -730,14 +733,13 @@ export function AuthShell({
 
         <main className="flex items-center justify-center px-4 pb-14 pt-6 sm:px-6 lg:px-10 lg:py-12">
           <div className={isWide ? 'w-full max-w-lg' : 'w-full max-w-md'}>
-            {/* Brand row */}
             <div className="mb-6 flex items-center justify-between gap-3">
               <BrandCapsule dark={isDark} href="/" size={44} mark={28} showWordmark />
               {!showAside && (
                 <span
                   className={`rounded-full px-2.5 py-1 text-[11px] font-semibold shadow-sm backdrop-blur ${
                     isDark
-                      ? 'border border-white/15 bg-white/10 text-white/80'
+                      ? 'border border-white/20 bg-white/12 text-white/90'
                       : 'border border-[#102A43]/10 bg-white/85 text-muted-foreground'
                   }`}
                 >
@@ -746,24 +748,29 @@ export function AuthShell({
               )}
             </div>
 
-            {/* Page-specific header block (outside the card for wide layouts) */}
             {isWide && (
               <div className="mb-5">
-                <RoleBadge className={theme.badgeClass}>{theme.badge}</RoleBadge>
-                <h1 className="mt-3 text-[1.65rem] font-bold leading-tight tracking-tight text-[#102A43] sm:text-3xl">
+                <RoleBadge className="border-white/25 bg-white/12 text-white/90">
+                  {theme.badge}
+                </RoleBadge>
+                <h1 className="mt-3 text-[1.65rem] font-bold leading-tight tracking-tight text-white sm:text-3xl">
                   {title || theme.title}
                 </h1>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{description}</p>
-                {steps && steps.length > 0 && <div className="mt-4"><StepRail steps={steps} /></div>}
+                <p className="mt-2 text-sm leading-relaxed text-white/70">{description}</p>
+                {steps && steps.length > 0 && (
+                  <div className="mt-4">
+                    <StepRail steps={steps} onDark />
+                  </div>
+                )}
                 {securityNote && (
-                  <p className="mt-3 rounded-lg border border-border bg-white/70 px-3 py-2 text-xs text-muted-foreground shadow-sm">
+                  <p className="mt-3 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-xs text-white/70 shadow-sm">
                     {securityNote}
                   </p>
                 )}
               </div>
             )}
 
-            {!isWide && steps && steps.length > 0 && <StepRail steps={steps} />}
+            {!isWide && steps && steps.length > 0 && <StepRail steps={steps} onDark={isDark} />}
 
             <DepthCard dark={isDark} accent={theme.accentBar}>
               <div className="px-6 py-7 sm:px-8">
@@ -815,7 +822,7 @@ export function AuthShell({
 
             <p
               className={`mt-5 text-center text-xs ${
-                isDark ? 'text-white/45' : 'text-muted-foreground'
+                isDark ? 'text-white/55' : 'text-muted-foreground'
               }`}
             >
               <Link href="/" className="underline-offset-2 hover:underline">
