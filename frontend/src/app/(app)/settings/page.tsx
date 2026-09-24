@@ -3,10 +3,12 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { SurfaceCard } from '@/components/ui/surface-card'
 import { Input } from '@/components/ui/input'
+import { Field } from '@/components/ui/field'
 import { Banner } from '@/components/ui/banner'
 import { ConfirmDialog } from '@/components/ui/dialog'
+import { PageHeader } from '@/components/ui/page-header'
 import { Save, Plus, Trash2, User } from 'lucide-react'
 import { api } from '@/lib/api'
 import { ChangePasswordCard } from '@/components/change-password'
@@ -118,90 +120,107 @@ export default function SettingsPage() {
     )
   }
 
+  const sectionHeading = 'text-lg font-semibold text-[#102A43]'
+
   return (
     <div className="min-h-screen">
       <main className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto space-y-6">
+        <div className="mx-auto max-w-4xl space-y-8">
+          <PageHeader
+            title="Settings"
+            description="Your profile, planning calendar and the curriculum reference data SchemeKnit uses."
+          />
+
           {error && <Banner tone="danger">{error}</Banner>}
           {success && <Banner tone="success">{success}</Banner>}
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <User className="h-5 w-5 mr-2" />
-                Teacher Profile
-              </CardTitle>
-              <CardDescription>
-                Your name appears on the lesson plans you generate
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
+          {/* ── Account ─────────────────────────────────────────────── */}
+          <section aria-labelledby="settings-account" className="space-y-6">
+            <h2 id="settings-account" className={sectionHeading}>Account</h2>
+
+            <SurfaceCard data-settings-profile accent="bg-gradient-to-r from-[#102A43] to-[#04A9CE]" className="px-5 py-5 sm:px-6">
+              <div className="flex items-center">
+                <User className="mr-2 h-5 w-5 text-[#04769B]" aria-hidden="true" />
                 <div>
-                  <label className="block text-sm font-medium mb-2">Full Name</label>
-                  <Input
-                    type="text"
-                    value={profileName}
-                    onChange={(e) => setProfileName(e.target.value)}
-                    placeholder="e.g. Ama Mensah"
-                  />
+                  <h3 className="text-base font-semibold text-[#102A43]">Teacher Profile</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Your name appears on the lesson plans you generate
+                  </p>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Email</label>
+              </div>
+              <div className="mt-4 space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field label="Full Name" htmlFor="profile-full-name">
+                    <Input
+                      id="profile-full-name"
+                      type="text"
+                      value={profileName}
+                      onChange={(e) => setProfileName(e.target.value)}
+                      placeholder="e.g. Ama Mensah"
+                    />
+                  </Field>
+                  <Field label="Email" htmlFor="profile-email">
+                    <Input
+                      id="profile-email"
+                      type="email"
+                      value={profile?.email || ''}
+                      disabled
+                      className="bg-muted text-muted-foreground"
+                    />
+                  </Field>
+                </div>
+                <Field
+                  label="School"
+                  htmlFor="profile-school"
+                  hint="Derived from your school membership and cannot be changed here"
+                >
                   <Input
-                    type="email"
-                    value={profile?.email || ''}
+                    id="profile-school"
+                    type="text"
+                    value={profile?.school_name || '—'}
                     disabled
                     className="bg-muted text-muted-foreground"
                   />
-                </div>
+                </Field>
+                <Button onClick={handleSaveProfile} disabled={savingProfile || !profileName.trim()}>
+                  <Save className="mr-2 h-4 w-4" />
+                  {savingProfile ? 'Saving...' : 'Save Profile'}
+                </Button>
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">School</label>
-                <Input
-                  type="text"
-                  value={profile?.school_name || '—'}
-                  disabled
-                  className="bg-muted text-muted-foreground"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Derived from your school membership and cannot be changed here
-                </p>
-              </div>
-              <Button onClick={handleSaveProfile} disabled={savingProfile || !profileName.trim()}>
-                <Save className="h-4 w-4 mr-2" />
-                {savingProfile ? 'Saving...' : 'Save Profile'}
-              </Button>
-            </CardContent>
-          </Card>
+            </SurfaceCard>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Holiday Calendar</CardTitle>
-              <CardDescription>
+            <ChangePasswordCard />
+          </section>
+
+          {/* ── Planning ────────────────────────────────────────────── */}
+          <section aria-labelledby="settings-planning" className="space-y-4">
+            <h2 id="settings-planning" className={sectionHeading}>Planning</h2>
+
+            <SurfaceCard data-settings-holidays className="px-5 py-5 sm:px-6">
+              <h3 className="text-base font-semibold text-[#102A43]">Holiday Calendar</h3>
+              <p className="text-sm text-muted-foreground">
                 Manage public holidays that affect lesson planning
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid md:grid-cols-4 gap-4 mb-6">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Holiday Name</label>
+              </p>
+
+              <div className="mt-4 grid gap-4 md:grid-cols-4">
+                <Field label="Holiday Name" htmlFor="holiday-name">
                   <Input
+                    id="holiday-name"
                     type="text"
                     value={newHoliday.name}
                     onChange={(e) => setNewHoliday({ ...newHoliday, name: e.target.value })}
                     placeholder="e.g., Christmas Day"
                   />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Date</label>
+                </Field>
+                <Field label="Date" htmlFor="holiday-date">
                   <Input
+                    id="holiday-date"
                     type="date"
                     value={newHoliday.date}
                     onChange={(e) => setNewHoliday({ ...newHoliday, date: e.target.value })}
                   />
-                </div>
-                <div className="flex items-end">
+                </Field>
+                <div className="flex items-end pb-2">
                   <label className="flex items-center space-x-2">
                     <input
                       type="checkbox"
@@ -212,109 +231,118 @@ export default function SettingsPage() {
                     <span className="text-sm">Recurring annually</span>
                   </label>
                 </div>
-                <div className="flex items-end">
+                <div className="flex items-end pb-2">
                   <Button onClick={handleAddHoliday} disabled={saving}>
-                    <Plus className="h-4 w-4 mr-2" />
+                    <Plus className="mr-2 h-4 w-4" />
                     Add
                   </Button>
                 </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="mt-4 space-y-2">
                 {holidays.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-4">No holidays configured</p>
+                  <p className="py-4 text-center text-muted-foreground">No holidays configured</p>
                 ) : (
                   holidays.map((holiday) => (
-                    <div key={holiday.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                    <div key={holiday.id} className="flex items-center justify-between rounded-lg bg-muted p-3">
                       <div>
                         <span className="font-medium">{holiday.name}</span>
-                        <span className="text-muted-foreground ml-2">
+                        <span className="ml-2 text-muted-foreground">
                           {new Date(holiday.date).toLocaleDateString()}
                         </span>
                         {holiday.is_recurring && (
-                          <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded ml-2">Recurring</span>
+                          <span className="ml-2 rounded bg-[#04A9CE]/10 px-2 py-1 text-xs text-[#04769B]">
+                            Recurring
+                          </span>
                         )}
                       </div>
-                      <Button variant="ghost" size="sm" onClick={() => setPendingDeleteId(holiday.id)}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`Delete holiday ${holiday.name}`}
+                        onClick={() => setPendingDeleteId(holiday.id)}
+                      >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
                   ))
                 )}
               </div>
-            </CardContent>
-          </Card>
+            </SurfaceCard>
+          </section>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Available Subjects</CardTitle>
-              <CardDescription>
+          {/* ── Curriculum reference ────────────────────────────────── */}
+          <section aria-labelledby="settings-reference" className="space-y-4">
+            <h2 id="settings-reference" className={sectionHeading}>Curriculum reference</h2>
+
+            <SurfaceCard data-settings-subjects className="px-5 py-5 sm:px-6">
+              <h3 className="text-base font-semibold text-[#102A43]">Available Subjects</h3>
+              <p className="text-sm text-muted-foreground">
                 Subjects available per level. The list shown when you upload or
                 generate follows the level you select.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {subjectGroups.length > 0 ? (
-                subjectGroups.map((group) => (
-                  <div key={group.class_level}>
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
-                      {group.class_level}
-                      <span className="ml-2 font-normal normal-case">
-                        {group.educational_level}
-                      </span>
-                    </h4>
-                    <div className="grid md:grid-cols-3 gap-2">
-                      {group.subjects.map((subject) => (
-                        <div key={`${group.class_level}-${subject}`} className="p-2 bg-muted rounded text-sm">
-                          {subject}
-                        </div>
-                      ))}
+              </p>
+              <div className="mt-4 space-y-4">
+                {subjectGroups.length > 0 ? (
+                  subjectGroups.map((group) => (
+                    <div key={group.class_level}>
+                      <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        {group.class_level}
+                        <span className="ml-2 font-normal normal-case">
+                          {group.educational_level}
+                        </span>
+                      </h4>
+                      <div className="grid gap-2 md:grid-cols-3">
+                        {group.subjects.map((subject) => (
+                          <div key={`${group.class_level}-${subject}`} className="rounded bg-muted p-2 text-sm">
+                            {subject}
+                          </div>
+                        ))}
+                      </div>
                     </div>
+                  ))
+                ) : (
+                  <div className="grid gap-2 md:grid-cols-3">
+                    {subjects.map((subject) => (
+                      <div key={subject} className="rounded bg-muted p-2 text-sm">{subject}</div>
+                    ))}
                   </div>
-                ))
-              ) : (
-                <div className="grid md:grid-cols-3 gap-2">
-                  {subjects.map((subject) => (
-                    <div key={subject} className="p-2 bg-muted rounded text-sm">{subject}</div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                )}
+              </div>
+            </SurfaceCard>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Available Class Levels</CardTitle>
-              <CardDescription>Class levels supported by SchemeKnit</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid md:grid-cols-3 gap-2">
+            <SurfaceCard data-settings-levels className="px-5 py-5 sm:px-6">
+              <h3 className="text-base font-semibold text-[#102A43]">Available Class Levels</h3>
+              <p className="text-sm text-muted-foreground">Class levels supported by SchemeKnit</p>
+              <div className="mt-4 grid gap-2 md:grid-cols-3">
                 {classLevels.map((level) => (
-                  <div key={level} className="p-2 bg-muted rounded text-sm">{level}</div>
+                  <div key={level} className="rounded bg-muted p-2 text-sm">{level}</div>
                 ))}
               </div>
-            </CardContent>
-          </Card>
+            </SurfaceCard>
+          </section>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>About SchemeKnit</CardTitle>
-            </CardHeader>
-            <CardContent>
+          {/* ── About ───────────────────────────────────────────────── */}
+          <section aria-labelledby="settings-about" className="space-y-4">
+            <h2 id="settings-about" className={sectionHeading}>About</h2>
+
+            <SurfaceCard data-settings-about className="px-5 py-5 sm:px-6">
               <div className="space-y-2 text-sm text-muted-foreground">
-                <p><strong>Version:</strong> 1.0.5</p>
-                <p><strong>Developer:</strong> BloomCore Technologies</p>
+                <p><strong className="text-[#102A43]">Version:</strong> 1.0.5</p>
+                <p><strong className="text-[#102A43]">Developer:</strong> BloomCore Technologies</p>
                 <p>
                   SchemeKnit is a professional lesson plan generator designed for
                   Ghanaian teachers. It extracts curriculum data from scheme of work
                   documents and generates formatted lesson plans aligned with
                   Ghana Education Service standards.
                 </p>
+                <p>
+                  <Link href="/dashboard" className="font-medium text-[#04769B] hover:underline">
+                    Back to Dashboard
+                  </Link>
+                </p>
               </div>
-            </CardContent>
-          </Card>
-
-          <ChangePasswordCard />
+            </SurfaceCard>
+          </section>
 
           <ConfirmDialog
             open={pendingDeleteId !== null}
