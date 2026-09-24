@@ -13,6 +13,7 @@ import { Download, Settings, Play, CheckCircle, FileText, FileSpreadsheet, FileA
 import { api } from '@/lib/api'
 import { resolveRouteId } from '@/lib/route-params'
 import { PageHeader } from '@/components/ui/page-header'
+import { StatusPill } from '@/components/ui/badge'
 import { SchemeOfWork, TermConfig, CurriculumCoverage, Template, CurriculumProfile } from '@/types'
 
 export default function GeneratePage() {
@@ -808,22 +809,21 @@ export default function GeneratePage() {
                       language, with the scheme's indicator count and the
                       remaining allowance so the teacher can choose a subset. */}
                   {allocationPreview.lesson_quota?.enforced && (
-                    <div
-                      data-quota-banner
-                      className="space-y-1 rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800"
-                    >
-                      <p className="font-semibold">
-                        {allocationPreview.lesson_quota.used} of {allocationPreview.lesson_quota.limit} Free Tier lesson plans used this month ·{' '}
-                        {allocationPreview.lesson_quota.remaining} remaining
-                      </p>
-                      {allocationPreview.selectable_indicators?.length > 0 && (
-                        <p>
-                          This scheme contains {allocationPreview.selectable_indicators.length} instructional indicator
-                          {allocationPreview.selectable_indicators.length === 1 ? '' : 's'}. You can generate up to{' '}
-                          {allocationPreview.lesson_quota.remaining} now; Teacher Pro removes this limit.
+                    <Banner tone="info" data-quota-banner className="text-xs">
+                      <div className="space-y-1">
+                        <p className="font-semibold">
+                          {allocationPreview.lesson_quota.used} of {allocationPreview.lesson_quota.limit} Free Tier lesson plans used this month ·{' '}
+                          {allocationPreview.lesson_quota.remaining} remaining
                         </p>
-                      )}
-                    </div>
+                        {allocationPreview.selectable_indicators?.length > 0 && (
+                          <p>
+                            This scheme contains {allocationPreview.selectable_indicators.length} instructional indicator
+                            {allocationPreview.selectable_indicators.length === 1 ? '' : 's'}. You can generate up to{' '}
+                            {allocationPreview.lesson_quota.remaining} now; Teacher Pro removes this limit.
+                          </p>
+                        )}
+                      </div>
+                    </Banner>
                   )}
 
                   {/* Indicator selection: one indicator = one lesson plan.
@@ -932,13 +932,13 @@ export default function GeneratePage() {
                                     </td>
                                     <td className="py-1.5">
                                       {alloc.status === 'needs_review' ? (
-                                        <span className="font-medium text-yellow-700">Needs review</span>
+                                        <StatusPill tone="warning">Needs review</StatusPill>
                                       ) : alloc.status === 'carried_forward' ? (
-                                        <span className="font-medium text-blue-700">
+                                        <StatusPill tone="info">
                                           Carried forward from Week {alloc.source_week}
-                                        </span>
+                                        </StatusPill>
                                       ) : (
-                                        <span className="font-medium text-green-700">Scheduled</span>
+                                        <StatusPill tone="success">Scheduled</StatusPill>
                                       )}
                                     </td>
                                   </tr>
@@ -1049,31 +1049,39 @@ export default function GeneratePage() {
                         )}
                       </div>
                       <div>
-                        <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                        <label
+                          htmlFor={`keywords-${row.lesson_sequence}`}
+                          className="mb-1 block text-[11px] font-medium text-muted-foreground"
+                        >
                           Keywords for this lesson
                         </label>
                         <input
+                          id={`keywords-${row.lesson_sequence}`}
                           type="text"
                           value={(row.keywords || []).join(', ')}
                           onChange={(e) => updateLessonReviewRow(row.lesson_sequence, {
                             keywords: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
                           })}
                           placeholder="Comma-separated"
-                          className="w-full rounded-md border px-2 py-1.5 text-xs"
+                          className="w-full rounded-md border border-input px-2 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#04A9CE]/45 focus-visible:border-[#04A9CE]/70"
                         />
                       </div>
                       <div>
-                        <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                        <label
+                          htmlFor={`other-tlrs-${row.lesson_sequence}`}
+                          className="mb-1 block text-[11px] font-medium text-muted-foreground"
+                        >
                           Other TLRs for this lesson (not source)
                         </label>
                         <input
+                          id={`other-tlrs-${row.lesson_sequence}`}
                           type="text"
                           value={(row.other_tlrs || []).join(', ')}
                           onChange={(e) => updateLessonReviewRow(row.lesson_sequence, {
                             other_tlrs: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
                           })}
                           placeholder="Comma-separated teacher additions"
-                          className="w-full rounded-md border px-2 py-1.5 text-xs"
+                          className="w-full rounded-md border border-input px-2 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#04A9CE]/45 focus-visible:border-[#04A9CE]/70"
                         />
                       </div>
                       <div>

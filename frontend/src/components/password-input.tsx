@@ -2,6 +2,7 @@
 
 import { useState, forwardRef } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 /**
  * Password input with a show/hide eye control (PART 3).
@@ -38,7 +39,16 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
           {...props}
           ref={ref}
           type={visible ? 'text' : 'password'}
-          className={`w-full px-3 py-2 pr-10 border rounded-md ${className}`}
+          className={cn(
+            'flex h-11 w-full rounded-lg border border-input bg-white px-3.5 py-2 pr-10 text-sm text-[#102A43]',
+            'shadow-[0_1px_2px_rgba(16,42,67,0.04)] transition-all duration-150',
+            'placeholder:text-muted-foreground',
+            'hover:border-[#04A9CE]/45',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#04A9CE]/45 focus-visible:border-[#04A9CE]/70 focus-visible:shadow-[0_0_0_3px_rgba(4,169,206,0.16)]',
+            'disabled:cursor-not-allowed disabled:opacity-60 disabled:bg-muted',
+            'aria-[invalid=true]:border-destructive aria-[invalid=true]:ring-2 aria-[invalid=true]:ring-destructive/25',
+            className,
+          )}
         />
         <button
           type="button"
@@ -47,7 +57,7 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
           aria-pressed={visible}
           // Keeps the input's typed content untouched and focus where it was.
           tabIndex={0}
-          className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring rounded-r-md"
+          className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring rounded-r-lg"
           title={visible ? 'Hide password' : 'Show password'}
         >
           {visible ? (

@@ -4,6 +4,7 @@ import { useState, useEffect, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { SurfaceCard } from '@/components/ui/surface-card'
 import { StatusPill } from '@/components/ui/badge'
+import { Banner } from '@/components/ui/banner'
 import { PageHeader } from '@/components/ui/page-header'
 import { AlertTriangle, CheckCircle } from 'lucide-react'
 import { api } from '@/lib/api'
@@ -98,10 +99,10 @@ export default function SchoolLicensePage() {
           </div>
 
           {!active && (
-            <p className="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            <Banner tone="warning" className="mt-4 text-sm">
               This license is {lic.status}. Teacher lesson planning and new teacher
               accounts are restricted until renewal. All school and teacher data is preserved.
-            </p>
+            </Banner>
           )}
 
           <p className="mt-4 text-xs text-muted-foreground">

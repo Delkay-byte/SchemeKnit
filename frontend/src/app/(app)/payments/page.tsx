@@ -52,6 +52,7 @@ export default function PaymentsPage() {
   const [plans, setPlans] = useState<ProductPlan[]>([])
   const [history, setHistory] = useState<PaymentHistory[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<ProductPlan | null>(null)
   const [showSubmitForm, setShowSubmitForm] = useState(false)
@@ -70,6 +71,7 @@ export default function PaymentsPage() {
   const loadData = async () => {
     try {
       setLoading(true)
+      setLoadError(null)
       const [configData, plansData, historyData] = await Promise.all([
         api.getPaymentConfig(),
         api.listProductPlans(),
@@ -80,6 +82,11 @@ export default function PaymentsPage() {
       setHistory(historyData.payments || [])
     } catch (err) {
       console.error('Failed to load payment data:', err)
+      setLoadError(
+        err instanceof Error && err.message
+          ? err.message
+          : 'Could not load payment information. Check your connection and try again.',
+      )
     } finally {
       setLoading(false)
     }
@@ -135,6 +142,30 @@ export default function PaymentsPage() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div className="min-h-screen">
+        <main className="container mx-auto px-4 py-8 max-w-4xl">
+          <div className="mb-6">
+            <PageHeader
+              eyebrow="Billing"
+              title="Payments & Subscriptions"
+              description="Manage your SchemeKnit subscription"
+            />
+          </div>
+          <Banner tone="danger" data-payments-error>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span>{loadError}</span>
+              <Button variant="outline" size="sm" onClick={() => loadData()}>
+                Try Again
+              </Button>
+            </div>
+          </Banner>
+        </main>
       </div>
     )
   }
@@ -253,7 +284,7 @@ export default function PaymentsPage() {
                     <option value="bank_transfer">Bank Transfer</option>
                   </Select>
                 </Field>
-                <Field label={<>Your Name *</>} htmlFor="payer-name">
+                <Field label="Your Name" htmlFor="payer-name" required>
                   <Input
                     id="payer-name"
                     type="text"

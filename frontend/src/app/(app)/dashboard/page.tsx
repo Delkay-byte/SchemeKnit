@@ -345,7 +345,10 @@ export default function Dashboard() {
                   <p className="mt-3 text-sm text-muted-foreground">
                     {plan.generations_used} of {plan.generation_limit} lesson plans used this month ·{' '}
                     {Math.max(plan.generation_limit - plan.generations_used, 0)} remaining.
-                    {' '}Your allowance renews on the 1st. Upgrade to Teacher Pro for unlimited lesson plans.
+                    {' '}Your allowance renews on the 1st.{' '}
+                    <Link href="/upgrade" className="font-medium text-[#04769B] hover:text-[#04A9CE] hover:underline">
+                      Upgrade to Teacher Pro
+                    </Link>{' '}for unlimited lesson plans.
                   </p>
                 )}
                 {/* Free Tier AI is a one-time lifetime allowance — say so plainly
