@@ -65,6 +65,11 @@ export default function IndividualSignupPage() {
       role="register"
       title="Create your SchemeKnit account"
       description="Create your account — no school required. Start on the Free Tier and upgrade to Pro anytime."
+      steps={[
+        { label: 'Your details', active: true },
+        { label: 'Secure password' },
+        { label: 'Ready' },
+      ]}
       footer={
         <p className="text-center text-sm text-muted-foreground">
           Already have an account?{' '}

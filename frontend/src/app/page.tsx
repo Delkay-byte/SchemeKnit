@@ -52,9 +52,17 @@ export default function Home() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between gap-4">
             <Link href="/" className="flex items-center gap-3">
-              {/* Premium logo capsule — raised navy surface so the S mark reads
-                  clearly against the dark header without changing the mark. */}
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-[#0d2740]/95 shadow-[0_8px_24px_rgba(0,0,0,0.35),0_0_0_1px_rgba(4,169,206,0.12)] ring-1 ring-[#04A9CE]/25">
+              {/* Canonical navy S on a light capsule — required for contrast
+                  against the dark header (mark fills are #102A43 + #04A9CE). */}
+              <span
+                className="flex h-11 w-11 items-center justify-center rounded-xl border"
+                style={{
+                  background: '#F4F7FA',
+                  borderColor: 'rgba(16,42,67,0.12)',
+                  boxShadow:
+                    '0 0 0 1px rgba(4,169,206,0.3), 0 6px 18px rgba(0,0,0,0.28)',
+                }}
+              >
                 <SchemeKnitMark size={28} className="h-7 w-7" />
               </span>
               <span className="text-2xl font-bold tracking-tight">

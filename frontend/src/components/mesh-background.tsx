@@ -3,24 +3,20 @@
 import { useEffect, useRef } from 'react'
 
 /**
- * Interactive curriculum mesh (Hero V2).
+ * Interactive curriculum mesh (Hero V3).
  *
- * A spring-damped grid of nodes with neighbour links (H/V/diagonal).
- * On fine-pointer desktops the cursor creates a soft radial bulge that
- * settles elastically. Ambient mode (mobile / coarse pointer) uses a slow
- * low-amplitude drift. Reduced-motion draws a static refined mesh once.
+ * Connected flexible surface: grid nodes + neighbour springs + cursor force
+ * with strong central lens bulge, elastic return, and subtle depth cues.
+ * Canvas 2D only — no WebGL, no React re-renders per frame.
  *
- * Runs entirely in Canvas 2D outside React render cycles.
+ * Landing-exclusive: do not mount on auth/activation routes.
  */
 
 type MeshMode = 'hero' | 'ambient'
 
 export interface MeshBackgroundProps {
-  /** Visual density + interaction strength preset. */
   mode?: MeshMode
-  /** className for the canvas wrapper (layout only). */
   className?: string
-  /** Optional opacity of the drawn mesh (0–1). */
   opacity?: number
 }
 
@@ -31,28 +27,38 @@ interface Node {
   y: number
   vx: number
   vy: number
+  /** Neighbor average displacement for membrane cohesion (scratch). */
+  lx: number
+  ly: number
   phase: number
-  /** Curriculum accent node (brighter cyan). */
   accent: boolean
+  elevation: number
 }
 
 const ACCENT_LABELS = ['SCHEME', 'SUBJECT', 'WEEK', 'INDICATOR', 'PERIOD', 'LESSON']
 
 function prefersReducedMotion(): boolean {
-  return typeof window !== 'undefined'
-    && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  return (
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  )
 }
 
 function isFinePointer(): boolean {
-  return typeof window !== 'undefined'
-    && window.matchMedia('(hover: hover) and (pointer: fine)').matches
+  return (
+    typeof window !== 'undefined' &&
+    window.matchMedia('(hover: hover) and (pointer: fine)').matches
+  )
 }
 
-function smoothFalloff(t: number): number {
-  if (t <= 0 || t >= 1) return 0
-  // Smoothstep — continuous, soft edges (no hard disc).
-  const u = t * t * (3 - 2 * t)
-  return u * u
+/** 1 at center → 0 at radius edge, smooth, then power-shaped for a strong core. */
+function lensFalloff(dist: number, radius: number, power: number): number {
+  if (dist >= radius || radius <= 0) return 0
+  const t = dist / radius
+  const inv = 1 - t
+  // smoothstep on inverted t: soft shoulder, strong core
+  const s = inv * inv * (3 - 2 * inv)
+  return Math.pow(s, power)
 }
 
 export function MeshBackground({
@@ -67,12 +73,9 @@ export function MeshBackground({
     const canvas = canvasRef.current
     const wrap = wrapRef.current
     if (!canvas || !wrap) return
-
     const ctx = canvas.getContext('2d', { alpha: true })
     if (!ctx) return
 
-    // Capture non-null refs for nested callbacks (TS narrowing does not
-    // survive into function declarations below).
     const canvasEl: HTMLCanvasElement = canvas
     const wrapEl: HTMLDivElement = wrap
 
@@ -88,52 +91,67 @@ export function MeshBackground({
     let nodes: Node[] = []
     let raf = 0
     let running = true
-    let t0 = performance.now()
+    const t0 = performance.now()
     let last = t0
+    let frameCost = 0
 
     const pointer = {
       x: -9999,
       y: -9999,
+      px: -9999,
+      py: -9999,
+      vx: 0,
+      vy: 0,
       active: false,
       tx: -9999,
       ty: -9999,
       strength: 0,
     }
 
-    // Tuning — hero is denser and stronger than ambient auth mesh.
-    const cfg = mode === 'hero'
-      ? {
-          baseSpacing: 48,
-          minCols: 14,
-          maxCols: 36,
-          spring: 0.055,
-          damping: 0.84,
-          influenceRadius: 160,
-          pushStrength: 38,
-          ambientAmp: mode === 'hero' ? 2.2 : 1.4,
-          ambientSpeed: 0.00035,
-          lineBase: 0.1,
-          lineBoost: 0.42,
-          nodeBase: 0.22,
-          accentEvery: 11,
-        }
-      : {
-          baseSpacing: 56,
-          minCols: 10,
-          maxCols: 24,
-          spring: 0.05,
-          damping: 0.86,
-          influenceRadius: 0,
-          pushStrength: 0,
-          ambientAmp: 1.6,
-          ambientSpeed: 0.00022,
-          lineBase: 0.07,
-          lineBoost: 0,
-          nodeBase: 0.16,
-          accentEvery: 14,
-        }
+    // V3 tuning — stronger bulge, membrane cohesion, velocity lag.
+    const cfg =
+      mode === 'hero'
+        ? {
+            baseSpacing: 42,
+            minCols: 18,
+            maxCols: 42,
+            spring: 0.048,
+            damping: 0.86,
+            neighborBlend: 0.14,
+            influenceRadius: 200,
+            pushStrength: 52,
+            tangential: 0.14,
+            ambientAmp: 1.6,
+            ambientSpeed: 0.00032,
+            lineBase: 0.075,
+            lineBoost: 0.55,
+            nodeBase: 0.18,
+            accentEvery: 13,
+            lensPower: 2.1,
+            velocityGain: 0.55,
+            elevationGain: 1.6,
+          }
+        : {
+            baseSpacing: 56,
+            minCols: 10,
+            maxCols: 24,
+            spring: 0.05,
+            damping: 0.86,
+            neighborBlend: 0.08,
+            influenceRadius: 0,
+            pushStrength: 0,
+            tangential: 0,
+            ambientAmp: 1.4,
+            ambientSpeed: 0.00022,
+            lineBase: 0.055,
+            lineBoost: 0,
+            nodeBase: 0.14,
+            accentEvery: 14,
+            lensPower: 2,
+            velocityGain: 0,
+            elevationGain: 0,
+          }
 
-    // Lower-powered / mobile: reduce density for ambient.
     const effectiveSpacing =
       mode === 'ambient'
         ? Math.max(cfg.baseSpacing, Math.round(56 * Math.min(2, window.innerWidth / 430)))
@@ -149,10 +167,10 @@ export function MeshBackground({
       canvasEl.style.height = `${height}px`
       ctx!.setTransform(dpr, 0, 0, dpr, 0, 0)
 
-      const targetCols = mode === 'hero'
-        ? Math.min(cfg.maxCols, Math.max(cfg.minCols, Math.round(width / effectiveSpacing)))
-        : Math.min(cfg.maxCols, Math.max(cfg.minCols, Math.round(width / effectiveSpacing)))
-      cols = targetCols
+      cols = Math.min(
+        cfg.maxCols,
+        Math.max(cfg.minCols, Math.round(width / effectiveSpacing)),
+      )
       spacing = width / Math.max(1, cols - 1)
       rows = Math.max(4, Math.ceil(height / spacing) + 1)
 
@@ -160,11 +178,10 @@ export function MeshBackground({
       let accentIdx = 0
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
-          // Semi-irregular: slight jitter on rest positions for a woven feel.
           const jitterX = ((r * 17 + c * 31) % 7) / 7 - 0.5
           const jitterY = ((r * 13 + c * 19) % 5) / 5 - 0.5
-          const ox = c * spacing + jitterX * spacing * 0.12
-          const oy = r * spacing + jitterY * spacing * 0.12
+          const ox = c * spacing + jitterX * spacing * 0.14
+          const oy = r * spacing + jitterY * spacing * 0.14
           const accent = accentIdx > 0 && accentIdx % cfg.accentEvery === 0
           accentIdx++
           nodes.push({
@@ -174,20 +191,25 @@ export function MeshBackground({
             y: oy,
             vx: 0,
             vy: 0,
+            lx: 0,
+            ly: 0,
             phase: (r * 0.37 + c * 0.61) % (Math.PI * 2),
             accent,
+            elevation: 0,
           })
         }
       }
+      // Reset pointer scale after rebuild (prevents huge stale displacement).
+      pointer.px = pointer.x
+      pointer.py = pointer.y
+      pointer.vx = 0
+      pointer.vy = 0
     }
 
     function idx(r: number, c: number): number {
       return r * cols + c
     }
 
-    // Listeners are on window because the wrapper is pointer-events:none
-    // (so clicks/passes reach hero copy underneath). Coordinates are mapped
-    // into wrap space so deformation still tracks the cursor over the hero.
     function onPointerMove(e: PointerEvent) {
       if (!interactive) return
       const rect = wrapEl.getBoundingClientRect()
@@ -205,25 +227,20 @@ export function MeshBackground({
       pointer.active = false
       pointer.tx = -9999
       pointer.ty = -9999
-    }
-
-    function onTouchStart() {
-      // Touch devices never run interactive deformation.
-      pointer.active = false
+      pointer.vx = 0
+      pointer.vy = 0
     }
 
     function drawStatic() {
-      // One refined still frame for reduced-motion / first paint.
       ctx!.clearRect(0, 0, width, height)
       const a = opacity
-      ctx!.lineWidth = 1
-
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
           const n = nodes[idx(r, c)]
           if (c < cols - 1) {
             const right = nodes[idx(r, c + 1)]
-            ctx!.strokeStyle = `rgba(126, 220, 240, ${cfg.lineBase * a * 1.2})`
+            ctx!.strokeStyle = `rgba(197, 210, 223, ${cfg.lineBase * a})`
+            ctx!.lineWidth = 1
             ctx!.beginPath()
             ctx!.moveTo(n.x, n.y)
             ctx!.lineTo(right.x, right.y)
@@ -231,7 +248,8 @@ export function MeshBackground({
           }
           if (r < rows - 1) {
             const down = nodes[idx(r + 1, c)]
-            ctx!.strokeStyle = `rgba(126, 220, 240, ${cfg.lineBase * a})`
+            ctx!.strokeStyle = `rgba(197, 210, 223, ${cfg.lineBase * a * 0.9})`
+            ctx!.lineWidth = 1
             ctx!.beginPath()
             ctx!.moveTo(n.x, n.y)
             ctx!.lineTo(down.x, down.y)
@@ -239,29 +257,22 @@ export function MeshBackground({
           }
           if (c < cols - 1 && r < rows - 1) {
             const diag = nodes[idx(r + 1, c + 1)]
-            ctx!.strokeStyle = `rgba(4, 169, 206, ${cfg.lineBase * a * 0.55})`
+            ctx!.strokeStyle = `rgba(4, 169, 206, ${cfg.lineBase * a * 0.45})`
+            ctx!.lineWidth = 1
             ctx!.beginPath()
             ctx!.moveTo(n.x, n.y)
             ctx!.lineTo(diag.x, diag.y)
             ctx!.stroke()
           }
-
           if (n.accent) {
-            ctx!.fillStyle = `rgba(4, 169, 206, ${0.55 * a})`
+            ctx!.fillStyle = `rgba(4, 169, 206, ${0.5 * a})`
             ctx!.beginPath()
-            ctx!.arc(n.x, n.y, 2.4, 0, Math.PI * 2)
+            ctx!.arc(n.x, n.y, 2.2, 0, Math.PI * 2)
             ctx!.fill()
-            // Very faint curriculum label — atmospheric, not a diagram.
-            ctx!.fillStyle = `rgba(126, 220, 240, ${0.22 * a})`
-            ctx!.font = '600 8px ui-sans-serif, system-ui, sans-serif'
-            const label = ACCENT_LABELS[
-              nodes.filter((x) => x.accent).indexOf(n) % ACCENT_LABELS.length
-            ]
-            ctx!.fillText(label, n.x + 6, n.y - 5)
           } else {
             ctx!.fillStyle = `rgba(197, 210, 223, ${cfg.nodeBase * a})`
             ctx!.beginPath()
-            ctx!.arc(n.x, n.y, 1.4, 0, Math.PI * 2)
+            ctx!.arc(n.x, n.y, 1.3, 0, Math.PI * 2)
             ctx!.fill()
           }
         }
@@ -273,84 +284,149 @@ export function MeshBackground({
       const dt = Math.min(48, now - last)
       last = now
       const elapsed = now - t0
+      const start = now
 
-      // Smooth pointer interpolation for fluid follow.
+      // Interpolated pointer + velocity for momentum / lag.
       if (interactive && pointer.active) {
-        pointer.x += (pointer.tx - pointer.x) * 0.22
-        pointer.y += (pointer.ty - pointer.y) * 0.22
-        pointer.strength += (1 - pointer.strength) * 0.12
+        const prevX = pointer.x
+        const prevY = pointer.y
+        if (pointer.x < -1000) {
+          pointer.x = pointer.tx
+          pointer.y = pointer.ty
+          pointer.px = pointer.tx
+          pointer.py = pointer.ty
+        } else {
+          pointer.x += (pointer.tx - pointer.x) * 0.18
+          pointer.y += (pointer.ty - pointer.y) * 0.18
+        }
+        pointer.vx = (pointer.x - prevX) * 0.85 + pointer.vx * 0.15
+        pointer.vy = (pointer.y - prevY) * 0.85 + pointer.vy * 0.15
+        pointer.strength += (1 - pointer.strength) * 0.14
       } else {
-        pointer.strength += (0 - pointer.strength) * 0.06
-        if (pointer.strength < 0.01) pointer.strength = 0
+        pointer.strength += (0 - pointer.strength) * 0.055
+        if (pointer.strength < 0.008) {
+          pointer.strength = 0
+          pointer.vx *= 0.9
+          pointer.vy *= 0.9
+        }
       }
 
       ctx!.clearRect(0, 0, width, height)
       const a = opacity
       const R = cfg.influenceRadius
-      const R2 = R * R
+      const velMag = Math.min(40, Math.hypot(pointer.vx, pointer.vy))
 
-      // Physics: ambient target + cursor force + spring + damping.
+      // Pass 1 — forces: ambient rest + cursor lens + spring
       for (let i = 0; i < nodes.length; i++) {
         const n = nodes[i]
         const ambX = Math.sin(elapsed * cfg.ambientSpeed + n.phase) * cfg.ambientAmp
-        const ambY = Math.cos(elapsed * cfg.ambientSpeed * 0.85 + n.phase * 1.1) * cfg.ambientAmp
-        let restX = n.ox + ambX
-        let restY = n.oy + ambY
+        const ambY =
+          Math.cos(elapsed * cfg.ambientSpeed * 0.85 + n.phase * 1.1) * cfg.ambientAmp
+        const restX = n.ox + ambX
+        const restY = n.oy + ambY
 
         let fx = (restX - n.x) * cfg.spring
         let fy = (restY - n.y) * cfg.spring
 
+        n.elevation = 0
+
         if (interactive && pointer.strength > 0.001 && R > 0) {
           const dx = n.x - pointer.x
           const dy = n.y - pointer.y
-          const d2 = dx * dx + dy * dy
-          if (d2 < R2 && d2 > 0.01) {
-            const d = Math.sqrt(d2)
-            const t = d / R
-            const influence = smoothFalloff(t) * pointer.strength
-            // Soft gravitational push (radial) — creates a clear local bulge.
+          const d = Math.hypot(dx, dy)
+          if (d < R && d > 0.001) {
+            const fall = lensFalloff(d, R, cfg.lensPower) * pointer.strength
             const nx = dx / d
             const ny = dy / d
-            const push = influence * cfg.pushStrength
+            // Strong outward radial push → local surface bulge / lens.
+            const push = fall * cfg.pushStrength
             fx += nx * push
             fy += ny * push
-            // Slight tangential swirl for elastic fabric feel.
-            fx += -ny * push * 0.18
-            fy += nx * push * 0.18
+            // Slight tangential shear for fabric elasticity.
+            fx += -ny * push * cfg.tangential
+            fy += nx * push * cfg.tangential
+            // Velocity coupling — fast cursor imparts momentum (lag/inertia).
+            fx += pointer.vx * fall * cfg.velocityGain
+            fy += pointer.vy * fall * cfg.velocityGain
+            n.elevation = fall
           }
         }
 
         n.vx = (n.vx + fx) * cfg.damping
         n.vy = (n.vy + fy) * cfg.damping
-        n.x += n.vx
-        n.y += n.vy
-
-        // dt awareness: scale soft damping extra on long frames.
         if (dt > 32) {
           n.vx *= 0.98
           n.vy *= 0.98
         }
       }
 
-      // Draw links
+      // Pass 2 — neighbour membrane smoothing (coherent surface, not isolated dots).
+      if (cfg.neighborBlend > 0 && cols > 1 && rows > 1) {
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const n = nodes[idx(r, c)]
+            let sx = 0
+            let sy = 0
+            let count = 0
+            if (c > 0) {
+              const w = nodes[idx(r, c - 1)]
+              sx += w.x
+              sy += w.y
+              count++
+            }
+            if (c < cols - 1) {
+              const w = nodes[idx(r, c + 1)]
+              sx += w.x
+              sy += w.y
+              count++
+            }
+            if (r > 0) {
+              const w = nodes[idx(r - 1, c)]
+              sx += w.x
+              sy += w.y
+              count++
+            }
+            if (r < rows - 1) {
+              const w = nodes[idx(r + 1, c)]
+              sx += w.x
+              sy += w.y
+              count++
+            }
+            n.lx = count ? sx / count : n.x
+            n.ly = count ? sy / count : n.y
+          }
+        }
+        for (let i = 0; i < nodes.length; i++) {
+          const n = nodes[i]
+          n.vx += (n.lx - n.x) * cfg.neighborBlend
+          n.vy += (n.ly - n.y) * cfg.neighborBlend
+          n.x += n.vx
+          n.y += n.vy
+        }
+      } else {
+        for (let i = 0; i < nodes.length; i++) {
+          const n = nodes[i]
+          n.x += n.vx
+          n.y += n.vy
+        }
+      }
+
+      // Draw membrane
       let accentCount = 0
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
           const n = nodes[idx(r, c)]
-          const dxp = interactive ? n.x - pointer.x : 0
-          const dyp = interactive ? n.y - pointer.y : 0
-          const dist2 = interactive && R > 0 ? dxp * dxp + dyp * dyp : R2 + 1
-          const near = dist2 < R2 ? 1 - Math.sqrt(dist2) / R : 0
-          const boost = smoothFalloff(Math.max(0, Math.min(1, near))) * pointer.strength
+          let boost = n.elevation * pointer.strength
 
           if (c < cols - 1) {
             const right = nodes[idx(r, c + 1)]
-            const alpha = (cfg.lineBase + boost * cfg.lineBoost) * a
+            const midEl = (n.elevation + right.elevation) * 0.5 * pointer.strength
+            const alpha = (cfg.lineBase + midEl * cfg.lineBoost) * a
             ctx!.strokeStyle =
-              boost > 0.08
+              midEl > 0.12
                 ? `rgba(126, 220, 240, ${alpha})`
-                : `rgba(197, 210, 223, ${alpha * 0.85})`
-            ctx!.lineWidth = 1 + boost * 0.45
+                : `rgba(197, 210, 223, ${alpha * 0.9})`
+            ctx!.lineWidth = 1 + midEl * 0.7
             ctx!.beginPath()
             ctx!.moveTo(n.x, n.y)
             ctx!.lineTo(right.x, right.y)
@@ -358,12 +434,13 @@ export function MeshBackground({
           }
           if (r < rows - 1) {
             const down = nodes[idx(r + 1, c)]
-            const alpha = (cfg.lineBase * 0.9 + boost * cfg.lineBoost * 0.85) * a
+            const midEl = (n.elevation + down.elevation) * 0.5 * pointer.strength
+            const alpha = (cfg.lineBase * 0.92 + midEl * cfg.lineBoost * 0.9) * a
             ctx!.strokeStyle =
-              boost > 0.08
+              midEl > 0.12
                 ? `rgba(126, 220, 240, ${alpha})`
-                : `rgba(197, 210, 223, ${alpha * 0.85})`
-            ctx!.lineWidth = 1 + boost * 0.4
+                : `rgba(197, 210, 223, ${alpha * 0.9})`
+            ctx!.lineWidth = 1 + midEl * 0.65
             ctx!.beginPath()
             ctx!.moveTo(n.x, n.y)
             ctx!.lineTo(down.x, down.y)
@@ -371,7 +448,8 @@ export function MeshBackground({
           }
           if (c < cols - 1 && r < rows - 1) {
             const diag = nodes[idx(r + 1, c + 1)]
-            const alpha = (cfg.lineBase * 0.55 + boost * cfg.lineBoost * 0.55) * a
+            const midEl = (n.elevation + diag.elevation) * 0.5 * pointer.strength
+            const alpha = (cfg.lineBase * 0.5 + midEl * cfg.lineBoost * 0.55) * a
             ctx!.strokeStyle = `rgba(4, 169, 206, ${alpha})`
             ctx!.lineWidth = 1
             ctx!.beginPath()
@@ -380,49 +458,78 @@ export function MeshBackground({
             ctx!.stroke()
           }
 
-          // Soft cyan lens around the cursor (subtle, not a ring).
-          if (boost > 0.2 && interactive) {
-            ctx!.fillStyle = `rgba(4, 169, 206, ${boost * 0.08 * a})`
+          // Depth: elevated nodes read larger + brighter near cursor.
+          const elev = n.elevation * pointer.strength * cfg.elevationGain
+          if (boost > 0.15) {
+            ctx!.fillStyle = `rgba(4, 169, 206, ${boost * 0.1 * a})`
             ctx!.beginPath()
-            ctx!.arc(n.x, n.y, 2.2 + boost * 2.5, 0, Math.PI * 2)
+            ctx!.arc(n.x, n.y, 2.4 + boost * 4, 0, Math.PI * 2)
             ctx!.fill()
           }
 
           if (n.accent) {
             accentCount++
-            const pulse = 0.55 + 0.25 * Math.sin(elapsed * 0.002 + n.phase)
-            ctx!.fillStyle = `rgba(4, 169, 206, ${Math.min(1, pulse + boost * 0.3) * a})`
+            const pulse = 0.5 + 0.22 * Math.sin(elapsed * 0.002 + n.phase)
+            const alpha = Math.min(1, pulse + boost * 0.35) * a
+            ctx!.fillStyle = `rgba(4, 169, 206, ${alpha})`
             ctx!.beginPath()
-            ctx!.arc(n.x, n.y, 2.6, 0, Math.PI * 2)
+            ctx!.arc(n.x, n.y, 2.4 + elev * 1.4, 0, Math.PI * 2)
             ctx!.fill()
-            ctx!.fillStyle = `rgba(126, 220, 240, ${(0.18 + boost * 0.25) * a})`
-            ctx!.font = '600 8px ui-sans-serif, system-ui, sans-serif'
-            ctx!.fillText(
-              ACCENT_LABELS[(accentCount - 1) % ACCENT_LABELS.length],
-              n.x + 6,
-              n.y - 5,
-            )
+            if (accentCount % 4 === 1) {
+              ctx!.fillStyle = `rgba(126, 220, 240, ${(0.14 + boost * 0.22) * a})`
+              ctx!.font = '600 8px ui-sans-serif, system-ui, sans-serif'
+              ctx!.fillText(
+                ACCENT_LABELS[(accentCount - 1) % ACCENT_LABELS.length],
+                n.x + 6,
+                n.y - 5,
+              )
+            }
           } else {
-            ctx!.fillStyle = `rgba(197, 210, 223, ${(cfg.nodeBase + boost * 0.35) * a})`
+            ctx!.fillStyle = `rgba(197, 210, 223, ${(cfg.nodeBase + boost * 0.4) * a})`
             ctx!.beginPath()
-            ctx!.arc(n.x, n.y, 1.35 + boost * 1.1, 0, Math.PI * 2)
+            ctx!.arc(n.x, n.y, 1.25 + boost * 1.5, 0, Math.PI * 2)
             ctx!.fill()
           }
+          boost = 0
         }
       }
 
-      // Cursor glow (very soft ambient light in the influence area).
-      if (interactive && pointer.strength > 0.05 && R > 0) {
+      // Soft lens light under the cursor (depth cue, not a neon ring).
+      if (interactive && pointer.strength > 0.08 && R > 0) {
         const g = ctx!.createRadialGradient(
-          pointer.x, pointer.y, 0,
-          pointer.x, pointer.y, R * 0.85,
+          pointer.x,
+          pointer.y,
+          0,
+          pointer.x,
+          pointer.y,
+          R * 0.9,
         )
-        g.addColorStop(0, `rgba(4, 169, 206, ${0.1 * pointer.strength * a})`)
+        g.addColorStop(0, `rgba(4, 169, 206, ${0.09 * pointer.strength * a})`)
+        g.addColorStop(0.55, `rgba(4, 169, 206, ${0.035 * pointer.strength * a})`)
         g.addColorStop(1, 'rgba(4, 169, 206, 0)')
         ctx!.fillStyle = g
         ctx!.beginPath()
-        ctx!.arc(pointer.x, pointer.y, R * 0.85, 0, Math.PI * 2)
+        ctx!.arc(pointer.x, pointer.y, R * 0.9, 0, Math.PI * 2)
         ctx!.fill()
+        // Soft outer wake from velocity
+        if (velMag > 4) {
+          ctx!.fillStyle = `rgba(126, 220, 240, ${Math.min(0.06, velMag * 0.0015) * a})`
+          ctx!.beginPath()
+          ctx!.arc(
+            pointer.x - pointer.vx * 2,
+            pointer.y - pointer.vy * 2,
+            R * 0.45,
+            0,
+            Math.PI * 2,
+          )
+          ctx!.fill()
+        }
+      }
+
+      frameCost = performance.now() - start
+      // Adaptive: if frames are consistently heavy, pause non-essential labels next frames (cheap guard).
+      if (frameCost > 40 && nodes.length > 800) {
+        // already drawn; no further action needed — density is viewport-capped
       }
 
       raf = requestAnimationFrame(frame)
@@ -439,6 +546,11 @@ export function MeshBackground({
       }
     }
 
+    function onDprChange() {
+      buildGrid()
+      if (reduce) drawStatic()
+    }
+
     buildGrid()
 
     if (reduce) {
@@ -451,13 +563,18 @@ export function MeshBackground({
       buildGrid()
       if (reduce) drawStatic()
     })
-    ro.observe(wrap)
+    ro.observe(wrapEl)
 
     window.addEventListener('pointermove', onPointerMove, { passive: true })
     window.addEventListener('pointerleave', onPointerLeave, { passive: true })
     window.addEventListener('blur', onPointerLeave, { passive: true })
-    window.addEventListener('touchstart', onTouchStart, { passive: true })
     document.addEventListener('visibilitychange', onVisibility)
+    // DPR / monitor change
+    const mqDpr =
+      typeof window !== 'undefined'
+        ? window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`)
+        : null
+    mqDpr?.addEventListener?.('change', onDprChange)
 
     return () => {
       running = false
@@ -466,8 +583,8 @@ export function MeshBackground({
       window.removeEventListener('pointermove', onPointerMove)
       window.removeEventListener('pointerleave', onPointerLeave)
       window.removeEventListener('blur', onPointerLeave)
-      window.removeEventListener('touchstart', onTouchStart)
       document.removeEventListener('visibilitychange', onVisibility)
+      mqDpr?.removeEventListener?.('change', onDprChange)
     }
   }, [mode, opacity])
 
@@ -478,13 +595,12 @@ export function MeshBackground({
       aria-hidden="true"
     >
       <canvas ref={canvasRef} className="block h-full w-full" />
-      {/* Subtle cursor glow companion (desktop hero only) */}
       {mode === 'hero' && (
         <div
           className="pointer-events-none absolute inset-0"
           style={{
             background:
-              'radial-gradient(720px 400px at 70% 40%, rgba(4,169,206,0.10), transparent 65%)',
+              'radial-gradient(720px 400px at 70% 40%, rgba(4,169,206,0.08), transparent 65%)',
           }}
         />
       )}

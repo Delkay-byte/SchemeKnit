@@ -7,10 +7,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { PasswordInput, PasswordMatchIndicator, passwordMatchStatus } from '@/components/password-input'
 import { SchemeKnitMark } from '@/components/scheme-knit-mark'
+import { AuthShell } from '@/components/auth/auth-shell'
 import { validateEmail, validatePassword, PASSWORD_POLICY } from '@/lib/password-policy'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import { Shield, ArrowRight, CheckCircle2 } from 'lucide-react'
+import { ArrowRight, CheckCircle2 } from 'lucide-react'
 
 /**
  * One-time Platform Admin bootstrap page.
@@ -151,129 +152,115 @@ export default function SetupPlatformAdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/30 flex items-center justify-center p-4">
-      <Card className="w-full max-w-lg">
-        <div className="h-2 bg-gradient-to-r from-slate-800 to-slate-700" />
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-2">
-            <SchemeKnitMark size={32} />
-          </div>
-          <div className="flex items-center justify-center gap-2 mb-1">
-            <Shield className="h-5 w-5 text-slate-600" />
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              One-Time Setup
-            </span>
-          </div>
-          <CardTitle className="text-2xl">
-            Set Up SchemeKnit Platform Administration
-          </CardTitle>
-          <CardDescription>
-            This one-time setup creates the first authorized SchemeKnit platform
-            administrator. After completion, this page becomes permanently
-            unavailable.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Full Name</label>
-              <input
-                type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                required
-                autoComplete="name"
-                placeholder="Platform Administrator"
-                className="w-full px-3 py-2 border rounded-md"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoComplete="email"
-                placeholder="admin@bloomcore.com"
-                className="w-full px-3 py-2 border rounded-md"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Bootstrap Setup Secret
-              </label>
-              <PasswordInput
-                value={secret}
-                onChange={(e) => setSecret(e.target.value)}
-                required
-                autoComplete="off"
-                placeholder="Provided by your deployment operator"
-                toggleLabel="Show secret"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                The secret comes from secure server configuration
-                (PLATFORM_ADMIN_BOOTSTRAP_SECRET). It is never stored or logged.
-              </p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Password</label>
-              <PasswordInput
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={8}
-                autoComplete="new-password"
-                placeholder="Create a password"
-                toggleLabel="Show password"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                {PASSWORD_POLICY.description}
-              </p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Confirm Password
-              </label>
-              <PasswordInput
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                minLength={8}
-                autoComplete="new-password"
-                placeholder="Confirm your password"
-                toggleLabel="Show password"
-              />
-              <PasswordMatchIndicator
-                password={password}
-                confirm={confirmPassword}
-              />
-            </div>
+    <AuthShell
+      role="platform_admin"
+      title="Set Up SchemeKnit Platform Administration"
+      description="This one-time setup creates the first authorized SchemeKnit platform administrator. After completion, this page becomes permanently unavailable."
+      securityNote="One-time bootstrap — requires PLATFORM_ADMIN_BOOTSTRAP_SECRET from your deployment operator."
+      steps={[
+        { label: 'Identity', active: true },
+        { label: 'Bootstrap secret' },
+        { label: 'Password' },
+      ]}
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-1">Full Name</label>
+          <input
+            type="text"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            required
+            autoComplete="name"
+            placeholder="Platform Administrator"
+            className="w-full px-3 py-2 border rounded-md"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Email</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoComplete="email"
+            placeholder="admin@bloomcore.com"
+            className="w-full px-3 py-2 border rounded-md"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">
+            Bootstrap Setup Secret
+          </label>
+          <PasswordInput
+            value={secret}
+            onChange={(e) => setSecret(e.target.value)}
+            required
+            autoComplete="off"
+            placeholder="Provided by your deployment operator"
+            toggleLabel="Show secret"
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            The secret comes from secure server configuration
+            (PLATFORM_ADMIN_BOOTSTRAP_SECRET). It is never stored or logged.
+          </p>
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Password</label>
+          <PasswordInput
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={8}
+            autoComplete="new-password"
+            placeholder="Create a password"
+            toggleLabel="Show password"
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            {PASSWORD_POLICY.description}
+          </p>
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">
+            Confirm Password
+          </label>
+          <PasswordInput
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+            minLength={8}
+            autoComplete="new-password"
+            placeholder="Confirm your password"
+            toggleLabel="Show password"
+          />
+          <PasswordMatchIndicator
+            password={password}
+            confirm={confirmPassword}
+          />
+        </div>
 
-            {error && (
-              <p className="text-sm text-destructive bg-destructive/10 p-2 rounded">
-                {error}
-              </p>
-            )}
+        {error && (
+          <p className="text-sm text-destructive bg-destructive/10 p-2 rounded">
+            {error}
+          </p>
+        )}
 
-            <Button
-              type="submit"
-              disabled={loading || (!match.matched && confirmPassword.length > 0)}
-              className="w-full"
-            >
-              {loading ? 'Please wait...' : 'Create First Platform Admin'}
-            </Button>
-          </form>
+        <Button
+          type="submit"
+          disabled={loading || (!match.matched && confirmPassword.length > 0)}
+          className="w-full"
+        >
+          {loading ? 'Please wait...' : 'Create First Platform Admin'}
+        </Button>
+      </form>
 
-          <div className="mt-6 p-4 bg-muted rounded-lg">
-            <p className="text-sm text-muted-foreground text-center">
-              The first platform admin uses the same password policy as every
-              other account. After setup, you can change your password from
-              Settings at any time.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+      <div className="mt-6 p-4 bg-muted rounded-lg">
+        <p className="text-sm text-muted-foreground text-center">
+          The first platform admin uses the same password policy as every
+          other account. After setup, you can change your password from
+          Settings at any time.
+        </p>
+      </div>
+    </AuthShell>
   )
 }

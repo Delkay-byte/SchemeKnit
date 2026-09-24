@@ -21,7 +21,14 @@ export function PublicFooter() {
           {/* Brand */}
           <div className="space-y-3">
             <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 ring-1 ring-[#04A9CE]/30">
+              <span
+                className="flex h-10 w-10 items-center justify-center rounded-xl border"
+                style={{
+                  background: '#F4F7FA',
+                  borderColor: 'rgba(16,42,67,0.12)',
+                  boxShadow: '0 0 0 1px rgba(4,169,206,0.28)',
+                }}
+              >
                 <SchemeKnitMark size={26} />
               </span>
               <span className="text-lg font-bold">

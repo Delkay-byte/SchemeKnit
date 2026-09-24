@@ -95,7 +95,6 @@ export function RoleLogin({ entry }: { entry: EntryRole }) {
   const [checking, setChecking] = useState(true)
 
   const copy = ENTRY_COPY[entry]
-  const operational = entry === 'platform_admin'
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -139,11 +138,24 @@ export function RoleLogin({ entry }: { entry: EntryRole }) {
     }
   }
 
+  // Loading skeleton matches each role's page theme (no mesh).
   if (authLoading || checking) {
+    const loadingBg =
+      entry === 'school_admin'
+        ? 'bg-[#0B1F3A]'
+        : entry === 'platform_admin'
+          ? 'bg-[#050E18]'
+          : 'bg-[#F7F5F0]'
+    const spin =
+      entry === 'school_admin'
+        ? 'border-[#04A9CE]'
+        : entry === 'platform_admin'
+          ? 'border-slate-400'
+          : 'border-[#04A9CE]'
     return (
-      <div className="min-h-screen bg-[#071826] flex items-center justify-center">
+      <div className={`min-h-screen ${loadingBg} flex items-center justify-center`}>
         <div
-          className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#04A9CE]"
+          className={`animate-spin rounded-full h-12 w-12 border-b-2 ${spin}`}
           role="status"
           aria-label="Loading"
         />
@@ -156,7 +168,6 @@ export function RoleLogin({ entry }: { entry: EntryRole }) {
       role={entry}
       title={copy.title}
       description={copy.description}
-      operational={operational}
       securityNote={copy.securityNote}
       footer={
         <div className="space-y-3">
