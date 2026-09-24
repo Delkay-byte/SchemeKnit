@@ -3,11 +3,12 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Key, CheckCircle, AlertCircle, Building2 } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Key, CheckCircle, AlertCircle, Building2, ArrowRight } from 'lucide-react'
 import { api } from '@/lib/api'
 import { PasswordInput, PasswordMatchIndicator } from '@/components/password-input'
 import { AuthShell } from '@/components/auth/auth-shell'
+import { AuthField, AuthError } from '@/components/auth/auth-field'
 import {
   validatePassword, validateEmail, PASSWORD_POLICY,
 } from '@/lib/password-policy'
@@ -92,19 +93,17 @@ export default function ActivateSchoolPage() {
   }
 
   const handleEnter = () => {
-    // The admin signs in normally with the credentials just created (§8).
-    // The activation code was an onboarding credential, not a login credential.
     router.push('/login/school-admin')
   }
 
   const stepMeta =
     step === 'code'
-      ? { title: 'Activate Your School', description: 'Enter the activation code provided by SchemeKnit to set up your school workspace.' }
+      ? { title: 'Activate your school', description: 'Connect your school to SchemeKnit and begin managing your teaching team. Enter the activation code provided by SchemeKnit.' }
       : step === 'details'
-        ? { title: 'Code Valid', description: 'This code activates the following school workspace' }
+        ? { title: 'Code valid', description: 'This code activates the following school workspace. Review the details before continuing.' }
         : step === 'account'
-          ? { title: 'Create School Administrator', description: `Administrator for ${info?.school?.name}. This account manages teachers and settings.` }
-          : { title: 'School Activated', description: `${info?.school?.name} is active. Sign in as ${createdEmail} to open your workspace.` }
+          ? { title: 'Create school administrator', description: `Administrator for ${info?.school?.name}. This account manages teachers and settings.` }
+          : { title: 'School activated', description: `${info?.school?.name} is active. Sign in as ${createdEmail} to open your workspace.` }
 
   return (
     <AuthShell
@@ -118,127 +117,178 @@ export default function ActivateSchoolPage() {
         { label: 'Done', done: step === 'done', active: step === 'done' },
       ]}
     >
-      <Card className="w-full border-0 shadow-none">
-        {step === 'code' && (
-          <>
-            <CardHeader className="text-center px-0 pt-0">
-              <Key className="h-12 w-12 text-primary mx-auto mb-4" />
-            </CardHeader>
-            <CardContent className="px-0 pb-0">
-              <form onSubmit={handleValidate} className="space-y-4">
-                {error && (
-                  <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md flex items-start gap-2">
-                    <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-                    <span>{error}</span>
-                  </div>
-                )}
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium">Activation Code</label>
-                  <input
-                    type="text"
-                    value={code}
-                    onChange={(e) => setCode(e.target.value)}
-                    placeholder="TF-SCH-XXXX-XXXX-XXXX"
-                    required
-                    className="w-full px-3 py-2 border rounded-md font-mono text-center text-lg tracking-wider"
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? 'Validating...' : 'Validate Code'}
-                </Button>
-              </form>
-            </CardContent>
-          </>
-        )}
+      {step === 'code' && (
+        <form onSubmit={handleValidate} className="space-y-4" noValidate>
+          <div className="rounded-xl border border-[#04A9CE]/25 bg-[#04A9CE]/8 px-4 py-3 text-center shadow-sm">
+            <Key className="mx-auto h-5 w-5 text-[#04A9CE]" aria-hidden="true" />
+            <p className="mt-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-[#0389a8]">
+              Institutional activation code
+            </p>
+          </div>
+          <AuthField id="school-activation-code" label="Activation code">
+            <Input
+              id="school-activation-code"
+              type="text"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder="TF-SCH-XXXX-XXXX-XXXX"
+              required
+              autoComplete="off"
+              aria-invalid={error ? true : undefined}
+              className="h-12 text-center font-mono text-base tracking-[0.2em] shadow-inner"
+            />
+          </AuthField>
+          <AuthError message={error} />
+          <Button
+            type="submit"
+            disabled={loading}
+            className="h-11 w-full rounded-lg bg-[#102A43] text-white font-semibold shadow-[0_4px_14px_rgba(16,42,67,0.25)] hover:bg-[#0d2740] active:scale-[0.98] transition focus-visible:ring-2 focus-visible:ring-[#04A9CE] focus-visible:ring-offset-2 disabled:opacity-60"
+          >
+            {loading ? (
+              <span className="inline-flex items-center gap-2">
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                Validating…
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-2">
+                Validate code
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </span>
+            )}
+          </Button>
+        </form>
+      )}
 
-        {step === 'details' && info && (
-          <>
-            <CardHeader className="text-center px-0 pt-0">
-              <Building2 className="h-12 w-12 text-primary mx-auto mb-4" />
-            </CardHeader>
-            <CardContent className="px-0 pb-0 space-y-4">
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">School:</span>
-                  <span className="font-medium">{info.school?.name}</span>
+      {step === 'details' && info && (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-border bg-[#F4F7FA] p-4 shadow-sm">
+            <div className="mb-3 flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-[#04A9CE]" aria-hidden="true" />
+              <p className="text-[11px] font-bold uppercase tracking-wider text-[#04A9CE]">License details</p>
+            </div>
+            <dl className="space-y-2.5 text-sm">
+              {[
+                ['School', info.school?.name],
+                ['Plan', info.license?.plan],
+                ['License status', info.license?.status],
+                ['Teacher seats', String(info.license?.seat_limit ?? '—')],
+                ['Valid until', info.license?.expiry_date],
+              ].map(([k, v]) => (
+                <div key={k} className="flex items-center justify-between gap-3 border-b border-border/60 pb-2 last:border-0 last:pb-0">
+                  <dt className="text-muted-foreground">{k}</dt>
+                  <dd className="font-semibold text-[#102A43] text-right">{v ?? '—'}</dd>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Plan:</span>
-                  <span className="font-medium">{info.license?.plan}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">License status:</span>
-                  <span className="font-medium">{info.license?.status}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Teacher seats:</span>
-                  <span className="font-medium">{info.license?.seat_limit}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Valid until:</span>
-                  <span className="font-medium">{info.license?.expiry_date}</span>
-                </div>
-              </div>
-              <Button className="w-full" onClick={() => setStep('account')}>
-                Continue — Create School Administrator
-              </Button>
-              <Button variant="ghost" className="w-full" onClick={() => setStep('code')}>
-                Use a different code
-              </Button>
-            </CardContent>
-          </>
-        )}
+              ))}
+            </dl>
+          </div>
+          <Button
+            onClick={() => setStep('account')}
+            className="h-11 w-full rounded-lg bg-[#102A43] text-white font-semibold shadow-[0_4px_14px_rgba(16,42,67,0.25)] hover:bg-[#0d2740] active:scale-[0.98] transition"
+          >
+            Continue — Create school administrator
+          </Button>
+          <Button
+            variant="ghost"
+            className="w-full"
+            onClick={() => setStep('code')}
+          >
+            Use a different code
+          </Button>
+        </div>
+      )}
 
-        {step === 'account' && (
-          <>
-            <CardContent className="px-0 pb-0">
-              <form onSubmit={handleCreateAdmin} className="space-y-4">
-                {error && (
-                  <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">{error}</div>
-                )}
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium">Full Name</label>
-                  <input type="text" value={name} onChange={(e) => setName(e.target.value)}
-                    placeholder="Ama Serwaa" required className="w-full px-3 py-2 border rounded-md" />
-                </div>
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium">Email</label>
-                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                    placeholder="admin@school.edu.gh" required className="w-full px-3 py-2 border rounded-md" />
-                </div>
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium">Password (min 8 characters)</label>
-                  <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)}
-                    required toggleLabel="Show password" placeholder="At least 8 characters" />
-                  <p className="text-xs text-muted-foreground">{PASSWORD_POLICY.description}</p>
-                </div>
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium">Confirm Password</label>
-                  <PasswordInput value={confirm} onChange={(e) => setConfirm(e.target.value)}
-                    required toggleLabel="Show password" placeholder="Confirm password" />
-                  <PasswordMatchIndicator password={password} confirm={confirm} />
-                </div>
-                <Button type="submit" className="w-full" disabled={creating}>
-                  {creating ? 'Creating Account...' : 'Create Administrator'}
-                </Button>
-              </form>
-            </CardContent>
-          </>
-        )}
+      {step === 'account' && (
+        <form onSubmit={handleCreateAdmin} className="space-y-4" noValidate>
+          <AuthField id="school-admin-name" label="Full name">
+            <Input
+              id="school-admin-name"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Ama Serwaa"
+              required
+              autoComplete="name"
+              aria-invalid={error ? true : undefined}
+            />
+          </AuthField>
+          <AuthField id="school-admin-email" label="Email">
+            <Input
+              id="school-admin-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="admin@school.edu.gh"
+              required
+              autoComplete="email"
+              aria-invalid={error ? true : undefined}
+            />
+          </AuthField>
+          <AuthField
+            id="school-admin-password"
+            label="Password"
+            hint={PASSWORD_POLICY.description}
+          >
+            <PasswordInput
+              id="school-admin-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              toggleLabel="Show password"
+              placeholder="At least 8 characters"
+              autoComplete="new-password"
+            />
+          </AuthField>
+          <AuthField id="school-admin-confirm" label="Confirm password">
+            <PasswordInput
+              id="school-admin-confirm"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              required
+              toggleLabel="Show password"
+              placeholder="Confirm password"
+              autoComplete="new-password"
+            />
+          </AuthField>
+          <PasswordMatchIndicator password={password} confirm={confirm} />
+          <AuthError message={error} />
+          <Button
+            type="submit"
+            disabled={creating}
+            className="h-11 w-full rounded-lg bg-[#102A43] text-white font-semibold shadow-[0_4px_14px_rgba(16,42,67,0.25)] hover:bg-[#0d2740] active:scale-[0.98] transition disabled:opacity-60"
+          >
+            {creating ? (
+              <span className="inline-flex items-center gap-2">
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                Creating account…
+              </span>
+            ) : (
+              'Create administrator'
+            )}
+          </Button>
+        </form>
+      )}
 
-        {step === 'done' && (
-          <>
-            <CardHeader className="text-center px-0 pt-0">
-              <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-            </CardHeader>
-            <CardContent className="px-0 pb-0">
-              <Button className="w-full" onClick={handleEnter}>
-                Go to Sign In
-              </Button>
-            </CardContent>
-          </>
-        )}
-      </Card>
+      {step === 'done' && (
+        <div className="space-y-4 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 shadow-inner">
+            <CheckCircle className="h-8 w-8 text-emerald-600" aria-hidden="true" />
+          </div>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            {info?.school?.name} is active. Sign in as{' '}
+            <strong className="text-[#102A43]">{createdEmail}</strong> to open
+            your workspace.
+          </p>
+          <Button
+            onClick={handleEnter}
+            className="h-11 w-full rounded-lg bg-[#102A43] text-white font-semibold shadow-[0_4px_14px_rgba(16,42,67,0.25)] hover:bg-[#0d2740] active:scale-[0.98] transition"
+          >
+            <span className="inline-flex items-center gap-2">
+              Go to sign in
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </span>
+          </Button>
+        </div>
+      )}
     </AuthShell>
   )
 }

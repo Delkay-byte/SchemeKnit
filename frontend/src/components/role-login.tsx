@@ -12,15 +12,11 @@ import { AuthShell } from '@/components/auth/auth-shell'
 import { AuthField, AuthError } from '@/components/auth/auth-field'
 import { validateEmail } from '@/lib/password-policy'
 import { isDesktop } from '@/lib/build-target'
-import { Building2, Shield, GraduationCap, KeyRound, AlertCircle } from 'lucide-react'
+import { Building2, Shield, GraduationCap, KeyRound, AlertCircle, ArrowRight } from 'lucide-react'
 
 /**
- * Sign-in entry points (Hero V2 / auth redesign).
- *
+ * Sign-in entry points.
  * Routes unchanged: /login · /login/school-admin · /login/platform-admin
- * All submit to the same backend endpoint. Role routing uses the account's
- * real role — never the entry URL. Platform Admin is not linked from public
- * pages; the direct route keeps working.
  */
 export type EntryRole = 'teacher' | 'school_admin' | 'platform_admin'
 
@@ -35,12 +31,13 @@ const ENTRY_COPY: Record<
     securityNote?: string
     showForgot: boolean
     forgotHint: string
+    welcome?: string
   }
 > = {
   teacher: {
-    title: 'Teacher Sign In',
+    title: 'Welcome back, teacher.',
     description:
-      'Sign in to create, manage and export your lesson plans with SchemeKnit.',
+      'Pick up where your lesson planning left off — schemes, indicators and ready-to-teach lessons.',
     emailPlaceholder: 'teacher@school.edu.gh',
     note:
       'Your SchemeKnit administrator creates teacher accounts for school installations. ' +
@@ -49,6 +46,7 @@ const ENTRY_COPY: Record<
     showForgot: true,
     forgotHint:
       'Password resets are issued by your administrator. Contact your school admin or SchemeKnit support if you cannot sign in.',
+    welcome: 'Your teaching workspace',
   },
   school_admin: {
     title: 'School Administration Sign In',
@@ -73,7 +71,7 @@ const ENTRY_COPY: Record<
       'or your server operator for a controlled password reset.',
     icon: Shield,
     securityNote:
-      'Authorized SchemeKnit platform staff only. Direct route — not listed on public pages.',
+      'SECURE ADMIN ACCESS — Authorized SchemeKnit platform staff only. Direct route — not listed on public pages.',
     showForgot: false,
     forgotHint: '',
   },
@@ -138,7 +136,6 @@ export function RoleLogin({ entry }: { entry: EntryRole }) {
     }
   }
 
-  // Loading skeleton matches each role's page theme (no mesh).
   if (authLoading || checking) {
     const loadingBg =
       entry === 'school_admin'
@@ -268,7 +265,7 @@ export function RoleLogin({ entry }: { entry: EntryRole }) {
         <Button
           type="submit"
           disabled={loading}
-          className="h-11 w-full rounded-lg bg-[#102A43] text-white font-semibold hover:bg-[#0d2740] active:scale-[0.99] transition focus-visible:ring-2 focus-visible:ring-[#04A9CE] focus-visible:ring-offset-2 disabled:opacity-60"
+          className="h-11 w-full rounded-lg bg-[#102A43] text-white font-semibold shadow-[0_4px_14px_rgba(16,42,67,0.25)] hover:bg-[#0d2740] active:scale-[0.98] transition focus-visible:ring-2 focus-visible:ring-[#04A9CE] focus-visible:ring-offset-2 disabled:opacity-60"
         >
           {loading ? (
             <span className="inline-flex items-center gap-2">
@@ -276,14 +273,17 @@ export function RoleLogin({ entry }: { entry: EntryRole }) {
               Signing in…
             </span>
           ) : (
-            'Sign in'
+            <span className="inline-flex items-center gap-2">
+              Sign in
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </span>
           )}
         </Button>
       </form>
 
       {entry === 'teacher' && (
         <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-3">
+          <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-3 shadow-sm">
             <p className="text-[11px] font-bold text-blue-700 uppercase tracking-wide mb-1">
               School Teacher
             </p>
@@ -292,7 +292,7 @@ export function RoleLogin({ entry }: { entry: EntryRole }) {
               administrator gave you.
             </p>
           </div>
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3">
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 shadow-sm">
             <p className="text-[11px] font-bold text-emerald-700 uppercase tracking-wide mb-1">
               Individual Teacher
             </p>
