@@ -288,7 +288,10 @@ class TestDNurseryIngestion:
     def test_nursery_is_multi_subject_and_indicatorless(self):
         scheme = _parse(NURSERY_SCHEME)
         assert scheme.subject.value == "Our World Our People"
-        assert scheme.class_level.value == "Nursery"
+        # The document body declares "NURSERY 1 — TERM 1 (2024/2025)": the
+        # specific level is kept (never collapsed to the generic family name
+        # and never renumbered), and stays distinct from KG.
+        assert scheme.class_level.value == "Nursery 1"
         assert scheme_has_indicators(scheme.weeks) is False
         instruction = [w for w in scheme.weeks if w.week_type == WeekType.INSTRUCTION]
         assert instruction
