@@ -1,7 +1,15 @@
 // SchemeKnit API Service
 
 import { DEV_TOOLS_ENABLED } from './dev-tools'
-import type { WapefOptions } from '@/types'
+import type {
+  WapefOptions,
+  WeeklyClassPlan,
+  WeeklyDayOption,
+  WeeklyPlanListItem,
+  WeeklyPlanRequest,
+  WeeklyPreviewResponse,
+  WeeklyRouting,
+} from '@/types'
 
 /**
  * Single source of truth for the API base URL.
@@ -924,6 +932,64 @@ class ApiService {
   async listPlatformAuditLogs(limit?: number): Promise<{ logs: any[] }> {
     const params = limit ? `?limit=${limit}` : ''
     return this.request(`/api/platform-admin/audit${params}`)
+  }
+
+  // ── Weekly class-teacher plans (Approved WAPEF Basic 1-3 Plan) ─────────────
+  // Basic 1-3 only: the class boundary is decided server-side by
+  // wapef_template_for_class, and this client never routes Basic 4-JHS here.
+
+  /** Which WAPEF planning model applies to a class (Basic 1-3 boundary). */
+  async getWeeklyRouting(classLevel: string): Promise<WeeklyRouting> {
+    return this.request(`/api/weekly-plans/routing/${encodeURIComponent(classLevel)}`)
+  }
+
+  /** The teaching-day options the teacher assigns per subject. */
+  async getWeeklyDayOptions(): Promise<{ days: WeeklyDayOption[]; week_days: string[] }> {
+    return this.request('/api/weekly-plans/day-options')
+  }
+
+  /** Build a weekly class plan without persisting it. */
+  async previewWeeklyPlan(request: WeeklyPlanRequest): Promise<WeeklyPreviewResponse> {
+    return this.request('/api/weekly-plans/preview', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    })
+  }
+
+  /** Persist one weekly class plan (review -> save -> reload -> edit -> export). */
+  async createWeeklyPlan(request: WeeklyPlanRequest): Promise<{ plan: WeeklyClassPlan; id: string }> {
+    return this.request('/api/weekly-plans', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    })
+  }
+
+  /** The teacher's weekly class plans (newest first). */
+  async listWeeklyPlans(): Promise<{ plans: WeeklyPlanListItem[] }> {
+    return this.request('/api/weekly-plans')
+  }
+
+  /** Fetch one weekly plan (reload after save, with full day-plan content). */
+  async getWeeklyPlan(planId: string): Promise<{ plan: WeeklyClassPlan }> {
+    return this.request(`/api/weekly-plans/${planId}`)
+  }
+
+  /** Edit a saved weekly plan (subject + day granularity, isolation enforced). */
+  async updateWeeklyPlan(planId: string, updates: Record<string, unknown>): Promise<{ plan: WeeklyClassPlan }> {
+    return this.request(`/api/weekly-plans/${planId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    })
+  }
+
+  /** One DOCX: one weekly class plan with every subject section in it. */
+  async exportWeeklyDocx(planId: string) {
+    return this.exportBlob(`${this.baseUrl}/api/weekly-plans/${planId}/export/docx`)
+  }
+
+  /** PDF from the same canonical weekly document (DOCX -> PDF). */
+  async exportWeeklyPdf(planId: string) {
+    return this.exportBlob(`${this.baseUrl}/api/weekly-plans/${planId}/export/pdf`)
   }
 
   // Electron file download (native save dialog) / browser blob download

@@ -362,3 +362,149 @@ export interface ContentPack {
   lesson_count: number
   status: string
 }
+
+// ── Weekly class-teacher plan (Approved WAPEF Basic 1-3 Plan) ────────────────
+// Basic 1-3 is the class-teacher model: ONE teacher -> MULTIPLE subjects ->
+// DIFFERENT days -> ONE weekly plan document. Basic 4-JHS keeps the
+// subject-teacher Approved WAPEF Plan and never enters these flows.
+
+/** Which WAPEF planning model applies to a class (the routing boundary). */
+export interface WeeklyRouting {
+  class_level: string
+  template_id: string
+  template_name: string
+  planning_model: 'class_teacher' | 'subject_teacher'
+  basic13_template_id: string
+  subject_teacher_template_id: string
+  class_levels: string[]
+}
+
+/** One teaching-day option the teacher assigns per subject. */
+export interface WeeklyDayOption {
+  label: string
+  value: string
+}
+
+/** One subject the class teacher wants in this week's plan. */
+export interface WeeklyPlanSubjectRequest {
+  scheme_id: string
+  /** Teacher-confirmed day groups: one entry per shared teaching row
+   *  (e.g. ["MONDAY", "THURSDAY"] renders as "MONDAY & THURSDAY"). */
+  teaching_day_groups: string[][]
+  wapef_deep_hope?: string
+  wapef_storyline?: string
+  wapef_through_lines?: string[]
+  wapef_gods_story?: string
+  keywords?: string[]
+  core_competencies?: string[]
+  other_tlrs?: string[]
+}
+
+/** Request body for generating one Basic 1-3 weekly class plan. */
+export interface WeeklyPlanRequest {
+  class_level: string
+  week_number: number
+  term_start_date: string
+  term_end_date: string
+  term: string
+  academic_year: string
+  class_size?: number
+  lesson_duration_minutes?: number
+  subjects: WeeklyPlanSubjectRequest[]
+}
+
+/** One teaching-day entry in a week's subject section. */
+export interface WeeklyDayPlan {
+  lesson_plan_id?: string | null
+  days: string[]
+  day_label: string
+  focus_indicators: string[]
+  focus_indicator_codes: string[]
+  starter: string
+  main_activities: { phase?: string; description?: string; [k: string]: unknown }[]
+  reflection: string
+  resources: string[]
+  lesson_date?: string | null
+  period: string
+}
+
+/** Curriculum + WAPEF metadata shared by one subject's day plans. */
+export interface WeeklySubjectMetadata {
+  subject: string
+  class_level: string
+  week_number: number
+  week_ending?: string | null
+  week_ending_derived?: boolean
+  reference: string
+  strand: string
+  sub_strand: string
+  content_standards: string[]
+  content_standard_codes: string[]
+  indicators: string[]
+  indicator_codes: string[]
+  performance_indicators: string[]
+  teaching_learning_resources: string[]
+  core_competencies: string[]
+  keywords: string[]
+  wapef_deep_hope: string
+  wapef_storyline: string
+  wapef_through_lines: string[]
+  wapef_gods_story: string
+}
+
+/** One subject section of a weekly class plan. */
+export interface WeeklySubjectPlan {
+  scheme_of_work_id: string
+  job_id: string
+  subject: string
+  teaching_days: string[]
+  teaching_day_groups: string[][]
+  metadata: WeeklySubjectMetadata
+  day_plans: WeeklyDayPlan[]
+}
+
+/** One weekly class-teacher plan holding every subject of the class. */
+export interface WeeklyClassPlan {
+  id: string
+  owner_id: string
+  class_level: string
+  week_number: number
+  term: string
+  academic_year: string
+  term_start_date?: string | null
+  term_end_date?: string | null
+  school_name?: string | null
+  teacher_name?: string | null
+  template_id: string
+  subjects: WeeklySubjectPlan[]
+  created_date: string
+  updated_date: string
+}
+
+/** Subject -> teaching days summary shown alongside a preview. */
+export interface WeeklyTeachingDaysSummary {
+  subject: string
+  scheme_of_work_id: string
+  teaching_days: string[]
+  teaching_day_groups: string[][]
+}
+
+export interface WeeklyPreviewResponse {
+  plan: WeeklyClassPlan
+  teaching_days: WeeklyTeachingDaysSummary[]
+  validation_issues: string[]
+}
+
+/** Summary row of a saved weekly plan (list view). */
+export interface WeeklyPlanListItem {
+  id: string
+  class_level: string
+  week_number: number
+  term: string
+  academic_year: string
+  template_id: string
+  school_name?: string | null
+  subjects: string[]
+  created_date: string
+  updated_date: string
+}

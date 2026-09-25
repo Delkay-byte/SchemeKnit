@@ -630,6 +630,7 @@ def _compose_main_phases(
     profile: SubjectPedagogy,
     fmt: Dict[str, str],
     act_key: Optional[str],
+    position_index: int = 0,
 ) -> List[Tuple[str, str, float]]:
     """Return (phase_name, description, weight) for the MAIN block.
 
@@ -637,23 +638,43 @@ def _compose_main_phases(
     genuinely expressed; otherwise the subject profile's own pedagogy supplies
     the phases (mathematics: worked example → practice; science: inquiry;
     English: model → production).
-    """
-    phases: List[Tuple[str, str, float]] = []
-    bank = _PHASE_BANK.get(act_key) if act_key else None
-    if bank:
-        base = [0.30, 0.40, 0.30]
-        if len(bank) == 4:
-            base = [0.25, 0.30, 0.30, 0.15]
-        for i, (name, tmpl) in enumerate(bank):
-            weight = base[i] if i < len(base) else 0.25
-            phases.append((name, _safe_format(tmpl, **fmt), weight))
-        return phases
 
-    # Fallback: subject pedagogy's own phases (still indicator-specific
-    # because every profile template embeds the indicator's focus).
-    for mp in profile.main_phases:
-        phases.append((mp.name, _safe_format(mp.template, **fmt), mp.weight))
-    return phases
+    ``position_index`` is the lesson's position in its teaching week (0 = the
+    week's first lesson of that subject). A class-teacher week may teach the
+    same curriculum focus on several days, so a later position composes its
+    MAIN block from the week's other available structure — the subject
+    profile's phases when the first day used the indicator's activity phases,
+    and vice versa — and rotates within it. That keeps each day's MAIN work
+    genuinely different while using only the pedagogy data that already exists:
+    no new curriculum content is invented, and position 0 is byte-identical to
+    the established single-lesson output.
+    """
+    bank: List[Tuple[str, str, float]] = []
+    if act_key:
+        phase_bank = _PHASE_BANK.get(act_key)
+        if phase_bank:
+            base = [0.30, 0.40, 0.30]
+            if len(phase_bank) == 4:
+                base = [0.25, 0.30, 0.30, 0.15]
+            for i, (name, tmpl) in enumerate(phase_bank):
+                weight = base[i] if i < len(base) else 0.25
+                bank.append((name, _safe_format(tmpl, **fmt), weight))
+
+    profile_phases = [
+        (mp.name, _safe_format(mp.template, **fmt), mp.weight)
+        for mp in profile.main_phases
+    ]
+
+    if not position_index or not bank or len(bank) < 2:
+        # Established single-lesson behaviour: the indicator's own activity
+        # phases when genuinely expressed, else the subject profile's phases.
+        return bank or profile_phases
+
+    source = profile_phases if position_index % 2 else bank
+    if len(source) < 2:
+        return bank or profile_phases
+    shift = ((position_index + 1) // 2) % len(source)
+    return source[shift:] + source[:shift]
 
 
 def build_lesson(
@@ -662,8 +683,22 @@ def build_lesson(
     scheme_id: str,
     previous_indicator: Optional[str] = None,
     next_indicator: Optional[str] = None,
+    position_index: int = 0,
+    day_label: str = "",
+    previous_day_label: str = "",
 ) -> LessonPlan:
-    """Compose one deterministic, subject-aware, indicator-specific lesson plan."""
+    """Compose one deterministic, subject-aware, indicator-specific lesson plan.
+
+    ``position_index``/``day_label``/``previous_day_label`` place the lesson
+    inside a class-teacher teaching WEEK (Basic 1-3 weekly plans): position 0
+    is the week's first lesson of that subject and keeps the established
+    single-lesson output exactly, while later positions open with an explicit
+    link to the previous teaching day and compose a different MAIN block (see
+    ``_compose_main_phases``) so repeated curriculum focus across days is never
+    cloned. The parameters default to the single-lesson behaviour, so every
+    existing caller (Basic 4-JHS, KG, Nursery, subject-teacher WAPEF) is
+    unchanged.
+    """
     subject_name = (
         config.subject.value if isinstance(config.subject, Subject) else str(config.subject)
     )
@@ -752,7 +787,14 @@ def build_lesson(
     # ── STARTER — prepares learners for THIS indicator's activity ───────
     starter_line = _STARTER_BANK.get(act_key) or profile.starter_template
     starter = _safe_format(starter_line, **fmt)
-    if prev_short:
+    if position_index and (prev_short or focus_short):
+        # A class-teacher week (Basic 1-3): the day's starter names the teaching
+        # day it continues from, so two days on the same curriculum focus open
+        # differently instead of repeating one sentence.
+        link = prev_short or focus_short
+        label = previous_day_label or "the previous lesson"
+        starter = f"Continue from {label} on '{link}'. " + starter
+    elif prev_short:
         starter = f"Build on the previous lesson ('{prev_short}'). " + starter
     if misconceptions and "Monitor for general" not in misconceptions:
         starter += f" Watch for: {misconceptions}"
@@ -764,11 +806,19 @@ def build_lesson(
         intro = f"This lesson builds on '{prev_short}' and moves the class on to {skill}."
     else:
         intro = f"This lesson focuses on {skill} within {topic}."
+    if position_index:
+        # Same curriculum focus on a later teaching day: the framing states the
+        # continuation explicitly (never a cloned opening sentence).
+        label = previous_day_label or "the previous lesson"
+        link = prev_short or focus_short or skill
+        intro = (f"This lesson continues the week's work from {label} on "
+                 f"'{link}' and develops {skill}.")
 
     # ── MAIN — phases follow the indicator's activity type ──────────────
     starter_min = max(5, round(duration * 0.15))
     plenary_min = max(5, round(duration * 0.20))
-    phase_specs = _compose_main_phases(profile, fmt, act_key)
+    phase_specs = _compose_main_phases(profile, fmt, act_key,
+                                       position_index=position_index)
     main_total = max(duration - starter_min - plenary_min, len(phase_specs))
     phase_minutes = _distribute(main_total, [p[2] for p in phase_specs])
 
