@@ -31,6 +31,10 @@ from .official_ges_template import (
     is_ges_form_template,
     render_document as render_official_ges_document,
 )
+from .wapef_template import (
+    is_wapef_template,
+    render_document as render_wapef_document,
+)
 
 
 class DOCXExportEngine:
@@ -45,6 +49,11 @@ class DOCXExportEngine:
         """Generate a single lesson plan DOCX."""
         if template is None:
             template = default_template_for_lessons([lesson_plan], TemplateType.GES_STYLE)
+
+        if is_wapef_template(template):
+            if output_path is None:
+                output_path = Path(f"lesson_plan_{lesson_plan.id}.docx")
+            return self.export_wapef([lesson_plan], output_path)
 
         if is_ges_form_template(template):
             if output_path is None:
@@ -158,6 +167,9 @@ class DOCXExportEngine:
         if template is None:
             template = default_template_for_lessons(lesson_plans, TemplateType.GES_STYLE)
 
+        if is_wapef_template(template):
+            return self.export_wapef(lesson_plans, output_path)
+
         if is_ges_form_template(template):
             return self.export_official_ges(lesson_plans, output_path,
                                             spec=spec_for_template_id(template.id))
@@ -172,6 +184,27 @@ class DOCXExportEngine:
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
         doc.save(str(output_path))
+        return output_path
+
+    def export_wapef(
+        self,
+        lesson_plans: List[LessonPlan],
+        output_path: Optional[Path] = None,
+        context: dict = None,
+    ) -> Path:
+        """Render lessons onto the Approved WAPEF Plan form.
+
+        The bundled WAPEF source document *is* the page: its tokens are filled
+        in place, one plan per lesson, so the output is topologically identical
+        to the approved WAPEF structure by construction. PDF export derives
+        from this same document (see the generation router).
+        """
+        if output_path is None:
+            output_path = Path("exports/lesson_plans.docx")
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        document = render_wapef_document(list(lesson_plans), context)
+        document.save(str(output_path))
         return output_path
 
     def export_official_ges(

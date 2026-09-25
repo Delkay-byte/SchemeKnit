@@ -140,7 +140,7 @@ export default function LessonsPage() {
                 <Select
                   value={filterScheme}
                   onChange={(e) => setFilterScheme(e.target.value)}
-                  className="w-auto"
+                  className="w-auto max-w-full"
                   aria-label="Filter by scheme"
                 >
                   <option value="">All Schemes</option>

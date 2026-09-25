@@ -1,6 +1,7 @@
 // SchemeKnit API Service
 
 import { DEV_TOOLS_ENABLED } from './dev-tools'
+import type { WapefOptions } from '@/types'
 
 /**
  * Single source of truth for the API base URL.
@@ -386,6 +387,11 @@ class ApiService {
       method: 'PUT',
       body: JSON.stringify({ drafts }),
     })
+  }
+
+  // Approved WAPEF Plan option lists (teacher-selected structured fields)
+  async getWapefOptions(): Promise<WapefOptions> {
+    return this.request('/api/generation/wapef/options')
   }
 
   // Generation API

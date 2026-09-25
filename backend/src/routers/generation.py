@@ -128,6 +128,12 @@ async def preview_allocation(
     from ..entitlements import resolve_entitlement, lesson_quota_status
     quota = lesson_quota_status(db, user, resolve_entitlement(db, user))
     report["lesson_quota"] = quota
+    # Only genuine indicator allocations are teacher-SELECTABLE under the
+    # quota. Nursery-style week-unit allocations carry an empty indicator code
+    # (the source has none — never fabricated); advertising them as selectable
+    # would dead-end the generate button, because a selection can never be
+    # made. The generate endpoint already exempts indicatorless schemes from
+    # the selection requirement.
     report["selectable_indicators"] = [
         {
             "indicator_code": a.indicator_code,
@@ -136,6 +142,7 @@ async def preview_allocation(
             "teaching_week": a.teaching_week or a.week_number,
         }
         for a in sorted(coverage.allocations, key=lambda x: x.lesson_sequence)
+        if a.indicator_code
     ] if quota.get("enforced") else []
 
     # Per-lesson review seeds + any drafts the teacher already saved (Section H).
@@ -161,10 +168,28 @@ async def preview_allocation(
             "other_tlrs": list((drafts.get(str(a.lesson_sequence)) or {}).get("other_tlrs") or []),
             "core_competencies": list((drafts.get(str(a.lesson_sequence)) or {}).get("core_competencies") or []),
             "structured_references": list((drafts.get(str(a.lesson_sequence)) or {}).get("structured_references") or []),
+            "wapef_deep_hope": (drafts.get(str(a.lesson_sequence)) or {}).get("wapef_deep_hope", ""),
+            "wapef_storyline": (drafts.get(str(a.lesson_sequence)) or {}).get("wapef_storyline", ""),
+            "wapef_through_lines": list((drafts.get(str(a.lesson_sequence)) or {}).get("wapef_through_lines") or []),
+            "wapef_gods_story": (drafts.get(str(a.lesson_sequence)) or {}).get("wapef_gods_story", ""),
+            "remarks": (drafts.get(str(a.lesson_sequence)) or {}).get("remarks", ""),
         }
         for a in sorted(coverage.allocations, key=lambda x: x.lesson_sequence)
     ]
     return report
+
+
+@router.get("/wapef/options")
+async def get_wapef_options(
+    user: User = Depends(get_current_user),
+):
+    """Approved WAPEF option lists for the review UI dropdowns.
+
+    The four WAPEF fields are teacher-selected structured values; these are
+    the only values a teacher may select, served from the canonical registry.
+    """
+    from ..engines.wapef_fields import wapef_options
+    return wapef_options()
 
 
 @router.get("/{scheme_id}/lesson-review")
@@ -319,30 +344,43 @@ async def generate_lesson_plans(
     # The full curriculum indicator list, in curriculum order (never reordered).
     ae = pipeline.allocation_engine
     include_special = bool(config.include_special_weeks)
+
+    # ── Nursery-style schemes (no indicator source) ───────────────────────
+    # WAPEF Nursery schemes legitimately have no indicator column: the weekly
+    # row is the curriculum unit. Bypassing the indicator catalogue here is
+    # NOT a bypass of the allocation engine — allocate() itself detects the
+    # same condition and allocates one lesson per weekly row without ever
+    # inventing indicator codes or content standards.
+    from ..engines.allocation_engine import scheme_has_indicators
+    indicatorless = not scheme_has_indicators(
+        [w for w in scheme.weeks
+         if include_special or w.week_type == WeekType.INSTRUCTION])
+
     available_codes: list = []
-    for w in sorted(scheme.weeks, key=lambda x: x.week_number):
-        if not include_special and w.week_type != WeekType.INSTRUCTION:
-            continue
-        for text in ae._split_indicators(w.indicators):
-            code = ae._extract_indicator_code(text)
-            if code not in available_codes:
-                available_codes.append(code)
+    if not indicatorless:
+        for w in sorted(scheme.weeks, key=lambda x: x.week_number):
+            if not include_special and w.week_type != WeekType.INSTRUCTION:
+                continue
+            for text in ae._split_indicators(w.indicators):
+                code = ae._extract_indicator_code(text)
+                if code not in available_codes:
+                    available_codes.append(code)
 
     supplied_selection = list(config.selected_indicator_codes or [])
     selected_set = set(supplied_selection)
-    if supplied_selection and not (selected_set & set(available_codes)):
+    if supplied_selection and not indicatorless and not (selected_set & set(available_codes)):
         raise HTTPException(
             status_code=400,
             detail="None of the selected indicators could be found in this scheme.",
         )
 
     # Preserve curriculum order regardless of the teacher's click order.
-    if selected_set:
+    if selected_set and not indicatorless:
         requested_codes = [c for c in available_codes if c in selected_set]
     else:
         requested_codes = list(available_codes)
 
-    if not requested_codes:
+    if not requested_codes and not indicatorless:
         raise HTTPException(
             status_code=422,
             detail="This scheme contains no instructional indicators to generate.",
@@ -571,6 +609,7 @@ async def get_latest_job_for_scheme(
     jobs = data_service.list_jobs(db, user.id)
     for job in jobs:
         if job.scheme_id == scheme_id:
+            snapshot = job.config_snapshot or {}
             return {
                 "id": job.id,
                 "status": job.status,
@@ -579,6 +618,11 @@ async def get_latest_job_for_scheme(
                 "completed_lessons": job.completed_lessons,
                 "failed_lessons": job.failed_lessons,
                 "error_message": job.error_message,
+                # The template the lessons were actually generated with, so a
+                # reloaded generate page exports with the same form instead of
+                # silently falling back to the level default (a WAPEF lesson
+                # would otherwise export onto a GES sheet).
+                "template_id": snapshot.get("template_id"),
                 "coverage": {
                     "total_generated_lessons": job.completed_lessons,
                 },
@@ -1171,9 +1215,11 @@ def _resolve_teacher_name(db: Session, user: User) -> Optional[str]:
 def _apply_lesson_review_draft(lp, drafts: dict) -> None:
     """Apply teacher-saved pre-generation review fields onto a built lesson.
 
-    Only the four editable review fields are written. source_tlrs, indicator,
-    content standard, strand and week_ending remain whatever the deterministic
-    builder produced from the source document (Section P authority).
+    The four editable review fields plus the four WAPEF teacher-selected
+    structured fields are written. source_tlrs, indicator, content standard,
+    strand and week_ending remain whatever the deterministic builder produced
+    from the source document (Section P authority). WAPEF selections are
+    normalized through the approved option lists — only approved values persist.
     """
     if not drafts:
         return
@@ -1183,6 +1229,17 @@ def _apply_lesson_review_draft(lp, drafts: dict) -> None:
         draft = drafts.get(codes[0]) if codes else None
     if not isinstance(draft, dict):
         return
+    if any(k in draft for k in (
+            "wapef_deep_hope", "wapef_storyline", "wapef_through_lines",
+            "wapef_gods_story")):
+        from ..engines.wapef_fields import normalize_wapef_payload
+        canonical = normalize_wapef_payload(draft)
+        lp.wapef_deep_hope = canonical["deep_hope"]
+        lp.wapef_storyline = canonical["storyline"]
+        lp.wapef_through_lines = canonical["through_lines"]
+        lp.wapef_gods_story = canonical["gods_story"]
+    if "remarks" in draft:
+        lp.remarks = str(draft.get("remarks") or "")
     if "keywords" in draft:
         lp.keywords = list(draft.get("keywords") or [])
     if "other_tlrs" in draft:
@@ -1248,6 +1305,11 @@ def _serialize_lesson(lp) -> dict:
         "indicator_codes": lp.indicator_codes or [],
         "lesson_topic": lp.lesson_topic,
         "previous_knowledge": lp.previous_knowledge,
+        "wapef_deep_hope": getattr(lp, "wapef_deep_hope", "") or "",
+        "wapef_storyline": getattr(lp, "wapef_storyline", "") or "",
+        "wapef_through_lines": list(getattr(lp, "wapef_through_lines", None) or []),
+        "wapef_gods_story": getattr(lp, "wapef_gods_story", "") or "",
+        "remarks": getattr(lp, "remarks", "") or "",
         "learning_objectives": lp.learning_objectives or [],
         "core_competencies": lp.core_competencies or [],
         "source_tlrs": list(getattr(lp, "source_tlrs", None) or []),
@@ -1321,6 +1383,11 @@ def _db_to_lesson_model(lp) -> LessonPlan:
         indicator_codes=lp.indicator_codes or [],
         lesson_topic=lp.lesson_topic,
         previous_knowledge=lp.previous_knowledge,
+        wapef_deep_hope=getattr(lp, "wapef_deep_hope", "") or "",
+        wapef_storyline=getattr(lp, "wapef_storyline", "") or "",
+        wapef_through_lines=list(getattr(lp, "wapef_through_lines", None) or []),
+        wapef_gods_story=getattr(lp, "wapef_gods_story", "") or "",
+        remarks=getattr(lp, "remarks", "") or "",
         learning_objectives=_parse_activity_list(lp.learning_objectives, LearningObjective),
         core_competencies=lp.core_competencies or [],
         source_tlrs=list(getattr(lp, "source_tlrs", None) or []),

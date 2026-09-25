@@ -201,6 +201,7 @@ def _build_v2_prompt_from_context(
     other_tlrs: Optional[list] = None,
     core_competencies: Optional[list] = None,
     references: Optional[list] = None,
+    wapef_context: Optional[list] = None,
 ) -> str:
     """Build a V2 prompt directly from context (no indicator interpretation needed)."""
     from ..curriculum.indicator_interpreter import interpret_indicator, Indicator
@@ -285,6 +286,7 @@ class AIProvider(ABC):
         other_tlrs: Optional[list] = None,
         core_competencies: Optional[list] = None,
         references: Optional[list] = None,
+        wapef_context: Optional[list] = None,
     ) -> Dict[str, Any]:
         """V2 structured lesson generation.
 
@@ -439,7 +441,8 @@ class GeminiProvider(AIProvider):
                            source_week_ending=None,
                            term=None, teaching_week=None, period=None,
                            teacher_keywords=None, other_tlrs=None,
-                           core_competencies=None, references=None):
+                           core_competencies=None, references=None,
+                           wapef_context=None):
         prompt = _build_v2_prompt_from_context(
             subject=subject, class_level=class_level, strand=strand,
             sub_strand=sub_strand, content_standard=content_standard,
@@ -449,13 +452,13 @@ class GeminiProvider(AIProvider):
             previous_lesson_context=previous_lesson_context,
             next_lesson_context=next_lesson_context,
             teaching_day=teaching_day, week_number=week_number,
-            term=term, teaching_week=teaching_week, period=period,
-            teacher_keywords=teacher_keywords,
+            term=term, teaching_week=teaching_week, period=period,        teacher_keywords=teacher_keywords,
                             source_week_ending=source_week_ending,
                             other_tlrs=other_tlrs,
                             core_competencies=core_competencies,
                             references=references,
-        )
+                            wapef_context=wapef_context,
+    )
         from ..curriculum.generation_prompt import SYSTEM_PROMPT
         return _parse_or_diagnose(
             self,
@@ -588,7 +591,8 @@ class GroqProvider(AIProvider):
                            source_week_ending=None,
                            term=None, teaching_week=None, period=None,
                            teacher_keywords=None, other_tlrs=None,
-                           core_competencies=None, references=None):
+                           core_competencies=None, references=None,
+                           wapef_context=None):
         prompt = _build_v2_prompt_from_context(
             subject=subject, class_level=class_level, strand=strand,
             sub_strand=sub_strand, content_standard=content_standard,
@@ -598,13 +602,13 @@ class GroqProvider(AIProvider):
             previous_lesson_context=previous_lesson_context,
             next_lesson_context=next_lesson_context,
             teaching_day=teaching_day, week_number=week_number,
-            term=term, teaching_week=teaching_week, period=period,
-            teacher_keywords=teacher_keywords,
+            term=term, teaching_week=teaching_week, period=period,        teacher_keywords=teacher_keywords,
                             source_week_ending=source_week_ending,
                             other_tlrs=other_tlrs,
                             core_competencies=core_competencies,
                             references=references,
-        )
+                            wapef_context=wapef_context,
+    )
         from ..curriculum.generation_prompt import SYSTEM_PROMPT
         return _parse_or_diagnose(
             self,
@@ -694,7 +698,8 @@ class OpenAIProvider(AIProvider):
                            source_week_ending=None,
                            term=None, teaching_week=None, period=None,
                            teacher_keywords=None, other_tlrs=None,
-                           core_competencies=None, references=None):
+                           core_competencies=None, references=None,
+                           wapef_context=None):
         prompt = _build_v2_prompt_from_context(
             subject=subject, class_level=class_level, strand=strand,
             sub_strand=sub_strand, content_standard=content_standard,
@@ -704,13 +709,13 @@ class OpenAIProvider(AIProvider):
             previous_lesson_context=previous_lesson_context,
             next_lesson_context=next_lesson_context,
             teaching_day=teaching_day, week_number=week_number,
-            term=term, teaching_week=teaching_week, period=period,
-            teacher_keywords=teacher_keywords,
+            term=term, teaching_week=teaching_week, period=period,        teacher_keywords=teacher_keywords,
                             source_week_ending=source_week_ending,
                             other_tlrs=other_tlrs,
                             core_competencies=core_competencies,
                             references=references,
-        )
+                            wapef_context=wapef_context,
+    )
         from ..curriculum.generation_prompt import SYSTEM_PROMPT
         return _parse_or_diagnose(
             self,
@@ -807,7 +812,8 @@ class OpenCodeZenProvider(AIProvider):
                            source_week_ending=None,
                            term=None, teaching_week=None, period=None,
                            teacher_keywords=None, other_tlrs=None,
-                           core_competencies=None, references=None):
+                           core_competencies=None, references=None,
+                           wapef_context=None):
         prompt = _build_v2_prompt_from_context(
             subject=subject, class_level=class_level, strand=strand,
             sub_strand=sub_strand, content_standard=content_standard,
@@ -817,13 +823,13 @@ class OpenCodeZenProvider(AIProvider):
             previous_lesson_context=previous_lesson_context,
             next_lesson_context=next_lesson_context,
             teaching_day=teaching_day, week_number=week_number,
-            term=term, teaching_week=teaching_week, period=period,
-            teacher_keywords=teacher_keywords,
+            term=term, teaching_week=teaching_week, period=period,        teacher_keywords=teacher_keywords,
                             source_week_ending=source_week_ending,
                             other_tlrs=other_tlrs,
                             core_competencies=core_competencies,
                             references=references,
-        )
+                            wapef_context=wapef_context,
+    )
         from ..curriculum.generation_prompt import SYSTEM_PROMPT
         return _parse_or_diagnose(
             self,
@@ -911,7 +917,8 @@ class OllamaProvider(AIProvider):
                            source_week_ending=None,
                            term=None, teaching_week=None, period=None,
                            teacher_keywords=None, other_tlrs=None,
-                           core_competencies=None, references=None):
+                           core_competencies=None, references=None,
+                           wapef_context=None):
         if not self.is_available():
             self.last_error = "unavailable"
             return {}
@@ -924,13 +931,13 @@ class OllamaProvider(AIProvider):
 previous_lesson_context=previous_lesson_context,
             next_lesson_context=next_lesson_context,
             teaching_day=teaching_day, week_number=week_number,
-            term=term, teaching_week=teaching_week, period=period,
-            teacher_keywords=teacher_keywords,
+            term=term, teaching_week=teaching_week, period=period,        teacher_keywords=teacher_keywords,
                             source_week_ending=source_week_ending,
                             other_tlrs=other_tlrs,
                             core_competencies=core_competencies,
                             references=references,
-        )
+                            wapef_context=wapef_context,
+    )
         return _parse_or_diagnose(self, self._generate(prompt), require_lesson_schema=True)
 
     def generate_structured(self, prompt: str) -> dict:

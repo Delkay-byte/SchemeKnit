@@ -14,7 +14,11 @@ import { api } from '@/lib/api'
 import { resolveRouteId } from '@/lib/route-params'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatusPill } from '@/components/ui/badge'
-import { SchemeOfWork, TermConfig, CurriculumCoverage, Template, CurriculumProfile } from '@/types'
+import { SchemeOfWork, TermConfig, CurriculumCoverage, Template, CurriculumProfile, WapefOptions } from '@/types'
+
+// The Approved WAPEF Plan is one shared form for Nursery/KG/Basic/JHS; its
+// four structured fields are teacher-selected from approved option lists.
+const WAPEF_TEMPLATE_ID = 'tpl-wapef-approved-plan'
 
 export default function GeneratePage() {
   const router = useRouter()
@@ -41,6 +45,9 @@ export default function GeneratePage() {
   const [lessonReview, setLessonReview] = useState<any[]>([])
   const [reviewSaving, setReviewSaving] = useState(false)
   const [reviewSaved, setReviewSaved] = useState(false)
+  // Approved WAPEF option lists (Deep Hope / Storyline / Through lines /
+  // God's Story). Dropdown-only: the teacher picks, never free text, never AI.
+  const [wapefOptions, setWapefOptions] = useState<WapefOptions | null>(null)
   const NACCA_COMPETENCIES = [
     'Critical Thinking and Problem Solving',
     'Creativity and Innovation',
@@ -110,6 +117,11 @@ export default function GeneratePage() {
       if (saved) setConfig(prev => ({ ...prev, ai_mode: saved as any }))
     } catch { /* storage unavailable */ }
     loadData()
+    // WAPEF dropdown options are canonical; a failure just means the WAPEF
+    // selects stay hidden (non-WAPEF templates never show them anyway).
+    api.getWapefOptions()
+      .then(setWapefOptions)
+      .catch(() => setWapefOptions(null))
   }, [schemeId])
 
   // The displayed AI status must always reflect what the backend will actually
@@ -163,10 +175,18 @@ export default function GeneratePage() {
         })
       }
       const defaultTemplate = templatesData.templates?.find((t: Template) => t.is_default)
+      // Prefer the template the lessons were actually generated with (from the
+      // job snapshot): exporting a reloaded WAPEF job must use the WAPEF form,
+      // not silently fall back to the level default.
+      const generatedTemplateId: string | undefined =
+        statusData?.status === 'completed' ? statusData.template_id : undefined
+      const restoredTemplate = generatedTemplateId
+        ? templatesData.templates?.find((t: Template) => t.id === generatedTemplateId)
+        : undefined
       setConfig(prev => ({
         ...prev,
         scheme_of_work_id: schemeId,
-        template_id: defaultTemplate?.id || '',
+        template_id: restoredTemplate?.id || defaultTemplate?.id || prev.template_id || '',
         // The backend requires these fields; seed them from the parsed scheme.
         academic_year: schemeData.academic_year || prev.academic_year,
         term: schemeData.term || prev.term,
@@ -271,6 +291,13 @@ export default function GeneratePage() {
           other_tlrs: row.other_tlrs || [],
           core_competencies: row.core_competencies || [],
           structured_references: row.structured_references || [],
+          // Approved WAPEF Plan teacher-selected fields (dropdown values,
+          // sent as-is; the server normalizes against the approved lists).
+          wapef_deep_hope: row.wapef_deep_hope || '',
+          wapef_storyline: row.wapef_storyline || '',
+          wapef_through_lines: row.wapef_through_lines || [],
+          wapef_gods_story: row.wapef_gods_story || '',
+          remarks: row.remarks || '',
         }
       }
       await api.saveLessonReview(schemeId, drafts)
@@ -428,6 +455,9 @@ export default function GeneratePage() {
 
   const filteredTemplates = getTemplatesForScheme()
   const currentProfile = getProfileForScheme()
+  // The WAPEF structured fields belong to the Approved WAPEF Plan only; they
+  // appear in the per-lesson review when that template is the chosen form.
+  const isWapefSelected = config.template_id === WAPEF_TEMPLATE_ID
 
   // Why the Generate action is unavailable — never a silent disable.
   const generateBlockReasons: string[] = []
@@ -438,6 +468,20 @@ export default function GeneratePage() {
     selectedCodes.length === 0
   ) {
     generateBlockReasons.push('Select at least one indicator to generate.')
+  }
+  // Quota exhaustion with nothing left to select: state it explicitly.
+  // (Indicatorless Nursery-style schemes never enter this branch: the preview
+  // advertises no selectable indicators for them and the server exempts them
+  // from the selection requirement.)
+  if (
+    allocationPreview &&
+    allocationPreview.lesson_quota?.enforced &&
+    (allocationPreview.lesson_quota.remaining ?? 0) <= 0 &&
+    (allocationPreview.selectable_indicators?.length || 0) === 0 &&
+    selectedCodes.length === 0
+  ) {
+    generateBlockReasons.push(
+      'Your Free Tier lesson plans for this month are used up. Upgrade to Teacher Pro for unlimited generation, or wait for next month.')
   }
   const generateIsBlocked = generateBlockReasons.length > 0
 
@@ -1084,6 +1128,105 @@ export default function GeneratePage() {
                           className="w-full rounded-md border border-input px-2 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#04A9CE]/45 focus-visible:border-[#04A9CE]/70"
                         />
                       </div>
+                      {isWapefSelected && wapefOptions && (
+                        <div className="rounded-md border bg-background p-2.5">
+                          <p className="mb-2 text-[11px] font-semibold text-[#102A43]">
+                            Approved WAPEF Plan fields
+                            <span className="ml-1 font-normal text-muted-foreground">
+                              (teacher-selected — the AI never changes these)
+                            </span>
+                          </p>
+                          <div className="grid gap-2.5 sm:grid-cols-2">
+                            <Field label="Deep Hope" htmlFor={`wapef-deep-hope-${row.lesson_sequence}`}>
+                              <Select
+                                id={`wapef-deep-hope-${row.lesson_sequence}`}
+                                value={row.wapef_deep_hope || ''}
+                                onChange={(e) => updateLessonReviewRow(row.lesson_sequence, {
+                                  wapef_deep_hope: e.target.value,
+                                })}
+                              >
+                                <option value="">— Select —</option>
+                                {wapefOptions.deep_hopes.map((option) => (
+                                  <option key={option} value={option}>{option}</option>
+                                ))}
+                              </Select>
+                            </Field>
+                            <Field label="Storyline" htmlFor={`wapef-storyline-${row.lesson_sequence}`}>
+                              <Select
+                                id={`wapef-storyline-${row.lesson_sequence}`}
+                                value={row.wapef_storyline || ''}
+                                onChange={(e) => updateLessonReviewRow(row.lesson_sequence, {
+                                  wapef_storyline: e.target.value,
+                                })}
+                              >
+                                <option value="">— Select —</option>
+                                {wapefOptions.storylines.map((option) => (
+                                  <option key={option} value={option}>{option}</option>
+                                ))}
+                              </Select>
+                            </Field>
+                          </div>
+                          <div className="mt-2.5">
+                            <p className="mb-1 text-[11px] font-medium text-muted-foreground">
+                              Through lines (select all that apply)
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {wapefOptions.through_lines.map((option) => {
+                                const selected = (row.wapef_through_lines || []).includes(option)
+                                return (
+                                  <button
+                                    key={option}
+                                    type="button"
+                                    onClick={() => {
+                                      const cur = row.wapef_through_lines || []
+                                      const next = selected
+                                        ? cur.filter((t: string) => t !== option)
+                                        : [...cur, option]
+                                      updateLessonReviewRow(row.lesson_sequence, {
+                                        wapef_through_lines: next,
+                                      })
+                                    }}
+                                    className={`rounded border px-1.5 py-0.5 text-[10px] ${
+                                      selected
+                                        ? 'border-[#102A43] bg-[#102A43] text-white'
+                                        : 'bg-background text-muted-foreground'
+                                    }`}
+                                  >
+                                    {option}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+                          <div className="mt-2.5 grid gap-2.5 sm:grid-cols-2">
+                            <Field label="God's Story" htmlFor={`wapef-gods-story-${row.lesson_sequence}`}>
+                              <Select
+                                id={`wapef-gods-story-${row.lesson_sequence}`}
+                                value={row.wapef_gods_story || ''}
+                                onChange={(e) => updateLessonReviewRow(row.lesson_sequence, {
+                                  wapef_gods_story: e.target.value,
+                                })}
+                              >
+                                <option value="">— Select —</option>
+                                {wapefOptions.gods_story.map((option) => (
+                                  <option key={option} value={option}>{option}</option>
+                                ))}
+                              </Select>
+                            </Field>
+                            <Field label="Remarks" htmlFor={`wapef-remarks-${row.lesson_sequence}`}>
+                              <TextArea
+                                id={`wapef-remarks-${row.lesson_sequence}`}
+                                value={row.remarks || ''}
+                                onChange={(e) => updateLessonReviewRow(row.lesson_sequence, {
+                                  remarks: e.target.value,
+                                })}
+                                placeholder="Your reflection (printed in REMARKS)"
+                                rows={2}
+                              />
+                            </Field>
+                          </div>
+                        </div>
+                      )}
                       <div>
                         <p className="mb-1 text-[11px] font-medium text-muted-foreground">
                           Core competencies
