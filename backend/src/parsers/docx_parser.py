@@ -185,10 +185,22 @@ class DOCXParser:
         forced_subject: Optional[Subject] = None
         if target_subject:
             sections = self._detect_sections(blocks)
+            # The teacher confirms a subject by the name the document itself
+            # used, so the confirmation is resolved through the SAME canonical
+            # heading matcher that detected the sections. A section heading
+            # "CREATIVE ARTS" and a confirmed "Creative Arts" therefore select
+            # the same section without hard-coding any subject name.
+            wanted = canonical_subject_from_heading(target_subject)
+            wanted_values = {
+                v.value for v in (
+                    {wanted} if wanted is not None else set()
+                )
+            }
+            wanted_values.add(target_subject)
             selected = [
                 s for s in sections
                 if s["subject"] is not None
-                and s["subject"].value == target_subject
+                and s["subject"].value in wanted_values
             ]
             if selected:
                 tables_data = [t for s in selected for t in s["tables"]]
@@ -259,7 +271,12 @@ class DOCXParser:
 
     # ── Multi-subject document detection (§4) ────────────────────────────
 
-    def analyze(self, file_path: Path, original_filename: str = None) -> Dict[str, Any]:
+    def analyze(
+        self,
+        file_path: Path,
+        original_filename: str = None,
+        target_subject: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """Inspect a document WITHOUT generating anything.
 
         Returns the document title, the subject sections detected, and a
@@ -334,6 +351,18 @@ class DOCXParser:
             status = "single"
         else:
             status = "low_confidence"
+
+        # A teacher's confirmation only counts as a detected section when it
+        # resolves through the same canonical heading matcher the sections
+        # were found with — same rule the parse() confirmation path uses.
+        if target_subject:
+            confirmed = canonical_subject_from_heading(target_subject)
+            if confirmed is not None and any(
+                d["subject"] == confirmed.value for d in non_empty
+            ):
+                non_empty = [d for d in non_empty if d["subject"] == confirmed.value]
+            elif any(d["subject"] == target_subject for d in non_empty):
+                non_empty = [d for d in non_empty if d["subject"] == target_subject]
 
         # ── Metadata reconciliation (PART H) ────────────────────────────────
         # Class/subject are detected from multiple independent signals and
@@ -679,7 +708,8 @@ class DOCXParser:
                 else:
                     primary_weeks.add(current_week)
 
-            strand_text = normalized.get("strand", "").strip()
+            strand_text = self._normalize_special_week_label(
+                normalized.get("strand", "").strip())
             if strand_text:
                 if self._is_special_week_text(strand_text):
                     current_week_type = self._classify_special_week(strand_text)
@@ -689,11 +719,21 @@ class DOCXParser:
             elif current_week is not None and current_week_type == WeekType.INSTRUCTION:
                 pass
 
-            sub_strand_text = normalized.get("sub_strand", "").strip()
+            if strand_text and self._is_special_week_text(strand_text):
+                # A special-period row declares the period in every cell:
+                # normalise the noisy label ("AND VACATION", "REVISION1") in
+                # the sub-strand and resource positions too. Curriculum rows
+                # are never touched.
+                sub_strand_text = self._normalize_special_week_label(
+                    normalized.get("sub_strand", "").strip())
+                resources_text = self._normalize_special_week_label(
+                    normalized.get("resources", "").strip())
+            else:
+                sub_strand_text = normalized.get("sub_strand", "").strip()
+                resources_text = normalized.get("resources", "").strip()
             if sub_strand_text:
                 current_sub_strand = sub_strand_text
 
-            resources_text = normalized.get("resources", "").strip()
             if resources_text:
                 current_resources.append(resources_text)
 
@@ -935,6 +975,30 @@ class DOCXParser:
             if d:
                 return d
         return None
+
+    #: Special-period rows printed with source noise: the Numeracy table of
+    #: the Nursery scheme prints week 15 as "AND VACATION" (a line-wrap of
+    #: "REVISION AND VACATION" that lost its first word), and the Creative Arts
+    #: table prints week 13 as "REVISION1" (a stray digit). Normalising these
+    #: to their canonical period name keeps the WEEK/period semantics without
+    #: teaching the parser any filename-specific rule.
+    _SPECIAL_ROW_TITLE_RE = re.compile(
+        r"^(?:and\s+)?(revision|examination|exam|vacation)(?:\s*\d+)?$",
+        re.IGNORECASE,
+    )
+
+    @classmethod
+    def _normalize_special_week_label(cls, text: str) -> str:
+        """Canonicalise a noisy special-period row label.
+
+        Only rows that are (after noise) exactly a special-period name are
+        rewritten — ordinary curriculum text is never touched.
+        """
+        stripped = (text or "").strip()
+        match = cls._SPECIAL_ROW_TITLE_RE.match(stripped)
+        if match:
+            return match.group(1).upper()
+        return stripped
 
     def _is_special_week_text(self, text: str) -> bool:
         text_lower = text.strip().lower()
@@ -1225,6 +1289,8 @@ class DOCXParser:
 
     _CLASS_LEVEL_MAPPING = {
         "Nursery": ClassLevel.NURSERY,
+        "Nursery 1": ClassLevel.NURSERY_1,
+        "Nursery 2": ClassLevel.NURSERY_2,
         "KG 1": ClassLevel.KG1,
         "KG 2": ClassLevel.KG2,
         "Basic 1": ClassLevel.BASIC_1,
@@ -1259,6 +1325,14 @@ class DOCXParser:
         ("kg 2", "KG 2"), ("kg two", "KG 2"), ("kg ii", "KG 2"),
         ("kindergarten 1", "KG 1"), ("kindergarten 2", "KG 2"),
         ("kindergarten two", "KG 2"),
+        # Nursery is a real level family, not a synonym for KG: specific
+        # signals ("NURSERY 1", "NURSERY 2", word-number spellings) must win
+        # over the plain "nursery" keyword so a scheme that declares its exact
+        # level keeps it — and stays distinct from KG 1/KG 2.
+        ("nursery 1", "Nursery 1"), ("nursery one", "Nursery 1"),
+        ("nursery i", "Nursery 1"),
+        ("nursery 2", "Nursery 2"), ("nursery two", "Nursery 2"),
+        ("nursery ii", "Nursery 2"),
         ("nursery", "Nursery"),
     ]
 
@@ -1364,9 +1438,33 @@ class DOCXParser:
         signals = self.class_level_signals(raw_text, filename)
         if signals["conflict"]:
             return None
+        text_level = signals["resolved"]
         if parsed and parsed.class_level:
-            return self._CLASS_LEVEL_MAPPING.get(parsed.class_level)
-        return self._CLASS_LEVEL_MAPPING.get(signals["resolved"]) if signals["resolved"] else None
+            table_level = self._CLASS_LEVEL_MAPPING.get(parsed.class_level)
+            if text_level is None or table_level is None or text_level == table_level:
+                if table_level:
+                    return table_level
+                return self._CLASS_LEVEL_MAPPING.get(text_level) if text_level else None
+            if self._same_level_family(text_level, table_level):
+                # Same level family declared at different specificity (the
+                # Nursery scheme's table cell says "NURSERY" while the body
+                # says "NURSERY 1"): the MORE SPECIFIC declaration wins and
+                # the level stays distinct — never silently collapsed to the
+                # generic family name, and never renumbered.
+                if text_level.startswith(table_level + " "):
+                    return self._CLASS_LEVEL_MAPPING.get(text_level)
+                return table_level
+            # Genuinely contradictory declarations → teacher confirmation.
+            return None
+        return self._CLASS_LEVEL_MAPPING.get(text_level) if text_level else None
+
+    @staticmethod
+    def _same_level_family(a: str, b: str) -> bool:
+        """True when two canonical level names belong to the same family
+        ("Nursery" / "Nursery 1" / "Nursery 2"; "KG 1" / "KG 2")."""
+        fa = (a or "").split()
+        fb = (b or "").split()
+        return bool(fa and fb) and fa[0].lower() == fb[0].lower()
 
     def _detect_term(self, raw_text: str) -> str:
         return self._extract_term_from_text(raw_text) or "First Term"

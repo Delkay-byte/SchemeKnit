@@ -63,6 +63,10 @@ class EducationalLevel(str, Enum):
 
 class ClassLevel(str, Enum):
     NURSERY = "Nursery"
+    #: Specific nursery levels — a real N1/N2 scheme declares its exact level
+    #: and keeps it (never silently collapsed to the generic family name).
+    NURSERY_1 = "Nursery 1"
+    NURSERY_2 = "Nursery 2"
     KG1 = "KG 1"
     KG2 = "KG 2"
     BASIC_1 = "Basic 1"
