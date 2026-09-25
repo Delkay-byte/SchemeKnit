@@ -98,7 +98,7 @@ class Settings(BaseSettings):
     # provider: gemini | groq | openai | ollama | opencode-zen | minimax.
     AI_MODE: str = "OFF"
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-2.5-flash"
+    GEMINI_MODEL: str = "gemini-3.8-flash"
     GROQ_API_KEY: str = ""
     GROQ_MODEL: str = "openai/gpt-oss-20b"
     GROQ_BASE_URL: str = "https://api.groq.com/openai/v1"
