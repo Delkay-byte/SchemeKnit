@@ -407,9 +407,13 @@ class TestRegressions:
         plans, cov = _plans(nursery, config)
         assert len(plans) == cov.total_generated_lessons
         assert all(not lp.indicator_codes for lp in plans)
-        # Nursery objectives keep the (non-KG) explore phrasing
+        # Nursery objectives are evidence-based for THIS cohort: the source's
+        # own sub-strand topics ("Sorting and matching", "Colouring, Tracing
+        # and Alphabets") are do-and-say activities, so the objective is a
+        # demonstrable "show and talk about" — not Basic-style measurable
+        # analysis and not the KG role-play phrasing.
         assert plans[0].learning_objectives[0].description.startswith(
-            "Learners can explore")
+            "Learners can show and talk about")
 
     def test_basic9_still_uses_subject_pedagogy(self):
         """Basic 9 Science keeps the subject profile (worked examples etc.)
