@@ -86,6 +86,9 @@ HEADER_ALIASES = {
     "specific indicators": "indicators",
     "indicator/indicators": "indicators",
     "learning indicator/codes": "indicators",
+    # "INDICATOR(S)" — the KG scheme style (normalization strips '-'/'_' but
+    # keeps parentheses).
+    "indicator(s)": "indicators",
     # ── resources ───────────────────────────────────────────────────────
     "resources": "resources",
     "resource": "resources",
@@ -748,6 +751,17 @@ class DOCXParser:
         if start_idx >= len(rows):
             return None
 
+        # Vertically-merged header fragments (the KG 1 scheme splits "CONTENT
+        # STANDARD" across three physical rows: "CONTENT" / "" / "STANDARD").
+        # These fragment aliases are ONLY consulted in this multi-row merge
+        # path — never in single-row detection — because in a normal data row
+        # the words "Content" or "Indicator" appear as cell values and must
+        # not classify that row as a header.
+        _MERGED_HEADER_FRAGMENTS = {
+            "content": "content_standard",
+            "standard": "content_standard",
+        }
+
         merged: Dict[str, int] = {}
         consumed = 0
 
@@ -757,8 +771,10 @@ class DOCXParser:
             row_matched = 0
             for c_idx, cell in enumerate(row):
                 normalized = self._normalize_header_text(cell)
-                if normalized in HEADER_ALIASES:
-                    field = HEADER_ALIASES[normalized]
+                field = HEADER_ALIASES.get(normalized)
+                if field is None and len(rows) > 1:
+                    field = _MERGED_HEADER_FRAGMENTS.get(normalized)
+                if field is not None:
                     if field not in merged:
                         row_map[field] = c_idx
                         row_matched += 1
@@ -953,10 +969,13 @@ class DOCXParser:
             if cs_text:
                 cs_code = self._extract_code(cs_text, CONTENT_STANDARD_CODE_PATTERN)
                 cs_desc = self._clean_description(cs_text, cs_code)
-                if cs_code and cs_desc and not any(c.code == cs_code for c in all_content_standards):
+                # KG schemes commonly print the content-standard cell as ONLY
+                # the code ("K1.1.1.1") — the code IS the source data. Keep it
+                # with an empty description rather than dropping the column.
+                if cs_code and not any(c.code == cs_code for c in all_content_standards):
                     all_content_standards.append(ParsedContentStandard(
                         code=cs_code,
-                        description=cs_desc
+                        description=(cs_desc or "").strip()
                     ))
 
             ind_text = row.get("indicators", "")
@@ -987,12 +1006,20 @@ class DOCXParser:
     def _extract_code(self, text: str, pattern: re.Pattern) -> str:
         match = pattern.search(text)
         if match:
-            return match.group(0)
+            # Canonical code casing: the scheme prefix is always printed B/K
+            # uppercase in the curriculum, but real files contain "k2.1.1.1".
+            return match.group(0).upper()
         return text.split()[0] if text.split() else ""
 
     def _clean_description(self, text: str, code: str) -> str:
         if code and code in text:
             desc = text.replace(code, "").strip()
+        elif code and code.lower() in text.lower():
+            # The code matched case-insensitively only ("k2.1.1.1" in the file
+            # vs the canonical "K2.1.1.1"): strip the raw occurrence so the
+            # code is not duplicated when code and description recombine.
+            import re as _re
+            desc = _re.sub(_re.escape(code.lower()), "", text, flags=_re.IGNORECASE).strip()
         else:
             desc = text.strip()
         desc = re.sub(r'\s+', ' ', desc).strip()
@@ -1029,8 +1056,14 @@ class DOCXParser:
             start = week_ending
             prev_end = week_ending
 
-            content_std_texts = [f"{cs.code} {cs.description}" for cs in pw.content_standards]
-            indicator_texts = [f"{ind.code} {ind.description}" for ind in pw.indicators]
+            content_std_texts = [
+                f"{cs.code} {cs.description}".strip() if cs.description else cs.code
+                for cs in pw.content_standards
+            ]
+            indicator_texts = [
+                f"{ind.code} {ind.description}".strip() if ind.description else ind.code
+                for ind in pw.indicators
+            ]
 
             week = Week(
                 week_number=pw.week_number,
