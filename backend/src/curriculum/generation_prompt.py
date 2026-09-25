@@ -214,6 +214,7 @@ def build_generation_prompt(
     other_tlrs: Optional[List[str]] = None,
     core_competencies: Optional[List[str]] = None,
     references: Optional[List[str]] = None,
+    wapef_context: Optional[List[str]] = None,
 ) -> str:
     """Build a structured, indicator-grounded generation prompt.
 
@@ -290,6 +291,16 @@ Suggested Phases: {', '.join(strategy.get('phases', []))}""")
     if references:
         sections.append(f"""REFERENCES (teacher-controlled for THIS lesson)
 {chr(10).join(f'- {r}' for r in references)}""")
+
+    if wapef_context:
+        sections.append(f"""WAPEF CONTEXT (teacher-selected, READ-ONLY)
+{chr(10).join(f'- {w}' for w in wapef_context)}
+
+These selections were made by the teacher from the approved WAPEF option lists.
+They are NOT part of your JSON output and MUST NOT appear as fields in it. Use
+them only as instructional context: shape activities, examples, discussion
+themes and tone so the lesson reflects them. Never choose, rewrite or replace
+any of these values.""")
 
     # Teacher-supplied vocabulary: MUST be preserved verbatim and used in the lesson.
     if teacher_keywords:

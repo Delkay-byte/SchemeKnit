@@ -32,6 +32,22 @@ from ..models import (
 )
 
 
+def scheme_has_indicators(weeks) -> bool:
+    """True when any instruction week actually carries an indicator.
+
+    WAPEF Nursery schemes legitimately have no Content Standard / Indicator
+    column — their weekly row (subject + strand + sub-strand) IS the
+    curriculum unit. Forcing the indicator pipeline there would fabricate
+    curriculum data, which the product never does.
+    """
+    for w in weeks or []:
+        if getattr(w, "week_type", WeekType.INSTRUCTION) != WeekType.INSTRUCTION:
+            continue
+        if w.indicators:
+            return True
+    return False
+
+
 class AllocationEngine:
     """Deterministic engine for allocating curriculum indicators to lessons.
 
@@ -75,6 +91,15 @@ class AllocationEngine:
 
         if not instruction_weeks:
             return CurriculumCoverage()
+
+        # ── Nursery-style schemes (WAPEF_NURSERY source variant) ────────────
+        # The source has no indicators. The weekly row (subject + strand +
+        # sub-strand + resources) IS the unit of curriculum focus: one week =
+        # one teaching period = one lesson. No indicator code and no content
+        # standard is EVER fabricated for these rows.
+        if not scheme_has_indicators(instruction_weeks):
+            return self._allocate_week_units(
+                instruction_weeks, calendar, config, warnings, conflicts)
 
         last_teaching_week = instruction_weeks[-1].week_number
 
@@ -237,6 +262,79 @@ class AllocationEngine:
 
     # ── Lesson plan generation ──────────────────────────────────────────
 
+    def _allocate_week_units(
+        self,
+        instruction_weeks: List[Week],
+        calendar: TeachingCalendar,
+        config: TermConfig,
+        warnings: List[str],
+        conflicts: List[str],
+    ) -> CurriculumCoverage:
+        """Allocate ONE lesson per weekly curriculum row (no indicator source).
+
+        Used when a scheme legitimately carries no indicators (WAPEF Nursery):
+        each instructional week becomes one lesson whose curriculum focus is
+        the source row itself — subject/strand/sub-strand/resources verbatim.
+        The empty indicator fields stay empty; nothing is invented.
+        """
+        allocations: List[AllocatedIndicator] = []
+
+        for week in instruction_weeks:
+            available_dates = sorted(
+                d.date for d in calendar.days
+                if d.is_teaching_day and d.week_number == week.week_number
+            )
+            if not available_dates:
+                warnings.append(
+                    f"Week {week.week_number}: no teaching dates available"
+                )
+            # The weekly row is the focus. One lesson per week, placed on the
+            # first teaching date of that week (no carry-forward exists: the
+            # row is the unit, and inventing an overflow split would fabricate
+            # structure the source does not have).
+            lesson_date = available_dates[0] if available_dates else None
+            cs_text = week.content_standards[0] if week.content_standards else ""
+            allocations.append(AllocatedIndicator(
+                # No indicator exists in the source; the code stays empty and
+                # the description records the actual source row focus.
+                indicator_code="",
+                indicator_description="",
+                content_standard_code="",
+                content_standard_description=cs_text,
+                strand=week.strand or "",
+                sub_strand=week.sub_strand or "",
+                week_number=week.week_number,
+                week_ending=week.end_date,
+                week_ending_derived=bool(
+                    getattr(week, "week_ending_derived", False)),
+                source_resources=list(week.resources or []),
+                lesson_date=lesson_date,
+                period_index=1,
+                allocated=True,
+                teaching_week=week.week_number,
+                carry_forward=False,
+                carry_forward_from_week=None,
+                needs_review=lesson_date is None,
+            ))
+
+        for seq, alloc in enumerate(allocations):
+            alloc.lesson_sequence = seq
+
+        total = len(allocations)
+        return CurriculumCoverage(
+            total_instructional_weeks=len(instruction_weeks),
+            total_indicators=total,
+            total_generated_lessons=total,
+            total_periods_allocated=total,
+            indicators_allocated=total,
+            indicators_unallocated=0,
+            indicators_duplicated=0,
+            coverage_percentage=100.0 if total else 0.0,
+            allocations=allocations,
+            warnings=warnings,
+            allocation_conflicts=conflicts,
+        )
+
     def generate_lesson_plans(
         self,
         coverage: CurriculumCoverage,
@@ -298,7 +396,7 @@ class AllocationEngine:
 
     def _extract_indicator_code(self, text: str) -> str:
         import re
-        m = re.search(r'[Bb]?\d+\.\d+\.\d+\.\d+(\.\d+)?', text)
+        m = re.search(r'[BbKk]?\d+\.\d+\.\d+\.\d+(\.\d+)?', text)
         return m.group(0) if m else text[:30]
 
     @staticmethod
@@ -320,16 +418,31 @@ class AllocationEngine:
         import re
 
         # A code looks like B9.1.1.1.2 / 9.1.1.1.2 / B9.4.1.1.1 (4-5 numeric groups).
-        # Use a CONSUMING match (not a lookahead) so a code cannot match again
+        # KG schemes use the same shape with a K prefix (K2.1.1.1.1-3). Use a
+        # CONSUMING match (not a lookahead) so a code cannot match again
         # inside itself — "B9.1.1.1.1" must yield ONE code, not "B9..." plus "9...".
-        code_re = re.compile(r'[Bb]?\d+\.\d+\.\d+\.\d+(?:\.\d+)?')
+        code_re = re.compile(r'[BbKk]?\d+\.\d+\.\d+\.\d+(?:\.\d+)?')
 
         result: List[str] = []
         for text in indicators:
             if not text or not text.strip():
                 continue
-            positions = [m.start() for m in code_re.finditer(text)]
-            # Only split when two or more codes are present in one string.
+            positions: List[int] = []
+            prev_code: Optional[str] = None
+            prev_end = 0
+            for m in code_re.finditer(text):
+                code = m.group(0)
+                # A repeated code separated only by whitespace is the SAME
+                # indicator, not the next one: KG ranges come back from the
+                # parser as "K2.1.1.1.1 K2.1.1.1.1-3" (code + rejoined range).
+                # Splitting there would allocate one code-only phantom lesson.
+                if (prev_code is not None and code == prev_code
+                        and not text[prev_end:m.start()].strip()):
+                    continue
+                positions.append(m.start())
+                prev_code = code
+                prev_end = m.end()
+            # Only split when two or more DISTINCT code positions are present.
             if len(positions) >= 2:
                 for i, pos in enumerate(positions):
                     end = positions[i + 1] if i + 1 < len(positions) else len(text)
@@ -342,7 +455,7 @@ class AllocationEngine:
 
     def _extract_cs_code(self, text: str) -> str:
         import re
-        m = re.search(r'[Bb]?\d+\.\d+\.\d+\.\d+', text)
+        m = re.search(r'[BbKk]?\d+\.\d+\.\d+\.\d+', text)
         return m.group(0) if m else ""
 
     def _derive_topic(self, alloc: AllocatedIndicator) -> str:
@@ -355,9 +468,9 @@ class AllocationEngine:
 
     @staticmethod
     def _strip_indicator_code(text: str) -> str:
-        """Remove a leading curriculum indicator code (e.g. B7.4.3.1.2) from text."""
+        """Remove a leading curriculum indicator code (e.g. B7.4.3.1.2 / K2.1.1.1) from text."""
         import re
-        stripped = re.sub(r'^\s*[Bb]?\d+(?:\.\d+){2,4}[.:]?\s*', '', text).strip()
+        stripped = re.sub(r'^\s*[BbKk]?\d+(?:\.\d+){2,4}[.:]?\s*', '', text).strip()
         return stripped or text.strip()
 
     @staticmethod

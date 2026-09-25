@@ -58,7 +58,10 @@ HEADER_ALIASES = {
     # ── sub-strand / context ────────────────────────────────────────────
     "sub-strand": "sub_strand",
     "sub strand": "sub_strand",
+    "sub strands": "sub_strand",
+    "sub-strands": "sub_strand",
     "substrand": "sub_strand",
+    "substrands": "sub_strand",
     "sub_strand": "sub_strand",
     "sub-strand/topic": "sub_strand",
     "sub strand/topic": "sub_strand",
@@ -113,8 +116,8 @@ WEEK_NUMBER_PATTERN = re.compile(
 WEEK_ONLY_PATTERN = re.compile(r'^(\d{1,2})$')
 DATE_SLASH_PATTERN = re.compile(r'(\d{1,2})/(\d{1,2})/(\d{2,4})')
 DATE_DASH_PATTERN = re.compile(r'(\d{1,2})-(\d{1,2})-(\d{2,4})')
-INDICATOR_CODE_PATTERN = re.compile(r'[Bb]?\d+\.\d+\.\d+\.\d+(\.\d+)?')
-CONTENT_STANDARD_CODE_PATTERN = re.compile(r'[Bb]?\d+\.\d+\.\d+\.\d+')
+INDICATOR_CODE_PATTERN = re.compile(r'[BbKk]?\d+\.\d+\.\d+\.\d+(\.\d+)?')
+CONTENT_STANDARD_CODE_PATTERN = re.compile(r'[BbKk]?\d+\.\d+\.\d+\.\d+')
 
 #: Month name → number (full and common abbreviations), lowercased keys.
 _MONTHS = {
@@ -187,11 +190,21 @@ class DOCXParser:
             if selected:
                 tables_data = [t for s in selected for t in s["tables"]]
                 forced_subject = selected[0]["subject"]
-            else:
+            elif any(s["subject"] is not None for s in sections):
                 # The requested section does not exist. Never fall back to
                 # parsing every subject table — that would silently mix
                 # Week N from French with Week N from ICT.
                 tables_data = []
+            else:
+                # Whole-level scheme with NO subject headings anywhere (the
+                # WAPEF KG shape: one table for the whole level, no per-subject
+                # sections). The teacher's confirmed subject therefore applies
+                # to the entire document — there is nothing to mix. An unknown
+                # subject name still yields no tables (handled below).
+                try:
+                    forced_subject = Subject(target_subject)
+                except ValueError:
+                    tables_data = []
 
         filename_for_detection = original_filename or file_path.name
         parsed_scheme = self._parse_scheme(tables_data, raw_text, filename_for_detection)
@@ -940,7 +953,7 @@ class DOCXParser:
             if cs_text:
                 cs_code = self._extract_code(cs_text, CONTENT_STANDARD_CODE_PATTERN)
                 cs_desc = self._clean_description(cs_text, cs_code)
-                if cs_code and not any(c.code == cs_code for c in all_content_standards):
+                if cs_code and cs_desc and not any(c.code == cs_code for c in all_content_standards):
                     all_content_standards.append(ParsedContentStandard(
                         code=cs_code,
                         description=cs_desc
@@ -950,7 +963,7 @@ class DOCXParser:
             if ind_text:
                 ind_code = self._extract_code(ind_text, INDICATOR_CODE_PATTERN)
                 ind_desc = self._clean_description(ind_text, ind_code)
-                if ind_code and not any(i.code == ind_code for i in all_indicators):
+                if ind_code and ind_desc and not any(i.code == ind_code for i in all_indicators):
                     all_indicators.append(ParsedIndicator(
                         code=ind_code,
                         description=ind_desc
@@ -983,7 +996,15 @@ class DOCXParser:
         else:
             desc = text.strip()
         desc = re.sub(r'\s+', ' ', desc).strip()
-        return desc if desc else text.strip()
+        if not desc:
+            # The cell was ONLY the code (common in KG schemes: "k2.1.1.1").
+            # Return empty rather than echoing the code as its own description.
+            return ""
+        # Indicator ranges print as "K2.1.1.1.1-3": rejoin the code and the
+        # range tail without the space the code split introduced.
+        if desc.startswith("-") and code:
+            return f"{code}{desc}"
+        return desc
 
     def _convert_to_weeks(self, parsed_scheme: ParsedScheme) -> List[Week]:
         """Build Week rows. Source week-ending dates are AUTHORITATIVE.
@@ -1081,6 +1102,15 @@ class DOCXParser:
                     message=f"Week {pw.week_number}: Special week detected ({pw.week_type.value})"
                 ))
 
+    #: Subject keywords that appear inside ordinary early-years curriculum
+    #: prose and must not classify a whole document on their own when the
+    #: document itself declares an early-years level ("KG TWO", "NURSERY").
+    #: e.g. the WAPEF KG scheme's "my family history" cell is curriculum
+    #: content, not a History scheme.
+    _EARLY_YEARS_LEVEL_RE = re.compile(
+        r"\b(?:kg|k\.g|kindergarten|nursery|kg1|kg2)\b", re.IGNORECASE
+    )
+
     def _extract_subject_from_text(self, text: str) -> Optional[str]:
         """Best-effort subject from free text, using the canonical keyword list.
 
@@ -1088,11 +1118,32 @@ class DOCXParser:
         before Science, Core Mathematics before Mathematics). Detection is only
         a hint — a multi-subject document is confirmed by the teacher, never
         silently classified.
+
+        Early-years documents (KG/Nursery) teach topics that mention secondary
+        subjects in prose ("family history", "creative arts"). When the
+        document explicitly declares an early-years level, generic single-word
+        keyword hits inside that prose are suppressed — an explicit level mark
+        beats a coincidental subject word, and the level itself keeps the
+        teacher confirmation flow honest instead of a wrong guess.
         """
         text_lower = (text or "").lower()
+        early_years = bool(self._EARLY_YEARS_LEVEL_RE.search(text_lower))
         for keyword, subject in SUBJECT_KEYWORDS:
-            if keyword in text_lower:
-                return subject.value
+            if keyword not in text_lower:
+                continue
+            if early_years and " " not in keyword and len(keyword) > 2:
+                # Short generic words (ict, history, english, french, …) inside
+                # KG/Nursery prose are not subject classifications.
+                continue
+            if " " not in keyword and len(keyword) <= 3:
+                # Short keywords must match as whole words even outside the
+                # early-years guard: "ict" inside "depicting" is prose, not a
+                # subject. Multi-word phrases keep substring matching.
+                if not re.search(
+                        r"(?<![a-z0-9])" + re.escape(keyword) + r"(?![a-z0-9])",
+                        text_lower):
+                    continue
+            return subject.value
         return None
 
     def _extract_class_level_from_text(self, text: str, filename: str = "") -> Optional[str]:
@@ -1169,7 +1220,13 @@ class DOCXParser:
         ("basic 1", "Basic 1"), ("basic 2", "Basic 2"),
         ("basic 3", "Basic 3"), ("basic 4", "Basic 4"),
         ("basic 5", "Basic 5"), ("basic 6", "Basic 6"),
-        ("kg 1", "KG 1"), ("kg 2", "KG 2"), ("nursery", "Nursery"),
+        # Kindergarten: digit and word-number spellings ("KG 2", "KG TWO",
+        # "K.G. TWO" — real KG scheme titles use both).
+        ("kg 1", "KG 1"), ("kg one", "KG 1"), ("kg i", "KG 1"),
+        ("kg 2", "KG 2"), ("kg two", "KG 2"), ("kg ii", "KG 2"),
+        ("kindergarten 1", "KG 1"), ("kindergarten 2", "KG 2"),
+        ("kindergarten two", "KG 2"),
+        ("nursery", "Nursery"),
     ]
 
     @staticmethod
