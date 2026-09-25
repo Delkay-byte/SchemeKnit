@@ -161,7 +161,7 @@ class TestDefaultsNeverStampCurriculum:
 
     def test_frontend_generate_form_has_no_basic9_seed(self):
         page = (
-            BACKEND.parent / "frontend" / "src" / "app" / "generate" / "[id]" / "page.tsx"
+            BACKEND.parent / "frontend" / "src" / "app" / "(app)" / "generate" / "[id]" / "page.tsx"
         ).read_text(encoding="utf-8")
         assert "class_level: 'Basic 9'" not in page
         assert "subject: 'Science'" not in page.split("loadData")[0]

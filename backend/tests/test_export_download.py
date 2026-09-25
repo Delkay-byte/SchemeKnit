@@ -473,7 +473,7 @@ class TestBrowserDownloadTransport:
         return (FRONTEND / "lib" / "api.ts").read_text(encoding="utf-8")
 
     def _generate_page_source(self) -> str:
-        return (FRONTEND / "app" / "generate" / "[id]" / "page.tsx").read_text(
+        return (FRONTEND / "app" / "(app)" / "generate" / "[id]" / "page.tsx").read_text(
             encoding="utf-8")
 
     def test_object_url_is_revoked_only_after_a_deferral(self):
@@ -521,10 +521,15 @@ class TestBrowserDownloadTransport:
 
     def test_export_failures_are_visible_when_a_scheme_is_loaded(self):
         """A failed export must not be silent: the error banner has to render
-        even though the scheme loaded correctly."""
+        even though the scheme loaded correctly. Since the app-ui redesign the
+        banner is the shared Banner primitive, which gives danger-tone banners
+        role="alert" (screen-reader announced)."""
         src = self._generate_page_source()
         assert "{error && scheme && (" in src
-        assert 'role="alert"' in src
+        assert 'tone="danger"' in src
+        banner = (FRONTEND / "components" / "ui" / "banner.tsx").read_text(
+            encoding="utf-8")
+        assert "tone === 'danger' ? 'alert' : 'status'" in banner
 
     def test_export_errors_surface_as_messages(self):
         """A 403/500/503 export must show the server message, not crash."""

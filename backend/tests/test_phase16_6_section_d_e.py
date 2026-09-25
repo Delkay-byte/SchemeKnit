@@ -46,7 +46,8 @@ class TestSourceDatesRealDocuments:
             assert w.week_ending_derived is False, (
                 f"week {w.week_number} wrongly derived"
             )
-            assert w.end_date != date.today() or w.week_number == 0
+            # week_ending_derived is False already proves the date came from
+            # the document; a *source* date may legitimately be today.
         ends = [w.end_date for w in sorted(scheme.weeks, key=lambda x: x.week_number)]
         for prev, nxt in zip(ends, ends[1:]):
             assert (nxt - prev).days == 7

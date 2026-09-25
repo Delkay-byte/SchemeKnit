@@ -118,6 +118,21 @@ PROVENANCE_REGISTRY: Dict[str, TemplateProvenance] = {
                   "drift from the golden master."),
         levels=("Basic 7", "Basic 8", "Basic 9"),
     ),
+    "tpl-wapef-approved-plan": TemplateProvenance(
+        template_id="tpl-wapef-approved-plan",
+        provenance=PROVENANCE_APPROVED_ORGANIZATIONAL,
+        verification_status=VERIFICATION_VERIFIED,
+        official=True,
+        source_document="backend/src/engines/assets/wapef_approved_plan_template.docx",
+        evidence=("Approved WAPEF lesson-plan document supplied by WAPEF; its "
+                  "structure (7x6 metadata table, 3x3 + 4x3 phase grids, merges "
+                  "and labels) is reproduced from the source file itself — blank "
+                  "value cells were tokenized in place, so the renderer's output "
+                  "topology matches the source by construction. The completed "
+                  "WAPEF Science sample is the populated acceptance fixture."),
+        levels=("Nursery", "KG 1", "KG 2", "Basic 1", "Basic 2", "Basic 3",
+                "Basic 4", "Basic 5", "Basic 6", "Basic 7", "Basic 8", "Basic 9"),
+    ),
     "tpl-official-ges-nacca-kg": TemplateProvenance(
         template_id="tpl-official-ges-nacca-kg",
         provenance=PROVENANCE_APPROVED_ORGANIZATIONAL,

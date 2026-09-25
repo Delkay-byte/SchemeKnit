@@ -244,6 +244,14 @@ class LessonPlanDB(Base):
 
     previous_knowledge = Column(Text, default="")
     learning_objectives = Column(JSON, default=list)
+    # ── WAPEF structured fields (Approved WAPEF Plan; v025) ────────────
+    # Teacher-selected curriculum/context selections — never AI-chosen.
+    # Optional (empty default) so existing lessons stay valid.
+    wapef_deep_hope = Column(Text, default="")
+    wapef_storyline = Column(Text, default="")
+    wapef_through_lines = Column(JSON, default=list)
+    wapef_gods_story = Column(String, default="")
+    remarks = Column(Text, default="")
     core_competencies = Column(JSON, default=list)
     #: TLRs from the scheme for this subject + source week (SOURCE provenance).
     source_tlrs = Column(JSON, default=list)

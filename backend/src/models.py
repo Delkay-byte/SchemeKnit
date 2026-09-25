@@ -641,6 +641,16 @@ class LessonPlan(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     scheme_of_work_id: str
     term_config_id: str
+    #: WAPEF teacher-selected structured fields (Approved WAPEF Plan). Optional
+    #: so existing lessons stay valid; never AI-chosen, never overwritten by
+    #: generation. See engines/wapef_fields.py for the approved option lists.
+    wapef_deep_hope: str = ""
+    wapef_storyline: str = ""
+    #: Selected Through lines in APPROVED ORDER (export order).
+    wapef_through_lines: List[str] = []
+    wapef_gods_story: str = ""
+    #: Teacher-written remarks (WAPEF REMARKS row); blank when not written.
+    remarks: str = ""
     #: Source curriculum week the lesson's indicator belongs to.
     week_number: int
     #: Source week-ending date for that curriculum week. Authoritative when

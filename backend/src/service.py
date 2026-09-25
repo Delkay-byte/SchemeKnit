@@ -207,14 +207,17 @@ class DataService:
         """Persist (or replace) one lesson's review draft.
 
         Keys are lesson_sequence strings. Allowed fields only: keywords,
-        other_tlrs, core_competencies, structured_references. Source fields
+        other_tlrs, core_competencies, structured_references plus the four
+        WAPEF teacher-selected structured fields. Source fields
         (source_tlrs / week_ending / indicator / content standard) are never
         written through this path.
         """
         scheme = self.get_scheme(db, scheme_id, owner_id)
         if not scheme:
             return {}
-        allowed = ("keywords", "other_tlrs", "core_competencies", "structured_references")
+        allowed = ("keywords", "other_tlrs", "core_competencies", "structured_references",
+                   "wapef_deep_hope", "wapef_storyline", "wapef_through_lines",
+                   "wapef_gods_story", "remarks")
         clean = {k: draft[k] for k in allowed if k in (draft or {})}
         store = getattr(scheme, "lesson_review_drafts", None)
         if not isinstance(store, dict):
@@ -233,7 +236,9 @@ class DataService:
         scheme = self.get_scheme(db, scheme_id, owner_id)
         if not scheme:
             return {}
-        allowed = ("keywords", "other_tlrs", "core_competencies", "structured_references")
+        allowed = ("keywords", "other_tlrs", "core_competencies", "structured_references",
+                   "wapef_deep_hope", "wapef_storyline", "wapef_through_lines",
+                   "wapef_gods_story", "remarks")
         store = {}
         for key, draft in (drafts or {}).items():
             if isinstance(draft, dict):
@@ -314,6 +319,12 @@ class DataService:
             job_id=job_id,
             owner_id=owner_id,
             scheme_id=scheme_id,
+            # WAPEF teacher-selected structured fields (verbatim, never AI-chosen).
+            wapef_deep_hope=getattr(lp, "wapef_deep_hope", "") or "",
+            wapef_storyline=getattr(lp, "wapef_storyline", "") or "",
+            wapef_through_lines=list(getattr(lp, "wapef_through_lines", []) or []),
+            wapef_gods_story=getattr(lp, "wapef_gods_story", "") or "",
+            remarks=getattr(lp, "remarks", "") or "",
             week_number=lp.week_number,
             week_ending=getattr(lp, "week_ending", None),
             week_ending_derived=bool(getattr(lp, "week_ending_derived", False)),
@@ -402,6 +413,25 @@ class DataService:
         for key, value in updates.items():
             if hasattr(lp, key) and key not in ("id", "job_id", "owner_id", "scheme_id", "created_at"):
                 setattr(lp, key, value)
+
+        # WAPEF teacher-selected fields are normalized through the approved
+        # option lists whenever a lesson update touches them: only approved
+        # values persist (through the teacher UI they are already validated;
+        # this keeps the stored lesson canonical even if a client re-sends).
+        from .engines.wapef_fields import normalize_wapef_payload
+        if any(k in updates for k in (
+                "wapef_deep_hope", "wapef_storyline", "wapef_through_lines",
+                "wapef_gods_story")):
+            canonical = normalize_wapef_payload({
+                "deep_hope": updates.get("wapef_deep_hope", lp.wapef_deep_hope),
+                "storyline": updates.get("wapef_storyline", lp.wapef_storyline),
+                "through_lines": updates.get("wapef_through_lines", lp.wapef_through_lines),
+                "gods_story": updates.get("wapef_gods_story", lp.wapef_gods_story),
+            })
+            lp.wapef_deep_hope = canonical["deep_hope"]
+            lp.wapef_storyline = canonical["storyline"]
+            lp.wapef_through_lines = canonical["through_lines"]
+            lp.wapef_gods_story = canonical["gods_story"]
 
         lp.teacher_edited = True
         lp.status = "edited"
