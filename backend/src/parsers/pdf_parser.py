@@ -227,11 +227,22 @@ class PDFParser:
             if selected:
                 tables = [t for s in selected for t in s["tables"]]
                 forced_subject = selected[0]["subject"]
-            else:
+            elif any(s["subject"] is not None for s in sections):
                 # Missing section → empty parse, never a cross-subject mix
                 # and never a text fallback that re-reads every heading.
                 tables = []
                 section_miss = True
+            else:
+                # Whole-level scheme with NO subject headings anywhere (the
+                # KG scheme shape). The teacher's confirmed subject applies to
+                # the entire document — there is nothing to mix. An unknown
+                # subject name still yields nothing.
+                from ..models import Subject as _Subject
+                try:
+                    forced_subject = _Subject(target_subject)
+                except ValueError:
+                    tables = []
+                    section_miss = True
 
         if not tables and not section_miss:
             non_heading = [
