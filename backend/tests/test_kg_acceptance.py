@@ -444,8 +444,30 @@ class TestRegressions:
         assert plans[0].learning_objectives[0].description.startswith("Learners can")
 
     def test_wapef_template_still_single_common_output(self):
-        """No KG-specific WAPEF variant was introduced."""
+        """No KG-specific WAPEF variant was introduced.
+
+        The registry now holds the original Approved WAPEF Plan (still the
+        single common WAPEF output covering Nursery/KG through Basic 9) plus
+        the new Basic 1-3 class-teacher weekly plan, which covers Basic 1-3
+        only and never claims KG or Nursery.
+        """
         from src.engines.template_engine import DEFAULT_TEMPLATES
+        from src.engines.template_provenance import provenance_for_template
+        from src.engines.wapef_basic13_template import is_basic13_class
+        from src.models import ClassLevel
+
         wapef = [t for t in DEFAULT_TEMPLATES if t.id.startswith("tpl-wapef")]
-        assert len(wapef) == 1
-        assert wapef[0].name == "Approved WAPEF Plan"
+        assert len(wapef) == 2
+        names = {t.id: t.name for t in wapef}
+        assert names["tpl-wapef-approved-plan"] == "Approved WAPEF Plan"
+        # The original approved plan still covers KG (shared common output).
+        approved_levels = provenance_for_template(
+            "tpl-wapef-approved-plan").levels
+        assert "KG 1" in approved_levels and "KG 2" in approved_levels
+        # The new weekly plan is Basic 1-3 only: no KG/Nursery claim,
+        # and KG classes never route into the class-teacher model.
+        weekly_levels = provenance_for_template(
+            "tpl-wapef-basic13-weekly-plan").levels
+        assert not any(level.startswith(("KG", "Nursery")) for level in weekly_levels)
+        assert not is_basic13_class(ClassLevel.KG1)
+        assert not is_basic13_class(ClassLevel.KG2)
