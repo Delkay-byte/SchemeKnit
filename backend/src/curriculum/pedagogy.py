@@ -494,6 +494,53 @@ _EARLY = SubjectPedagogy(
     pedagogy_note="Everything is concrete and play-based; keep activities short and lively.",
 )
 
+_NURSERY = SubjectPedagogy(
+    key="nursery",
+    label="Nursery",
+    starter_template=(
+        "Gather the children with a familiar song or rhyme, then show the real "
+        "objects or pictures for {skill} and let them touch and talk about them."
+    ),
+    main_phases=[
+        MainPhase("Teacher modelling",
+                  "Model {skill} slowly with real objects while the children "
+                  "watch, listen and repeat after you.", 0.30),
+        MainPhase("Guided participation",
+                  "Guide the children to try {skill} themselves, one small step "
+                  "at a time, helping each child by name.", 0.40),
+        MainPhase("Playful practice",
+                  "Let the children play at {skill} in small groups — sorting, "
+                  "matching, singing or colouring — while you watch and "
+                  "encourage them.", 0.30),
+    ],
+    assessment_template=(
+        "Watch each child during the activity and ask simple oral questions — "
+        "point to, name or show {skill}. Tick who can do it and who needs more "
+        "help; there is no written test."
+    ),
+    plenary_template=(
+        "Bring the children back to the circle, sing or clap about {skill}, let "
+        "a few children show what they made or did, and praise each child."
+    ),
+    resources=["charts & pictures", "counters", "flash cards", "colours",
+               "real objects"],
+    support_template=(
+        "Sit beside the child, guide the hand or the answer for {skill}, and "
+        "use bigger, simpler objects until the child succeeds."
+    ),
+    extension_template=(
+        "Let children who finish early do {skill} again with more objects or "
+        "show a friend how it is done."
+    ),
+    grouping="Whole-class circle time, then small guided groups.",
+    keywords=["objects", "play", "oral"],
+    essential_question="What can each child do or say about {skill} today?",
+    pedagogy_note=(
+        "Oral instruction, concrete objects, imitation, play and praise; keep "
+        "every activity short and repeat it often."
+    ),
+)
+
 _GENERIC = SubjectPedagogy(
     key="generic",
     label="General",
@@ -538,7 +585,7 @@ _GENERIC = SubjectPedagogy(
 SUBJECT_PROFILES = {
     p.key: p for p in [
         _MATH, _SCIENCE, _ENGLISH, _SOCIAL, _CREATIVE, _ICT, _RME, _PHE,
-        _CAREER, _EARLY, _GENERIC,
+        _CAREER, _EARLY, _NURSERY, _GENERIC,
     ]
 }
 

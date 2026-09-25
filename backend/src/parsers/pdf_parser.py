@@ -220,9 +220,17 @@ class PDFParser:
 
         if target_subject:
             sections = self._resolve_sections(blocks, text_sections)
+            # Same canonical-confirmation rule as the DOCX parser: the
+            # teacher's subject name is resolved through the shared heading
+            # matcher, so an alias heading ("CREATIVE ARTS" vs the canonical
+            # enum value) selects its own section.
+            from .subject_keywords import canonical_subject_from_heading as _csh
+            _wanted = _csh(target_subject)
+            _wanted_values = {_wanted.value} if _wanted is not None else set()
+            _wanted_values.add(target_subject)
             selected = [
                 s for s in sections
-                if s["subject"] is not None and s["subject"].value == target_subject
+                if s["subject"] is not None and s["subject"].value in _wanted_values
             ]
             if selected:
                 tables = [t for s in selected for t in s["tables"]]
