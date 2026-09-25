@@ -45,7 +45,7 @@ from ..models import (
 )
 from .pedagogy import profile_for_subject, SubjectPedagogy
 
-_CODE_RE = re.compile(r"^\s*[Bb]?\d+(?:\.\d+){2,4}[.:]?\s*")
+_CODE_RE = re.compile(r"^\s*[BbKk]?\d+(?:\.\d+){2,4}[.:]?\s*")
 
 #: Legacy learner-facing prefixes stripped before re-phrasing.
 _LEARNER_PREFIXES = (
@@ -464,6 +464,25 @@ def strip_indicator_code(text: str) -> str:
     return _CODE_RE.sub("", text).strip() or text.strip()
 
 
+_ANY_CODE_RE = re.compile(r"[BbKk]?\d+(?:\.\d+)+")
+
+
+def _is_code_only(text: str) -> bool:
+    """True when the indicator text is only a curriculum code / code range.
+
+    KG schemes legitimately print ranges like "K2.1.1.1.1-3" (the parser may
+    rejoin them as "K2.1.1.1.1 K2.1.1.1.1-3") with no prose. Such text must
+    never be phrased as learner-facing prose ("Learners can K2.1.1.1.1"); the
+    source row's sub-strand is the honest lesson focus.
+    """
+    if not text:
+        return True
+    without_codes = _ANY_CODE_RE.sub("", text)
+    # What remains must be punctuation/whitespace only — any letter means the
+    # cell carried real prose alongside the code.
+    return not re.search(r"[A-Za-z]", without_codes)
+
+
 def _learner_phrase(indicator: str) -> str:
     """Phrase the indicator as an approved learner-facing performance statement."""
     clean = strip_indicator_code(indicator)
@@ -631,12 +650,25 @@ def build_lesson(
     profile: SubjectPedagogy = profile_for_subject(subject_name)
 
     skill = strip_indicator_code(alloc.indicator_description)
-    focus_short = _first_clause(alloc.indicator_description) or skill
+    # KG-style rows whose indicator cell holds ONLY a code / code range (e.g.
+    # "K2.1.1.1.1-3") carry no teachable prose. Like Nursery rows, the source
+    # row itself (sub-strand) is the honest curriculum focus — the bare code
+    # is never phrased as learner-facing text or shown in its place.
+    if alloc.indicator_description and _is_code_only(alloc.indicator_description):
+        skill = ""
+    focus_short = "" if skill == "" else (_first_clause(alloc.indicator_description) or skill)
     # Embed the FULL cleaned indicator text into every phase template via
     # {focus} so the lesson visibly teaches this exact indicator (helps the
     # quality gate's exactness check and the teacher's own review).
     if not focus_short or len(focus_short.split()) < 4:
-        focus_short = skill or alloc.indicator_code or focus_short
+        focus_short = skill or focus_short
+    # Nursery-style rows (and KG code-only rows) carry no indicator prose: the
+    # source row itself (strand + sub-strand) is the authoritative curriculum
+    # focus. The sub-strand names what the lesson actually teaches; the strand
+    # alone is never inflated into a fake indicator.
+    if not skill and alloc.sub_strand:
+        skill = alloc.sub_strand
+        focus_short = alloc.sub_strand
     topic = _derive_topic(alloc)
     class_level = (
         config.class_level.value
@@ -663,9 +695,16 @@ def build_lesson(
         getattr(interp, "misconception_risks", "") if interp else ""
     )
 
+    # The raw code/range is curriculum metadata, not prose: phase templates
+    # that reference {indicators} get the honest focus text instead when the
+    # source cell was code-only.
+    indicators_for_templates = (
+        "" if alloc.indicator_description and _is_code_only(alloc.indicator_description)
+        else (alloc.indicator_description or "")
+    )
     fmt = dict(
         skill=skill, focus=skill, focus_short=focus_short, topic=topic,
-        indicators=alloc.indicator_description or "",
+        indicators=indicators_for_templates,
         strand=alloc.strand or "", sub_strand=alloc.sub_strand or "",
         class_level=class_level, prev=prev_short, next=next_short,
         content_standard=alloc.content_standard_description or "",
@@ -814,8 +853,15 @@ def build_lesson(
             references.append(label)
 
     objectives = [LearningObjective(
-        description=_learner_phrase(alloc.indicator_description),
-        indicator_code=alloc.indicator_code,
+        # Indicator-bearing rows phrase the indicator; Nursery-style rows and
+        # KG code-only rows phrase the source row's own focus (sub-strand or
+        # strand). No code is attached when the source supplied none.
+        description=(
+            _learner_phrase(alloc.indicator_description)
+            if alloc.indicator_description and not _is_code_only(alloc.indicator_description)
+            else f"Learners can explore and talk about {(alloc.sub_strand or alloc.strand or 'the lesson focus').strip()}"
+        ),
+        indicator_code=alloc.indicator_code or None,
     )]
 
     previous_knowledge = (
@@ -849,8 +895,10 @@ def build_lesson(
         sub_strand=alloc.sub_strand,
         content_standard=alloc.content_standard_description,
         content_standard_code=alloc.content_standard_code,
-        indicators=[alloc.indicator_description],
-        indicator_codes=[alloc.indicator_code],
+        # Nursery-style lessons keep the source's empty indicator fields —
+        # never a fabricated code or description.
+        indicators=[alloc.indicator_description] if alloc.indicator_description else [],
+        indicator_codes=[alloc.indicator_code] if alloc.indicator_code else [],
         lesson_topic=topic,
         essential_questions=[essential_question],
         previous_knowledge=previous_knowledge,
