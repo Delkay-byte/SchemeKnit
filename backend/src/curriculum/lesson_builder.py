@@ -467,6 +467,13 @@ def strip_indicator_code(text: str) -> str:
 _ANY_CODE_RE = re.compile(r"[BbKk]?\d+(?:\.\d+)+")
 
 
+def is_code_only_indicator(text: str) -> bool:
+    """Public alias of :func:`_is_code_only` for cross-module use (the
+    allocation engine passes curriculum-context text to the builder and needs
+    the same code-only test for KG-style rows)."""
+    return _is_code_only(text)
+
+
 def _is_code_only(text: str) -> bool:
     """True when the indicator text is only a curriculum code / code range.
 
@@ -648,6 +655,21 @@ def build_lesson(
         config.subject.value if isinstance(config.subject, Subject) else str(config.subject)
     )
     profile: SubjectPedagogy = profile_for_subject(subject_name)
+    class_level = (
+        config.class_level.value
+        if isinstance(config.class_level, ClassLevel) else str(config.class_level)
+    )
+    # KG classes are developmentally early-childhood regardless of the subject
+    # label the file was confirmed under: a KG2 "Numeracy" row is taught
+    # through play, songs and concrete objects — not the board-worked examples
+    # and written class exercises of the Basic-7-9 mathematics profile. The
+    # KG1/KG2 source evidence (play-based authentic assessment, observation
+    # checklists, songs and role-play in the resource columns) supports the
+    # early-childhood profile for every KG subject area. Basic 1+ keeps the
+    # subject profile.
+    if class_level in ("KG 1", "KG 2"):
+        from .pedagogy import SUBJECT_PROFILES
+        profile = SUBJECT_PROFILES["early_childhood"]
 
     skill = strip_indicator_code(alloc.indicator_description)
     # KG-style rows whose indicator cell holds ONLY a code / code range (e.g.
@@ -670,10 +692,6 @@ def build_lesson(
         skill = alloc.sub_strand
         focus_short = alloc.sub_strand
     topic = _derive_topic(alloc)
-    class_level = (
-        config.class_level.value
-        if isinstance(config.class_level, ClassLevel) else str(config.class_level)
-    )
     duration = int(config.lesson_duration_minutes or 60)
 
     prev_short = _first_clause(previous_indicator or "") if previous_indicator else ""
@@ -855,11 +873,20 @@ def build_lesson(
     objectives = [LearningObjective(
         # Indicator-bearing rows phrase the indicator; Nursery-style rows and
         # KG code-only rows phrase the source row's own focus (sub-strand or
-        # strand). No code is attached when the source supplied none.
+        # strand). No code is attached when the source supplied none. KG rows
+        # use a play-based observable verb ("explore, talk about and act out")
+        # matching the source evidence: the KG1 scheme assesses through play,
+        # observation and oral response, and the completed WAPEF samples phrase
+        # outcomes as demonstrable actions, never board work.
         description=(
             _learner_phrase(alloc.indicator_description)
             if alloc.indicator_description and not _is_code_only(alloc.indicator_description)
-            else f"Learners can explore and talk about {(alloc.sub_strand or alloc.strand or 'the lesson focus').strip()}"
+            else (
+                f"Learners can identify, talk about and act out "
+                f"{(alloc.sub_strand or alloc.strand or 'the lesson focus').strip()}"
+                if class_level in ("KG 1", "KG 2")
+                else f"Learners can explore and talk about {(alloc.sub_strand or alloc.strand or 'the lesson focus').strip()}"
+            )
         ),
         indicator_code=alloc.indicator_code or None,
     )]

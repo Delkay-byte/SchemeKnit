@@ -539,10 +539,17 @@ def _check_anti_hallucination(lesson: Dict[str, Any]) -> List[QualityIssue]:
 
 def _lesson_text(lesson: Dict[str, Any]) -> str:
     """Flatten every teacher-visible text field of a lesson for analysis."""
+    # introduction and starter_activity are the same paragraph in deterministic
+    # lessons (the builder stores the framing sentence in both fields; the
+    # WAPEF/GES renderers dedupe them into ONE phase-1 bullet). Counting both
+    # copies here would flag every such lesson as boilerplate — a false
+    # positive, not padding.
+    intro = str(lesson.get("introduction", ""))
+    starter = str(lesson.get("starter_activity", ""))
     parts: List[str] = [
         str(lesson.get("lesson_topic", "")),
-        str(lesson.get("introduction", "")),
-        str(lesson.get("starter_activity", "")),
+        intro,
+        "" if starter and starter.strip() == intro.strip() else starter,
         str(lesson.get("assessment", "")),
         str(lesson.get("conclusion", "")),
         str(lesson.get("differentiation", "")),

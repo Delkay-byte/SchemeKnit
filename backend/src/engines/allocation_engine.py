@@ -367,6 +367,17 @@ class AllocationEngine:
                 ordered[idx + 1].indicator_description
                 if idx < len(ordered) - 1 else None
             )
+            # KG-style rows carry a code-only indicator cell, so passing the
+            # raw description to the builder gives it nothing to phrase
+            # ("Build on the previous lesson ('')"). Substitute the row's own
+            # curriculum focus (sub-strand) so continuation weeks like the
+            # KG scheme's repeated "My School Family" rows still open with an
+            # honest link to the previous lesson instead of cloning it.
+            from ..curriculum.lesson_builder import is_code_only_indicator as _ico
+            if previous_indicator and _ico(previous_indicator):
+                previous_indicator = ordered[idx - 1].sub_strand or None
+            if next_indicator and _ico(next_indicator):
+                next_indicator = ordered[idx + 1].sub_strand or None
             lp = build_lesson(
                 alloc, config, scheme_id,
                 previous_indicator=previous_indicator,
