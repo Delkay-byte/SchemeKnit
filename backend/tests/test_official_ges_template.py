@@ -205,7 +205,7 @@ class TestBundledAssets:
         assert set(summary["verified_approved"]) == {
             "tpl-official-ges-nacca-jhs", "tpl-approved-org-headteacher",
             "tpl-official-ges-nacca-kg", "tpl-official-ges-nacca-primary",
-            "tpl-official-ges-nacca-shs"}
+            "tpl-official-ges-nacca-shs", "tpl-wapef-approved-plan"}
 
     def test_provenance_records_declare_levels_and_labels(self):
         jhs = provenance_for_template(JHS_SPEC.template_id)
@@ -706,7 +706,8 @@ class TestTemplatesEndpointDefaults:
         official = {t["id"] for t in payload["templates"] if t["is_official"]}
         assert official == {
             JHS_SPEC.template_id, "tpl-approved-org-headteacher",
-            KG_SPEC.template_id, PRIMARY_SPEC.template_id, SHS_SPEC.template_id}
+            KG_SPEC.template_id, PRIMARY_SPEC.template_id, SHS_SPEC.template_id,
+            "tpl-wapef-approved-plan"}
         assert payload["provenance_summary"]["pending_verification"] == []
         by_id = {t["id"]: t for t in payload["templates"]}
         for spec in ALL_SPECS:

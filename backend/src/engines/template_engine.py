@@ -26,6 +26,12 @@ from .official_ges_template import (
     TEMPLATE_VERSION as OFFICIAL_GES_TEMPLATE_VERSION,
     sections_for as official_ges_sections,
 )
+from .wapef_template import (
+    TEMPLATE_ID as WAPEF_TEMPLATE_ID,
+    TEMPLATE_NAME as WAPEF_TEMPLATE_NAME,
+    TEMPLATE_VERSION as WAPEF_TEMPLATE_VERSION,
+    WAPEF_TOKEN_FIELDS,
+)
 from .template_provenance import provenance_for_template
 
 
@@ -212,6 +218,123 @@ def _make_approved_sections() -> List[TemplateSection]:
             fields=[TemplateField(name=m["field"] or m["label"], label=m["label"],
                                   field_type=ftype, required=False)],
         ))
+    return sections
+
+
+def _make_wapef_sections() -> List[TemplateSection]:
+    """Sections for the Approved WAPEF Plan, derived from the form's token
+    contract (same document the renderer fills in place).
+
+    The four WAPEF structured fields are SELECT fields bound to their approved
+    option lists (``wapef_fields``); the teacher picks them in review and they
+    are never AI-generated.
+    """
+    from .wapef_fields import (
+        WAPEF_DEEP_HOPES, WAPEF_GODS_STORY, WAPEF_STORYLINES,
+        WAPEF_THROUGH_LINES,
+    )
+
+    field_type_by_token = {
+        "WEEK": TemplateFieldType.NUMBER,
+        "CLASS_SIZE": TemplateFieldType.NUMBER,
+    }
+    token_groups = [
+        ("wapef_metadata", "Lesson Metadata", (
+            "WEEK", "WEEK_ENDING", "SUBJECT", "CLASS", "CLASS_SIZE",
+        )),
+        ("wapef_curriculum", "Curriculum Alignment", (
+            "STRAND", "SUB_STRAND", "CONTENT_STANDARD", "LEARNING_INDICATOR",
+            "PERFORMANCE_INDICATOR", "CORE_COMPETENCIES", "KEY_WORDS",
+        )),
+        ("wapef_special", "WAPEF Special Fields", (
+            "THROUGH_LINE", "GODS_STORY", "DEEP_HOPE", "STORYLINE",
+        )),
+        ("wapef_delivery", "Lesson Delivery", (
+            "PHASE_1_STARTER", "PHASE_1_RESOURCES", "PHASE_2_MAIN",
+            "PHASE_2_RESOURCES", "PHASE_3_PLENARY", "PHASE_3_RESOURCES",
+            "EVALUATION", "REMARKS",
+        )),
+    ]
+    options_by_token = {
+        "THROUGH_LINE": WAPEF_THROUGH_LINES,
+        "GODS_STORY": WAPEF_GODS_STORY,
+        "DEEP_HOPE": WAPEF_DEEP_HOPES,
+        "STORYLINE": WAPEF_STORYLINES,
+    }
+    label_overrides = {
+        "THROUGH_LINE": "Through line",
+        "GODS_STORY": "God's Story",
+        "LEARNING_INDICATOR": "Learning Indicator",
+    }
+    sections: List[TemplateSection] = []
+    for order, (name, label, tokens) in enumerate(token_groups):
+        fields = []
+        for index, token in enumerate(tokens):
+            base = token.lower()
+            field_name = ("wapef_" + base.replace("_", " ").strip()
+                          .replace(" ", "_"))
+            if token == "THROUGH_LINE":
+                field_name = "wapef_through_lines"
+            elif token == "GODS_STORY":
+                field_name = "wapef_gods_story"
+            elif token == "DEEP_HOPE":
+                field_name = "wapef_deep_hope"
+            elif token == "STORYLINE":
+                field_name = "wapef_storyline"
+            elif token == "WEEK_ENDING":
+                field_name = "week_ending"
+            elif token == "SUBJECT":
+                field_name = "subject"
+            elif token == "CLASS":
+                field_name = "class_level"
+            elif token == "CLASS_SIZE":
+                field_name = "class_size"
+            elif token == "STRAND":
+                field_name = "strand"
+            elif token == "SUB_STRAND":
+                field_name = "sub_strand"
+            elif token == "CONTENT_STANDARD":
+                field_name = "content_standard"
+            elif token == "LEARNING_INDICATOR":
+                field_name = "indicators"
+            elif token == "PERFORMANCE_INDICATOR":
+                field_name = "learning_objectives"
+            elif token == "CORE_COMPETENCIES":
+                field_name = "core_competencies"
+            elif token == "KEY_WORDS":
+                field_name = "keywords"
+            elif token == "PHASE_1_STARTER":
+                field_name = "introduction"
+            elif token == "PHASE_2_MAIN":
+                field_name = "main_activities"
+            elif token == "PHASE_3_PLENARY":
+                field_name = "conclusion"
+            elif token == "EVALUATION":
+                field_name = "assessment"
+            elif token == "PHASE_1_RESOURCES":
+                field_name = "teaching_learning_resources"
+            elif token == "PHASE_2_RESOURCES":
+                field_name = "teaching_learning_resources"
+            elif token == "PHASE_3_RESOURCES":
+                field_name = "teaching_learning_resources"
+            elif token == "REMARKS":
+                field_name = "remarks"
+            options = options_by_token.get(token)
+            fields.append(TemplateField(
+                name=field_name,
+                label=label_overrides.get(
+                    token, token.replace("_", " ").title()),
+                field_type=(TemplateFieldType.SELECT if options
+                            else field_type_by_token.get(token,
+                                                         TemplateFieldType.TEXTAREA)),
+                order=index,
+                options=list(options) if options else [],
+                source=(ContentSource.DETERMINISTIC if token not in
+                        ("PHASE_1_STARTER", "PHASE_2_MAIN", "PHASE_3_PLENARY")
+                        else ContentSource.AI),
+            ))
+        sections.append(TemplateSection(
+            name=name, label=label, order=order, fields=fields))
     return sections
 
 
@@ -475,6 +598,25 @@ DEFAULT_TEMPLATES: List[Template] = [
         is_default=False,
         is_official=False,
         author="SchemeKnit",
+    ),
+    Template(
+        id=WAPEF_TEMPLATE_ID,
+        name=WAPEF_TEMPLATE_NAME,
+        family=TemplateFamily.EARLY_CHILDHOOD,
+        educational_level=EducationalLevel.EARLY_CHILDHOOD,
+        description="The approved WAPEF lesson-plan structure (metadata table, "
+                    "three-phase delivery grid, evaluation and remarks), rendered "
+                    "from the supplied WAPEF source document itself so the output "
+                    "matches it by construction. One common plan for Nursery, KG, "
+                    "Basic and JHS. Deep Hope, Storyline, Through lines and "
+                    "God's Story are teacher-selected structured fields.",
+        features=["Approved WAPEF source", "Teacher-selected WAPEF fields",
+                  "One plan for Nursery-KG-JHS", "Verified against source"],
+        sections=_make_wapef_sections(),
+        is_default=False,
+        is_official=True,
+        version=WAPEF_TEMPLATE_VERSION,
+        author="Approved WAPEF source via SchemeKnit",
     ),
     Template(
         id="tpl-approved-org-headteacher",
