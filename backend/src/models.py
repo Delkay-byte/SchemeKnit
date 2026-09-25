@@ -736,6 +736,140 @@ class LessonPlan(BaseModel):
     updated_date: datetime = Field(default_factory=datetime.now)
 
 
+# ── Weekly class-teacher plan (Approved WAPEF Basic 1-3 Plan) ─────────────────
+#
+# Basic 1-3 is the CLASS-TEACHER model: one teacher teaches several subjects on
+# different days inside the SAME weekly plan. One weekly plan therefore holds
+# several subject sections, and each section holds one day plan per teaching-day
+# group (a single day, or several days grouped into one shared entry such as
+# the supplied Basic 1 plan's "MONDAY & THURSDAY" RME row).
+#
+# The day plan is NOT a relabelled lesson: DAYS is a first-class structural
+# column (DAYS | PHASE 1: STARTER | PHASE 2: MAIN | PHASE 3: REFLECTION) and
+# each day carries its own starter/main/reflection content. Subject metadata is
+# shared across that subject's day plans and is stored once per plan section
+# (see engines/weekly_plan_engine.py).
+
+
+class DayPlan(BaseModel):
+    """One teaching-day entry in a week's subject section."""
+
+    #: The stored lesson row that carries this day plan (canonical lesson object).
+    lesson_plan_id: Optional[str] = None
+    #: Canonical uppercase day names, week order. One entry for a normal day,
+    #: several when the teacher groups days into one shared teaching entry.
+    days: List[str] = []
+    #: The export label the source prints ("MONDAY", "MONDAY & THURSDAY").
+    day_label: str = ""
+    #: Curriculum focus for this day (never invented; repeated only when the
+    #: source week has fewer indicators than teaching days).
+    focus_indicators: List[str] = []
+    focus_indicator_codes: List[str] = []
+    starter: str = ""
+    main_activities: List[TeachingActivity] = []
+    reflection: str = ""
+    resources: List[str] = []
+    lesson_date: Optional[date] = None
+    period: str = ""
+
+
+class SubjectMetadata(BaseModel):
+    """Curriculum + WAPEF metadata shared by one subject's day plans.
+
+    Every field is optional: the source's subject sections differ from one
+    another (some carry Strand/Sub strand, some do not), and a value the scheme
+    never supplied stays blank rather than being fabricated.
+    """
+
+    subject: str = ""
+    class_level: str = ""
+    week_number: int = 0
+    week_ending: Optional[date] = None
+    week_ending_derived: bool = False
+    reference: str = ""
+    strand: str = ""
+    sub_strand: str = ""
+    content_standards: List[str] = []
+    content_standard_codes: List[str] = []
+    indicators: List[str] = []
+    indicator_codes: List[str] = []
+    performance_indicators: List[str] = []
+    teaching_learning_resources: List[str] = []
+    core_competencies: List[str] = []
+    keywords: List[str] = []
+    wapef_deep_hope: str = ""
+    wapef_storyline: str = ""
+    wapef_through_lines: List[str] = []
+    wapef_gods_story: str = ""
+
+
+class SubjectPlan(BaseModel):
+    """One subject section of a weekly class plan."""
+
+    scheme_of_work_id: str = ""
+    job_id: str = ""
+    subject: str = ""
+    #: Every declared teaching day of the week, in week order.
+    teaching_days: List[str] = []
+    #: The declared teaching-day groups, in week order. Each inner list is one
+    #: shared teaching entry ("["MONDAY", "THURSDAY"]").
+    teaching_day_groups: List[List[str]] = []
+    metadata: SubjectMetadata = SubjectMetadata()
+    day_plans: List[DayPlan] = []
+
+
+class WeeklyClassPlan(BaseModel):
+    """One weekly class-teacher plan holding every subject of the class."""
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    owner_id: str = ""
+    class_level: ClassLevel = ClassLevel.UNKNOWN
+    week_number: int = 0
+    term: str = ""
+    academic_year: str = ""
+    term_start_date: Optional[date] = None
+    term_end_date: Optional[date] = None
+    school_name: Optional[str] = None
+    teacher_name: Optional[str] = None
+    template_id: str = ""
+    subjects: List[SubjectPlan] = []
+    created_date: datetime = Field(default_factory=datetime.now)
+    updated_date: datetime = Field(default_factory=datetime.now)
+
+
+class WeeklyPlanSubjectRequest(BaseModel):
+    """One subject the class teacher wants in this week's plan."""
+
+    scheme_id: str
+    #: Teacher-confirmed teaching-day groups. Empty means "every weekday the
+    #: subject's scheme week has content for" is NOT assumed: the teacher's
+    #: selection is authoritative and an empty selection is rejected.
+    teaching_day_groups: List[List[str]] = []
+    wapef_deep_hope: str = ""
+    wapef_storyline: str = ""
+    wapef_through_lines: List[str] = []
+    wapef_gods_story: str = ""
+    keywords: List[str] = []
+    core_competencies: List[str] = []
+    other_tlrs: List[str] = []
+
+
+class WeeklyPlanRequest(BaseModel):
+    """Request body for generating one Basic 1-3 weekly class plan."""
+
+    class_level: ClassLevel = ClassLevel.UNKNOWN
+    week_number: int = 1
+    term_start_date: date = Field(default_factory=date.today)
+    term_end_date: date = Field(default_factory=date.today)
+    term: str = ""
+    academic_year: str = "2026/2027"
+    class_size: int = 24
+    lesson_duration_minutes: int = 60
+    include_special_weeks: bool = False
+    ai_mode: AIMode = AIMode.OFF
+    subjects: List[WeeklyPlanSubjectRequest] = []
+
+
 # ── Generation Job ────────────────────────────────────────────────────────────
 
 class GenerationJob(BaseModel):
