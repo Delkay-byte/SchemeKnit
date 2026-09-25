@@ -165,12 +165,29 @@ PROVENANCE_REGISTRY: Dict[str, TemplateProvenance] = {
         verification_status=VERIFICATION_VERIFIED,
         official=True,
         source_document="backend/src/engines/assets/ges_shs_lesson_plan_template.docx",
-        evidence=("Official GES/NaCCA Senior High School lesson-plan form: the file "
+        evidence=("Official GES/NaCCA Senior High School lesson-plan form: the file it "
                   "prints its own GES/NaCCA title and is a token form (2 tables, CCP "
                   "academic delivery grid). Fingerprinted from the file itself; its "
                   "renderer fills the form in place with no surviving tokens and "
                   "unchanged table topology."),
         levels=("SHS 1", "SHS 2", "SHS 3"),
+    ),
+    "tpl-wapef-basic13-weekly-plan": TemplateProvenance(
+        template_id="tpl-wapef-basic13-weekly-plan",
+        provenance=PROVENANCE_APPROVED_ORGANIZATIONAL,
+        verification_status=VERIFICATION_VERIFIED,
+        official=True,
+        source_document="backend/tests/fixtures/wapef/WAPEF BASIC 1 PLAN.docx",
+        evidence=("Approved WAPEF Basic 1 weekly class-teacher plan supplied by WAPEF; "
+                  "its structure (one subject-section table per subject — metadata "
+                  "rows, a DAYS | PHASE 1: STARTER | PHASE 2: MAIN | PHASE 3: "
+                  "REFLECTION grid, grouped 'MONDAY & THURSDAY' day rows, and "
+                  "subject sections that differ in their metadata rows) is reproduced "
+                  "from the source file itself — value cells were tokenized in place "
+                  "and the renderer clones the block once per subject, so the output "
+                  "topology matches the source by construction. The supplied Basic 1 "
+                  "plan is the structural acceptance fixture."),
+        levels=("Basic 1", "Basic 2", "Basic 3"),
     ),
 }
 

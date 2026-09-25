@@ -32,6 +32,13 @@ from .wapef_template import (
     TEMPLATE_VERSION as WAPEF_TEMPLATE_VERSION,
     WAPEF_TOKEN_FIELDS,
 )
+from .wapef_basic13_template import (
+    TEMPLATE_ID as WAPEF_BASIC13_TEMPLATE_ID,
+    TEMPLATE_NAME as WAPEF_BASIC13_TEMPLATE_NAME,
+    TEMPLATE_VERSION as WAPEF_BASIC13_TEMPLATE_VERSION,
+    BASIC13_CLASS_LEVELS,
+    template_sections as wapef_basic13_sections,
+)
 from .template_provenance import provenance_for_template
 
 
@@ -619,6 +626,28 @@ DEFAULT_TEMPLATES: List[Template] = [
         author="Approved WAPEF source via SchemeKnit",
     ),
     Template(
+        id=WAPEF_BASIC13_TEMPLATE_ID,
+        name=WAPEF_BASIC13_TEMPLATE_NAME,
+        family=TemplateFamily.EARLY_CHILDHOOD,
+        educational_level=EducationalLevel.PRIMARY,
+        description=("The approved WAPEF weekly CLASS-TEACHER plan for Basic 1-3: "
+                     "one weekly document holding one section per subject, each "
+                     "with its own metadata and a DAYS | PHASE 1: STARTER | "
+                     "PHASE 2: MAIN | PHASE 3: REFLECTION table. Rendered from "
+                     "the supplied WAPEF Basic 1 weekly plan itself, so the "
+                     "output matches it by construction. Teaching days are the "
+                     "teacher's (day subsets and grouped days are supported); "
+                     "Basic 4-JHS keeps the subject-teacher Approved WAPEF Plan."),
+        features=["Approved WAPEF Basic 1-3 source", "Class-teacher weekly plan",
+                  "One plan, multiple subject sections", "DAYS as a first-class column",
+                  "Teacher-selected WAPEF fields", "Verified against source"],
+        sections=wapef_basic13_sections(),
+        is_default=False,
+        is_official=True,
+        version=WAPEF_BASIC13_TEMPLATE_VERSION,
+        author="Approved WAPEF source via SchemeKnit",
+    ),
+    Template(
         id="tpl-approved-org-headteacher",
         name="Approved Organizational Lesson Plan (Headteacher Source)",
         family=TemplateFamily.JHS,
@@ -673,6 +702,11 @@ def get_default_template_for_class_level(class_level: ClassLevel) -> Template:
     Primary) has no separately verified form, so it falls back to the same
     verified primary form rather than to a non-approved SchemeKnit-standard
     template — a teacher's default selection is always an approved form.
+
+    The Approved WAPEF Basic 1-3 Plan is an ADDITIONAL template: it is
+    available for Basic 1-3 (the class-teacher weekly model) but is never the
+    forced default and never applies to Basic 4-JHS — the WAPEF routing in
+    ``wapef_basic13_template`` is the single place that boundary is decided.
     """
     official = get_template_by_id(spec_for_level(LEVEL_PRIMARY).template_id)
     if class_level in OFFICIAL_GES_LOWER_PRIMARY_CLASSES or (

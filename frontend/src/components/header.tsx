@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { BookOpen, LogOut, LayoutDashboard, Upload, FileText, Settings, Users, Shield, Mail, Menu, X } from 'lucide-react'
+import { BookOpen, LogOut, LayoutDashboard, Upload, FileText, Settings, Users, Shield, Mail, Menu, X, CalendarDays } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { isDesktop } from '@/lib/build-target'
 import { SchemeKnitMark } from '@/components/scheme-knit-mark'
@@ -67,6 +67,7 @@ export function Header() {
             { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, exact: true },
             { href: '/upload', label: 'Upload', icon: Upload, exact: true },
             { href: '/lessons', label: 'Lesson Plans', icon: BookOpen, exact: false },
+            { href: '/weekly-plans', label: 'Weekly Plan', icon: CalendarDays, exact: true },
             { href: '/templates', label: 'Templates', icon: FileText, exact: true },
             ...((user.is_admin || user.role === 'school_admin')
               ? [{ href: '/school-admin', label: 'Admin', icon: Users, exact: false }]
