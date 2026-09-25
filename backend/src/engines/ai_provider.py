@@ -327,98 +327,164 @@ class MockProvider(AIProvider):
 
 
 class GeminiProvider(AIProvider):
-    """Google Gemini API provider (REST — no SDK dependency).
+    """Google Gemini API provider using the official google-genai SDK.
 
-    Model is configurable via GEMINI_MODEL (default: current stable Flash).
-    Auth uses the ``x-goog-api-key`` header so the key never appears in URLs
-    or logs. Structured output uses ``responseMimeType: application/json``.
+    Model is configurable via GEMINI_MODEL (default: gemini-3.8-flash).
+    Auth uses the API key passed to the Client constructor.
+    Structured output uses response_mime_type: application/json and
+    response_schema for V2 lesson generation.
+
+    The provider verifies model accessibility on first use and caches the
+    result, so is_available() reflects both key presence and model access.
     """
 
+    # Maximum retry attempts for transient failures (rate limit, 5xx).
+    MAX_RETRIES = 2
+
     def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
-        self.api_key = api_key or _env("GEMINI_API_KEY")
+        self.api_key = api_key or _env("GEMINI_API_KEY", "")
         self.model = (model or _env("GEMINI_MODEL", DEFAULT_GEMINI_MODEL) or DEFAULT_GEMINI_MODEL).strip()
+        self._client = None
+        self._model_checked = False
+        self._model_accessible = False
 
-    def _generate_text(self, prompt: str, *, json_mode: bool = False,
-                       system: Optional[str] = None) -> str:
-        import requests
+    def _get_client(self):
+        if self._client is None:
+            from google import genai
+            self._client = genai.Client(api_key=self.api_key)
+        return self._client
 
+    def _generate_content(
+        self,
+        prompt: str,
+        *,
+        json_mode: bool = False,
+        system: Optional[str] = None,
+        response_schema: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """Call Gemini with the given prompt, returning raw text or "" on failure.
+
+        Sets self.last_error to a secret-free code on every failure path.
+        """
         self.last_error = None
-        if not self.is_available():
+        if not self.api_key:
             self.last_error = "missing_api_key"
             return ""
-        url = (
-            "https://generativelanguage.googleapis.com/v1beta/models/"
-            f"{self.model}:generateContent"
-        )
-        body: Dict[str, Any] = {
-            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "temperature": 0.7,
-                "maxOutputTokens": 4096,
-            },
+
+        client = self._get_client()
+        config: Dict[str, Any] = {
+            "temperature": 0.7,
+            "max_output_tokens": 4096,
         }
-        if system:
-            body["systemInstruction"] = {"parts": [{"text": system}]}
         if json_mode:
-            body["generationConfig"]["responseMimeType"] = "application/json"
+            config["response_mime_type"] = "application/json"
+            if response_schema:
+                config["response_schema"] = response_schema
+        if system:
+            config["system_instruction"] = {"parts": [{"text": system}]}
+
+        last_err = None
+        for attempt in range(self.MAX_RETRIES + 1):
+            try:
+                response = client.models.generate_content(
+                    model=self.model,
+                    contents=[{"role": "user", "parts": [{"text": prompt}]}],
+                    config=config,
+                )
+                # SDK raises on 401/403/404/429/5xx via google.api_core.exceptions
+                # We rely on response.text to detect empty/refused output
+                text = response.text
+                if not text or not text.strip():
+                    last_err = "empty_output"
+                    continue  # retry
+                return text
+
+            except Exception as exc:
+                last_err = self._map_exception(exc)
+                # Only retry on transient errors
+                if attempt < self.MAX_RETRIES and self._is_transient(last_err):
+                    continue
+                break
+
+        self.last_error = last_err or "unknown_error"
+        return ""
+
+    def _map_exception(self, exc: Exception) -> str:
+        """Convert an exception to a provider-specific error code."""
+        # Official SDK errors carry an HTTP status code (APIError.code).
+        code = getattr(exc, "code", None)
+        if isinstance(code, int):
+            if code == 401:
+                return "auth_failed"
+            if code == 403:
+                return "auth_key_rejected"
+            if code == 404:
+                return "model_not_found"
+            if code == 429:
+                return "rate_limit"
+            if code == 400:
+                return "invalid_api_key"
+            if code in (408, 504):
+                return "timeout"
+            if code >= 500:
+                return f"http_{code}"
+            return f"http_{code}"
+
+        # Fallback: classify from the SDK status string or the exception text.
+        err_str = str(exc)
+        err_lower = err_str.lower()
+        status = getattr(exc, "status", "") or ""
+        status_lower = status.lower()
+        if "unauthenticated" in status_lower or "auth" in err_lower and "failed" in err_lower:
+            return "auth_failed"
+        if "permissiondenied" in status_lower:
+            return "auth_key_rejected"
+        if "notfound" in status_lower or "not found" in err_lower:
+            return "model_not_found"
+        if "resource_exhausted" in status_lower or "rate_limit" in err_lower:
+            return "rate_limit"
+        if "deadline" in status_lower or "timed out" in err_lower or "timeout" in err_lower:
+            return "timeout"
+        if "internal" in status_lower or "server error" in err_lower:
+            return "http_500"
+        return "http_400"
+
+    def _is_transient(self, error_code: str) -> bool:
+        """Return True for errors that warrant a retry.
+
+        Rate limits, timeouts, and every 5xx (including the free-tier
+        high-demand 503) are transient and retryable. Auth, model-not-found,
+        and malformed responses are NOT retried.
+        """
+        if error_code in ("rate_limit", "timeout"):
+            return True
+        return error_code.startswith("http_5")
+
+    def _check_model_access(self) -> bool:
+        """Probe model availability via a cheap count_tokens call.
+
+        Caches the result so we do not spam the API on every is_available check.
+        """
+        if self._model_checked:
+            return self._model_accessible
+        self._model_checked = True
+
+        if not self.api_key:
+            self._model_accessible = False
+            return False
+
         try:
-            resp = requests.post(
-                url,
-                json=body,
-                headers={"x-goog-api-key": self.api_key},
-                timeout=PROVIDER_TIMEOUT_SECONDS,
-            )
-            if resp.status_code == 429:
-                self.last_error = "rate_limit"
-                return ""
-            if resp.status_code in (401, 403):
-                # Google's current auth model: AI Studio issues authorization
-                # keys, which ARE the supported credential format on the native
-                # REST surface via x-goog-api-key (Bearer is only for
-                # /v1beta/openai). A 401 ACCESS_TOKEN_TYPE_UNSUPPORTED
-                # therefore means the specific key string was rejected — invalid,
-                # truncated, expired, or constrained to another Google service —
-                # NOT that the key format is unsupported. The owner must verify
-                # or regenerate the key in AI Studio (restricted to Gemini API),
-                # not downgrade to the legacy standard-key format.
-                body = resp.text or ""
-                if "ACCESS_TOKEN_TYPE_UNSUPPORTED" in body:
-                    self.last_error = "auth_key_rejected"
-                else:
-                    self.last_error = "auth_failed"
-                return ""
-            if resp.status_code == 400 and "API key not valid" in resp.text:
-                self.last_error = "invalid_api_key"
-                return ""
-            if resp.status_code == 404:
-                self.last_error = "model_not_found"
-                return ""
-            if resp.status_code >= 500:
-                self.last_error = f"http_{resp.status_code}"
-                return ""
-            if resp.status_code != 200:
-                self.last_error = f"http_{resp.status_code}"
-                return ""
-            data = resp.json()
-            candidates = data.get("candidates") or []
-            if not candidates:
-                # Content refusal / safety block / empty output
-                feedback = data.get("promptFeedback") or {}
-                block = feedback.get("blockReason") or data.get("promptFeedback", {}).get("blockReason")
-                self.last_error = f"empty_or_refused:{block}" if block else "empty_output"
-                return ""
-            parts = (candidates[0].get("content") or {}).get("parts") or []
-            text = "".join(p.get("text", "") for p in parts if isinstance(p, dict))
-            if not text.strip():
-                self.last_error = "empty_output"
-                return ""
-            return text
-        except Exception as exc:
-            _record_error(self, exc)
-            return ""
+            client = self._get_client()
+            # A zero-token input is a safe probe that exercises auth + model lookup
+            client.models.count_tokens(model=self.model, contents=[{"role": "user", "parts": [{"text": "?"}]}])
+            self._model_accessible = True
+            return True
+        except Exception:
+            self._model_accessible = False
+            return False
 
     def generate_lesson_content(self, indicator, strand, sub_strand, content_standard,
-                                 lesson_type="instruction", context=None):
+                               lesson_type="instruction", context=None):
         prompt = _build_v2_prompt_from_context(
             subject=context.get("subject", strand) if context else strand,
             class_level=context.get("class_level", "") if context else "",
@@ -430,7 +496,7 @@ class GeminiProvider(AIProvider):
         from ..curriculum.generation_prompt import SYSTEM_PROMPT
         return _parse_or_diagnose(
             self,
-            self._generate_text(prompt, json_mode=True, system=SYSTEM_PROMPT),
+            self._generate_content(prompt, json_mode=True, system=SYSTEM_PROMPT),
         )
 
     def generate_lesson_v2(self, *, subject, class_level, strand, sub_strand,
@@ -452,25 +518,49 @@ class GeminiProvider(AIProvider):
             previous_lesson_context=previous_lesson_context,
             next_lesson_context=next_lesson_context,
             teaching_day=teaching_day, week_number=week_number,
-            term=term, teaching_week=teaching_week, period=period,        teacher_keywords=teacher_keywords,
-                            source_week_ending=source_week_ending,
-                            other_tlrs=other_tlrs,
-                            core_competencies=core_competencies,
-                            references=references,
-                            wapef_context=wapef_context,
-    )
+            term=term, teaching_week=teaching_week, period=period,
+            teacher_keywords=teacher_keywords,
+            source_week_ending=source_week_ending,
+            other_tlrs=other_tlrs,
+            core_competencies=core_competencies,
+            references=references,
+            wapef_context=wapef_context,
+        )
         from ..curriculum.generation_prompt import SYSTEM_PROMPT
         return _parse_or_diagnose(
             self,
-            self._generate_text(prompt, json_mode=True, system=SYSTEM_PROMPT),
+            self._generate_content(
+                prompt,
+                json_mode=True,
+                system=SYSTEM_PROMPT,
+                response_schema={
+                    "type": "object",
+                    "properties": {
+                        "learning_objectives": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                        "starter": {"type": "string"},
+                        "main_learning": {"type": "string"},
+                        "assessment": {"type": "string"},
+                        "plenary": {"type": "string"},
+                    },
+                    "required": [
+                        "learning_objectives", "starter", "main_learning",
+                        "assessment", "plenary",
+                    ],
+                },
+            ),
             require_lesson_schema=True,
         )
 
     def generate_structured(self, prompt: str) -> dict:
-        return _parse_or_diagnose(self, self._generate_text(prompt, json_mode=True))
+        return _parse_or_diagnose(self, self._generate_content(prompt, json_mode=True))
 
     def is_available(self) -> bool:
-        return bool(self.api_key)
+        if not self.api_key:
+            return False
+        return self._check_model_access()
 
     def get_name(self) -> str:
         return "gemini"
