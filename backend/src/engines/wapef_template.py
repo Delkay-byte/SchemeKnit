@@ -221,10 +221,15 @@ def _phase_block(lesson, phase_index: int) -> str:
 def _phase_resources(lesson, phase_index: int, ctx: Dict[str, Any]) -> str:
     """Phase RESOURCES cell.
 
-    SOURCE resources from the scheme are preserved first; per-phase the source
-    convention keeps one shared list, so the full source list appears in the
-    MAIN row (the teaching-resources row) and nothing is invented per phase.
+    SOURCE resources from the scheme are preserved exactly once per lesson:
+    the source convention keeps one shared list, so it is rendered in the MAIN
+    (teaching-resources) row only. Repeating the identical list in every phase
+    row would triple-count one resource set inside a single lesson. Teacher
+    per-phase extras (other_tlrs) still appear on their own phase.
     """
+    if phase_index != 2:
+        # Phase 1/3 carry no separate resource list in the source convention.
+        return ""
     source = _text_items(_get(lesson, "source_tlrs"))
     teacher = _text_items(_get(lesson, "other_tlrs"))
     display = _text_items(_get(lesson, "teaching_learning_resources"))

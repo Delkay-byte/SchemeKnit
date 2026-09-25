@@ -87,6 +87,10 @@ _MEASURABLE_VERBS = (
     "experiment", "gather", "choose", "select", "outline", "organize",
     "organise", "relate", "summarise", "summarize", "convert", "translate",
     "substitute", "change", "reorder", "rewrite",
+    # Early-years observable actions (Nursery/KG phrasings such as "Learners
+    # can show and talk about …" / "act out …" describe what the child
+    # demonstrably DOES — they are not vague verbs).
+    "show", "act out", "explore", "talk about", "observe", "sing", "point",
     "use",
 )
 
@@ -755,10 +759,25 @@ def _check_cognitive_demand(lesson: Dict[str, Any], indicator: Optional[Indicato
         message="Cognitive demand is appropriate to the indicator.", category="cognition")]
 
 
+def _split_sentences(text: str) -> List[str]:
+    """Split text into sentences without breaking on common abbreviations.
+
+    Curriculum text is full of ``etc.``, ``e.g.`` and numeric ranges
+    (``1-5.``, ``0 – 2.``): a naive split on ``[.!?]`` turns one sentence into
+    several fragments, and two DIFFERENT sentences that happen to share such a
+    fragment ("Model … etc." from two different phase descriptions) then look
+    like boilerplate. The abbreviation periods are masked before splitting so
+    only real sentence boundaries are used.
+    """
+    masked = re.sub(r"\b(etc|e\.g|i\.e|vs|Mr|Mrs|Dr|Prof|St|No)\.", r"\1<DOT>", text)
+    parts = re.split(r"(?<=[.!?])\s+|\n+", masked)
+    return [p.replace("<DOT>", ".").strip() for p in parts if p.strip()]
+
+
 def _check_boilerplate(lesson: Dict[str, Any]) -> List[QualityIssue]:
     """Detect repeated/boilerplate sentences that pad the lesson."""
     text = _lesson_text(lesson)
-    sentences = [s.strip().lower() for s in re.split(r"[.!?\n]+", text) if len(s.strip()) > 25]
+    sentences = [s.lower() for s in _split_sentences(text) if len(s) > 25]
     if not sentences:
         return []
     counts: Dict[str, int] = {}
@@ -782,9 +801,18 @@ def _check_required_fields(lesson: Dict[str, Any]) -> List[QualityIssue]:
         "main_activities": lesson.get("main_activities"),
         "assessment": lesson.get("assessment"),
         "conclusion": lesson.get("conclusion"),
-        "indicator_codes": lesson.get("indicator_codes"),
     }
     missing = [k for k, v in required.items() if not v]
+    # A lesson must be anchored to its source curriculum. Indicator-bearing
+    # schemes anchor on the indicator code; indicatorless early-years schemes
+    # (the WAPEF Nursery source has no Content Standard / Indicator columns at
+    # all) anchor on their strand/sub-strand. A lesson with NEITHER is still a
+    # failure — no threshold is lowered, the anchor is simply expressed in the
+    # vocabulary the source actually uses.
+    if not lesson.get("indicator_codes"):
+        anchor = lesson.get("strand") or lesson.get("sub_strand")
+        if not anchor:
+            missing.append("indicator_codes")
     if missing:
         return [QualityIssue(
             check_name="required_fields", status=QualityStatus.FAIL,

@@ -373,11 +373,25 @@ class AllocationEngine:
             # curriculum focus (sub-strand) so continuation weeks like the
             # KG scheme's repeated "My School Family" rows still open with an
             # honest link to the previous lesson instead of cloning it.
+            # Indicatorless Nursery rows are the same situation one step
+            # further: the description is empty outright, and the scheme marks
+            # genuine continuation weeks with IDENTICAL sub-strands
+            # (Nursery Numeracy W5/W6 "Pairing"). Those two weeks must not
+            # receive the same starter, so the previous row's sub-strand is
+            # the link here too — never an invented indicator.
             from ..curriculum.lesson_builder import is_code_only_indicator as _ico
             if previous_indicator and _ico(previous_indicator):
                 previous_indicator = ordered[idx - 1].sub_strand or None
+            elif not previous_indicator:
+                prev_row = ordered[idx - 1]
+                if prev_row.sub_strand and prev_row.sub_strand == alloc.sub_strand:
+                    previous_indicator = prev_row.sub_strand
             if next_indicator and _ico(next_indicator):
                 next_indicator = ordered[idx + 1].sub_strand or None
+            elif not next_indicator:
+                nxt_row = ordered[idx + 1] if idx + 1 < len(ordered) else None
+                if nxt_row and nxt_row.sub_strand and nxt_row.sub_strand == alloc.sub_strand:
+                    next_indicator = nxt_row.sub_strand
             lp = build_lesson(
                 alloc, config, scheme_id,
                 previous_indicator=previous_indicator,

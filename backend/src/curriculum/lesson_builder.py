@@ -572,14 +572,27 @@ def _content_terms(text: str, limit: int = 6) -> List[str]:
 
 
 def _interpret(alloc: AllocatedIndicator, subject: str):
-    """Best-effort subject/indicator interpretation (never fatal)."""
+    """Best-effort subject/indicator interpretation (never fatal).
+
+    Indicatorless rows (Nursery week-units) are interpreted from the row's OWN
+    curriculum text (sub-strand + strand) when the indicator cell is empty: the
+    sub-strand names what the lesson actually does ("Sorting and matching",
+    "Tracing", "Colouring"), so activity typing still follows the source
+    instead of defaulting every Nursery lesson to one skeleton. No curriculum
+    code is invented — the row text is used only to READ the activity type.
+    """
     try:
         from .indicator_interpreter import interpret_indicator
         from . import Indicator
+        description = alloc.indicator_description or ""
+        if not description.strip():
+            description = " ".join(
+                part for part in (alloc.sub_strand, alloc.strand) if part
+            ).strip()
         ind = Indicator(
             code=alloc.indicator_code or "",
-            exact_text=f"{alloc.indicator_code or ''} {alloc.indicator_description or ''}".strip(),
-            description=alloc.indicator_description or "",
+            exact_text=f"{alloc.indicator_code or ''} {description}".strip(),
+            description=description,
             source_week=alloc.week_number,
             source_subject=subject or "",
         )
@@ -659,17 +672,23 @@ def build_lesson(
         config.class_level.value
         if isinstance(config.class_level, ClassLevel) else str(config.class_level)
     )
-    # KG classes are developmentally early-childhood regardless of the subject
-    # label the file was confirmed under: a KG2 "Numeracy" row is taught
-    # through play, songs and concrete objects — not the board-worked examples
-    # and written class exercises of the Basic-7-9 mathematics profile. The
-    # KG1/KG2 source evidence (play-based authentic assessment, observation
-    # checklists, songs and role-play in the resource columns) supports the
-    # early-childhood profile for every KG subject area. Basic 1+ keeps the
-    # subject profile.
+    # KG and Nursery classes are developmentally early-childhood regardless
+    # of the subject label the file was confirmed under: a KG2 "Numeracy" row
+    # is taught through play, songs and concrete objects — not the board-worked
+    # examples and written class exercises of the Basic-7-9 mathematics
+    # profile. The KG1/KG2 source evidence (play-based authentic assessment,
+    # observation checklists, songs and role-play in the resource columns)
+    # supports the early-childhood profile for every KG subject area. Nursery
+    # keeps its OWN profile: the source evidence there is oral instruction,
+    # teacher modelling, guided participation and playful practice with the
+    # scheme's own resources — a younger cohort than KG, with simpler
+    # outcomes. Basic 1+ keeps the subject profile.
     if class_level in ("KG 1", "KG 2"):
         from .pedagogy import SUBJECT_PROFILES
         profile = SUBJECT_PROFILES["early_childhood"]
+    elif class_level in ("Nursery", "Nursery 1", "Nursery 2"):
+        from .pedagogy import SUBJECT_PROFILES
+        profile = SUBJECT_PROFILES["nursery"]
 
     skill = strip_indicator_code(alloc.indicator_description)
     # KG-style rows whose indicator cell holds ONLY a code / code range (e.g.
@@ -737,7 +756,14 @@ def build_lesson(
         starter = f"Build on the previous lesson ('{prev_short}'). " + starter
     if misconceptions and "Monitor for general" not in misconceptions:
         starter += f" Watch for: {misconceptions}"
-    intro = starter
+    # ``introduction`` is the lesson-level framing (how this lesson connects to
+    # the last one and where it sits in the topic); ``starter_activity`` is the
+    # concrete opening activity. Keeping them distinct stops the same sentence
+    # being emitted twice into the exported plan.
+    if prev_short:
+        intro = f"This lesson builds on '{prev_short}' and moves the class on to {skill}."
+    else:
+        intro = f"This lesson focuses on {skill} within {topic}."
 
     # ── MAIN — phases follow the indicator's activity type ──────────────
     starter_min = max(5, round(duration * 0.15))
@@ -770,6 +796,15 @@ def build_lesson(
     assessment = _safe_format(assessment_tmpl, **fmt)
     if assessment_mode and assessment_mode.lower() not in assessment.lower():
         assessment += f" Assessment mode: {assessment_mode}"
+    if not alloc.indicator_description:
+        # Indicatorless rows (Nursery week-units): the observation target is
+        # the row's own focus, so evaluation stays lesson-specific instead of
+        # one generic formula for every week — without inventing any test or
+        # curriculum code the source does not have.
+        assessment += (
+            f" Evidence: each child shows or names one example of "
+            f"{(alloc.sub_strand or alloc.strand or 'the lesson focus').strip()}."
+        )
 
     # ── PLENARY — consolidates THIS indicator ───────────────────────────
     conclusion = _safe_format(
@@ -885,7 +920,17 @@ def build_lesson(
                 f"Learners can identify, talk about and act out "
                 f"{(alloc.sub_strand or alloc.strand or 'the lesson focus').strip()}"
                 if class_level in ("KG 1", "KG 2")
-                else f"Learners can explore and talk about {(alloc.sub_strand or alloc.strand or 'the lesson focus').strip()}"
+                else (
+                    # Nursery: the source (sub-strand topics such as "Sorting
+                    # and matching", "Colouring, Tracing and Alphabets") asks
+                    # children to DO and SAY — a demonstrable "show" outcome,
+                    # not Basic-style measurable analysis and not the KG
+                    # role-play phrasing.
+                    f"Learners can show and talk about "
+                    f"{(alloc.sub_strand or alloc.strand or 'the lesson focus').strip()}"
+                    if class_level in ("Nursery", "Nursery 1", "Nursery 2")
+                    else f"Learners can explore and talk about {(alloc.sub_strand or alloc.strand or 'the lesson focus').strip()}"
+                )
             )
         ),
         indicator_code=alloc.indicator_code or None,
@@ -952,12 +997,18 @@ def build_lesson(
 
 def _learner_task(phase_name: str, skill: str) -> str:
     name = (phase_name or "").lower()
+    if "play" in name or "game" in name or "song" in name or "rhyme" in name:
+        # Early-years playful practice (Nursery/KG "Playful practice"): the
+        # child joins in — doing, saying, sorting, singing — with the group.
+        return f"Join in the play or song about {skill} and try it yourself."
     if "demonstrat" in name or "model" in name or "explanation" in name or "teaching" in name or "predict" in name or "stimulus" in name or "inspiration" in name or "present" in name or "vocabulary" in name:
         return f"Watch and listen carefully, then describe each step of {skill} in your own words."
-    if "guided" in name or "observation" in name or "practice" in name or "discussion" in name or "recording" in name or "investigation" in name or "analysis" in name or "guided writing" in name or "guided reading" in name or "comparison" in name or "first item" in name or "second item" in name or "experience" in name:
-        return f"Work with your partner/group to carry out the task for {skill} and record what you find."
-    if "independent" in name or "application" in name or "challenge" in name or "creation" in name or "try" in name or "comprehension" in name or "findings" in name or "sharing" in name or "accuracy" in name or "classification" in name:
+    if "independent" in name or "application" in name or "challenge" in name or "creation" in name or "try" in name or "comprehension" in name or "findings" in name or "sharing" in name or "accuracy" in name or "practice" in name:
+        # "practice" belongs with independent attempts: a guided step and a
+        # practice step must not emit the same learner sentence.
         return f"Complete the task for {skill} on your own and check your work before you finish."
+    if "guided" in name or "observation" in name or "discussion" in name or "recording" in name or "investigation" in name or "analysis" in name or "guided writing" in name or "guided reading" in name or "comparison" in name or "first item" in name or "second item" in name or "experience" in name or "participation" in name:
+        return f"Work with your partner/group to carry out the task for {skill} and record what you find."
     if "critique" in name or "reflection" in name or "revision" in name or "improve" in name:
         return f"Look at your work on {skill}, decide what went well and what to improve."
     return f"Take an active part in the activity for {skill}."
@@ -965,12 +1016,18 @@ def _learner_task(phase_name: str, skill: str) -> str:
 
 def _teacher_move(phase_name: str, skill: str) -> str:
     name = (phase_name or "").lower()
+    if "play" in name or "game" in name or "song" in name or "rhyme" in name:
+        # Early-years playful practice (Nursery/KG): the teacher watches,
+        # encourages and names what each child is doing — no written marking.
+        return f"Watch the children as they play at {skill}, encourage them by name and praise their attempts."
     if "demonstrat" in name or "model" in name or "explanation" in name or "teaching" in name or "predict" in name or "stimulus" in name or "inspiration" in name:
         return f"Model {skill} slowly, think aloud, and check that all learners can see and hear."
-    if "guided" in name or "observation" in name or "practice" in name or "discussion" in name or "recording" in name or "investigation" in name or "analysis" in name or "guided writing" in name or "guided reading" in name:
-        return f"Move around the room, observe each group, and correct misconceptions about {skill} on the spot."
-    if "independent" in name or "application" in name or "challenge" in name or "creation" in name or "try" in name or "comprehension" in name or "findings" in name or "sharing" in name or "accuracy" in name:
+    if "independent" in name or "application" in name or "challenge" in name or "creation" in name or "try" in name or "comprehension" in name or "findings" in name or "sharing" in name or "accuracy" in name or "practice" in name:
         return f"Circulate, give brief individual feedback, and note learners who need re-teaching of {skill}."
+    if "guided" in name or "observation" in name or "discussion" in name or "recording" in name or "investigation" in name or "analysis" in name or "guided writing" in name or "guided reading" in name or "participation" in name:
+        # "participation" is a guided step (the teacher helps each child by
+        # name), not an independent-practice step.
+        return f"Move around the room, observe each group, and correct misconceptions about {skill} on the spot."
     if "critique" in name or "reflection" in name or "revision" in name:
         return f"Lead a short, kind critique and highlight good examples relating to {skill}."
     return f"Facilitate the activity and keep every learner focused on {skill}."
