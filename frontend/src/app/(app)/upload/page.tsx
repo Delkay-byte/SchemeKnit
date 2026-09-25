@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useState, useRef } from 'react'
+import { Fragment, useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -8,6 +8,8 @@ import { SurfaceCard } from '@/components/ui/surface-card'
 import { Banner } from '@/components/ui/banner'
 import { PageHeader } from '@/components/ui/page-header'
 import { Upload, FileText, CheckCircle, AlertTriangle } from 'lucide-react'
+import { Select } from '@/components/ui/select'
+import { Field } from '@/components/ui/field'
 import { api } from '@/lib/api'
 import { WhatsAppButton } from '@/components/whatsapp-button'
 import { formatFileSize } from '@/lib/utils-display'
@@ -28,6 +30,10 @@ export default function UploadPage() {
   // Multi-subject document confirmation state (§4). When a document contains
   // several subjects the teacher must confirm which section to use.
   const [confirmingSubject, setConfirmingSubject] = useState<string | null>(null)
+  // Whole-level schemes (the WAPEF KG/Nursery shape) carry no subject headings
+  // at all. The teacher must still tell SchemeKnit which subject they teach, so
+  // offer the subject catalogue for the detected class level.
+  const [fallbackSubjects, setFallbackSubjects] = useState<string[]>([])
 
   const validExtensions = ['.docx', '.pdf']
 
@@ -104,6 +110,24 @@ export default function UploadPage() {
     result?.detection?.sections?.length
       ? result.detection.sections
       : (result?.detection?.subjects || []).map((s: string) => ({ subject: s }))
+
+  // A document with weeks but no subject headings (WAPEF KG/Nursery shape):
+  // load the subject catalogue for the detected class level so the teacher can
+  // declare the subject instead of dead-ending.
+  useEffect(() => {
+    if (!needsSubjectConfirmation || detectedSections.length > 0) {
+      setFallbackSubjects([])
+      return
+    }
+    const level: string | undefined = result?.class_level
+    if (!level || level === 'Unknown') return
+    let cancelled = false
+    api.listSubjects(level)
+      .then((data) => { if (!cancelled) setFallbackSubjects(data.subjects || []) })
+      .catch(() => { if (!cancelled) setFallbackSubjects([]) })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needsSubjectConfirmation, result?.class_level])
   // A genuinely unreadable document (e.g. a scanned/image-only PDF) is a
   // distinct state from "multiple subjects". It must give the teacher an
   // actionable reason instead of a subject picker with no options.
@@ -219,22 +243,62 @@ export default function UploadPage() {
               >
                 <div className="text-center">
                   <AlertTriangle className="mx-auto mb-3 h-10 w-10 text-amber-500" aria-hidden="true" />
-                  <h2 className="text-xl font-bold text-[#102A43]">Multiple subjects detected</h2>
+                  <h2 className="text-xl font-bold text-[#102A43]">
+                    {detectedSections.length > 0 ? 'Multiple subjects detected' : 'Confirm the subject'
+                    }
+                  </h2>
                   <p className="mt-1 text-sm font-medium">
                     {result.detection?.title || result.filename || file?.name}
                   </p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    This document contains more than one subject. Choose the
-                    subject you are teaching — SchemeKnit will use only that
-                    section.
-                  </p>
+                  {detectedSections.length > 0 ? (
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      This document contains more than one subject. Choose the
+                      subject you are teaching — SchemeKnit will use only that
+                      section.
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      The curriculum was extracted, but the subject could not be
+                      determined from the document. Confirm it before review.
+                    </p>
+                  )}
                 </div>
                 <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {detectedSections.length === 0 && (
+                  {detectedSections.length === 0 && fallbackSubjects.length === 0 && (
                     <p className="col-span-full text-center text-sm text-muted-foreground">
                       We could not identify a subject heading in this document.
                       Please review the extracted content, or use a clearer copy.
                     </p>
+                  )}
+                  {detectedSections.length === 0 && fallbackSubjects.length > 0 && (
+                    /* Whole-level scheme (no subject headings): the teacher
+                       declares the subject; SchemeKnit then extracts the whole
+                       table under that subject. */
+                    <div className="col-span-full">
+                      <p className="mb-3 text-center text-sm text-muted-foreground">
+                        This scheme has no subject headings (a whole-level
+                        scheme). Choose the subject you are teaching — the full
+                        extracted curriculum will be filed under it.
+                      </p>
+                      <div className="mx-auto max-w-xs">
+                        <Field label="Subject" htmlFor="confirm-fallback-subject">
+                          <Select
+                            id="confirm-fallback-subject"
+                            value=""
+                            disabled={confirmingSubject !== null}
+                            onChange={(e) => {
+                              const subject = e.target.value
+                              if (subject) handleConfirmSubject(subject)
+                            }}
+                          >
+                            <option value="">— Select subject —</option>
+                            {fallbackSubjects.map((s) => (
+                              <option key={s} value={s}>{s}</option>
+                            ))}
+                          </Select>
+                        </Field>
+                      </div>
+                    </div>
                   )}
                   {detectedSections.map((s, i) => (
                     <Button

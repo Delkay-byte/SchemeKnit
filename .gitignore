@@ -85,3 +85,4 @@ backend/opencode-be.err
 
 # Backend test outputs (generated, not source)
 backend/output/
+frontend/e2e/wapef-acceptance/

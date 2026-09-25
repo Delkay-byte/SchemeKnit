@@ -90,6 +90,29 @@ def _fit_activity_durations(activities: List[Any],
     return activities
 
 
+def _wapef_context_lines(lp: LessonPlan) -> List[str]:
+    """Read-only WAPEF context lines for the AI prompt (empty when none set).
+
+    The teacher's structured selections are described as instructional
+    guidance, never as output fields — the AI cannot echo them back.
+    """
+    from .wapef_fields import format_through_lines
+    lines: List[str] = []
+    deep_hope = (getattr(lp, "wapef_deep_hope", "") or "").strip()
+    storyline = (getattr(lp, "wapef_storyline", "") or "").strip()
+    through_lines = list(getattr(lp, "wapef_through_lines", None) or [])
+    gods_story = (getattr(lp, "wapef_gods_story", "") or "").strip()
+    if deep_hope:
+        lines.append(f"Deep Hope: {deep_hope}")
+    if storyline:
+        lines.append(f"Storyline: {storyline}")
+    if through_lines:
+        lines.append(f"Through lines: {format_through_lines(through_lines)}")
+    if gods_story:
+        lines.append(f"God's Story: {gods_story}")
+    return lines
+
+
 class GenerationPipeline:
     """Production lesson plan generation pipeline."""
 
@@ -408,6 +431,12 @@ class GenerationPipeline:
                     v2_kwargs["core_competencies"] = list(lp.core_competencies or [])
                 if supports_kwarg(provider.generate_lesson_v2, "references"):
                     v2_kwargs["references"] = list(lp.references or [])
+                # WAPEF selections are teacher-owned structured context. They
+                # are sent READ-ONLY (as instructional guidance) and never as
+                # JSON the AI could echo back into the lesson fields.
+                wapef_ctx = _wapef_context_lines(lp)
+                if wapef_ctx and supports_kwarg(provider.generate_lesson_v2, "wapef_context"):
+                    v2_kwargs["wapef_context"] = wapef_ctx
                 content = provider.generate_lesson_v2(**v2_kwargs)
 
                 if not content:
@@ -523,6 +552,17 @@ class GenerationPipeline:
             "week_ending": lp.week_ending,
             "strand": lp.strand,
             "sub_strand": lp.sub_strand,
+        }
+        # WAPEF teacher selections (and teacher-written remarks) are strictly
+        # teacher-owned: snapshotted before the AI content is applied and
+        # restored verbatim afterwards, so no AI output path can ever choose,
+        # rewrite or clear them. See engines/wapef_fields.py.
+        wapef_snapshot = {
+            "wapef_deep_hope": getattr(lp, "wapef_deep_hope", "") or "",
+            "wapef_storyline": getattr(lp, "wapef_storyline", "") or "",
+            "wapef_through_lines": list(getattr(lp, "wapef_through_lines", None) or []),
+            "wapef_gods_story": getattr(lp, "wapef_gods_story", "") or "",
+            "remarks": getattr(lp, "remarks", "") or "",
         }
         # Learning objectives
         if "learning_objectives" in content and content["learning_objectives"]:
@@ -667,6 +707,12 @@ class GenerationPipeline:
         lp.week_ending = authoritative["week_ending"]
         lp.strand = authoritative["strand"]
         lp.sub_strand = authoritative["sub_strand"]
+        # WAPEF selections always win: restore the teacher's exact values.
+        lp.wapef_deep_hope = wapef_snapshot["wapef_deep_hope"]
+        lp.wapef_storyline = wapef_snapshot["wapef_storyline"]
+        lp.wapef_through_lines = wapef_snapshot["wapef_through_lines"]
+        lp.wapef_gods_story = wapef_snapshot["wapef_gods_story"]
+        lp.remarks = wapef_snapshot["remarks"]
         # SOURCE TLRs stay source-only; OTHER TLRs stay teacher-only.
         lp.source_tlrs = lesson_source_tlrs
         lp.other_tlrs = lesson_other_tlrs

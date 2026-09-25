@@ -1,5 +1,24 @@
 // SchemeKnit Types — Milestone 2
 
+// ── Approved WAPEF Plan: teacher-selected structured fields ─────────────
+// These are TEACHER selections from the approved option lists (served by
+// GET /api/generation/wapef/options) — never AI-chosen, never rewritten by
+// generation. Spellings are the approved ones and must not be altered.
+export interface WapefOptions {
+  deep_hopes: string[]
+  storylines: string[]
+  through_lines: string[]
+  gods_story: string[]
+}
+
+export interface WapefSelection {
+  wapef_deep_hope?: string
+  wapef_storyline?: string
+  wapef_through_lines?: string[]
+  wapef_gods_story?: string
+  remarks?: string
+}
+
 export type EducationalLevel = 'Early Childhood' | 'Primary' | 'Junior High School' | 'Senior High School'
 
 export type ClassLevel =
@@ -254,6 +273,12 @@ export interface LessonPlan {
   ai_generated: boolean
   teacher_edited: boolean
   template_id?: string
+  // Approved WAPEF Plan teacher-selected fields (tpl-wapef-approved-plan).
+  wapef_deep_hope?: string
+  wapef_storyline?: string
+  wapef_through_lines?: string[]
+  wapef_gods_story?: string
+  remarks?: string
 }
 
 export interface GenerationJob {
