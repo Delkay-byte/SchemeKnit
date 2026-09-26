@@ -1,0 +1,14 @@
+Template/Lesson remediation acceptance — 2026-09-26T14:50:10.807Z
+PASS auth: signup reached dashboard 
+PASS auth: teacher login 
+PASS templates: catalog reachable count=6
+PASS templates: full active catalog shown (>=6 verified forms) count=6
+PASS templates: GES naming present Approved GES Plan | Approved GES KG / Nursery Plan | Approved GES Lower Primary Plan | Approved GES SHS Plan
+PASS templates: WAPEF naming present (plan + basic13) Approved WAPEF Plan | Approved WAPEF Basic 1–3 Plan
+PASS templates: Headteacher Source retired from selection 
+PASS ai-status[OFF]: provider reported as resolved provider=null state=OFF
+PASS ai-status[BASIC]: provider reported as resolved provider=gemini state=CONFIGURED
+PASS ai-status[ENHANCED]: provider reported as resolved provider=gemini state=CONFIGURED
+PASS responsive: no horizontal overflow @1440x900 
+PASS responsive: no horizontal overflow @1024x768 
+PASS responsive: no horizontal overflow @390x844 
