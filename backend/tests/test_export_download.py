@@ -535,7 +535,9 @@ class TestBrowserDownloadTransport:
         """A 403/500/503 export must show the server message, not crash."""
         src = self._api_source()
         assert "Export failed" in src
-        assert "err.detail" in src
+        assert "err?.detail" in src
+        # PART 22: the auth-expiry case has a dedicated, truthful message.
+        assert "session has expired" in src
 
 
 class TestPdfMessagesAreOperatorSafe:

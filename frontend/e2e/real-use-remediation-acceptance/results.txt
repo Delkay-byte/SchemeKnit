@@ -1,0 +1,19 @@
+PASS auth: signup reached dashboard 
+PASS dashboard: "AI generations this month" label 
+PASS dashboard: no "lifetime" wording 
+PASS dashboard: shows 5 / 5 allowance 
+PASS upload: WAPEF scheme analyzed 
+PASS api: scheme visible in list cbabd824
+PASS api: subject confirmed Numeracy
+PASS generate: AI provider status shown (resolved) 
+PASS api: generation completed 2 lessons; ai={"active":true,"lessons_ai":0}
+PASS review: source TLRs render as resource chips 9 chips
+PASS review: no serialized array text 
+PASS review: Other TLRs start blank 
+PASS review: Other TLR edit persists after reload Globe, Marker pens
+PASS review: reference slots present (3 empty by default) 0
+PASS download: DOCX via one-time URL 38130 bytes application/vnd.openxmlformats-officedocument.wordprocessingml.document
+PASS download: PDF via one-time URL 156566 bytes application/pdf
+PASS download: XLSX via one-time URL 5506 bytes application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+PASS responsive tablet-1024: no horizontal overflow 
+PASS responsive mobile-390: no horizontal overflow 
