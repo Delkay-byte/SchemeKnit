@@ -32,6 +32,89 @@ from ..models import (
 )
 
 
+def is_special_period_text(text) -> bool:
+    """True when text is a special-period label, not curriculum content.
+
+    Shares the parser's keyword list so parse and allocation agree on what a
+    special period is (PART O). Defensive net for weeks persisted BEFORE the
+    parser fix: rows saved as ``instruction`` whose cells hold "MID-TERM ..."
+    are re-classified at allocation time instead of becoming fake lessons.
+    """
+    from ..parsers.docx_parser import SPECIAL_WEEK_KEYWORDS
+    t = (text or "").strip().lower()
+    return any(kw in t for kw in SPECIAL_WEEK_KEYWORDS)
+
+
+def week_is_non_instructional(week) -> bool:
+    """True when a week is a special period with NO teaching content (PART S).
+
+    The distinction the product requires:
+      * REVISION PERIOD WITH ACTUAL TEACHING CONTENT — the source row carries
+        real indicators/strand text (a revision week that genuinely teaches)
+        → False: it keeps allocating lessons.
+      * NON-INSTRUCTIONAL SPECIAL PERIOD — a MID-TERM/VACATION/EXAM label row
+        (reclassification cleared its curriculum fields) or a special week
+        with no indicator/strand content at all → True: never a fake lesson.
+    """
+    if getattr(week, "special_period_label", ""):
+        return True
+    if getattr(week, "week_type", WeekType.INSTRUCTION) == WeekType.INSTRUCTION:
+        return False
+    has_indicators = bool(list(getattr(week, "indicators", None) or []))
+    has_strand = bool((getattr(week, "strand", None) or "").strip())
+    has_sub_strand = bool((getattr(week, "sub_strand", None) or "").strip())
+    return not (has_indicators or has_strand or has_sub_strand)
+
+
+def reclassify_special_weeks(weeks):
+    """Normalize special-period weeks in place (PART O/P).
+
+    A week claiming INSTRUCTION whose strand/sub-strand/indicator text is a
+    special-period label ("MID-TERM (05-11-2026 to 06-11-2026)") is
+    re-classified as a special period: its curriculum fields are cleared, the
+    verbatim label is kept as metadata, and the normalized type is set.
+    Normal instructional weeks are never touched.
+    """
+    from ..models import SpecialPeriodType
+    for w in weeks or []:
+        if getattr(w, "week_type", WeekType.INSTRUCTION) != WeekType.INSTRUCTION:
+            continue
+        candidates = [
+            getattr(w, "strand", None) or "",
+            getattr(w, "sub_strand", None) or "",
+            *(list(getattr(w, "indicators", None) or [])),
+        ]
+        label = next((c.strip() for c in candidates if is_special_period_text(c)), "")
+        if not label:
+            continue
+        # Curriculum authority stays with the source: a special-period label is
+        # metadata, never a strand/indicator/lesson topic. A revision week
+        # that carries REAL teaching content ("B9.1.1.2.1 Explain kinetic
+        # theory") keeps its content: only the LABEL cell is a period name.
+        def _is_label(cell: str) -> bool:
+            c = (cell or "").strip()
+            return bool(c) and is_special_period_text(c)
+        w.special_period_label = label
+        w.special_period_type = SpecialPeriodType.classify(label).value
+        if _is_label(w.strand or ""):
+            w.strand = None
+        if _is_label(w.sub_strand or ""):
+            w.sub_strand = None
+        w.indicators = [t for t in (w.indicators or []) if not _is_label(t)]
+        w.content_standards = [
+            c for c in (w.content_standards or []) if not _is_label(c)
+        ]
+        # Weeks whose ONLY content was the label become special periods.
+        still_content = (
+            bool(w.indicators)
+            or bool((w.strand or "").strip())
+            or bool((w.sub_strand or "").strip())
+        )
+        if not still_content:
+            w.week_type = WeekType.OTHER
+    return weeks
+
+
 def scheme_has_indicators(weeks) -> bool:
     """True when any instruction week actually carries an indicator.
 
@@ -83,6 +166,18 @@ class AllocationEngine:
         warnings: List[str] = []
         conflicts: List[str] = []
 
+        # ── Special-period normalization (PART O/P) ─────────────────────
+        # Defensive net for weeks persisted before the parser classified
+        # special periods: "MID-TERM ..." rows stored as instruction are
+        # re-classified here so they can never become fake lessons.
+        reclassify_special_weeks(weeks)
+
+        # Week selection: instruction weeks always; other weeks only when the
+        # teacher explicitly includes special weeks. A REVISION week with real
+        # teaching content therefore allocates ONLY when the teacher opts in
+        # (PART S: the product treats an explicitly included revision week as
+        # real teaching), while a MID-TERM label row never does — see the
+        # special-period skip inside the loop below.
         instruction_weeks = sorted(
             (w for w in weeks
              if include_special_weeks or w.week_type == WeekType.INSTRUCTION),
@@ -91,6 +186,13 @@ class AllocationEngine:
 
         if not instruction_weeks:
             return CurriculumCoverage()
+
+        # ── Nursery-style schemes (WAPEF_NURSERY source variant) ────────────
+        # The source has no indicators. The weekly row (subject + strand +
+        # sub-strand + resources) IS the unit of curriculum focus: one week =
+        # one teaching period = one lesson. No indicator code and no content
+        # standard is EVER fabricated for these rows. A special week carries
+        # no teachable row content, so it never triggers this path.
 
         # ── Nursery-style schemes (WAPEF_NURSERY source variant) ────────────
         # The source has no indicators. The weekly row (subject + strand +
@@ -136,6 +238,52 @@ class AllocationEngine:
             )
 
         for week in instruction_weeks:
+            # ── Special periods are NOT lessons (PART Q/S) ───────────
+            # A mid-term/exam/vacation (or non-teaching revision) week never
+            # becomes a lesson plan and never consumes a lesson-generation
+            # unit — even when special weeks are included in the allocation.
+            # A metadata-only allocation row is emitted so the review UI can
+            # show "Special Period: <label> — this period does not contain a
+            # normal lesson" in the week table without any fake curriculum.
+            # A REVISION week WITH actual teaching content stays instructional
+            # (PART S): only content-less special periods are non-instructional.
+            label = (getattr(week, "special_period_label", "") or "").strip()
+            if week_is_non_instructional(week):
+                if include_special_weeks:
+                    special_alloc = AllocatedIndicator(
+                        indicator_code="",
+                        indicator_description="",
+                        content_standard_code="",
+                        content_standard_description="",
+                        strand="",
+                        sub_strand="",
+                        week_number=week.week_number,
+                        week_ending=week.end_date,
+                        week_ending_derived=bool(
+                            getattr(week, "week_ending_derived", False)),
+                        source_resources=[],
+                        lesson_date=None,
+                        period_index=0,
+                        allocated=False,
+                        teaching_week=week.week_number,
+                        carry_forward=False,
+                        carry_forward_from_week=None,
+                        needs_review=False,
+                        special_period_label=label or (week.strand or "").strip(),
+                        special_period_type=(
+                            getattr(week, "special_period_type", "")
+                            or "other_non_instructional"
+                        ),
+                        is_special_period=True,
+                    )
+                    allocations.append(special_alloc)
+                warnings.append(
+                    f"Week {week.week_number}: special period"
+                    f"{f' ({label})' if label else ''} — not a teaching week; "
+                    f"no lesson generated."
+                )
+                continue
+
             # Real teaching dates for this week (teaching days minus holidays).
             available_dates = sorted(
                 d.date for d in calendar.days
@@ -230,12 +378,23 @@ class AllocationEngine:
             )
 
         # ── Assign global lesson sequence (curriculum order) ─────────────
-        for seq, alloc in enumerate(allocations):
-            alloc.lesson_sequence = seq
+        # Special-period metadata rows do NOT take a lesson sequence: they are
+        # not lessons and never consume a generation unit (PART S).
+        seq = 0
+        for alloc in allocations:
+            if getattr(alloc, "is_special_period", False):
+                alloc.lesson_sequence = -1
+            else:
+                alloc.lesson_sequence = seq
+                seq += 1
 
         # ── Real coverage calculation ────────────────────────────────
+        # Special-period metadata rows are not lessons (PART S): they are
+        # excluded from every lesson/indicator count.
+        real_allocations = [a for a in allocations
+                            if not getattr(a, "is_special_period", False)]
         code_counts: Dict[str, int] = defaultdict(int)
-        for a in allocations:
+        for a in real_allocations:
             code_counts[a.indicator_code] += 1
         duplicated = {c: n for c, n in code_counts.items() if n > 1}
 
@@ -249,8 +408,8 @@ class AllocationEngine:
         return CurriculumCoverage(
             total_instructional_weeks=len(instruction_weeks),
             total_indicators=total_indicators,
-            total_generated_lessons=len(allocations),
-            total_periods_allocated=len(allocations),
+            total_generated_lessons=len(real_allocations),
+            total_periods_allocated=len(real_allocations),
             indicators_allocated=indicators_allocated,
             indicators_unallocated=indicators_unallocated,
             indicators_duplicated=len(duplicated),
@@ -280,6 +439,17 @@ class AllocationEngine:
         allocations: List[AllocatedIndicator] = []
 
         for week in instruction_weeks:
+            # ── Special periods are NOT lessons (PART Q/S) ───────────
+            # (Nursery-style path: same rule, no quota consumption.)
+            label = (getattr(week, "special_period_label", "") or "").strip()
+            if week_is_non_instructional(week):
+                warnings.append(
+                    f"Week {week.week_number}: special period"
+                    f"{f' ({label})' if label else ''} — not a teaching week; "
+                    f"no lesson generated."
+                )
+                continue
+
             available_dates = sorted(
                 d.date for d in calendar.days
                 if d.is_teaching_day and d.week_number == week.week_number
@@ -359,6 +529,9 @@ class AllocationEngine:
         lesson_plans: List[LessonPlan] = []
         lesson_counter = 0
         for idx, alloc in enumerate(ordered):
+            # Special-period metadata rows produce NO lesson plan (PART Q/S).
+            if getattr(alloc, "is_special_period", False):
+                continue
             lesson_counter += 1
             previous_indicator = (
                 ordered[idx - 1].indicator_description if idx > 0 else None
@@ -401,6 +574,10 @@ class AllocationEngine:
             # builder stays position-independent (and deterministic).
             lp.lesson_sequence = lesson_counter
             lp.period = self._period_label(alloc.period_index, config)
+            # Special-period metadata flows onto the lesson row (PART O/R) so
+            # review/export can present it as a period, not a lesson.
+            lp.special_period_label = alloc.special_period_label
+            lp.special_period_type = alloc.special_period_type
             lesson_plans.append(lp)
 
         return lesson_plans
@@ -408,16 +585,16 @@ class AllocationEngine:
     # ── Helpers ──────────────────────────────────────────────────────────
 
     def _period_label(self, period_index: int, config: TermConfig) -> str:
-        """Render the period label for a lesson.
+        """Render the period label for a lesson (PART K).
 
-        If the teacher configured a specific timetable period string
-        (e.g. "1st & 2nd"), it is preserved verbatim. Otherwise a
-        deterministic "Period N" label is used.
+        Period/timing is LESSON-SPECIFIC teacher data: when the teacher
+        configured a timetable period string (e.g. "1st & 2nd") it is used
+        verbatim. When they did not, the field stays EMPTY — never "Period N",
+        "0", "-" or "N/A" — so exports and review show a genuinely blank
+        cell the teacher can fill in.
         """
         configured = getattr(config, "period", "") or ""
-        if configured:
-            return configured
-        return f"Period {period_index}"
+        return configured.strip()
 
     def _extract_indicator_code(self, text: str) -> str:
         import re

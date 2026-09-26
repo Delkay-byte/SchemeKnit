@@ -127,6 +127,11 @@ class WeekDB(Base):
     content_standards = Column(JSON, default=list)
     indicators = Column(JSON, default=list)
     resources = Column(JSON, default=list)
+    #: Special-period metadata (PART O/P): the verbatim source label of a
+    #: non-instructional period row and its normalized type. Empty for normal
+    #: instructional weeks. Existing rows default to empty via migration v026.
+    special_period_label = Column(String, default="")
+    special_period_type = Column(String, default="")
 
     scheme = relationship("SchemeDB", back_populates="weeks")
 

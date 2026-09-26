@@ -256,6 +256,35 @@ class WeekType(str, Enum):
     OTHER = "other"
 
 
+class SpecialPeriodType(str, Enum):
+    """Normalized special-period categories (PART O/P).
+
+    A special period is NOT curriculum content: its source label must never
+    become a strand, sub-strand, content standard, indicator or lesson topic.
+    The source label (with dates) is preserved verbatim as metadata.
+    """
+
+    MID_TERM = "mid_term"
+    REVISION = "revision"
+    EXAMINATION = "examination"
+    VACATION = "vacation"
+    OTHER_NON_INSTRUCTIONAL = "other_non_instructional"
+
+    @classmethod
+    def classify(cls, text: str) -> "SpecialPeriodType":
+        """Classify a source label into the normalized special-period type."""
+        t = (text or "").strip().lower()
+        if "mid" in t and ("term" in t or "sem" in t):
+            return cls.MID_TERM
+        if "exam" in t or "assessment" in t:
+            return cls.EXAMINATION
+        if "vacation" in t or "holiday" in t or "sba" in t:
+            return cls.VACATION
+        if "revision" in t or "review" in t:
+            return cls.REVISION
+        return cls.OTHER_NON_INSTRUCTIONAL
+
+
 class ValidationSeverity(str, Enum):
     ERROR = "error"
     WARNING = "warning"
@@ -429,6 +458,11 @@ class ParsedWeek(BaseModel):
     content_standards: List[ParsedContentStandard] = []
     indicators: List[ParsedIndicator] = []
     resources: List[str] = []
+    #: Special-period metadata: the verbatim source label of a non-instructional
+    #: row ("MID-TERM (05-11-2026 to 06-11-2026)"), preserved as data — never
+    #: used as curriculum content. Empty for normal instructional weeks.
+    special_period_label: str = ""
+    special_period_type: str = ""
 
 
 class ParsedScheme(BaseModel):
@@ -460,6 +494,10 @@ class Week(BaseModel):
     indicators: List[str] = []
     resources: List[str] = []
     strands: List[Any] = []
+    #: Verbatim special-period label from the source (PART P metadata). Empty
+    #: for normal instructional weeks; never rendered as curriculum content.
+    special_period_label: str = ""
+    special_period_type: str = ""
     scheme_of_work_id: str
 
 
@@ -579,6 +617,13 @@ class AllocatedIndicator(BaseModel):
     #: True when the indicator could not be placed on a real teaching date
     #: (e.g. the term has no further teaching periods) and needs teacher review.
     needs_review: bool = False
+    #: Special-period metadata for non-instructional allocations (PART O/P).
+    #: label is the verbatim source text; type is the normalized category.
+    special_period_label: str = ""
+    special_period_type: str = ""
+    #: True when this allocation is a special period (mid-term, exam,
+    #: vacation, non-instructional revision) rather than a normal lesson.
+    is_special_period: bool = False
 
 
 class CurriculumCoverage(BaseModel):
@@ -674,6 +719,11 @@ class LessonPlan(BaseModel):
     carry_forward: bool = False
     # Timetable slot, e.g. "1st & 2nd". Teacher-configured; never invented.
     period: str = ""
+    #: Special-period metadata (PART O/P/R): verbatim source label plus
+    #: normalized type. Non-empty means this "lesson" is a special period —
+    #: it carries no curriculum fields and is never AI-generated.
+    special_period_label: str = ""
+    special_period_type: str = ""
 
     educational_level: EducationalLevel = EducationalLevel.JHS
     class_level: ClassLevel = ClassLevel.UNKNOWN

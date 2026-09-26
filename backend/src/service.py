@@ -93,6 +93,8 @@ class DataService:
                 content_standards=week.content_standards,
                 indicators=week.indicators,
                 resources=week.resources,
+                special_period_label=getattr(week, "special_period_label", "") or "",
+                special_period_type=getattr(week, "special_period_type", "") or "",
             )
             db.add(db_week)
 
@@ -174,6 +176,8 @@ class DataService:
                 content_standards=w.content_standards or [],
                 indicators=w.indicators or [],
                 resources=w.resources or [],
+                special_period_label=getattr(w, "special_period_label", "") or "",
+                special_period_type=getattr(w, "special_period_type", "") or "",
                 scheme_of_work_id=w.scheme_id,
             ))
 
