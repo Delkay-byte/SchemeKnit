@@ -301,6 +301,11 @@ function staticChecks() {
     for (const sel of ['[data-settings-profile]', '[data-settings-holidays]', '[data-settings-subjects]', '[data-settings-about]']) {
       log((await count(page, sel)) >= 1, `settings: ${sel} section present`, '')
     }
+    // Server-authoritative plan card (entitlement work): label + quotas come
+    // from GET /api/auth/my-plan, never from client flags.
+    log((await count(page, '[data-settings-plan]')) >= 1, 'settings: plan card present', '')
+    log((await count(page, '[data-plan-label]')) >= 1, 'settings: plan label present', '')
+    log((await count(page, '[data-quota-lessons]')) >= 1, 'settings: lesson quota card present', '')
     const sInputs = await count(page,
       'main input[type="text"], main input[type="email"], main input[type="date"]')
     log(sInputs >= 3, 'settings: shared Input primitives present', `count=${sInputs}`)
@@ -414,7 +419,7 @@ function staticChecks() {
       const list = document.querySelector('main [role="tablist"]')
       return list ? list.querySelectorAll('[role="tab"]').length : 0
     })
-    log(paTabs === 9, 'platform-admin: 9 console tabs render', `count=${paTabs}`)
+    log(paTabs === 10, 'platform-admin: 10 console tabs render (incl. teachers)', `count=${paTabs}`)
 
     const schoolsTab = pPage.locator('main [role="tab"]:has-text("schools")').first()
     if ((await schoolsTab.count()) > 0) {
@@ -445,6 +450,20 @@ function staticChecks() {
         'platform-admin/settings: section renders', '')
       log((await count(pPage, '[data-maintenance]')) >= 1,
         'platform-admin/settings: maintenance control present', '')
+    }
+
+    // Teachers tab: admin entitlement controls (activate/revoke per teacher).
+    const teachersTab = pPage.locator('main [role="tab"]:has-text("teachers")').first()
+    if ((await teachersTab.count()) > 0) {
+      await teachersTab.click()
+      await pPage.waitForTimeout(700)
+      log((await pPage.getByText(/Individual Teachers/i).count()) >= 1,
+        'platform-admin/teachers: Individual Teachers section renders', '')
+      log((await count(pPage, '[data-teacher-row], main p:text-is("No individual teachers yet")')) >= 1,
+        'platform-admin/teachers: list or empty state', '')
+      await checkOverflow(pPage, 'platform-admin/teachers')
+    } else {
+      log(false, 'platform-admin/teachers: tab present', 'tab not found')
     }
 
     await ctxP.close()

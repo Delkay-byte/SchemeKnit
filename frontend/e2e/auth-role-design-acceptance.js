@@ -145,10 +145,22 @@ async function main() {
     const info = await pageInfo(page)
     const ov = await overflow(page)
 
-    log(r.title.test(info.title) || r.title.test(info.h1), `${r.name}: title`, `${info.title} / h1=${info.h1}`)
-    log(info.bg === r.bg, `${r.name}: distinct bg`, `${info.bg} expected ${r.bg}`)
+    // /setup is a first-run route: once ANY user exists the backend reports
+    // needs_setup=false and the page redirects to sign-in. In that state the
+    // redirect (and the sign-in design it lands on) is the correct behavior.
+    const setupRedirected = r.name === 'setup' && /\/login/.test(page.url())
+    if (setupRedirected) {
+      log(/welcome back/i.test(info.h1), `${r.name}: redirects to sign-in when already bootstrapped`, page.url())
+    } else {
+      log(r.title.test(info.title) || r.title.test(info.h1), `${r.name}: title`, `${info.title} / h1=${info.h1}`)
+    }
+    log(
+      setupRedirected ? info.bg === 'rgb(7, 24, 38)' : info.bg === r.bg,
+      setupRedirected ? `${r.name}: sign-in bg after redirect` : `${r.name}: distinct bg`,
+      setupRedirected ? `${info.bg} expected rgb(7, 24, 38)` : `${info.bg} expected ${r.bg}`,
+    )
     bgs.add(info.bg)
-    const expectedSignal = LOGIN_SIGNALS[r.name]
+    const expectedSignal = setupRedirected ? 'teacher' : LOGIN_SIGNALS[r.name]
     if (expectedSignal) {
       log(info.meshCount === 0, `${r.name}: no landing mesh`, `mesh=${info.meshCount}`)
       log(
@@ -242,7 +254,9 @@ async function main() {
     const info = await pageInfo(page)
     log(ov.scrollW <= ov.clientW, `${r.name} @390: no overflow`, `${ov.scrollW}/${ov.clientW}`)
     log(info.logoOk || info.logoBg !== '', `${r.name} @390: logo present`, info.logoBg)
-    const expected390 = LOGIN_SIGNALS[r.name]
+    const expected390 = r.name === 'setup' && /\/login/.test(page.url())
+      ? 'teacher'
+      : LOGIN_SIGNALS[r.name]
     if (expected390) {
       log(info.gridSignals.includes(expected390), `${r.name} @390: grid signal`, JSON.stringify(info.gridSignals))
       log(info.meshCount === 0, `${r.name} @390: no landing mesh`, `mesh=${info.meshCount}`)

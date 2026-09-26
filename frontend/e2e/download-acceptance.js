@@ -90,19 +90,22 @@ async function saveDownload(page, label, action, timeout = 30000) {
     await page.waitForSelector('button:has-text("Download DOCX")', { timeout: 30000 })
     record('export panel rendered', true)
 
-    // 3. Select the canonical approved organizational template
+    // 3. Select the canonical approved organizational template.
+    // (tpl-approved-org-headteacher was retired by the template remediation;
+    //  the approved GES NACCA JHS template is its canonical successor.)
     const select = page.locator('select').first()
     const optionCount = await select.locator('option').count()
+    const APPROVED_TPL = 'tpl-official-ges-nacca-jhs'
     let approvedLabel = null
     for (let i = 0; i < optionCount; i++) {
       const value = await select.locator('option').nth(i).getAttribute('value')
-      if (value === 'tpl-approved-org-headteacher') {
+      if (value === APPROVED_TPL) {
         approvedLabel = (await select.locator('option').nth(i).innerText()).trim()
         break
       }
     }
     if (approvedLabel) {
-      await select.selectOption('tpl-approved-org-headteacher')
+      await select.selectOption(APPROVED_TPL)
     }
     record('approved organizational template is selectable',
       !!approvedLabel, approvedLabel || `${optionCount} options, approved template not offered`)

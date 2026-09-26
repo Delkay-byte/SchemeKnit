@@ -338,8 +338,11 @@ function staticChecks() {
         header: document.querySelectorAll('[data-page-header]').length,
         cta: !!cta,
         alreadyPro: !!document.querySelector('[data-already-pro]'),
-        payments: cta ? cta.querySelectorAll('a[href="/payments"]').length : 0,
-        badLogin: cta ? cta.querySelectorAll('a[href="/login/school-admin"]').length : 0,
+      // trailingSlash: true renders Link hrefs as /payments/ — match both forms.
+      payments: cta ? cta.querySelectorAll('a[href="/payments"], a[href="/payments/"]').length : 0,
+      badLogin: cta
+        ? cta.querySelectorAll('a[href="/login/school-admin"], a[href="/login/school-admin/"]').length
+        : 0,
         back: document.querySelectorAll('main a[href^="/dashboard"]').length,
       }
     })
@@ -539,7 +542,7 @@ function staticChecks() {
       const list = document.querySelector('main [role="tablist"]')
       return list ? list.querySelectorAll('[role="tab"]').length : 0
     })
-    log(paTabs === 9, 'platform-admin: 9-tab navigation', `tabs=${paTabs}`)
+    log(paTabs === 10, 'platform-admin: 10-tab navigation (incl. teachers)', `tabs=${paTabs}`)
     await singleH1(pPage, 'platform-admin')
     await buttonNameAudit(pPage, 'platform-admin')
     const licence = await pPage.evaluate(() => /Licence|licence/.test(document.body.innerText))

@@ -264,10 +264,15 @@ async function main() {
     await page.waitForTimeout(500)
     await shot(page, `${r.label}.png`)
 
+    // /setup redirects to sign-in once the platform already has users
+    // (needs_setup=false): assert that redirect target instead of the wizard.
+    const setupRedirected = r.label === 'setup' && /\/login/.test(page.url())
     const title = await page.locator('h1').first().innerText().catch(() => '')
     log(
-      title.toLowerCase().includes(r.titleMust.toLowerCase()),
-      `${r.label}: title`,
+      setupRedirected
+        ? /welcome back/i.test(title)
+        : title.toLowerCase().includes(r.titleMust.toLowerCase()),
+      setupRedirected ? `${r.label}: redirects to sign-in when already bootstrapped` : `${r.label}: title`,
       title.replace(/\s+/g, ' ').trim(),
     )
 
@@ -308,9 +313,11 @@ async function main() {
     })
     bgSet.add(rootEl)
     log(
-      rootEl === r.bg || rootEl.replace(/\s/g, '') === r.bg.replace(/\s/g, ''),
-      `${r.label}: distinct bg`,
-      `${rootEl} expected ${r.bg}`,
+      setupRedirected
+        ? rootEl.replace(/\s/g, '') === 'rgb(7,24,38)'
+        : rootEl === r.bg || rootEl.replace(/\s/g, '') === r.bg.replace(/\s/g, ''),
+      setupRedirected ? `${r.label}: sign-in bg after redirect` : `${r.label}: distinct bg`,
+      `${rootEl} expected ${setupRedirected ? 'rgb(7, 24, 38)' : r.bg}`,
     )
 
     const logo = await logoReadable(page)
