@@ -164,8 +164,7 @@ export default function IndividualSignupPage() {
 
       <div className="mt-5 rounded-xl border border-border bg-[#F4F7FA] p-4 shadow-sm">
         <p className="text-xs leading-relaxed text-muted-foreground text-center">
-          Free Tier includes 5 lesson plans per calendar month, individual DOCX and
-          PDF export, 1 custom template and 5 lifetime AI credits.
+          Free Tier includes 5 lesson plans per calendar month, individual DOCX and            PDF export, 1 custom template and 5 AI generations per month.
         </p>
       </div>
     </AuthShell>

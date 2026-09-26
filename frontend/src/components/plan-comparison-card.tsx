@@ -20,7 +20,7 @@ const FEATURES: Feature[] = [
   { label: 'PDF export', free: true, pro: true },
   { label: 'Custom templates', free: '1 saved', pro: '10 saved' },
   { label: 'Approved GES templates', free: true, pro: true },
-  { label: 'AI assistance', free: '5 lifetime AI credits', pro: 'Full (50 credits)' },
+  { label: 'AI assistance', free: '5 AI generations / month', pro: 'Full (50 credits)' },
   { label: 'Lesson history', free: '10 lessons', pro: '100 lessons' },
   { label: 'Advanced analytics', free: false, pro: true },
   { label: 'Priority features', free: false, pro: true },

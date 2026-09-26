@@ -326,11 +326,9 @@ export default function Dashboard() {
                       <div className="font-semibold text-foreground">
                         {plan.ai_credits === 0
                           ? 'Unlimited'
-                          : `${Math.max(plan.ai_credits - plan.ai_credits_used, 0)} / ${plan.ai_credits}`}
+                          : `${Math.max(plan.ai_quota_remaining ?? Math.max(plan.ai_credits - plan.ai_credits_used, 0), 0)} / ${plan.ai_credits}`}
                       </div>
-                      <div>
-                        {plan.ai_lifetime ? 'AI generations (lifetime)' : 'AI generations remaining'}
-                      </div>
+                      <div>AI generations this month</div>
                     </div>
                     {plan.edition === 'free' && plan.source === 'free' && (
                       <Button size="sm" onClick={() => setShowActivateModal(true)}>
@@ -351,12 +349,16 @@ export default function Dashboard() {
                     </Link>{' '}for unlimited lesson plans.
                   </p>
                 )}
-                {/* Free Tier AI is a one-time lifetime allowance — say so plainly
-                    (never "resets tomorrow"). */}
-                {plan.ai_lifetime && plan.ai_credits > 0 &&
-                  Math.max(plan.ai_credits - plan.ai_credits_used, 0) === 0 && (
+                {/* AI is a CALENDAR-MONTH allowance that renews on the 1st —
+                    same as lesson plans (PART 18). No lifetime wording. */}
+                {plan.ai_credits > 0 &&
+                  Math.max(plan.ai_quota_remaining ?? Math.max(plan.ai_credits - plan.ai_credits_used, 0), 0) === 0 && (
                   <p className="mt-3 text-sm text-muted-foreground">
-                    You&apos;ve used all {plan.ai_credits} free AI generations included with the Free Tier.
+                    You&apos;ve used all {plan.ai_credits} free AI generations for this month.
+                    {' '}Your allowance renews on the 1st.{' '}
+                    <Link href="/upgrade" className="font-medium text-[#04769B] hover:text-[#04A9CE] hover:underline">
+                      Upgrade to Teacher Pro
+                    </Link>{' '}for unlimited AI.
                   </p>
                 )}
               </SurfaceCard>
