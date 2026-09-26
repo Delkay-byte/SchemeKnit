@@ -879,13 +879,12 @@ def build_lesson(
         if r and r.lower() not in [x.lower() for x in source_tlrs]:
             source_tlrs.append(r)
 
-    # OTHER TLRs: teacher additions for THIS lesson (from config seed on first
-    # build; later owned by the lesson review object). Never merged into source.
+    # OTHER TLRs: teacher additions for THIS lesson only (PART I).
+    # DEFAULT: empty. The old global config seed is NOT copied here — a batch
+    # seed value must never silently become per-lesson "teacher-added" data.
+    # The teacher adds Other TLRs per lesson in review; AI suggestions never
+    # land here either (they may only enrich the display union).
     other_tlrs: List[str] = []
-    for r in list(getattr(config, "teaching_learning_resources", []) or []):
-        r = (r or "").strip()
-        if r and r.lower() not in [x.lower() for x in other_tlrs]:
-            other_tlrs.append(r)
 
     # Display union for templates that expect one TLR list.
     resources: List[str] = list(source_tlrs)
@@ -899,24 +898,36 @@ def build_lesson(
             if r and r.lower() not in [x.lower() for x in resources]:
                 resources.append(r)
 
-    # ── Keywords / vocabulary — content standard + exact indicator first ─
+    # ── Keywords / vocabulary — PER-LESSON, curriculum-derived (PART G) ──
+    # Priority: exact lesson indicator / learning focus first, then sub-strand,
+    # then content standard, then subject-level activity context. Two lessons
+    # under the same scheme therefore do NOT receive one identical generic
+    # list merely because they share a subject: each list is derived from THIS
+    # lesson's own indicator/row text. AI may refine these in review; the
+    # teacher's edits always win once saved.
     keywords: List[str] = []
     kw_sources: List[str] = []
-    # Primary derivation: content standard + exact indicator + activity context.
-    kw_sources.extend(_content_terms(alloc.content_standard_description or "", limit=3))
+    # 1. Exact lesson indicator / learning focus.
     kw_sources.extend(_content_terms(alloc.indicator_description, limit=5))
+    # 2. Sub-strand (the lesson's own curriculum focus when no indicator prose).
+    kw_sources.extend(_content_terms(alloc.sub_strand or "", limit=3))
+    # 3. Content standard.
+    kw_sources.extend(_content_terms(alloc.content_standard_description or "", limit=2))
+    # 4. Lesson-specific activity context from the interpreter.
     if act_key and interp is not None:
         kw_sources.extend(getattr(interp, "activity_keywords", []) or [])
-    # Teacher-supplied terms always survive (added after derived so they stay).
+    # Teacher-supplied PER-LESSON terms always survive (never a batch seed).
     kw_sources.extend((getattr(config, "keywords", []) or []))
-    kw_sources.extend(profile.keywords)
     for k in kw_sources:
         k = (k or "").strip()
         if k and k.lower() not in [x.lower() for x in keywords]:
             keywords.append(k)
 
-    # ── Core competencies — activity-derived defaults; teacher multi-select
-    # is authoritative once set on the lesson review object. ─────────────
+    # ── Core competencies — PER-LESSON, activity-derived (PART H) ───────
+    # AI-suggested + teacher-editable. ONLY the competencies meaningful for
+    # THIS lesson's activity type are selected — never the whole taxonomy for
+    # every lesson. Teacher multi-select is authoritative once set on the
+    # lesson review object; the generator never re-forces a removed value.
     competencies: List[str] = []
     comp_sources = list(getattr(config, "core_competencies", []) or [])
     comp_sources.extend(_COMPETENCIES_BY_ACTIVITY.get(act_key or "demonstration", []))
@@ -925,27 +936,15 @@ def build_lesson(
         if c and c.lower() not in [x.lower() for x in competencies]:
             competencies.append(c)
 
-    # ── References — curriculum context + teacher-supplied (no invented pages)
+    # ── References — TEACHER-ENTERED only (PART L/M) ────────────────────
+    # DEFAULT: empty. The builder never invents curriculum/handbook references:
+    # the review UI presents 3 empty structured slots and the teacher fills
+    # what applies to THIS lesson (different lessons may cite different pages).
+    # Teacher-supplied flat seed strings still become structured Other entries
+    # (pages stay blank unless explicitly supplied), but no fabricated defaults.
     references: List[str] = []
     structured_refs = []
     from ..models import ReferenceEntry
-    if subject_name and subject_name.strip() and subject_name.upper() != "UNKNOWN":
-        structured_refs.append(ReferenceEntry(
-            type="Subject Curriculum",
-            title=f"{subject_name} Curriculum (NaCCA)",
-            notes=f"{class_level} {subject_name}" if class_level else "",
-        ))
-        structured_refs.append(ReferenceEntry(
-            type="Teacher's Handbook / Teacher's Guide",
-            title=f"{class_level} {subject_name} Teacher's Guide",
-        ))
-        if alloc.strand:
-            structured_refs.append(ReferenceEntry(
-                type="Other",
-                title=f"{subject_name} Curriculum — {alloc.strand}",
-            ))
-    # Teacher-supplied flat reference strings become structured Other entries
-    # (pages remain blank unless the teacher supplies them explicitly).
     for ref in (getattr(config, "references", []) or []):
         ref = (ref or "").strip()
         if ref:

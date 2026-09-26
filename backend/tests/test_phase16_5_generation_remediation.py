@@ -423,19 +423,17 @@ class TestContextualFields:
         create, _ = _run(Subject.CREATIVE_ARTS, [TWELVE[8]], "Visual Arts", "Patterns")
         assert solve[0].core_competencies != create[0].core_competencies
 
-    def test_references_are_curriculum_derived(self):
+    def test_references_are_teacher_entered(self):
+        """PART L/M: the builder no longer fabricates curriculum references —
+        they stay empty until the teacher enters them."""
         plans, _ = _run(Subject.SCIENCE, TWELVE[:2], "Diversity", "Matter")
         for lp in plans:
-            joined = " ".join(lp.references)
-            assert "Science" in joined
-            assert "Curriculum" in joined
+            assert lp.references == []
+            assert lp.structured_references == []
 
-    def test_teacher_resources_are_preserved(self):
-        plans, _ = _run(Subject.SCIENCE, TWELVE[:2], "S", "Sub")
-        # Explicit teacher TLRs survive deterministic generation.
-        plans2, _ = _run(
-            Subject.SCIENCE, TWELVE[:2], "S", "Sub",
-        )
+    def test_teacher_resources_are_per_lesson_additions(self):
+        """PART I: the batch TLR seed is NOT copied into per-lesson Other TLRs
+        or the display union — teacher additions are entered per lesson."""
         config = _config(Subject.SCIENCE)
         config.teaching_learning_resources = ["School lab kit"]
         from src.curriculum.lesson_builder import build_lesson
@@ -448,4 +446,5 @@ class TestContextualFields:
             teaching_week=1,
         )
         lp = build_lesson(alloc, config, "s")
-        assert "School lab kit" in lp.teaching_learning_resources
+        assert lp.other_tlrs == []
+        assert "School lab kit" not in lp.teaching_learning_resources

@@ -138,9 +138,11 @@ export default function GeneratePage() {
     try {
       setLoading(true)
       const schemeData = await api.getScheme(schemeId)
-      const level = levelForClass(schemeData.class_level || '')
+      // PART A: no level filter — the full active catalog is requested so the
+      // template selector lists every active template (GES forms, WAPEF plans,
+      // plus the teacher's own templates).
       const [templatesData, profilesData, statusData] = await Promise.all([
-        api.listTemplates(level, schemeData.class_level || ''),
+        api.listTemplates(),
         api.listProfiles(),
         api.getGenerationStatusForScheme(schemeId).catch(() => null),
       ])
@@ -215,7 +217,21 @@ export default function GeneratePage() {
       setAllocationConfirmed(false)
       const preview = await api.getAllocationPreview(schemeId, config)
       setAllocationPreview(preview)
-      setLessonReview(Array.isArray(preview.lesson_review) ? preview.lesson_review : [])
+      // PART T: per-lesson review rows arrive with GENERATED DEFAULTS
+      // (lesson-specific keywords from the indicator/sub-strand, competencies
+      // from the activity type, exact source TLRs) — the teacher only edits
+      // where necessary. References start as exactly 3 empty slots (PART L);
+      // "Add reference" appends another.
+      const reviewRows = Array.isArray(preview.lesson_review)
+        ? preview.lesson_review.map((row: any) => ({
+            ...row,
+            structured_references:
+              row.structured_references && row.structured_references.length > 0
+                ? row.structured_references
+                : [0, 1, 2].map(() => ({ type: 'Other', title: '', page: '' })),
+          }))
+        : []
+      setLessonReview(reviewRows)
       setReviewSaved(false)
       // Seed the indicator selection: when the Free Tier quota is enforced,
       // pre-select up to the remaining allowance so the teacher can generate
@@ -413,10 +429,11 @@ export default function GeneratePage() {
     return profiles.find(p => p.educational_level === scheme.educational_level) || null
   }
 
-  const getTemplatesForScheme = () => {
-    if (!scheme?.educational_level) return templates
-    return templates.filter(t => t.educational_level === scheme.educational_level)
-  }
+  // PART A: the teacher must see EVERY ACTIVE template the system offers —
+  // never a level-limited slice that hides valid forms (the old client-side
+  // educational_level filter was exactly why only two templates appeared).
+  // The backend already enforces verified/active visibility per teacher.
+  const getTemplatesForScheme = () => templates
 
   if (loading) {
     return (
@@ -684,11 +701,14 @@ export default function GeneratePage() {
                       </Select>
                       {aiStatus && (
                         <p className={`mt-1 text-xs ${aiStatus.active ? 'text-green-600' : 'text-muted-foreground'}`}>
+                          {/* PART E: this label reports the backend-RESOLVED
+                              provider for the current generation context — the
+                              same resolution the generate request itself uses. */}
                           {aiStatus.active
                             ? `AI active · provider: ${aiStatus.provider}`
                             : config.ai_mode === 'OFF'
                               ? 'Deterministic engine · AI provider active: No'
-                              : 'No AI provider available — lessons will be deterministic.'}
+                              : `No usable AI provider for mode '${aiStatus.mode}' — lessons will be deterministic.`}
                         </p>
                       )}
                     </Field>
@@ -723,27 +743,33 @@ export default function GeneratePage() {
                   </div>
                 </section>
 
-                {/* Lesson metadata the teacher supplies once (PART 11-24).
-                    Each is optional; blanks stay blank and are never invented.
-                    Keywords / TLRs / Competencies / References here are SEEDS
-                    for every lesson — source TLRs and per-lesson review data
-                    stay authoritative in the per-lesson panel below. */}
+                {/* PART F/G/H/I/L: the GLOBAL SEED model is gone. Keywords,
+                    competencies, TLRs and references are generated PER LESSON
+                    from the lesson's own curriculum context (AI-suggested +
+                    teacher-editable in the per-lesson review below); Other TLRs
+                    and references start EMPTY per lesson. Period/timing is
+                    teacher-entered and stays blank when not supplied. */}
                 <section aria-label="Lesson plan details" className="border-t pt-6">
                   <h3 className="text-sm font-semibold">Lesson Plan Details</h3>
                   <p className="mb-4 text-xs text-muted-foreground">
-                    These seed every lesson as a starting point. Source TLRs from
-                    your scheme and per-lesson edits in Allocation Preview override
-                    them for that lesson. Leave blank to keep them empty.
+                    Keywords, core competencies and source resources are filled in
+                    automatically for EACH lesson from your scheme — you edit them
+                    in the per-lesson review below. Other TLRs and references stay
+                    empty unless you add them per lesson. Period/timing is
+                    teacher-entered; leave blank if not applicable.
                   </p>
                   <div className="space-y-4">
                     <div className="grid gap-4 md:grid-cols-2">
-                      <Field label="Period" htmlFor="cfg-period">
+                      {/* PART K: period/timing is LESSON-SPECIFIC teacher data.
+                          When left empty it stays genuinely empty — never "0",
+                          "-", "N/A" or a generated "Period N". */}
+                      <Field label="Period / Timing" htmlFor="cfg-period">
                         <Input
                           id="cfg-period"
                           type="text"
                           value={config.period || ''}
                           onChange={(e) => setConfig({ ...config, period: e.target.value })}
-                          placeholder="e.g. 1st & 2nd"
+                          placeholder="e.g. 1st & 2nd — leave blank if not applicable"
                         />
                       </Field>
                       <Field label="Academic Term" htmlFor="cfg-term">
@@ -758,54 +784,6 @@ export default function GeneratePage() {
                         </Select>
                       </Field>
                     </div>
-                    <Field label={<>Keywords / Vocabulary <span className="font-normal text-muted-foreground">(seed for all lessons)</span></>} htmlFor="cfg-keywords">
-                      <TextArea
-                        id="cfg-keywords"
-                        value={(config.keywords || []).join(', ')}
-                        onChange={(e) => setConfig({
-                          ...config,
-                          keywords: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
-                        })}
-                        placeholder="Comma-separated, e.g. material, property, matter"
-                        rows={2}
-                      />
-                    </Field>
-                    <Field label={<>Other Teaching &amp; Learning Resources (TLRs) <span className="font-normal text-muted-foreground">(seed — not source)</span></>} htmlFor="cfg-tlrs">
-                      <TextArea
-                        id="cfg-tlrs"
-                        value={(config.teaching_learning_resources || []).join(', ')}
-                        onChange={(e) => setConfig({
-                          ...config,
-                          teaching_learning_resources: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
-                        })}
-                        placeholder="Comma-separated, e.g. Textbook, Real objects, Chart"
-                        rows={2}
-                      />
-                    </Field>
-                    <Field label={<>Core Competencies <span className="font-normal text-muted-foreground">(seed for all lessons)</span></>} htmlFor="cfg-competencies">
-                      <TextArea
-                        id="cfg-competencies"
-                        value={(config.core_competencies || []).join(', ')}
-                        onChange={(e) => setConfig({
-                          ...config,
-                          core_competencies: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
-                        })}
-                        placeholder="Comma-separated, e.g. Critical Thinking, Collaboration"
-                        rows={2}
-                      />
-                    </Field>
-                    <Field label={<>Reference <span className="font-normal text-muted-foreground">(seed for all lessons)</span></>} htmlFor="cfg-references">
-                      <TextArea
-                        id="cfg-references"
-                        value={(config.references || []).join(', ')}
-                        onChange={(e) => setConfig({
-                          ...config,
-                          references: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
-                        })}
-                        placeholder="Comma-separated, e.g. Science Curriculum, Teacher's Guide"
-                        rows={2}
-                      />
-                    </Field>
                   </div>
                 </section>
               </div>
@@ -1067,68 +1045,89 @@ export default function GeneratePage() {
                           </p>
                         </div>
                       </div>
-                      <p className="text-[11px] leading-snug text-muted-foreground">
-                        {row.indicator_description}
-                      </p>
-                      {(row.content_standard || row.strand) && (
-                        <p className="text-[11px] text-muted-foreground">
-                          {row.strand}{row.sub_strand ? ` › ${row.sub_strand}` : ''}
-                          {row.content_standard ? ` · ${row.content_standard}` : ''}
-                        </p>
-                      )}
-                      <div>
-                        <p className="mb-1 text-[11px] font-medium text-muted-foreground">
-                          Source TLRs (from scheme — read only)
-                        </p>
-                        {row.source_tlrs?.length ? (
-                          <ul className="list-inside list-disc text-[11px] text-muted-foreground">
-                            {row.source_tlrs.map((r: string, i: number) => (
-                              <li key={i}>{r}</li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="text-[11px] italic text-muted-foreground">
-                            No source TLRs for this week
+                      {/* PART R: a special period is NOT a lesson. Show the
+                          period banner instead of fake curriculum fields and
+                          offer no lesson fields or AI generation for it. */}
+                      {row.is_special_period && (
+                        <Banner tone="info" className="text-xs">
+                          <p className="font-semibold">
+                            Special Period: {row.special_period_label || 'Mid-Term'}
                           </p>
-                        )}
-                      </div>
-                      <div>
-                        <label
-                          htmlFor={`keywords-${row.lesson_sequence}`}
-                          className="mb-1 block text-[11px] font-medium text-muted-foreground"
-                        >
-                          Keywords for this lesson
-                        </label>
-                        <input
-                          id={`keywords-${row.lesson_sequence}`}
-                          type="text"
-                          value={(row.keywords || []).join(', ')}
-                          onChange={(e) => updateLessonReviewRow(row.lesson_sequence, {
-                            keywords: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
-                          })}
-                          placeholder="Comma-separated"
-                          className="w-full rounded-md border border-input px-2 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#04A9CE]/45 focus-visible:border-[#04A9CE]/70"
-                        />
-                      </div>
-                      <div>
-                        <label
-                          htmlFor={`other-tlrs-${row.lesson_sequence}`}
-                          className="mb-1 block text-[11px] font-medium text-muted-foreground"
-                        >
-                          Other TLRs for this lesson (not source)
-                        </label>
-                        <input
-                          id={`other-tlrs-${row.lesson_sequence}`}
-                          type="text"
-                          value={(row.other_tlrs || []).join(', ')}
-                          onChange={(e) => updateLessonReviewRow(row.lesson_sequence, {
-                            other_tlrs: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
-                          })}
-                          placeholder="Comma-separated teacher additions"
-                          className="w-full rounded-md border border-input px-2 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#04A9CE]/45 focus-visible:border-[#04A9CE]/70"
-                        />
-                      </div>
-                      {isWapefSelected && wapefOptions && (
+                          <p>This period does not contain a normal lesson.</p>
+                        </Banner>
+                      )}
+                      {!row.is_special_period && (
+                        <>
+                          {/* CURRICULUM CONTEXT — read-only authoritative source
+                              data (PART X/Y). */}
+                          <p className="text-[11px] leading-snug text-muted-foreground">
+                            {row.indicator_description}
+                          </p>
+                          {(row.content_standard || row.strand) && (
+                            <p className="text-[11px] text-muted-foreground">
+                              {row.strand}{row.sub_strand ? ` › ${row.sub_strand}` : ''}
+                              {row.content_standard ? ` · ${row.content_standard}` : ''}
+                            </p>
+                          )}
+                          <div>
+                            <p className="mb-1 text-[11px] font-medium text-muted-foreground">
+                              Source TLRs (from scheme — read only)
+                            </p>
+                            {row.source_tlrs?.length ? (
+                              <ul className="list-inside list-disc text-[11px] text-muted-foreground">
+                                {row.source_tlrs.map((r: string, i: number) => (
+                                  <li key={i}>{r}</li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="text-[11px] italic text-muted-foreground">
+                                No source TLRs for this week
+                              </p>
+                            )}
+                          </div>
+                          {/* KEYWORDS — AI-suggested per lesson + editable
+                              (PART G/X). */}
+                          <div>
+                            <label
+                              htmlFor={`keywords-${row.lesson_sequence}`}
+                              className="mb-1 block text-[11px] font-medium text-muted-foreground"
+                            >
+                              Keywords for this lesson (AI-suggested — edit as needed)
+                            </label>
+                            <input
+                              id={`keywords-${row.lesson_sequence}`}
+                              type="text"
+                              value={(row.keywords || []).join(', ')}
+                              onChange={(e) => updateLessonReviewRow(row.lesson_sequence, {
+                                keywords: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
+                              })}
+                              placeholder="Comma-separated"
+                              className="w-full rounded-md border border-input px-2 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#04A9CE]/45 focus-visible:border-[#04A9CE]/70"
+                            />
+                          </div>
+                          {/* OTHER TLRs — teacher-added only; default empty
+                              (PART I/X). */}
+                          <div>
+                            <label
+                              htmlFor={`other-tlrs-${row.lesson_sequence}`}
+                              className="mb-1 block text-[11px] font-medium text-muted-foreground"
+                            >
+                              Other TLRs for this lesson (optional teacher additions)
+                            </label>
+                            <input
+                              id={`other-tlrs-${row.lesson_sequence}`}
+                              type="text"
+                              value={(row.other_tlrs || []).join(', ')}
+                              onChange={(e) => updateLessonReviewRow(row.lesson_sequence, {
+                                other_tlrs: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
+                              })}
+                              placeholder="Leave blank unless you want to add resources"
+                              className="w-full rounded-md border border-input px-2 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#04A9CE]/45 focus-visible:border-[#04A9CE]/70"
+                            />
+                          </div>
+                        </>
+                      )}
+                      {isWapefSelected && wapefOptions && !row.is_special_period && (
                         <div className="rounded-md border bg-background p-2.5">
                           <p className="mb-2 text-[11px] font-semibold text-[#102A43]">
                             Approved WAPEF Plan fields
@@ -1227,9 +1226,12 @@ export default function GeneratePage() {
                           </div>
                         </div>
                       )}
+                      {/* CORE COMPETENCIES — AI-suggested for this lesson's
+                          activity type + teacher-editable (PART H/X). */}
+                      {!row.is_special_period && (
                       <div>
                         <p className="mb-1 text-[11px] font-medium text-muted-foreground">
-                          Core competencies
+                          Core competencies (AI-suggested — edit as needed)
                         </p>
                         <div className="flex flex-wrap gap-1.5">
                           {NACCA_COMPETENCIES.map((label) => {
@@ -1259,10 +1261,15 @@ export default function GeneratePage() {
                           })}
                         </div>
                       </div>
+                      )}
+                      {/* REFERENCES — teacher-entered only. Exactly 3 empty
+                          slots by default; + Add creates another slot (PART
+                          L/M/X). Empty slots are never persisted. */}
+                      {!row.is_special_period && (
                       <div>
                         <div className="mb-1 flex items-center justify-between">
                           <p className="text-[11px] font-medium text-muted-foreground">
-                            References
+                            References (teacher-entered)
                           </p>
                           <Button
                             size="sm"
@@ -1275,7 +1282,7 @@ export default function GeneratePage() {
                               ],
                             })}
                           >
-                            + Add
+                            + Add reference
                           </Button>
                         </div>
                         {(row.structured_references || []).map((ref: any, idx: number) => (
@@ -1307,6 +1314,7 @@ export default function GeneratePage() {
                           </div>
                         ))}
                       </div>
+                      )}
                     </div>
                   ))}
                 </div>

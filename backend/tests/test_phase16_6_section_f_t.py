@@ -189,23 +189,39 @@ class Test14SourceTLRsSubjectWeekScoped:
 # ── 15. Other TLRs are separate from source ─────────────────────────────────
 
 class Test15OtherTLRsSeparate:
-    def test_other_tlrs_not_in_source(self):
+    def test_other_tlrs_default_empty_and_never_seeded(self):
+        """PART I: Other TLRs are teacher-added ONLY. The old global config
+        seed was copied into every lesson's other_tlrs — that fabricated data
+        the teacher never entered per lesson. DEFAULT: empty for every lesson;
+        source TLRs stay separate."""
         plans, *_ = _run(
             Subject.SCIENCE, _science_weeks(),
             teaching_learning_resources=["Teacher's handmade poster"],
         )
         for lp in plans:
-            assert "Teacher's handmade poster" in lp.other_tlrs
+            # A batch seed is NOT per-lesson teacher-entered data.
+            assert "Teacher's handmade poster" not in lp.other_tlrs
+            assert lp.other_tlrs == []
             assert "Teacher's handmade poster" not in lp.source_tlrs
 
-    def test_display_union_contains_both(self):
-        plans, *_ = _run(
-            Subject.SCIENCE, _science_weeks(),
-            teaching_learning_resources=["Extra chart"],
-        )
+    def test_teacher_draft_other_tlrs_applied_per_lesson(self):
+        """PART I/V: per-lesson teacher additions land ONLY on that lesson."""
+        plans, *_ = _run(Subject.SCIENCE, _science_weeks())
+        drafts = {"1": {"other_tlrs": ["Teacher's handmade poster"]}}
+        for lp in plans:
+            _apply_lesson_review_draft(lp, drafts)
+        w1 = next(lp for lp in plans if lp.week_number == 1)
+        w2 = next(lp for lp in plans if lp.week_number == 2)
+        assert "Teacher's handmade poster" in w1.other_tlrs
+        assert "Teacher's handmade poster" not in w2.other_tlrs
+        assert "Teacher's handmade poster" not in w1.source_tlrs
+
+    def test_display_union_contains_source(self):
+        """The display union always contains the lesson's SOURCE TLRs."""
+        plans, *_ = _run(Subject.SCIENCE, _science_weeks())
         w1 = next(lp for lp in plans if lp.week_number == 1)
         display = [x.lower() for x in w1.teaching_learning_resources]
-        for r in SCIENCE_TLRS_WEEK1 + ["Extra chart"]:
+        for r in SCIENCE_TLRS_WEEK1:
             assert r.lower() in display
 
 
@@ -271,15 +287,14 @@ class Test17OfficialTaxonomy:
 # ── 18. Structured references: title + optional page ────────────────────────
 
 class Test18StructuredReferences:
-    def test_references_have_title_and_blank_page(self):
+    def test_references_default_empty_never_invented(self):
+        """PART L/M: references are teacher-entered only. The builder never
+        fabricates curriculum/handbook defaults for every lesson; page numbers
+        are never invented for teacher-supplied entries."""
         plans, *_ = _run(Subject.SCIENCE, _science_weeks())
         for lp in plans:
-            assert lp.structured_references, "expected structured references"
-            for ref in lp.structured_references:
-                assert isinstance(ref, ReferenceEntry)
-                assert (ref.title or ref.type).strip()
-                # Builder never invents page numbers.
-                assert ref.page in ("", None)
+            assert lp.structured_references == []
+            assert lp.references == []
 
     def test_teacher_reference_title_survives(self):
         plans, *_ = _run(
@@ -513,7 +528,9 @@ class Test24AIPromptReceivesLessonContext:
         # Every call carries lesson-level context (Section Q/24).
         for c in calls:
             assert "lesson_vocab" in [k.lower() for k in (c["teacher_keywords"] or [])]
-            assert "other tlr for prompt" in (c["other_tlrs"] or [])
+            # PART I: the batch TLR seed is never presented as the lesson's
+            # teacher-added other_tlrs — those start empty per lesson.
+            assert "other tlr for prompt" not in (c["other_tlrs"] or [])
             assert NACCA_COMPETENCY_LABELS[0] in (c["core_competencies"] or [])
             assert c["source_week_ending"] is not None
         # Source TLRs are week-scoped: week1 call has textbook, week2 has microscope.

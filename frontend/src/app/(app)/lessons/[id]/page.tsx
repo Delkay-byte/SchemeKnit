@@ -115,7 +115,10 @@ export default function LessonDetailPage() {
       setOtherTlrs(data.other_tlrs || [])
       setCoreCompetencies(data.core_competencies || [])
       setStructuredRefs(
-        (data.structured_references || []).map((r: any) => ({
+        (data.structured_references && data.structured_references.length > 0
+          ? data.structured_references
+          : []
+        ).map((r: any) => ({
           type: r.type || 'Other',
           title: r.title || '',
           author_publisher: r.author_publisher || '',
@@ -168,6 +171,9 @@ export default function LessonDetailPage() {
     try {
       setSaving(true)
       setSaved(false)
+      // PART L/M: only non-empty references are persisted — empty slots on
+      // screen never become stored empty objects.
+      const savedRefs = structuredRefs.filter(r => (r.title || '').trim())
       const updated = await api.updateLesson(lessonId, {
         lesson_topic: topic,
         introduction,
@@ -176,8 +182,8 @@ export default function LessonDetailPage() {
         keywords,
         other_tlrs: otherTlrs,
         core_competencies: coreCompetencies,
-        structured_references: structuredRefs,
-        references: structuredRefs.map(r => r.title || r.type).filter(Boolean),
+        structured_references: savedRefs,
+        references: savedRefs.map(r => r.title || r.type).filter(Boolean),
       })
       setLesson(updated)
       setSaved(true)
@@ -521,8 +527,12 @@ export default function LessonDetailPage() {
                 + Add reference
               </Button>
             </div>
+            {/* PART L/M: 3 empty entry slots by default; + Add reference
+                appends another. Empty slots are not persisted on save. */}
             {structuredRefs.length === 0 && (
-              <p className="text-sm text-muted-foreground">No references yet.</p>
+              <p className="mb-2 text-xs text-muted-foreground">
+                No references yet — fill a slot below or add one.
+              </p>
             )}
             {structuredRefs.map((ref, idx) => (
               <div key={idx} className="mb-2 grid grid-cols-12 gap-2">
