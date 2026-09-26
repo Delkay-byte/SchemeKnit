@@ -103,7 +103,8 @@ async function saveDownload(page, label, action, timeout = 60000) {
 async function api(page, method, apiPath, body) {
   return page.evaluate(
     async ({ method, apiPath, body, API }) => {
-      const token = localStorage.getItem('teachflow_token')
+      const token = sessionStorage.getItem('teachflow_token') ||
+                    localStorage.getItem('teachflow_token')
       const res = await fetch(API + apiPath, {
         method,
         headers: {

@@ -78,8 +78,10 @@ class ApiService {
           && !endpoint.startsWith('/api/auth/setup')) {
         this.authToken = null
         try {
-          localStorage.removeItem('teachflow_token')
-          localStorage.removeItem('teachflow_user')
+          // Clear ONLY this tab's session (sessionStorage is tab-scoped), so an
+          // expired/invalid session logs out just this tab, never other tabs.
+          sessionStorage.removeItem('teachflow_token')
+          sessionStorage.removeItem('teachflow_user')
           if (!window.location.pathname.startsWith('/login')) {
             window.location.href = '/login'
           }

@@ -50,14 +50,14 @@ export function ChangePasswordCard() {
     setLoading(true)
     try {
       const res = await api.changePassword(currentPassword, newPassword)
-      // Replace the stored token with the fresh one so this session
+      // Replace the stored token with the fresh one so THIS tab's session
       // remains valid; all other sessions are invalidated by the pwv bump.
       if (res.access_token && token) {
-        const savedUser = localStorage.getItem('teachflow_user')
+        const savedUser = sessionStorage.getItem('teachflow_user')
         if (savedUser) {
           const userObj = JSON.parse(savedUser)
-          localStorage.setItem('teachflow_token', res.access_token)
-          localStorage.setItem('teachflow_user', JSON.stringify(userObj))
+          sessionStorage.setItem('teachflow_token', res.access_token)
+          sessionStorage.setItem('teachflow_user', JSON.stringify(userObj))
           api.setToken(res.access_token)
         }
       }
