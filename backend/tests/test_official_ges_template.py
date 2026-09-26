@@ -228,7 +228,9 @@ class TestBundledAssets:
 
     def test_stable_identity(self):
         assert JHS_SPEC.template_id == "tpl-official-ges-nacca-jhs"
-        assert "Junior High School" in JHS_SPEC.name
+        # PART B: the teacher-facing GES display name explicitly contains GES
+        # (internal template ids are unchanged).
+        assert "GES" in JHS_SPEC.name
         assert {s.template_id for s in ALL_SPECS} == {
             "tpl-official-ges-nacca-kg",
             "tpl-official-ges-nacca-primary",
@@ -705,8 +707,11 @@ class TestTemplatesEndpointDefaults:
                 assert t["is_official"] is True, t["id"]
                 assert t["provenance"]["verification_status"] == "verified", t["id"]
         official = {t["id"] for t in payload["templates"] if t["is_official"]}
+        # PART C: the retired headteacher alias is NOT selectable, so it is
+        # absent from the teacher-facing listing.
+        assert "tpl-approved-org-headteacher" not in official
         assert official == {
-            JHS_SPEC.template_id, "tpl-approved-org-headteacher",
+            JHS_SPEC.template_id,
             KG_SPEC.template_id, PRIMARY_SPEC.template_id, SHS_SPEC.template_id,
             "tpl-wapef-approved-plan", "tpl-wapef-basic13-weekly-plan"}
         assert payload["provenance_summary"]["pending_verification"] == []
