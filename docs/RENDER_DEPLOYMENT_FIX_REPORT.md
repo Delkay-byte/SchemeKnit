@@ -143,12 +143,24 @@ generation, export, and the httpx-touching HTTP/integration tests
 
 - Pre-push probe of `https://schemeknit-api.onrender.com/api/health` timed out
   (cold/starting service at probe time).
-- The fix was pushed to `origin/main`; Render rebuilds by running the same
-  `pip install -r requirements.txt` that now succeeds in the clean local
-  environment (§4) — the exact failure point is reproduced and fixed.
-- Deploy SHA is not exposed by any endpoint (documented limitation in earlier
-  phase reports), so live commit-level currency cannot be asserted from here;
-  health re-checks after push are the available signal.
+- The fix was pushed to `origin/main` (`7796f31` + `ae57e5b`); Render rebuilds by
+  running the same `pip install -r requirements.txt` that now succeeds in the
+  clean local environment (§4) — the exact failure point is reproduced and fixed.
+- Post-push probes (both successful):
+  - `GET https://schemeknit-api.onrender.com/api/health` → **200**
+    `{"status":"healthy","service":"SchemeKnit","version":"1.0.5"}`
+  - `GET https://schemeknit-api.onrender.com/api/service-status` → **200**
+    healthy, `maintenance.active=false`
+  - `GET https://schemeknit-frontend.onrender.com` → **200** (app HTML)
+- **ENVIRONMENT LIMITATION:** no Render deploy hook exists in the repo or
+  `.env`, and Render dashboard access is not available from this environment,
+  so a fresh deployment cannot be triggered programmatically here — the redeploy
+  must be triggered/confirmed from the Render dashboard (owner-side), same as in
+  earlier phase reports. Deploy SHA is not exposed by any endpoint, so
+  commit-level currency of the running build cannot be asserted from outside;
+  the honest signals available are: push landed on `main`, the exact build
+  step now passes in a faithful clean environment, and the live service reports
+  healthy with maintenance off.
 
 ## 11. Files changed
 
