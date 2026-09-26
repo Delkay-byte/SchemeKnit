@@ -150,7 +150,8 @@ _KG_GRID_FILLS = tuple(
 KG_SPEC = GESLevelSpec(
     key=LEVEL_KG,
     template_id="tpl-official-ges-nacca-kg",
-    name="Approved Nursery / KG Lesson Plan",
+    # Teacher-facing name contains "GES" and the level it covers (PART B).
+    name="Approved GES KG / Nursery Plan",
     filename="ges_kg_lesson_plan_template.docx",
     phase_names=("Phase 1: Tuning-In", "Phase 2: Active Learning", "Phase 3: Reflection"),
     fields=_KG_FIELDS,
@@ -197,7 +198,8 @@ _PRIMARY_GRID_FILLS = tuple(
 PRIMARY_SPEC = GESLevelSpec(
     key=LEVEL_PRIMARY,
     template_id="tpl-official-ges-nacca-primary",
-    name="Approved Lower Primary Lesson Plan",
+    # Teacher-facing name contains "GES" and the class range it covers (PART B).
+    name="Approved GES Lower Primary Plan",
     filename="ges_primary_lesson_plan_template.docx",
     phase_names=("Phase 1: Starter", "Phase 2: Main Learning", "Phase 3: Plenary"),
     fields=_PRIMARY_FIELDS,
@@ -256,7 +258,9 @@ _JHS_FIELDS = [
 JHS_SPEC = GESLevelSpec(
     key=LEVEL_JHS,
     template_id="tpl-official-ges-nacca-jhs",
-    name="Approved Junior High School Lesson Plan",
+    # The teacher-facing name MUST contain "GES" (PART B): this is the
+    # approved Ghana Education Service form for Junior High School.
+    name="Approved GES Plan",
     filename="ges_jhs_lesson_plan_template.docx",
     phase_names=("PHASE 1: STARTER / INTRO", "PHASE 2: MAIN LEARNING",
                  "PHASE 3: PLENARY / REFLECTION"),
@@ -312,7 +316,8 @@ _SHS_GRID_FILLS = tuple(
 SHS_SPEC = GESLevelSpec(
     key=LEVEL_SHS,
     template_id="tpl-official-ges-nacca-shs",
-    name="Approved Senior High School Lesson Plan",
+    # Teacher-facing name contains "GES" (PART B).
+    name="Approved GES SHS Plan",
     filename="ges_shs_lesson_plan_template.docx",
     phase_names=("Phase 1: Introduction", "Phase 2: Main Delivery", "Phase 3: Evaluation"),
     fields=_SHS_FIELDS,

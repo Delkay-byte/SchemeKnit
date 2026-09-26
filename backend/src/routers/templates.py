@@ -107,7 +107,11 @@ async def list_templates(
 
     is_platform_admin = getattr(current_user, "role", None) == "platform_admin"
 
-    # Built-in templates
+    # Built-in templates — the FULL active catalog is always returned (PART A):
+    # there is no fixed count and no extra server-side limit; the teacher sees
+    # every active built-in template for their level plus their own custom
+    # templates. Retired ids (e.g. the legacy Headteacher alias, PART C) are
+    # never listed for selection.
     builtin = DEFAULT_TEMPLATES
     if educational_level:
         try:
