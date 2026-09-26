@@ -886,48 +886,81 @@ async def export_pdf(
 # race against, so no false failure. The token is bound to the user and job,
 # expires quickly, and works exactly once.
 
-import time as _time
 import secrets as _secrets
+from datetime import datetime as _dt, timedelta as _timedelta
 
-#: token -> {user_id, job_id, path, media_type, filename, expires_at}
-_DOWNLOAD_TOKENS: Dict[str, dict] = {}
-DOWNLOAD_TOKEN_TTL_SECONDS = 120
+from ..database import DownloadTokenDB, generate_id
+
+#: How long an issued one-time download URL stays valid.
+DOWNLOAD_TOKEN_TTL_SECONDS = 600
 
 
-def _issue_download_token(user_id: str, job_id: str, path, media_type: str,
-                          filename: str) -> str:
-    """Create a single-use, short-lived download token bound to (user, job)."""
+def _issue_download_token(db: Session, user_id: str, job_id: str, path,
+                          media_type: str, filename: str) -> str:
+    """Create a single-use, short-lived download token bound to (user, job).
+
+    The token is PERSISTED (``download_tokens``). A process-local dict looked
+    correct but broke on any deployment with more than one worker or dyno: the
+    POST that issued the token and the browser's GET are separate requests and
+    can land on different processes, so the token was missing and the download
+    404'd. Persisting it makes the handoff worker-agnostic while keeping every
+    security property (unguessable, user-bound, expiring, single-use).
+    """
     token = _secrets.token_urlsafe(32)
-    _DOWNLOAD_TOKENS[token] = {
-        "user_id": user_id,
-        "job_id": job_id,
-        "path": str(path),
-        "media_type": media_type,
-        "filename": filename,
-        "expires_at": _time.time() + DOWNLOAD_TOKEN_TTL_SECONDS,
-    }
+    db.add(DownloadTokenDB(
+        token=token,
+        user_id=user_id,
+        job_id=job_id,
+        path=str(path),
+        media_type=media_type,
+        filename=filename,
+        expires_at=_dt.utcnow() + _timedelta(seconds=DOWNLOAD_TOKEN_TTL_SECONDS),
+    ))
+    db.commit()
     return token
 
 
-def _consume_download_token(token: Optional[str], user_id: Optional[str] = None) -> Optional[dict]:
-    """Pop a valid, unexpired token; else None.
+def _consume_download_token(db: Session, token: Optional[str],
+                            user_id: Optional[str] = None) -> Optional[dict]:
+    """Claim a valid, unexpired token exactly once; else None.
 
     ``user_id`` is optional: the browser reaches this URL by *navigation* and
     cannot attach a Bearer header, so the single-use token itself is the
     credential (a presigned URL). When an authenticated identity IS present it
     must still match the issuing user, so an authenticated caller can never
     consume another user's token.
+
+    Single-use is enforced with a guarded UPDATE (``used_at IS NULL``) so two
+    concurrent consumers cannot both win the same token.
     """
     if not token:
         return None
-    entry = _DOWNLOAD_TOKENS.pop(token, None)
-    if not entry:
+    row = db.query(DownloadTokenDB).filter(
+        DownloadTokenDB.token == token).first()
+    if not row:
         return None
-    if user_id is not None and entry["user_id"] != user_id:
+    if user_id is not None and row.user_id != user_id:
         return None
-    if _time.time() > entry["expires_at"]:
+    if row.used_at is not None:
         return None
-    return entry
+    if row.expires_at and row.expires_at < _dt.utcnow():
+        db.delete(row)
+        db.commit()
+        return None
+    updated = db.query(DownloadTokenDB).filter(
+        DownloadTokenDB.token == token,
+        DownloadTokenDB.used_at.is_(None),
+    ).update({DownloadTokenDB.used_at: _dt.utcnow()}, synchronize_session=False)
+    db.commit()
+    if updated != 1:
+        return None
+    return {
+        "user_id": row.user_id,
+        "job_id": row.job_id,
+        "path": row.path,
+        "media_type": row.media_type,
+        "filename": row.filename,
+    }
 
 
 @router.post("/{job_id}/download-url")
@@ -1053,7 +1086,7 @@ async def issue_download_url(
         filename = f"Lesson_Plans_{scheme_label}.pdf"
 
     data_service.log_export_event(db, job.id, job.scheme_id, user.id, fmt)
-    token = _issue_download_token(user.id, job.id, out, media_type, filename)
+    token = _issue_download_token(db, user.id, job.id, out, media_type, filename)
     return {
         "download_url": f"/api/generation/downloads/{token}",
         "filename": filename,
@@ -1065,6 +1098,7 @@ async def issue_download_url(
 async def download_by_token(
     token: str,
     user: Optional[User] = Depends(get_optional_user),
+    db: Session = Depends(get_db),
 ):
     """Deliver a pre-validated export as a native browser download.
 
@@ -1077,7 +1111,7 @@ async def download_by_token(
     no Bearer header, so the token itself is the credential; when an
     authenticated identity is supplied it must match the issuing user.
     """
-    entry = _consume_download_token(token, user.id if user else None)
+    entry = _consume_download_token(db, token, user.id if user else None)
     if not entry:
         raise HTTPException(status_code=404, detail="Download link expired or invalid")
     path = Path(entry["path"])
