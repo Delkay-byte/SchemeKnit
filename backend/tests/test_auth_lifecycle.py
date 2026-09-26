@@ -636,3 +636,69 @@ class TestRegression:
     def test_health_check(self, http):
         client, _ = http
         assert client.get("/api/health").status_code == 200
+
+
+class TestMaintenanceToggle:
+    """Platform-admin maintenance mode control.
+
+    Regression: set_maintenance_mode referenced an undeclared `db` and raised
+    NameError (HTTP 500) *after* mutating in-memory settings, so the UI could
+    never flip the toggle and desynced from the server state.
+    """
+
+    def test_toggle_on_off_roundtrip(self, http):
+        client, db = http
+        admin = make_user(db, role="platform_admin")
+        headers = _auth(create_user_token(admin))
+
+        res = client.get("/api/platform-admin/maintenance", headers=headers)
+        assert res.status_code == 200
+        assert res.json()["maintenance"]["active"] is False
+
+        res = client.post(
+            "/api/platform-admin/maintenance",
+            headers=headers,
+            json={"enabled": True, "message": "Under maintenance", "estimated_restore": "2 hours"},
+        )
+        assert res.status_code == 200, res.text
+        assert res.json()["maintenance"]["active"] is True
+
+        res = client.get("/api/platform-admin/maintenance", headers=headers)
+        assert res.status_code == 200
+        assert res.json()["maintenance"]["active"] is True
+        assert res.json()["maintenance"]["message"] == "Under maintenance"
+        assert res.json()["maintenance"]["estimated_restore"] == "2 hours"
+
+        res = client.post(
+            "/api/platform-admin/maintenance",
+            headers=headers,
+            json={"enabled": False},
+        )
+        assert res.status_code == 200, res.text
+        assert res.json()["maintenance"]["active"] is False
+
+        res = client.get("/api/platform-admin/maintenance", headers=headers)
+        assert res.json()["maintenance"]["active"] is False
+
+        actions = [
+            row.action
+            for row in db.query(PlatformAuditLogDB).all()
+            if row.action.startswith("maintenance_mode_")
+        ]
+        assert "maintenance_mode_enabled" in actions
+        assert "maintenance_mode_disabled" in actions
+
+    def test_maintenance_requires_platform_admin(self, http):
+        client, db = http
+        teacher = make_user(db, role="teacher")
+        headers = _auth(create_user_token(teacher))
+
+        res = client.post(
+            "/api/platform-admin/maintenance",
+            headers=headers,
+            json={"enabled": True},
+        )
+        assert res.status_code == 403
+
+        res = client.get("/api/platform-admin/maintenance", headers=headers)
+        assert res.status_code == 403
