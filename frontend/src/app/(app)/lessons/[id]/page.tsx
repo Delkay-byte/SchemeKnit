@@ -9,10 +9,46 @@ import { Input } from '@/components/ui/input'
 import { Field, TextArea } from '@/components/ui/field'
 import { Select } from '@/components/ui/select'
 import { Banner } from '@/components/ui/banner'
-import { ArrowLeft, CheckCircle, AlertCircle, Save, Loader2 } from 'lucide-react'
+import { ArrowLeft, CheckCircle, AlertCircle, Save, Loader2, Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
 import { api } from '@/lib/api'
+import { aiFailure } from '@/lib/ai-feedback'
 import { resolveRouteId } from '@/lib/route-params'
 import { PageHeader } from '@/components/ui/page-header'
+
+/** Canonical main-learning activity (PART X): never flattened to raw JSON. */
+interface MainActivity {
+  phase?: string
+  description: string
+  duration_minutes: number | null
+  resources?: string[]
+}
+
+/**
+ * Normalize any stored/provider activities to the editable shape. Drops
+ * entries without a usable description so the UI never shows blank/`null`
+ * activities (PART Y).
+ */
+function normalizeActivities(raw: unknown): MainActivity[] {
+  if (!Array.isArray(raw)) return []
+  const out: MainActivity[] = []
+  for (const a of raw) {
+    if (a && typeof a === 'object') {
+      const description = String((a as any).description || '').trim()
+      if (!description) continue
+      const rawDur = (a as any).duration_minutes
+      const n = typeof rawDur === 'number' ? rawDur : parseInt(String(rawDur ?? ''), 10)
+      out.push({
+        phase: (a as any).phase,
+        description,
+        duration_minutes: Number.isFinite(n) && n > 0 ? n : null,
+        resources: Array.isArray((a as any).resources) ? (a as any).resources : [],
+      })
+    } else if (typeof a === 'string' && a.trim()) {
+      out.push({ description: a.trim(), duration_minutes: null, resources: [] })
+    }
+  }
+  return out
+}
 
 interface LessonData {
   id: string
@@ -84,9 +120,13 @@ export default function LessonDetailPage() {
     'Textbook',
     'Other',
   ]
+  // Phase 2 · Main Learning — independently editable activities (PART A/B).
+  const [mainActivities, setMainActivities] = useState<MainActivity[]>([])
   // Optional AI section regeneration (existing /api/ai/regenerate-section)
   const [regenBusy, setRegenBusy] = useState<string | null>(null)
   const [regenNote, setRegenNote] = useState<string | null>(null)
+  // PART I: calm, teacher-safe AI failure notice (never raw provider detail).
+  const [aiWarning, setAiWarning] = useState<string | null>(null)
   // What AI would actually do for this teacher's selected mode.
   const [aiStatus, setAiStatus] = useState<{
     active: boolean; provider: string | null; mode: string; reason: string | null;
@@ -113,6 +153,7 @@ export default function LessonDetailPage() {
       setConclusion(data.conclusion || '')
       setKeywords(data.keywords || [])
       setOtherTlrs(data.other_tlrs || [])
+      setMainActivities(normalizeActivities(data.main_activities))
       setCoreCompetencies(data.core_competencies || [])
       setStructuredRefs(
         (data.structured_references && data.structured_references.length > 0
@@ -133,11 +174,14 @@ export default function LessonDetailPage() {
     }
   }
 
-  const handleRegenerate = async (section: 'introduction' | 'assessment' | 'conclusion') => {
+  const handleRegenerate = async (
+    section: 'introduction' | 'assessment' | 'conclusion' | 'main_activities',
+  ) => {
     if (!lesson) return
     try {
       setRegenBusy(section)
       setRegenNote(null)
+      setAiWarning(null)
       setError(null)
       // Stable idempotency key for this user action so a retried submission
       // cannot consume a second monthly AI generation.
@@ -152,6 +196,23 @@ export default function LessonDetailPage() {
         if (saved && saved !== 'OFF') mode = saved
       } catch { /* storage unavailable */ }
       const res = await api.regenerateSection(lesson.id, section, mode, '', requestId)
+      if (section === 'main_activities') {
+        // PART F/G: render the backend-normalized structured activities, then
+        // let the teacher review — saving is an explicit, separate action.
+        const next = normalizeActivities(res.new_activities)
+        if (next.length === 0) {
+          // A 200 with no usable activities is still a failed suggestion.
+          // Never blank the teacher's existing activities.
+          setAiWarning(aiFailure({ code: 'AI_NO_SUGGESTION' }).message)
+          return
+        }
+        setMainActivities(next)
+        setRegenNote(
+          `AI suggestion inserted by ${res.provider || 'provider'}. ` +
+          'Review and Save to keep it.'
+        )
+        return
+      }
       const text = res.new_content || ''
       if (section === 'introduction') setIntroduction(text)
       if (section === 'assessment') setAssessment(text)
@@ -161,11 +222,34 @@ export default function LessonDetailPage() {
         'Review and Save to keep it.'
       )
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'AI regeneration unavailable')
+      // PART H/I/J/AD: the teacher sees ONLY calm, non-technical copy; the raw
+      // provider diagnostic stays server-side.
+      setAiWarning(aiFailure(err).message)
     } finally {
       setRegenBusy(null)
     }
   }
+
+  const addActivity = () =>
+    setMainActivities(prev => [
+      ...prev,
+      { description: '', duration_minutes: null, resources: [] },
+    ])
+
+  const updateActivity = (idx: number, patch: Partial<MainActivity>) =>
+    setMainActivities(prev => prev.map((a, i) => (i === idx ? { ...a, ...patch } : a)))
+
+  const removeActivity = (idx: number) =>
+    setMainActivities(prev => prev.filter((_, i) => i !== idx))
+
+  const moveActivity = (idx: number, delta: number) =>
+    setMainActivities(prev => {
+      const next = [...prev]
+      const target = idx + delta
+      if (target < 0 || target >= next.length) return prev
+      ;[next[idx], next[target]] = [next[target], next[idx]]
+      return next
+    })
 
   const handleSave = async () => {
     try {
@@ -174,9 +258,19 @@ export default function LessonDetailPage() {
       // PART L/M: only non-empty references are persisted — empty slots on
       // screen never become stored empty objects.
       const savedRefs = structuredRefs.filter(r => (r.title || '').trim())
+      // Only non-empty activities persist; ordering is preserved as displayed.
+      const activities = mainActivities
+        .map(a => ({
+          phase: a.phase,
+          description: (a.description || '').trim(),
+          duration_minutes: a.duration_minutes,
+          resources: a.resources || [],
+        }))
+        .filter(a => a.description)
       const updated = await api.updateLesson(lessonId, {
         lesson_topic: topic,
         introduction,
+        main_activities: activities,
         assessment,
         conclusion,
         keywords,
@@ -232,7 +326,6 @@ export default function LessonDetailPage() {
   }
 
   const objectives = lesson.learning_objectives || []
-  const mainActivities = lesson.main_activities || []
 
   const suggestButton = (section: 'introduction' | 'assessment' | 'conclusion') => (
     <Button
@@ -333,6 +426,7 @@ export default function LessonDetailPage() {
             </span>
           </div>
           {regenNote && <Banner tone="success" className="mt-3">{regenNote}</Banner>}
+          {aiWarning && <Banner tone="warning" className="mt-3">{aiWarning}</Banner>}
 
           {/* Objectives — read-only from the generator. */}
           {objectives.length > 0 && (
@@ -385,27 +479,110 @@ export default function LessonDetailPage() {
             />
           </section>
 
-          {/* Phase 2 · Main Learning — generated content, read-only here. */}
-          {mainActivities.length > 0 && (
-            <section
-              className="mt-5 border-t border-slate-100 pt-5"
-              aria-label="Phase 2 Main Learning"
-            >
+          {/* Phase 2 · Main Learning — fully editable, AI-suggestible (PART A/B). */}
+          <section
+            className="mt-5 border-t border-slate-100 pt-5"
+            aria-label="Phase 2 Main Learning"
+          >
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-sm font-semibold text-[#102A43]">Phase 2 · Main Learning</h3>
-              <ul className="mt-2 space-y-2">
-                {mainActivities.map((act, i) => (
-                  <li key={i} className="rounded-lg bg-slate-50 px-3 py-2 text-sm">
-                    {act.description}
-                    {typeof act.duration_minutes === 'number' && act.duration_minutes > 0 && (
-                      <span className="ml-2 text-xs text-muted-foreground">
-                        {act.duration_minutes} min
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
+              <Button
+                size="sm"
+                variant="outline"
+                type="button"
+                disabled={regenBusy !== null}
+                onClick={() => handleRegenerate('main_activities')}
+              >
+                {regenBusy === 'main_activities' ? 'Generating...' : 'Suggest Main Learning'}
+              </Button>
+            </div>
+
+            {mainActivities.length === 0 && (
+              <p className="mb-2 text-sm text-muted-foreground">
+                No main learning activities yet.
+              </p>
+            )}
+
+            <div className="space-y-3">
+              {mainActivities.map((act, i) => (
+                <div key={i} className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+                  <div className="mb-1.5 flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                      Activity {i + 1}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        aria-label={`Move activity ${i + 1} up`}
+                        disabled={i === 0}
+                        onClick={() => moveActivity(i, -1)}
+                      >
+                        <ChevronUp className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        aria-label={`Move activity ${i + 1} down`}
+                        disabled={i === mainActivities.length - 1}
+                        onClick={() => moveActivity(i, 1)}
+                      >
+                        <ChevronDown className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        aria-label={`Remove activity ${i + 1}`}
+                        onClick={() => removeActivity(i)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <TextArea
+                    aria-label={`Activity ${i + 1} description`}
+                    value={act.description}
+                    onChange={(e) => updateActivity(i, { description: e.target.value })}
+                    rows={2}
+                  />
+                  <div className="mt-2 flex items-center gap-2">
+                    <label
+                      htmlFor={`activity-duration-${i}`}
+                      className="text-xs text-muted-foreground"
+                    >
+                      Duration
+                    </label>
+                    <Input
+                      id={`activity-duration-${i}`}
+                      type="number"
+                      min={1}
+                      value={act.duration_minutes ?? ''}
+                      onChange={(e) => {
+                        const n = parseInt(e.target.value, 10)
+                        updateActivity(i, { duration_minutes: Number.isFinite(n) && n > 0 ? n : null })
+                      }}
+                      className="h-9 w-24"
+                    />
+                    <span className="text-xs text-muted-foreground">min</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="mt-3"
+              onClick={addActivity}
+            >
+              <Plus className="mr-1.5 h-4 w-4" />
+              Add activity
+            </Button>
+          </section>
 
           {/* Assessment */}
           <section className="mt-5 border-t border-slate-100 pt-5" aria-label="Assessment">
