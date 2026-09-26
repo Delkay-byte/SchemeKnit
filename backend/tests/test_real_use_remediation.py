@@ -376,9 +376,11 @@ class TestDownloadEndpoints:
         from fastapi.testclient import TestClient
         from fastapi import FastAPI
         from src.auth import get_optional_user
+        from src.database import get_db
         app = FastAPI()
         app.include_router(gen_router.router, prefix="/api/generation")
         app.dependency_overrides[get_optional_user] = lambda: None
+        app.dependency_overrides[get_db] = lambda: db
         with TestClient(app) as client:
             r = client.get(res["download_url"])
         assert r.status_code == 200
@@ -410,9 +412,11 @@ class TestDownloadEndpoints:
         from fastapi.testclient import TestClient
         from fastapi import FastAPI
         from src.auth import get_optional_user
+        from src.database import get_db
         app = FastAPI()
         app.include_router(gen_router.router, prefix="/api/generation")
         app.dependency_overrides[get_optional_user] = lambda: None
+        app.dependency_overrides[get_db] = lambda: db
         with TestClient(app) as client:
             r = client.get(res["download_url"])
         assert r.status_code == 200
@@ -456,9 +460,11 @@ class TestDownloadEndpoints:
         from fastapi.testclient import TestClient
         from fastapi import FastAPI
         from src.auth import get_optional_user
+        from src.database import get_db
         app = FastAPI()
         app.include_router(gen_router.router, prefix="/api/generation")
         app.dependency_overrides[get_optional_user] = lambda: None
+        app.dependency_overrides[get_db] = lambda: db
         with TestClient(app) as client:
             # An unknown/expired/replayed token is always 404.
             r1 = client.get(res["download_url"])
@@ -485,11 +491,13 @@ class TestDownloadEndpoints:
         from fastapi.testclient import TestClient
         from fastapi import FastAPI
         from src.auth import get_optional_user
+        from src.database import get_db
         from src.database import User
         app = FastAPI()
         app.include_router(gen_router.router, prefix="/api/generation")
         other = User(id="other-user", email="other@t.test")
         app.dependency_overrides[get_optional_user] = lambda: other
+        app.dependency_overrides[get_db] = lambda: db
         with TestClient(app) as client:
             r = client.get(res["download_url"])
         assert r.status_code == 404

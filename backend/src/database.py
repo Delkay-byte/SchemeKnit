@@ -367,6 +367,22 @@ class EntitlementDB(Base):
     history_limit = Column(Integer, default=10)
     ai_credits = Column(Integer, default=0)  # 0 = unlimited or disabled
     ai_credits_used = Column(Integer, default=0)
+    # ── Authoritative plan lifecycle (v028) ────────────────────────────────
+    # ``edition`` carries the commercial plan (free | teacher | school); the
+    # columns below make the ADMIN-WORKFLOW explicit so a teacher's plan can be
+    # activated, expired or REVOKED without deleting the row (and without the
+    # frontend being able to influence it — every field is server-written).
+    #   status: "active" | "expired" | "revoked"
+    #   source: "free" | "admin" | "payment" | "license" | "activation_code"
+    status = Column(String, default="active", nullable=False)
+    source = Column(String, default="free")
+    starts_at = Column(DateTime, nullable=True)
+    # Who performed the activation/revocation and when (admin audit trail).
+    activated_by = Column(String, nullable=True)
+    activated_at = Column(DateTime, nullable=True)
+    revoked_by = Column(String, nullable=True)
+    revoked_at = Column(DateTime, nullable=True)
+    revoked_reason = Column(Text, default="")
 
 
 class SubscriptionDB(Base):
@@ -381,6 +397,40 @@ class SubscriptionDB(Base):
     expires_at = Column(DateTime, nullable=True)
     payment_provider = Column(String, default="")
     external_id = Column(String, default="")
+
+
+# ── One-time download tokens (PART C) ────────────────────────────────────────
+
+class DownloadTokenDB(Base):
+    """A single-use, short-lived credential for a pre-rendered export.
+
+    The browser reaches ``GET /api/generation/downloads/{token}`` by a plain
+    navigation, so it cannot attach the tab's Bearer header; the token itself
+    is the credential. Persisting it (rather than keeping a process-local dict)
+    means the POST that issues the token and the GET that consumes it may reach
+    DIFFERENT workers on a multi-process deployment and the link still works.
+
+    Security: the token is unguessable (``secrets.token_urlsafe(32)``), bound
+    to the issuing user and job, expires quickly, and is consumed exactly once
+    (``used_at`` set on first use; a second use 404s).
+    """
+
+    __tablename__ = "download_tokens"
+
+    token = Column(String, primary_key=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    job_id = Column(String, nullable=False)
+    path = Column(String, nullable=False)
+    media_type = Column(String, nullable=False)
+    filename = Column(String, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    used_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_download_tokens_user", "user_id"),
+        Index("ix_download_tokens_expires", "expires_at"),
+    )
 
 
 # ── Content Pack ──────────────────────────────────────────────────────────────
