@@ -30,8 +30,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const savedToken = localStorage.getItem('teachflow_token')
-    const savedUser = localStorage.getItem('teachflow_user')
+    // Tab-scoped session: read ONLY from sessionStorage (per-tab). A new tab
+    // has empty sessionStorage, so it never inherits another tab's login.
+    // Legacy shared localStorage tokens are intentionally NOT migrated — a
+    // fresh tab must not silently attach to another tab's identity.
+    const savedToken = sessionStorage.getItem('teachflow_token')
+    const savedUser = sessionStorage.getItem('teachflow_user')
     if (savedToken && savedUser) {
       setToken(savedToken)
       setUser(JSON.parse(savedUser))
@@ -44,16 +48,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const response = await api.login(email, password)
     setToken(response.access_token)
     setUser(response.user)
-    localStorage.setItem('teachflow_token', response.access_token)
-    localStorage.setItem('teachflow_user', JSON.stringify(response.user))
+    sessionStorage.setItem('teachflow_token', response.access_token)
+    sessionStorage.setItem('teachflow_user', JSON.stringify(response.user))
     api.setToken(response.access_token)
   }
 
   const logout = () => {
     setToken(null)
     setUser(null)
-    localStorage.removeItem('teachflow_token')
-    localStorage.removeItem('teachflow_user')
+    sessionStorage.removeItem('teachflow_token')
+    sessionStorage.removeItem('teachflow_user')
     api.setToken(null)
   }
 
