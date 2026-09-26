@@ -321,6 +321,17 @@ export interface PlanResolution {
   edition: string
   subscription_type: string | null
   plan_name: string
+  //: Authoritative server-side plan label. `FREE` | `PRO`. Never client-set.
+  plan?: 'FREE' | 'PRO'
+  //: Lifecycle of the underlying entitlement: active | expired | revoked.
+  status?: 'active' | 'expired' | 'revoked'
+  //: Provenance of a granted plan: free | admin | payment | license | activation_code.
+  plan_source?: string
+  starts_at?: string | null
+  activated_by?: string | null
+  activated_at?: string | null
+  revoked_by?: string | null
+  revoked_at?: string | null
   generation_limit: number
   generations_used: number
   batch_generation: boolean
