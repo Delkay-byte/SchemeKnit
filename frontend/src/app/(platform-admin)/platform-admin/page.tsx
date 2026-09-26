@@ -18,7 +18,7 @@ import {
   DialogDescription,
   ConfirmDialog,
 } from '@/components/ui/dialog'
-import { Building2, Key, Shield, Clock, AlertTriangle, Copy, Check, RefreshCw, Eye, KeyRound } from 'lucide-react'
+import { Building2, Key, Shield, Clock, AlertTriangle, Copy, Check, RefreshCw, Eye, KeyRound, Search } from 'lucide-react'
 import { api } from '@/lib/api'
 import { DEV_TOOLS_ENABLED } from '@/lib/dev-tools'
 import { useAuth } from '@/lib/auth-context'
@@ -28,6 +28,21 @@ import { formatCurrency, formatActivationDate } from '@/lib/utils-display'
 import { ChangePasswordCard } from '@/components/change-password'
 
 type Tab = 'dashboard' | 'schools' | 'licenses' | 'plans' | 'payments' | 'activations' | 'audit' | 'accounts' | 'settings'
+
+/**
+ * Smart account filter: case-insensitive, whitespace-tolerant, multi-token.
+ * Every token must match somewhere in the account's name, email or role, so
+ * "amoah ghana" finds "Grace Amoah <grace@ghana.edu>" but not "Grace Mensah".
+ */
+function filterAccounts(list: any[], query: string): any[] {
+  const q = query.trim().toLowerCase()
+  if (!q) return list
+  const tokens = q.split(/\s+/)
+  return list.filter((u) => {
+    const haystack = `${u.full_name || ''} ${u.email || ''} ${u.role || ''}`.toLowerCase()
+    return tokens.every((t) => haystack.includes(t))
+  })
+}
 
 export default function PlatformAdminPage() {
   const router = useRouter()
@@ -74,6 +89,10 @@ export default function PlatformAdminPage() {
   } | null>(null)
   const [resetLoadingId, setResetLoadingId] = useState<string | null>(null)
   const [copiedToken, setCopiedToken] = useState(false)
+
+  // Accounts-tab smart search
+  const [accountQuery, setAccountQuery] = useState('')
+  const visibleAccounts = filterAccounts(accounts, accountQuery)
 
   // School drill-down
   const [schoolDetail, setSchoolDetail] = useState<any>(null)
@@ -887,6 +906,33 @@ export default function PlatformAdminPage() {
                     <p className="font-medium text-[#102A43]">No accounts yet</p>
                   </SurfaceCard>
                 ) : (
+                <>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="relative w-full max-w-sm">
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="account-search"
+                      data-account-search
+                      type="search"
+                      aria-label="Search accounts"
+                      placeholder="Search by name, email or role…"
+                      value={accountQuery}
+                      onChange={(e) => setAccountQuery(e.target.value)}
+                      className="pl-8"
+                    />
+                  </div>
+                  {accountQuery.trim() && (
+                    <span className="text-sm text-muted-foreground">
+                      {visibleAccounts.length} of {accounts.length} shown
+                    </span>
+                  )}
+                </div>
+                {visibleAccounts.length === 0 ? (
+                  <SurfaceCard className="px-6 py-10 text-center">
+                    <p className="font-medium text-[#102A43]">No accounts match &ldquo;{accountQuery.trim()}&rdquo;</p>
+                    <p className="mt-1 text-sm text-muted-foreground">Try a different name, email or role.</p>
+                  </SurfaceCard>
+                ) : (
                 <SurfaceCard className="overflow-hidden">
                   <Table>
                     <TableHeader>
@@ -896,7 +942,7 @@ export default function PlatformAdminPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {accounts.map((u) => (
+                      {visibleAccounts.map((u) => (
                         <TableRow key={u.id}>
                           <TableCell>
                             <span className="font-medium text-[#102A43]">{u.full_name}</span>
@@ -938,6 +984,8 @@ export default function PlatformAdminPage() {
                     </TableBody>
                   </Table>
                 </SurfaceCard>
+                )}
+                </>
                 )}
               </div>
             )}
@@ -1193,6 +1241,7 @@ function MaintenanceControl() {
   const [estimatedRestore, setEstimatedRestore] = useState('')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     api.getMaintenanceMode().then((data) => {
@@ -1200,26 +1249,32 @@ function MaintenanceControl() {
       setMessage(data.maintenance.message || '')
       setEstimatedRestore(data.maintenance.estimated_restore || '')
       setLoading(false)
-    }).catch(() => setLoading(false))
+    }).catch(() => {
+      setError('Could not load maintenance status.')
+      setLoading(false)
+    })
   }, [])
 
   const handleToggle = async () => {
     setSaving(true)
+    setError('')
     try {
-      await api.setMaintenanceMode(!enabled, message, estimatedRestore)
-      setEnabled(!enabled)
+      const res = await api.setMaintenanceMode(!enabled, message, estimatedRestore)
+      setEnabled(res?.maintenance?.active ?? !enabled)
     } catch (err) {
-      console.error('Failed to toggle maintenance mode:', err)
+      setError(err instanceof Error ? err.message : 'Could not update maintenance mode. Please try again.')
     }
     setSaving(false)
   }
 
   const handleSave = async () => {
     setSaving(true)
+    setError('')
     try {
-      await api.setMaintenanceMode(enabled, message, estimatedRestore)
+      const res = await api.setMaintenanceMode(enabled, message, estimatedRestore)
+      setEnabled(res?.maintenance?.active ?? enabled)
     } catch (err) {
-      console.error('Failed to save maintenance settings:', err)
+      setError(err instanceof Error ? err.message : 'Could not save maintenance settings. Please try again.')
     }
     setSaving(false)
   }
@@ -1246,6 +1301,9 @@ function MaintenanceControl() {
             {saving ? 'Saving...' : enabled ? 'Disable Maintenance' : 'Enable Maintenance'}
           </Button>
         </div>
+        {error && (
+          <p role="alert" className="text-sm text-red-600">{error}</p>
+        )}
         <Field label="Maintenance Message" htmlFor="maintenance-message">
           <Input
             id="maintenance-message"
