@@ -92,7 +92,7 @@ class ApiService {
       const error = await response.json().catch(() => ({
         detail: 'An error occurred'
       }))
-      throw new Error(error.detail || 'Request failed')
+      throw errorFromDetail(error?.detail)
     }
 
     return response.json()
@@ -436,7 +436,18 @@ class ApiService {
     return this.request(`/api/generation/lessons/${lessonId}`)
   }
 
-  async regenerateSection(lessonId: string, section: string, aiMode = 'ollama', context = '', requestId = ''): Promise<any> {
+  async regenerateSection(lessonId: string, section: string, aiMode = 'ollama', context = '', requestId = ''): Promise<{
+    section: string
+    previous_content: string
+    new_content: string
+    /** Structured activities, present for section "main_activities". */
+    new_activities?: { phase?: string; description: string; duration_minutes?: number | null; resources?: string[] }[] | null
+    provider: string
+    model: string
+    mode: string
+    timestamp: string
+    source: string
+  }> {
     return this.request('/api/ai/regenerate-section', {
       method: 'POST',
       body: JSON.stringify({
@@ -498,7 +509,14 @@ class ApiService {
   }
 
   private async exportBlob(url: string): Promise<ExportPayload> {
-    const response = await fetch(url, { method: 'POST', headers: this.authHeaders() })
+    let response: Response
+    try {
+      response = await fetch(url, { method: 'POST', headers: this.authHeaders() })
+    } catch (err) {
+      // PART T: distinguish a genuine network failure from an HTTP error so the
+      // teacher never sees a bare "Failed to fetch".
+      throw new Error("We couldn't reach the server. Check your connection and try again.")
+    }
     if (!response.ok) {
       // PART 22: surface the ACTUAL cause — auth expiry, permissions, server
       // export failure, environment limitation — never a bare "Failed to fetch".
@@ -553,7 +571,17 @@ class ApiService {
                        templateId?: string): Promise<{ download_url: string; filename: string; media_type: string }> {
     const params = new URLSearchParams({ format, template_type: templateType })
     if (templateId) params.append('template_id', templateId)
-    return this.request(`/api/generation/${jobId}/download-url?${params}`, { method: 'POST' })
+    try {
+      return await this.request(`/api/generation/${jobId}/download-url?${params}`, { method: 'POST' })
+    } catch (err) {
+      // PART T: a browser-level fetch rejection (offline, DNS, CORS, mixed
+      // content) surfaces as TypeError("Failed to fetch"). Translate it to a
+      // truthful message instead of letting the raw text reach the teacher.
+      if (err instanceof TypeError) {
+        throw new Error("We couldn't reach the server. Check your connection and try again.")
+      }
+      throw err
+    }
   }
 
   /**
@@ -1056,6 +1084,38 @@ class ApiService {
       setTimeout(() => URL.revokeObjectURL(url), 60_000)
     }
   }
+}
+
+/**
+ * An Error carrying the backend's stable, machine-readable failure code.
+ * ``message`` is always the teacher-safe text; ``diagnostic`` (when present)
+ * holds the raw server-side cause for developer diagnostics only — it is never
+ * rendered to the teacher (PART H/AD).
+ */
+export interface ApiError extends Error {
+  code?: string
+  diagnostic?: string
+}
+
+/**
+ * Turn a backend error ``detail`` into a safe Error.
+ *
+ * ``detail`` is normally a plain string (legacy contract). AI endpoints now
+ * return ``{ code, message, diagnostic }`` so the teacher sees the calm,
+ * user-safe message while the raw provider error is preserved separately.
+ */
+export function errorFromDetail(detail: unknown): ApiError {
+  if (detail && typeof detail === 'object') {
+    const d = detail as { code?: string; message?: string; diagnostic?: string }
+    const err = new Error(d.message || 'Request failed') as ApiError
+    err.code = d.code
+    err.diagnostic = d.diagnostic
+    return err
+  }
+  if (typeof detail === 'string' && detail) {
+    return new Error(detail)
+  }
+  return new Error('Request failed')
 }
 
 /**

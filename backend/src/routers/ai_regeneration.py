@@ -74,6 +74,28 @@ SECTION_TO_PROVIDER_KEYS = {
 #: JSON response is never rejected because some OTHER field is short.
 MIN_SECTION_CHARS = 10
 
+#: Sane bounds for a single main-learning activity duration (minutes). A
+#: provider that returns nonsense (0, negative, or hours) is treated as an
+#: unusable suggestion rather than silently written into the lesson.
+MIN_ACTIVITY_MINUTES = 1
+MAX_ACTIVITY_MINUTES = 180
+
+
+def _ai_error(status_code: int, code: str, message: str, diagnostic: str = "") -> HTTPException:
+    """Build an HTTPException whose ``detail`` carries BOTH the safe, teacher-
+    facing message and the raw provider diagnostic.
+
+    PART H/I: the review UI must never show ``LIVE_ERROR``, provider state
+    codes, exception text or HTTP codes. The frontend reads ``message``; the
+    ``diagnostic`` is what backend logs / service-status surface. Keeping them
+    in one payload means the detailed cause is NOT lost from diagnostics while
+    still never reaching the teacher as-is.
+    """
+    return HTTPException(
+        status_code=status_code,
+        detail={"code": code, "message": message, "diagnostic": diagnostic},
+    )
+
 
 class SectionRegenerateRequest(BaseModel):
     lesson_plan_id: str
@@ -89,6 +111,10 @@ class SectionRegenerateResponse(BaseModel):
     section: str
     previous_content: str
     new_content: str
+    #: Structured activities for ``main_activities`` (PART F/X). None for every
+    #: other section. The frontend renders this array directly — it never has to
+    #: parse provider JSON itself.
+    new_activities: Optional[List[dict]] = None
     provider: str
     model: str
     mode: str
@@ -137,14 +163,16 @@ async def regenerate_section(
         from ..engines.ai_provider import provider_status
         state = provider_status(provider)
         resolved = provider.get_name() if provider else "none"
-        raise HTTPException(
-            status_code=503,
-            detail=(
+        logger.warning("section_regen_provider_unavailable",
+                       provider=resolved, state=state, section=req.section)
+        raise _ai_error(
+            503,
+            "AI_UNAVAILABLE",
+            "AI suggestion is currently unavailable. "
+            "Your existing content was preserved.",
+            diagnostic=(
                 f"AI provider '{resolved}' is not available (state: {state}). "
-                "No real AI provider is configured on the server. Lessons and "
-                "their deterministic content are unchanged — configure a "
-                "provider (Gemini, Groq, OpenAI) or start local Ollama to use "
-                "AI suggestions."
+                "No real AI provider is configured on the server."
             ),
         )
 
@@ -160,7 +188,17 @@ async def regenerate_section(
             # Section-targeted prompt: smaller, faster, section-relevant output.
             gen_kwargs["section"] = req.section
         result = provider.generate_lesson_content(**gen_kwargs)
-        new_content = _extract_section_text(result, req.section)
+
+        # ``main_activities`` is a STRUCTURED section: the provider's
+        # ``main_learning`` object must be normalized to
+        # ``[{description, duration_minutes}]`` rather than flattened to text
+        # (PART F/X). Every other section keeps the flat-text contract.
+        new_activities: Optional[List[dict]] = None
+        if req.section == "main_activities":
+            new_activities = _normalize_main_activities(result)
+            new_content = "\n".join(a["description"] for a in new_activities)
+        else:
+            new_content = _extract_section_text(result, req.section)
 
         # One bounded retry for empty/short results BEFORE surfacing a provider
         # diagnostic: local models occasionally return empty/truncated output,
@@ -168,40 +206,52 @@ async def regenerate_section(
         if (not new_content or len(new_content.strip()) < MIN_SECTION_CHARS) and provider.get_name() == "ollama":
             logger.warning("ai_empty_retry", section=req.section)
             result = provider.generate_lesson_content(**gen_kwargs)
-            new_content = _extract_section_text(result, req.section)
+            if req.section == "main_activities":
+                new_activities = _normalize_main_activities(result)
+                new_content = "\n".join(a["description"] for a in new_activities)
+            else:
+                new_content = _extract_section_text(result, req.section)
 
         # A still-empty payload is a provider DIAGNOSTIC, not a generic "too
-        # short" failure (PART W): surface the recorded error code (rate_limit /
-        # malformed_json / empty_output …) through the normal error contract.
+        # short" failure (PART W): map the recorded error code (rate_limit /
+        # malformed_json / empty_output …) to a TEACHER-SAFE message (PART H/I)
+        # while keeping the raw detail in the diagnostic field for logs.
         if not result or not new_content or not new_content.strip():
             from ..engines.ai_provider import provider_status
             state = provider_status(provider)
-            detail = {
-                "rate_limit": (
-                    f"AI provider '{provider.get_name()}' was rate-limited. "
-                    "Please retry in a moment. Previous content preserved."
-                ),
-                "malformed_json": (
-                    f"AI provider '{provider.get_name()}' returned an unparseable "
-                    "response. Previous content preserved."
-                ),
-                "empty_output": (
-                    f"AI provider '{provider.get_name()}' returned an empty "
-                    "response. Previous content preserved."
-                ),
-            }.get(provider.last_error,
-                  f"AI provider '{provider.get_name()}' returned no usable content "
-                  f"(state: {state}). Previous content preserved.")
-            raise HTTPException(status_code=502, detail=detail)
+            raw = (
+                f"AI provider '{provider.get_name()}' returned no usable "
+                f"content (state: {state}, last_error: {provider.last_error})."
+            )
+            logger.warning("section_regen_no_content", section=req.section,
+                           provider=provider.get_name(), state=state,
+                           last_error=str(provider.last_error))
+            if provider.last_error == "rate_limit":
+                raise _ai_error(
+                    502, "AI_RATE_LIMITED",
+                    "AI is busy right now. Your existing content was preserved. "
+                    "Please try again in a moment.",
+                    diagnostic=raw,
+                )
+            raise _ai_error(
+                502, "AI_NO_SUGGESTION",
+                "AI suggestion unavailable right now. Your existing content "
+                "was preserved. You can edit it manually or try again later.",
+                diagnostic=raw,
+            )
 
         # The length floor applies to the REGENERATED SECTION text only, after
         # the structured payload was mapped (PART W) — never to the raw model
         # output, and never to unrelated fields of a valid JSON response.
         if len(new_content.strip()) < MIN_SECTION_CHARS:
-            raise ValueError(
-                f"The provider did not return usable text for section "
-                f"'{req.section}' (model output was a valid response, but no "
-                f"content mapped to this section)."
+            raise _ai_error(
+                502, "AI_NO_SUGGESTION",
+                "AI suggestion unavailable right now. Your existing content "
+                "was preserved. You can edit it manually or try again later.",
+                diagnostic=(
+                    f"No content mapped to section '{req.section}' from a valid "
+                    "provider response."
+                ),
             )
 
         _save_enrichment_cache(db, lp.id, req.section, new_content, provider.__class__.__name__, mode_label)
@@ -218,6 +268,7 @@ async def regenerate_section(
             section=req.section,
             previous_content=previous_content,
             new_content=new_content,
+            new_activities=new_activities,
             provider=provider.get_name(),
             model=getattr(provider, 'model', 'unknown'),
             mode=mode_label,
@@ -226,15 +277,17 @@ async def regenerate_section(
         )
 
     except HTTPException:
-        # Surfaced provider diagnostics (rate limit, empty output) keep the
-        # lesson untouched and pass through unchanged.
+        # Teacher-safe provider errors keep the lesson untouched and pass
+        # through unchanged (the raw cause is in the diagnostic field).
         raise
     except Exception as e:
         logger.error("section_regeneration_failed",
-                     section=req.section, error=str(e))
-        raise HTTPException(
-            status_code=500,
-            detail=f"Regeneration failed: {str(e)}. Previous content preserved."
+                     section=req.section, error=str(e), exc_info=True)
+        raise _ai_error(
+            500, "AI_UNAVAILABLE",
+            "AI suggestion unavailable right now. Your existing content was "
+            "preserved. You can edit it manually or try again later.",
+            diagnostic=f"Regeneration failed: {str(e)}",
         )
 
 
@@ -344,6 +397,92 @@ def _extract_section_text(result: dict, section: str) -> str:
         if inner.strip():
             return inner
     return ""
+
+
+def _normalize_activity(phase, fallback_phase: str) -> Optional[dict]:
+    """Map ONE provider phase fragment to a canonical main activity item.
+
+    Providers may return an object (``{name, activity, duration_minutes,
+    resources_used}``) or a bare string. Anything that carries no usable
+    description (or an out-of-range duration) is dropped, never written as an
+    empty/``null``/``undefined`` activity.
+    """
+    if isinstance(phase, dict):
+        desc = phase.get("activity") or phase.get("description") or phase.get("text") or ""
+        if isinstance(desc, (dict, list)):
+            desc = _flatten_text(desc)
+        desc = str(desc).strip()
+        raw_dur = phase.get("duration_minutes")
+        try:
+            dur = int(raw_dur) if raw_dur is not None else None
+        except (TypeError, ValueError):
+            dur = None
+        if dur is not None and not (MIN_ACTIVITY_MINUTES <= dur <= MAX_ACTIVITY_MINUTES):
+            dur = None
+        resources = phase.get("resources_used")
+        if resources is None:
+            resources = phase.get("resources")
+        if not isinstance(resources, list):
+            resources = [resources] if resources else []
+        item = {
+            "phase": str(phase.get("name") or phase.get("phase") or fallback_phase).upper(),
+            "description": desc,
+            "duration_minutes": dur,
+            "resources": [str(r).strip() for r in resources if str(r).strip()],
+        }
+        return item if item["description"] else None
+    if isinstance(phase, str) and phase.strip():
+        return {
+            "phase": fallback_phase,
+            "description": phase.strip(),
+            "duration_minutes": None,
+            "resources": [],
+        }
+    return None
+
+
+def _normalize_main_activities(result) -> List[dict]:
+    """Normalize a provider payload into canonical main-learning activities.
+
+    Canonical shape (PART X): ``[{phase, description, duration_minutes,
+    resources}]``. Handles the V2 ``main_learning`` object keyed by phase, a
+    list of phase objects, and a bare string. Returns ``[]`` when the provider
+    produced nothing usable — the caller turns that into a teacher-safe
+    failure, never a blank replacement.
+    """
+    if not isinstance(result, dict):
+        return []
+    raw = None
+    for key in ("main_learning", "main_activities"):
+        if result.get(key):
+            raw = result[key]
+            break
+    if raw is None:
+        nested = result.get("lesson_content")
+        if isinstance(nested, dict):
+            for key in ("main_learning", "main_activities"):
+                if nested.get(key):
+                    raw = nested[key]
+                    break
+    if raw is None:
+        return []
+
+    items: List[dict] = []
+    if isinstance(raw, dict):
+        for phase_key, phase in raw.items():
+            item = _normalize_activity(phase, str(phase_key).upper())
+            if item:
+                items.append(item)
+    elif isinstance(raw, list):
+        for i, phase in enumerate(raw):
+            item = _normalize_activity(phase, f"MAIN {i + 1}")
+            if item:
+                items.append(item)
+    else:
+        item = _normalize_activity(raw, "MAIN")
+        if item:
+            items.append(item)
+    return items
 
 
 def _build_section_prompt(lp, section: str, current_content: str, additional_context: str) -> str:
