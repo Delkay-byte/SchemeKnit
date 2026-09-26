@@ -912,7 +912,9 @@ async def list_individual_teachers(
             continue
 
         effective_status = "active"
-        if ent and ent.expires_at and ent.expires_at < datetime.utcnow():
+        if ent and (ent.status or "active") == "revoked":
+            effective_status = "revoked"
+        elif ent and ent.expires_at and ent.expires_at < datetime.utcnow():
             effective_status = "expired"
 
         result.append({
@@ -923,14 +925,21 @@ async def list_individual_teachers(
             "subscription_type": "individual",
             "plan_name": "Teacher Pro" if ent and ent.edition == "teacher" else "Free Teacher",
             "edition": ent.edition if ent else "free",
+            "plan": "PRO" if ent and ent.edition == "teacher" else "FREE",
             "status": effective_status,
+            "source": (ent.source if ent and ent.source else "free"),
             "payment_status": sub.status if sub else "none",
             "ai_enabled": bool(ent.ai_enabled) if ent else False,
             "ai_credits": ent.ai_credits if ent else 5,
             "ai_credits_used": ent.ai_credits_used if ent else 0,
             "generation_limit": ent.generation_limit if ent else FREE_TIER_LESSON_PLANS_PER_MONTH,
             "generations_used": ent.generations_used if ent else 0,
+            "starts_at": ent.starts_at.isoformat() if ent and ent.starts_at else None,
             "expires_at": ent.expires_at.isoformat() if ent and ent.expires_at else None,
+            "activated_by": ent.activated_by if ent else None,
+            "activated_at": ent.activated_at.isoformat() if ent and ent.activated_at else None,
+            "revoked_by": ent.revoked_by if ent else None,
+            "revoked_at": ent.revoked_at.isoformat() if ent and ent.revoked_at else None,
             "created_at": t.created_at.isoformat() if t.created_at else None,
         })
 
@@ -973,6 +982,9 @@ async def get_individual_teacher(
         },
         "entitlement": {
             "edition": ent.edition if ent else "free",
+            "plan": "PRO" if ent and ent.edition == "teacher" else "FREE",
+            "status": (ent.status if ent and ent.status else "active"),
+            "source": (ent.source if ent and ent.source else "free"),
             "subscription_type": ent.subscription_type if ent else None,
             "generation_limit": ent.generation_limit if ent else FREE_TIER_LESSON_PLANS_PER_MONTH,
             "generations_used": ent.generations_used if ent else 0,
@@ -984,7 +996,13 @@ async def get_individual_teacher(
             "ai_enabled": bool(ent.ai_enabled) if ent else False,
             "ai_credits": ent.ai_credits if ent else 5,
             "ai_credits_used": ent.ai_credits_used if ent else 0,
+            "starts_at": ent.starts_at.isoformat() if ent and ent.starts_at else None,
             "expires_at": ent.expires_at.isoformat() if ent and ent.expires_at else None,
+            "activated_by": ent.activated_by if ent else None,
+            "activated_at": ent.activated_at.isoformat() if ent and ent.activated_at else None,
+            "revoked_by": ent.revoked_by if ent else None,
+            "revoked_at": ent.revoked_at.isoformat() if ent and ent.revoked_at else None,
+            "revoked_reason": ent.revoked_reason if ent else "",
         } if ent else None,
         "subscription": {
             "status": sub.status if sub else "none",
@@ -1009,6 +1027,33 @@ class ActivateIndividualRequest(BaseModel):
     teacher_id: str
     product_plan_id: str
     duration_days: Optional[int] = None
+    # Optional explicit window. ``expires_at`` wins over ``duration_days``.
+    starts_at: Optional[str] = None
+    expires_at: Optional[str] = None
+
+
+class RevokeIndividualRequest(BaseModel):
+    reason: str = ""
+
+
+class ExtendIndividualRequest(BaseModel):
+    duration_days: int
+
+
+def _parse_dt(value: Optional[str]) -> Optional[datetime]:
+    """Parse an ISO date/datetime string from the admin UI (lenient)."""
+    if not value:
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00")).replace(tzinfo=None)
+    except ValueError:
+        try:
+            return datetime.strptime(text[:10], "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format (use YYYY-MM-DD)")
 
 
 @router.post("/individual-teachers/activate")
@@ -1017,11 +1062,14 @@ async def activate_individual_teacher(
     user: User = Depends(require_platform_admin),
     db: Session = Depends(get_db),
 ):
-    """Manually activate Teacher Pro for an individual teacher.
+    """Admin-activate Teacher PRO for an individual teacher.
 
-    Platform Admin can directly activate without going through the payment flow.
+    This is the whole manual-commercial workflow: the teacher pays externally,
+    the Platform Admin verifies it, then this endpoint flips the SERVER-SIDE
+    entitlement. The teacher can never call it (``require_platform_admin``) and
+    no client storage participates.
     """
-    from ..database import EntitlementDB, SubscriptionDB
+    from ..entitlements import activate_pro_entitlement
 
     teacher = db.query(User).filter(User.id == req.teacher_id).first()
     if not teacher:
@@ -1031,92 +1079,82 @@ async def activate_individual_teacher(
     if not plan:
         raise HTTPException(status_code=404, detail="Product plan not found")
 
-    now = datetime.utcnow()
-    duration_days = req.duration_days or plan.duration_days or 30
-
-    # Create or update subscription
-    sub = db.query(SubscriptionDB).filter(
-        SubscriptionDB.user_id == req.teacher_id,
-        SubscriptionDB.status == "active",
-    ).first()
-
-    if sub:
-        if sub.expires_at and sub.expires_at > now:
-            sub.expires_at = sub.expires_at + timedelta(days=duration_days)
-        else:
-            sub.expires_at = now + timedelta(days=duration_days)
-        sub.status = "active"
-        sub.plan_name = plan.name
-    else:
-        sub = SubscriptionDB(
-            id=generate_id(),
-            user_id=req.teacher_id,
-            edition="teacher",
-            plan_name=plan.name,
-            status="active",
-            started_at=now,
-            expires_at=now + timedelta(days=duration_days),
-            payment_provider="admin_activation",
-            external_id="",
-        )
-        db.add(sub)
-
-    # Create or update entitlement
-    ent = db.query(EntitlementDB).filter(
-        EntitlementDB.user_id == req.teacher_id,
-    ).first()
-
-    if ent:
-        ent.edition = "teacher"
-        ent.subscription_type = "individual"
-        ent.ai_enabled = getattr(plan, 'ai_enabled', True)
-        ent.batch_generation = getattr(plan, 'batch_generation', True)
-        ent.zip_export = getattr(plan, 'zip_export', True)
-        ent.pdf_export = getattr(plan, 'pdf_export', True)
-        ent.custom_template_limit = getattr(plan, 'custom_template_limit', 10)
-        ent.history_limit = getattr(plan, 'history_limit', 100)
-        ent.ai_credits = getattr(plan, 'ai_credits', 50)
-        ent.generation_limit = getattr(plan, 'generation_limit', 0)
-        ent.expires_at = now + timedelta(days=duration_days)
-        ent.updated_at = now
-    else:
-        ent = EntitlementDB(
-            id=generate_id(),
-            user_id=req.teacher_id,
-            edition="teacher",
-            subscription_type="individual",
-            features=["ai_basic", "cloud_sync", "template_import", "content_library"],
-            ai_enabled=getattr(plan, 'ai_enabled', True),
-            batch_generation=getattr(plan, 'batch_generation', True),
-            zip_export=getattr(plan, 'zip_export', True),
-            pdf_export=getattr(plan, 'pdf_export', True),
-            custom_template_limit=getattr(plan, 'custom_template_limit', 10),
-            history_limit=getattr(plan, 'history_limit', 100),
-            ai_credits=getattr(plan, 'ai_credits', 50),
-            ai_credits_used=0,
-            generation_limit=getattr(plan, 'generation_limit', 0),
-            generations_used=0,
-            cloud_sync=True,
-            template_import=True,
-            content_library=True,
-            expires_at=now + timedelta(days=duration_days),
-            created_at=now,
-            updated_at=now,
-        )
-        db.add(ent)
-
-    # Update user subscription_type
-    teacher.subscription_type = "individual"
+    ent = activate_pro_entitlement(
+        db, teacher, admin=user, plan=plan,
+        duration_days=req.duration_days,
+        starts_at=_parse_dt(req.starts_at),
+        expires_at=_parse_dt(req.expires_at),
+        source="admin",
+    )
 
     _audit_log(db, user, "individual_teacher_activated", "user", req.teacher_id,
-               {"plan": plan.name, "duration_days": duration_days})
+               {"plan": plan.name, "expires_at": ent.expires_at.isoformat() if ent.expires_at else None})
     db.commit()
 
     return {
         "teacher_id": req.teacher_id,
         "plan": plan.name,
-        "expires_at": (now + timedelta(days=duration_days)).isoformat(),
+        # ``status`` keeps its historical meaning (the activation OUTCOME).
         "status": "activated",
+        "plan_status": ent.status,
+        "source": ent.source,
+        "starts_at": ent.starts_at.isoformat() if ent.starts_at else None,
+        "expires_at": ent.expires_at.isoformat() if ent.expires_at else None,
+    }
+
+
+@router.post("/individual-teachers/{teacher_id}/revoke")
+async def revoke_individual_teacher(
+    teacher_id: str,
+    req: RevokeIndividualRequest = RevokeIndividualRequest(),
+    user: User = Depends(require_platform_admin),
+    db: Session = Depends(get_db),
+):
+    """Revoke a teacher's individual PRO plan (server-side, admin only)."""
+    from ..entitlements import revoke_pro_entitlement
+
+    teacher = db.query(User).filter(User.id == teacher_id).first()
+    if not teacher:
+        raise HTTPException(status_code=404, detail="Teacher not found")
+
+    ent = revoke_pro_entitlement(db, teacher, admin=user, reason=req.reason)
+    _audit_log(db, user, "individual_teacher_revoked", "user", teacher_id,
+               {"reason": req.reason})
+    db.commit()
+    return {
+        "teacher_id": teacher_id,
+        "status": ent.status if ent else "free",
+        "plan": "FREE",
+        "revoked_at": ent.revoked_at.isoformat() if ent and ent.revoked_at else None,
+    }
+
+
+@router.post("/individual-teachers/{teacher_id}/extend")
+async def extend_individual_teacher(
+    teacher_id: str,
+    req: ExtendIndividualRequest,
+    user: User = Depends(require_platform_admin),
+    db: Session = Depends(get_db),
+):
+    """Extend an existing PRO plan by N days (admin only)."""
+    from ..entitlements import extend_pro_entitlement
+
+    if req.duration_days <= 0:
+        raise HTTPException(status_code=400, detail="duration_days must be positive")
+    teacher = db.query(User).filter(User.id == teacher_id).first()
+    if not teacher:
+        raise HTTPException(status_code=404, detail="Teacher not found")
+
+    ent = extend_pro_entitlement(db, teacher, admin=user, duration_days=req.duration_days)
+    if ent is None:
+        raise HTTPException(status_code=404, detail="Teacher has no entitlement to extend")
+    _audit_log(db, user, "individual_teacher_extended", "user", teacher_id,
+               {"duration_days": req.duration_days})
+    db.commit()
+    return {
+        "teacher_id": teacher_id,
+        "status": ent.status,
+        "expires_at": ent.expires_at.isoformat() if ent.expires_at else None,
     }
 
 

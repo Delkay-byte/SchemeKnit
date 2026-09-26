@@ -11,6 +11,7 @@ import pytest
 from datetime import datetime, date, timedelta
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 # Ensure backend src is importable
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -33,8 +34,17 @@ def _test_database_url():
 def db_engine():
     """Create a fresh database for each test (SQLite memory by default)."""
     url = _test_database_url()
-    connect_args = {"check_same_thread": False} if url.startswith("sqlite") else {}
-    engine = create_engine(url, connect_args=connect_args)
+    if url.startswith("sqlite"):
+        # StaticPool + a single shared connection: an in-memory SQLite database
+        # otherwise lives per connection, so a request served on another thread
+        # (e.g. FastAPI TestClient) would see an empty database with no tables.
+        engine = create_engine(
+            url,
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+    else:
+        engine = create_engine(url)
     Base.metadata.create_all(bind=engine)
     yield engine
     Base.metadata.drop_all(bind=engine)

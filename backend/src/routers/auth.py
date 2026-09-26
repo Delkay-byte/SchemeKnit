@@ -554,9 +554,9 @@ async def register_individual_teacher(
     db.add(new_user)
     db.flush()
 
-    # Create Free Tier entitlement. Lesson plans are 5 per CALENDAR MONTH
-    # (enforced server-side via the usage ledger); AI is a separate lifetime
-    # allowance of 5.
+    # Create Free Tier entitlement. Lesson plans are 5 per CALENDAR MONTH and
+    # AI is 5 per CALENDAR MONTH (both enforced server-side via the usage
+    # ledgers, PART 16-18) — never a lifetime cap.
     free_ent = EntitlementDB(
         id=generate_id(),
         user_id=new_user.id,

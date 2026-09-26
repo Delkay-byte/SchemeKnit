@@ -13,14 +13,14 @@ Precedence rule:
     higher AI credits, etc.).
 """
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Optional, Tuple, Dict, Any
 from fastapi import Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from .database import (
     get_db, User, EntitlementDB, SubscriptionDB, SchoolLicenseDB, SchoolDB,
-    AIUsageEventDB,
+    AIUsageEventDB, generate_id,
 )
 from .usage_quota import (
     PERIOD_TYPE_CALENDAR_MONTH, current_period_key, get_units_used,
@@ -32,14 +32,38 @@ AI_ENTITLEMENT_REQUIRED = (
     "AI assistance requires an active school license or a paid AI entitlement."
 )
 
-#: The Free Tier receives this many SUCCESSFUL AI generations for the LIFETIME
-#: of the account. There is NO daily, weekly or monthly reset and no automatic
-#: renewal — once used, the allowance stays at zero.
+#: The Free Tier receives this many SUCCESSFUL AI generations per CALENDAR
+#: MONTH (PART 16-18: the ai_generation_periods ledger is keyed YYYY-MM from
+#: the server clock). There is NO daily or weekly reset; the allowance simply
+#: starts fresh on the 1st of each month.
 FREE_TIER_AI_GENERATIONS = 5
 
 #: Visible plan label for the free individual-teacher tier (§14). The internal
 #: edition identifier stays "free"; only this user-facing wording changes.
 FREE_TIER_PLAN_NAME = "Free Tier"
+
+#: Commercial plan identifiers surfaced to the client. The backend is the ONLY
+#: authority for these — a plan is PRO only when a server-side EntitlementDB row
+#: says so; the frontend can never set them.
+PLAN_FREE = "FREE"
+PLAN_PRO = "PRO"
+
+#: Plan lifecycle values (EntitlementDB.status).
+PLAN_STATUS_ACTIVE = "active"
+PLAN_STATUS_EXPIRED = "expired"
+PLAN_STATUS_REVOKED = "revoked"
+
+#: Provenance of a granted plan (EntitlementDB.source).
+PLAN_SOURCE_FREE = "free"
+PLAN_SOURCE_ADMIN = "admin"
+PLAN_SOURCE_PAYMENT = "payment"
+PLAN_SOURCE_LICENSE = "license"
+PLAN_SOURCE_ACTIVATION = "activation_code"
+
+
+def plan_for_edition(edition: Optional[str]) -> str:
+    """Map a stored edition to the public plan label (never invented)."""
+    return PLAN_FREE if (edition or "free") == "free" else PLAN_PRO
 
 #: Free Tier LESSON-PLAN allowance: this many lesson plans per CALENDAR MONTH.
 #: One indicator → one period → one lesson plan → one unit. This is entirely
@@ -78,13 +102,31 @@ def free_tier_ai_exhausted_message(limit: int = FREE_TIER_AI_GENERATIONS) -> str
 
 # ── Core lookups ─────────────────────────────────────────────────────────────
 
-def get_user_entitlement(db: Session, user_id: str) -> Optional[EntitlementDB]:
-    """Return the user's EntitlementDB row, or None if expired."""
-    ent = db.query(EntitlementDB).filter(
+def get_raw_entitlement(db: Session, user_id: str) -> Optional[EntitlementDB]:
+    """Return the user's EntitlementDB row AS STORED, whatever its state.
+
+    Used to report lifecycle metadata (expired/revoked) even though an inactive
+    row no longer grants capabilities. Callers that need an ACTIVE entitlement
+    must use :func:`get_user_entitlement`.
+    """
+    return db.query(EntitlementDB).filter(
         EntitlementDB.user_id == user_id
     ).first()
-    if ent and ent.expires_at and ent.expires_at < datetime.utcnow():
-        ent = None
+
+
+def get_user_entitlement(db: Session, user_id: str) -> Optional[EntitlementDB]:
+    """Return the user's ACTIVE EntitlementDB row, or None.
+
+    None when the row is missing, expired, or REVOKED — in every such case the
+    account resolves to FREE capabilities.
+    """
+    ent = get_raw_entitlement(db, user_id)
+    if ent is None:
+        return None
+    if (ent.status or PLAN_STATUS_ACTIVE) == PLAN_STATUS_REVOKED:
+        return None
+    if ent.expires_at and ent.expires_at < datetime.utcnow():
+        return None
     return ent
 
 
@@ -187,6 +229,20 @@ def resolve_entitlement(db: Session, user: User) -> Dict[str, Any]:
         "ai_quota_limit": FREE_TIER_AI_GENERATIONS,
         "ai_quota_used": 0,
         "ai_quota_remaining": FREE_TIER_AI_GENERATIONS,
+        # ── Authoritative plan lifecycle (v028) ────────────────────────────
+        # ``plan`` is the public label the UI renders; ``plan_source`` /
+        # ``status`` and the audit timestamps come from the server-side
+        # entitlement only. NOTE: ``plan_source`` is deliberately distinct from
+        # the legacy ``source`` key (individual | school | free), which is part
+        # of the existing API contract and must not be repurposed.
+        "plan": PLAN_FREE,
+        "status": PLAN_STATUS_ACTIVE,
+        "plan_source": PLAN_SOURCE_FREE,
+        "starts_at": None,
+        "activated_at": None,
+        "activated_by": None,
+        "revoked_at": None,
+        "revoked_by": None,
         "expires_at": None,
         "is_active": True,
         "school_name": None,
@@ -198,6 +254,15 @@ def resolve_entitlement(db: Session, user: User) -> Dict[str, Any]:
         result["edition"] = ent.edition or "teacher"
         result["subscription_type"] = "individual"
         result["plan_name"] = "Teacher Pro" if ent.edition == "teacher" else FREE_TIER_PLAN_NAME
+        # Public plan label + lifecycle, straight from the stored row.
+        result["plan"] = plan_for_edition(ent.edition)
+        result["status"] = ent.status or PLAN_STATUS_ACTIVE
+        result["plan_source"] = ent.source or PLAN_SOURCE_FREE
+        result["starts_at"] = ent.starts_at
+        result["activated_at"] = ent.activated_at
+        result["activated_by"] = ent.activated_by
+        result["revoked_at"] = ent.revoked_at
+        result["revoked_by"] = ent.revoked_by
         #: Only the free edition is a lifetime AI allowance; paid plans keep
         #: their own (configurable) AI allowance and are never lifetime-capped.
         #: (Legacy flag — always False now; the AI allowance is monthly.)
@@ -230,6 +295,10 @@ def resolve_entitlement(db: Session, user: User) -> Dict[str, Any]:
             result["edition"] = "school"
             result["subscription_type"] = "school"
             result["plan_name"] = "School Subscription"
+        # A school license is a PRO plan for the teacher who holds it.
+        result["plan"] = PLAN_PRO
+        result["status"] = PLAN_STATUS_ACTIVE
+        result["plan_source"] = PLAN_SOURCE_LICENSE
         # A school license provides unlimited AI — not the free monthly tier.
         result["ai_lifetime"] = False
         result["ai_credits"] = 0
@@ -249,6 +318,23 @@ def resolve_entitlement(db: Session, user: User) -> Dict[str, Any]:
         result["history_limit"] = max(result["history_limit"], 100)
 
         # School AI entitlement is handled by ai_entitlement() separately
+
+    # ── Accurate lifecycle label when no ACTIVE entitlement applies ────────
+    # An expired or REVOKED row grants nothing (has_individual is False above),
+    # but the teacher should still see WHY they are on FREE rather than a bare
+    # "FREE" with no context. The plan stays FREE — never a capability.
+    if not has_individual and not has_school:
+        raw = get_raw_entitlement(db, user.id)
+        if raw is not None:
+            if (raw.status or "") == PLAN_STATUS_REVOKED:
+                result["status"] = PLAN_STATUS_REVOKED
+                result["revoked_at"] = raw.revoked_at
+                result["revoked_by"] = raw.revoked_by
+                result["plan_source"] = raw.source or PLAN_SOURCE_FREE
+            elif raw.expires_at and raw.expires_at < datetime.utcnow():
+                result["status"] = PLAN_STATUS_EXPIRED
+                result["expires_at"] = raw.expires_at
+                result["plan_source"] = raw.source or PLAN_SOURCE_FREE
 
     # ── Calendar-period authoritative usage for finite allowances ───────────
     # AI: the Free Tier monthly allowance is read from the ai_generation_
@@ -554,6 +640,208 @@ def consume_ai_generation(user: User, db: Session, request_id: Optional[str] = N
         ))
         db.commit()
     return ai_quota.consume_ai_generation(db, user.id, credits)
+
+
+# ── Admin-controlled PRO lifecycle ───────────────────────────────────────────
+#
+# These helpers are the ONLY sanctioned way to grant or remove an individual
+# teacher's PRO plan. They are called exclusively from platform-admin endpoints
+# that already enforce `require_platform_admin`; a normal teacher has no route
+# that reaches them, so the plan cannot be self-granted.
+#
+# Current quota policy is deliberately UNCHANGED: granting PRO flips the plan
+# edition (which lifts the Free Tier monthly caps, because the caps are keyed to
+# edition == "free") but does not invent any new unlimited allowance. The exact
+# behaviour is documented in docs/REMEDIATION_ENTITLEMENT_AND_DOWNLOADS.md.
+
+#: Feature flags applied to a new PRO entitlement when no product plan row is
+#: supplied. Mirrors the historical admin-activation contract.
+PRO_FEATURE_DEFAULTS = {
+    "features": ["ai_basic", "cloud_sync", "template_import", "content_library"],
+    "ai_enabled": True,
+    "advanced_ai_enabled": False,
+    "cloud_sync": True,
+    "template_import": True,
+    "content_library": True,
+    "batch_generation": True,
+    "zip_export": True,
+    "pdf_export": True,
+    "custom_template_limit": 10,
+    "history_limit": 100,
+    "ai_credits": 0,          # 0 == unlimited (monthly caps no longer apply)
+    "generation_limit": 0,    # 0 == unlimited
+}
+
+
+def _plan_field(plan, name, fallback):
+    """Read a product-plan field defensively (custom plans may omit it)."""
+    if plan is None:
+        return fallback
+    value = getattr(plan, name, None)
+    return fallback if value is None else value
+
+
+def activate_pro_entitlement(
+    db: Session,
+    teacher: User,
+    admin: User,
+    plan=None,
+    duration_days: Optional[int] = None,
+    starts_at: Optional[datetime] = None,
+    expires_at: Optional[datetime] = None,
+    source: str = PLAN_SOURCE_ADMIN,
+    activated_at: Optional[datetime] = None,
+) -> EntitlementDB:
+    """Grant (or re-grant) Teacher PRO to ``teacher``. Server-side only.
+
+    Idempotent: an existing entitlement row is UPDATED in place (including a
+    previously REVOKED or EXPIRED one), never duplicated. Does not commit — the
+    caller owns the transaction so the audit entry is written atomically.
+    """
+    now = datetime.utcnow()
+    start = starts_at or now
+    if expires_at is not None:
+        expiry = expires_at
+    else:
+        days = duration_days if duration_days is not None else _plan_field(plan, "duration_days", 30)
+        expiry = (start + timedelta(days=days)) if days else None
+
+    ent = get_raw_entitlement(db, teacher.id)
+    if ent is None:
+        ent = EntitlementDB(id=generate_id(), user_id=teacher.id)
+        db.add(ent)
+
+    ent.edition = "teacher"
+    ent.subscription_type = "individual"
+    ent.features = list(_plan_field(plan, "features", PRO_FEATURE_DEFAULTS["features"]) or [])
+    ent.ai_enabled = bool(_plan_field(plan, "ai_enabled", PRO_FEATURE_DEFAULTS["ai_enabled"]))
+    ent.advanced_ai_enabled = bool(_plan_field(
+        plan, "advanced_ai_enabled", PRO_FEATURE_DEFAULTS["advanced_ai_enabled"]))
+    ent.batch_generation = bool(_plan_field(
+        plan, "batch_generation", PRO_FEATURE_DEFAULTS["batch_generation"]))
+    ent.zip_export = bool(_plan_field(plan, "zip_export", PRO_FEATURE_DEFAULTS["zip_export"]))
+    ent.pdf_export = bool(_plan_field(plan, "pdf_export", PRO_FEATURE_DEFAULTS["pdf_export"]))
+    ent.custom_template_limit = int(_plan_field(
+        plan, "custom_template_limit", PRO_FEATURE_DEFAULTS["custom_template_limit"]))
+    ent.history_limit = int(_plan_field(
+        plan, "history_limit", PRO_FEATURE_DEFAULTS["history_limit"]))
+    ent.ai_credits = int(_plan_field(plan, "ai_credits", PRO_FEATURE_DEFAULTS["ai_credits"]))
+    ent.generation_limit = int(_plan_field(
+        plan, "generation_limit", PRO_FEATURE_DEFAULTS["generation_limit"]))
+
+    # Lifecycle: an activation clears any prior revocation.
+    ent.status = PLAN_STATUS_ACTIVE
+    ent.source = source or PLAN_SOURCE_ADMIN
+    ent.starts_at = start
+    ent.expires_at = expiry
+    ent.activated_by = admin.id if admin else None
+    ent.activated_at = activated_at or now
+    ent.revoked_by = None
+    ent.revoked_at = None
+    ent.revoked_reason = ""
+    ent.updated_at = now
+
+    teacher.subscription_type = "individual"
+    _sync_subscription(db, teacher, plan, start, expiry, source, admin)
+    return ent
+
+
+def _sync_subscription(db, teacher, plan, start, expiry, source, admin):
+    """Keep the SubscriptionDB mirror in step with the entitlement."""
+    sub = db.query(SubscriptionDB).filter(
+        SubscriptionDB.user_id == teacher.id,
+        SubscriptionDB.status == "active",
+    ).first()
+    plan_name = getattr(plan, "name", "") if plan is not None else "Teacher Pro"
+    provider = source or PLAN_SOURCE_ADMIN
+    if sub:
+        sub.status = "active"
+        sub.edition = "teacher"
+        sub.plan_name = plan_name or sub.plan_name
+        sub.starts_at = start
+        sub.expires_at = expiry
+        sub.payment_provider = provider
+        if admin:
+            sub.external_id = admin.id
+    else:
+        db.add(SubscriptionDB(
+            id=generate_id(),
+            user_id=teacher.id,
+            edition="teacher",
+            plan_name=plan_name or "Teacher Pro",
+            status="active",
+            started_at=start,
+            expires_at=expiry,
+            payment_provider=provider,
+            external_id=admin.id if admin else "",
+        ))
+
+
+def revoke_pro_entitlement(
+    db: Session,
+    teacher: User,
+    admin: User,
+    reason: str = "",
+) -> Optional[EntitlementDB]:
+    """Revoke ``teacher``'s individual PRO plan. Server-side only.
+
+    Never deletes the row: ``edition`` is dropped back to ``free`` and the row
+    is marked REVOKED with the acting admin and timestamp for the audit trail.
+    Idempotent. Does not commit.
+    """
+    now = datetime.utcnow()
+    ent = get_raw_entitlement(db, teacher.id)
+    if ent is not None:
+        ent.edition = "free"
+        ent.subscription_type = None
+        ent.status = PLAN_STATUS_REVOKED
+        ent.ai_enabled = False
+        ent.advanced_ai_enabled = False
+        ent.batch_generation = False
+        ent.zip_export = False
+        ent.ai_credits = FREE_TIER_AI_GENERATIONS
+        ent.generation_limit = FREE_TIER_LESSON_PLANS_PER_MONTH
+        ent.revoked_by = admin.id if admin else None
+        ent.revoked_at = now
+        ent.revoked_reason = reason or ""
+        ent.expires_at = None
+        ent.updated_at = now
+
+    sub = db.query(SubscriptionDB).filter(
+        SubscriptionDB.user_id == teacher.id,
+        SubscriptionDB.status == "active",
+    ).first()
+    if sub:
+        sub.status = "revoked"
+        sub.expires_at = now
+
+    teacher.subscription_type = None
+    return ent
+
+
+def extend_pro_entitlement(
+    db: Session,
+    teacher: User,
+    admin: User,
+    duration_days: int,
+) -> Optional[EntitlementDB]:
+    """Extend an active PRO plan by ``duration_days`` from its current expiry
+    (or from now when already elapsed). No-op when the teacher has no row."""
+    now = datetime.utcnow()
+    ent = get_raw_entitlement(db, teacher.id)
+    if ent is None:
+        return None
+    base = ent.expires_at if (ent.expires_at and ent.expires_at > now) else now
+    ent.expires_at = base + timedelta(days=duration_days)
+    ent.status = PLAN_STATUS_ACTIVE
+    ent.revoked_by = None
+    ent.revoked_at = None
+    ent.revoked_reason = ""
+    ent.updated_at = now
+    if admin:
+        ent.activated_by = admin.id
+        ent.activated_at = now
+    return ent
 
 
 def require_feature(feature: str):
