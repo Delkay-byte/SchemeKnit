@@ -1185,6 +1185,7 @@ class MaintenanceRequest(BaseModel):
 async def set_maintenance_mode(
     req: MaintenanceRequest,
     user: User = Depends(require_platform_admin),
+    db: Session = Depends(get_db),
 ):
     """Toggle maintenance mode. Changes take effect immediately."""
     from ..config import get_settings
@@ -1197,7 +1198,7 @@ async def set_maintenance_mode(
     if req.estimated_restore:
         settings.MAINTENANCE_ESTIMATED_RESTORE = req.estimated_restore
 
-    _audit_log(db, user, "maintenance_mode_toggled" if not req.enabled else "maintenance_mode_enabled",
+    _audit_log(db, user, "maintenance_mode_enabled" if req.enabled else "maintenance_mode_disabled",
                "platform", None, {
                    "enabled": req.enabled,
                    "message": req.message,
