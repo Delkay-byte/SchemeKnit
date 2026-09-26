@@ -475,11 +475,35 @@ class ApiService {
     return this.authToken ? { Authorization: `Bearer ${this.authToken}` } : {}
   }
 
+  /**
+   * Map an export HTTP failure to a truthful, user-facing message (PART 22).
+   * The backend detail wins when present (it names the real limitation, e.g.
+   * LibreOffice availability for PDF); the status refines the generic cases.
+   */
+  private exportErrorMessage(status: number, detail: string | null): string {
+    if (status === 401) {
+      return detail || 'Download failed — your session has expired. Please sign in again.'
+    }
+    if (status === 403) {
+      return detail || 'Download failed — this export is not available on your current plan.'
+    }
+    if (status === 503) {
+      return detail || 'PDF export is unavailable in this environment because LibreOffice is not installed.'
+    }
+    if (detail) return detail
+    if (status >= 500) {
+      return `Export failed — the server could not generate the document (server error ${status}).`
+    }
+    return `Export failed (${status})`
+  }
+
   private async exportBlob(url: string): Promise<ExportPayload> {
     const response = await fetch(url, { method: 'POST', headers: this.authHeaders() })
     if (!response.ok) {
-      const err = await response.json().catch(() => ({ detail: `Export failed (${response.status})` }))
-      throw new Error(err.detail || 'Export failed')
+      // PART 22: surface the ACTUAL cause — auth expiry, permissions, server
+      // export failure, environment limitation — never a bare "Failed to fetch".
+      const err = await response.json().catch(() => ({} as any))
+      throw new Error(this.exportErrorMessage(response.status, err?.detail ?? null))
     }
     const blob = await response.blob()
     // The server names the file. It sends the name in a custom header because a
