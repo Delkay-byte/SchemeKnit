@@ -85,7 +85,12 @@ class TestSectionIsolationRealB6:
         fre = _parse("French")
         w_s, w_f = _week(sci, 1), _week(fre, 1)
         assert set(w_s.resources).isdisjoint(set(w_f.resources))
-        assert "Grass, beans, mango, cassava and sweet potato" in w_s.resources
+        # Canonical resources: the cell is split into individual entries,
+        # with the multi-word phrase kept whole (PART 6/7).
+        assert "Grass" in w_s.resources
+        assert "mango" in w_s.resources
+        assert "beans" in w_s.resources
+        assert "cassava and sweet potato" in w_s.resources
 
     def test_strands_isolated_across_three_subjects(self):
         strands = {

@@ -123,7 +123,12 @@ def _text(value) -> str:
 
 
 def _text_items(value) -> List[str]:
-    """Stored JSON column (list | JSON string | text | None) -> list[str]."""
+    """Stored JSON column (list | JSON string | text | None) -> list[str].
+
+    CANONICAL (PART 6/9/11): delegates to the repository-wide normalizer so a
+    comma-joined/serialized/empty-dirty stored value becomes individual clean
+    items — and an empty value stays truly empty (never [\"\"] or [,]).
+    """
     import json
 
     if value is None or value == "":
@@ -136,14 +141,23 @@ def _text_items(value) -> List[str]:
             try:
                 value = json.loads(text)
             except Exception:
-                return [line.strip() for line in text.splitlines() if line.strip()]
+                # Not parseable as JSON — fall through to the canonical
+                # normalizer, which unwraps brackets and splits safely.
+                pass
         else:
-            return [line.strip() for line in text.splitlines() if line.strip()]
+            # Plain multi-line text keeps its line structure first; the
+            # normalizer then cleans any residual serialization damage.
+            lines = [line.strip() for line in text.splitlines() if line.strip()]
+            from ..ai_resource_text import normalize_text_items
+            out: List[str] = []
+            for line in lines:
+                out.extend(normalize_text_items(line))
+            return out
     if isinstance(value, dict):
         value = [value]
     if not isinstance(value, (list, tuple, set)):
-        return [str(value)]
-    out: List[str] = []
+        return _text_items(str(value))
+    out = []
     for item in value:
         if item is None:
             continue
@@ -154,7 +168,8 @@ def _text_items(value) -> List[str]:
             out.append(str(desc).strip())
         else:
             out.append(str(getattr(item, "description", item)).strip())
-    return [x for x in out if x]
+    from ..ai_resource_text import normalize_text_items
+    return normalize_text_items([x for x in out if x])
 
 
 def _bullet_block(lines: List[str]) -> str:

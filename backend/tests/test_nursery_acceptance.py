@@ -312,11 +312,14 @@ class TestFStrandSubstrandPreservation:
 
 class TestGResourcePreservation:
     def test_source_resources_survive_verbatim(self):
+        """Source resources survive as CANONICAL individual entries: the
+        parser normalizes one comma-joined cell into structured resources
+        (real-use remediation PART 6/7), so the joined form never returns."""
         scheme = _parse("Numeracy")
         w2 = next(w for w in scheme.weeks if w.week_number == 2)
         assert "Cut out shapes" in w2.resources
         w5 = next(w for w in scheme.weeks if w.week_number == 5)
-        assert "Counters, sticks, flash cards" in w5.resources
+        assert set(w5.resources) == {"Counters", "sticks", "flash cards"}
         w10 = next(w for w in scheme.weeks if w.week_number == 10)
         assert "Colours" in w10.resources
 

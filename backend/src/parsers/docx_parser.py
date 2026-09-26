@@ -30,6 +30,7 @@ from .subject_keywords import (
     SUBJECT_KEYWORDS, MAX_HEADING_LENGTH, canonical_subject_from_heading,
     detect_document_title,
 )
+from ..ai_resource_text import normalize_text_items
 
 
 #: Controlled aliases for equivalent curriculum concepts (PART G). Matching is
@@ -1105,7 +1106,13 @@ class DOCXParser:
 
             res = row.get("resources", "")
             if res and res.lower() not in ("", "resources", "resource"):
-                all_resources.add(res)
+                # CANONICAL RESOURCES (PART 6/7): one cell may hold several
+                # resources ("Charts, Pictures, counters"). Normalize into
+                # individual items here at the source so every downstream
+                # consumer (allocation, lessons, review UI, exports) receives
+                # structured entries — never one serialized string.
+                for item in normalize_text_items(res):
+                    all_resources.add(item)
 
         return ParsedWeek(
             week_number=week_num,
