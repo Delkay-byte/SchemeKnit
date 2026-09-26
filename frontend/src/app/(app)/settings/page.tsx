@@ -12,7 +12,7 @@ import { PageHeader } from '@/components/ui/page-header'
 import { Save, Plus, Trash2, User } from 'lucide-react'
 import { api } from '@/lib/api'
 import { ChangePasswordCard } from '@/components/change-password'
-import { Holiday } from '@/types'
+import { Holiday, PlanResolution } from '@/types'
 
 export default function SettingsPage() {
   const [holidays, setHolidays] = useState<Holiday[]>([])
@@ -28,6 +28,8 @@ export default function SettingsPage() {
   const [profileName, setProfileName] = useState('')
   const [savingProfile, setSavingProfile] = useState(false)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
+  // Server-authoritative plan + usage. Never derived from client storage.
+  const [plan, setPlan] = useState<PlanResolution | null>(null)
 
   useEffect(() => {
     loadSettings()
@@ -36,17 +38,19 @@ export default function SettingsPage() {
   const loadSettings = async () => {
     try {
       setLoading(true)
-      const [holidaysData, subjectsData, classLevelsData, profileData, groupsData] = await Promise.all([
+      const [holidaysData, subjectsData, classLevelsData, profileData, groupsData, planData] = await Promise.all([
         api.listHolidays(),
         api.listSubjects(),
         api.listClassLevels(),
         api.getProfile().catch(() => null),
         api.listSubjectsByLevel().catch(() => ({ levels: [] })),
+        api.getMyPlan().catch(() => null),
       ])
       setHolidays(holidaysData.holidays || [])
       setSubjects(subjectsData.subjects || [])
       setSubjectGroups(groupsData.levels || [])
       setClassLevels(classLevelsData.class_levels || [])
+      setPlan(planData)
       if (profileData) {
         setProfile(profileData)
         setProfileName(profileData.full_name || '')
@@ -133,6 +137,75 @@ export default function SettingsPage() {
 
           {error && <Banner tone="danger">{error}</Banner>}
           {success && <Banner tone="success">{success}</Banner>}
+
+          {/* ── Plan & Usage (server-authoritative) ──────────────────── */}
+          <section aria-labelledby="settings-plan" className="space-y-4">
+            <h2 id="settings-plan" className={sectionHeading}>Plan &amp; Usage</h2>
+
+            <SurfaceCard data-settings-plan accent="bg-gradient-to-r from-[#102A43] to-[#04A9CE]" className="px-5 py-5 sm:px-6">
+              {plan ? (
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-sm text-muted-foreground">Plan</span>
+                    <span
+                      data-plan-label
+                      className="rounded-full bg-[#04A9CE]/10 px-3 py-1 text-sm font-semibold text-[#04769B]"
+                    >
+                      {plan.plan || (plan.edition === 'free' ? 'FREE' : 'PRO')}
+                    </span>
+                    {(plan.plan || 'FREE') === 'PRO' && (
+                      <span data-plan-status className="text-sm text-muted-foreground">
+                        Status: {plan.status === 'revoked' ? 'Revoked' : plan.status === 'expired' ? 'Expired' : 'Active'}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div data-quota-lessons className="rounded-lg bg-muted p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Lesson plan generations
+                      </p>
+                      <p className="mt-1 text-sm">
+                        {plan.lesson_quota_unlimited
+                          ? 'Unlimited this month'
+                          : `${plan.generations_used ?? 0} / ${plan.lesson_quota_limit ?? plan.generation_limit ?? 0} this month`}
+                      </p>
+                    </div>
+                    <div data-quota-ai className="rounded-lg bg-muted p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        AI generations
+                      </p>
+                      <p className="mt-1 text-sm">
+                        {plan.ai_quota_unlimited
+                          ? 'Unlimited this month'
+                          : `${plan.ai_quota_used ?? 0} / ${plan.ai_quota_limit ?? plan.ai_credits ?? 0} this month`}
+                      </p>
+                    </div>
+                  </div>
+
+                  {plan.expires_at && (
+                    <p data-plan-expiry className="text-sm text-muted-foreground">
+                      Renews / expires: {new Date(plan.expires_at).toLocaleDateString()}
+                    </p>
+                  )}
+
+                  {(plan.plan || 'FREE') === 'FREE' && (
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <p className="text-sm text-muted-foreground">
+                        Need more? Teacher Pro is activated by an administrator after
+                        payment is verified.
+                      </p>
+                      <Button asChild variant="outline" size="sm">
+                        <Link href="/upgrade">Upgrade to Teacher Pro</Link>
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Plan information unavailable.</p>
+              )}
+            </SurfaceCard>
+          </section>
 
           {/* ── Account ─────────────────────────────────────────────── */}
           <section aria-labelledby="settings-account" className="space-y-6">

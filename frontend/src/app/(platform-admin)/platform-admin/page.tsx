@@ -27,7 +27,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatCurrency, formatActivationDate } from '@/lib/utils-display'
 import { ChangePasswordCard } from '@/components/change-password'
 
-type Tab = 'dashboard' | 'schools' | 'licenses' | 'plans' | 'payments' | 'activations' | 'audit' | 'accounts' | 'settings'
+type Tab = 'dashboard' | 'schools' | 'licenses' | 'plans' | 'teachers' | 'payments' | 'activations' | 'audit' | 'accounts' | 'settings'
 
 /**
  * Smart account filter: case-insensitive, whitespace-tolerant, multi-token.
@@ -80,6 +80,13 @@ export default function PlatformAdminPage() {
 
   // Accounts data (platform-wide user list for password reset)
   const [accounts, setAccounts] = useState<any[]>([])
+
+  // Individual-teacher entitlements (Free -> PRO admin workflow)
+  const [teachers, setTeachers] = useState<any[]>([])
+  const [teacherQuery, setTeacherQuery] = useState('')
+  const [teacherPlanId, setTeacherPlanId] = useState('')
+  const [teacherDays, setTeacherDays] = useState(30)
+  const [teacherBusyId, setTeacherBusyId] = useState<string | null>(null)
 
   // Password-reset token result modal
   const [pwResetResult, setPwResetResult] = useState<{
@@ -197,6 +204,17 @@ export default function PlatformAdminPage() {
           const usr = await api.listUsers()
           setAccounts(usr.users || [])
           break
+        case 'teachers': {
+          const [tch, pls] = await Promise.all([
+            api.listIndividualTeachers().catch(() => ({ teachers: [], count: 0 })),
+            api.listPlatformPlans().catch(() => ({ plans: [] })),
+          ])
+          setTeachers(tch.teachers || [])
+          setPlans(pls.plans || [])
+          const individual = (pls.plans || []).filter((p: any) => p.customer_type === 'individual_teacher')
+          setTeacherPlanId((prev) => prev || (individual[0]?.id || (pls.plans || [])[0]?.id || ''))
+          break
+        }
         case 'settings':
           break
       }
@@ -343,6 +361,50 @@ export default function PlatformAdminPage() {
     }
   }
 
+  // ── Individual teacher plan (Free → PRO admin workflow) ────────────────
+  const handleActivateTeacher = async (teacherId: string) => {
+    if (!teacherPlanId) {
+      setError('Select a plan to activate first')
+      return
+    }
+    try {
+      setTeacherBusyId(teacherId)
+      setError(null)
+      await api.activateIndividualTeacher(teacherId, teacherPlanId, teacherDays)
+      await loadTabData('teachers')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to activate PRO')
+    } finally {
+      setTeacherBusyId(null)
+    }
+  }
+
+  const handleRevokeTeacher = async (teacherId: string) => {
+    try {
+      setTeacherBusyId(teacherId)
+      setError(null)
+      await api.revokeIndividualTeacher(teacherId, 'Revoked by platform admin')
+      await loadTabData('teachers')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to revoke PRO')
+    } finally {
+      setTeacherBusyId(null)
+    }
+  }
+
+  const handleExtendTeacher = async (teacherId: string) => {
+    try {
+      setTeacherBusyId(teacherId)
+      setError(null)
+      await api.extendIndividualTeacher(teacherId, teacherDays)
+      await loadTabData('teachers')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to extend PRO')
+    } finally {
+      setTeacherBusyId(null)
+    }
+  }
+
   const copyToken = async () => {
     if (!pwResetResult) return
     try {
@@ -408,7 +470,7 @@ export default function PlatformAdminPage() {
             aria-label="Console sections"
             className="h-auto max-w-full flex-wrap justify-start gap-1 bg-transparent p-0"
           >
-            {(['dashboard', 'schools', 'licenses', 'plans', 'payments', 'activations', 'audit', 'accounts', 'settings'] as Tab[]).map((tab) => (
+            {(['dashboard', 'schools', 'licenses', 'plans', 'teachers', 'payments', 'activations', 'audit', 'accounts', 'settings'] as Tab[]).map((tab) => (
               <TabsTrigger
                 key={tab}
                 value={tab}
@@ -986,6 +1048,149 @@ export default function PlatformAdminPage() {
                 </SurfaceCard>
                 )}
                 </>
+                )}
+              </div>
+            )}
+
+            {/* Teachers Tab — individual FREE → PRO entitlements */}
+            {activeTab === 'teachers' && (
+              <div className="space-y-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-[#102A43]">
+                    Individual Teachers ({teachers.length})
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    The manual commercial workflow: a teacher pays, you verify it
+                    externally, then activate Teacher Pro here. Activation is
+                    server-side and audited — teachers cannot self-activate.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-end gap-3">
+                  <Field label="Plan to activate" htmlFor="teacher-plan">
+                    <Select
+                      id="teacher-plan"
+                      data-teacher-plan
+                      value={teacherPlanId}
+                      onChange={(e) => setTeacherPlanId(e.target.value)}
+                    >
+                      <option value="">Select a plan…</option>
+                      {plans.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <Field label="Duration (days)" htmlFor="teacher-days">
+                    <Input
+                      id="teacher-days"
+                      data-teacher-days
+                      type="number"
+                      min={1}
+                      value={teacherDays}
+                      onChange={(e) => setTeacherDays(Number(e.target.value) || 30)}
+                      className="w-32"
+                    />
+                  </Field>
+                  <div className="relative w-full max-w-sm pb-0.5">
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      data-teacher-search
+                      type="search"
+                      aria-label="Search teachers"
+                      placeholder="Search by name or email…"
+                      value={teacherQuery}
+                      onChange={(e) => setTeacherQuery(e.target.value)}
+                      className="pl-8"
+                    />
+                  </div>
+                </div>
+
+                {teachers.length === 0 ? (
+                  <SurfaceCard className="px-6 py-10 text-center">
+                    <p className="font-medium text-[#102A43]">No individual teachers yet</p>
+                  </SurfaceCard>
+                ) : (
+                  <SurfaceCard className="overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50 hover:bg-muted/50">
+                          <TableHead>Teacher</TableHead>
+                          <TableHead>Plan</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Expiry</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filterAccounts(teachers, teacherQuery).map((t) => {
+                          const isPro = t.plan === 'PRO' && t.status !== 'revoked' && t.status !== 'expired'
+                          return (
+                            <TableRow key={t.id} data-teacher-row={t.email}>
+                              <TableCell>
+                                <span className="font-medium text-[#102A43]">{t.full_name}</span>
+                                <span className="ml-2 text-muted-foreground">&lt;{t.email}&gt;</span>
+                                {t.activated_by && (
+                                  <p className="mt-0.5 text-xs text-muted-foreground">
+                                    Activated by admin {String(t.activated_by).slice(0, 8)}…
+                                  </p>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <StatusPill tone={isPro ? 'accent' : 'neutral'}>
+                                  {isPro ? 'PRO' : 'FREE'}
+                                </StatusPill>
+                              </TableCell>
+                              <TableCell className="capitalize">{t.status || 'active'}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {t.expires_at ? new Date(t.expires_at).toLocaleDateString() : '—'}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex justify-end gap-2">
+                                  {isPro ? (
+                                    <>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        data-teacher-extend
+                                        disabled={teacherBusyId === t.id}
+                                        onClick={() => handleExtendTeacher(t.id)}
+                                      >
+                                        Extend +{teacherDays}d
+                                      </Button>
+                                      <Button
+                                        variant="destructive"
+                                        size="sm"
+                                        data-teacher-revoke
+                                        disabled={teacherBusyId === t.id}
+                                        onClick={() => setPendingConfirm({
+                                          title: 'Revoke Teacher Pro',
+                                          message: `Revoke Teacher Pro for ${t.full_name} (${t.email})?\n\nThey will return to the Free plan immediately.`,
+                                          confirmLabel: 'Revoke',
+                                          destructive: true,
+                                          onConfirm: () => handleRevokeTeacher(t.id),
+                                        })}
+                                      >
+                                        Revoke
+                                      </Button>
+                                    </>
+                                  ) : (
+                                    <Button
+                                      size="sm"
+                                      data-teacher-activate
+                                      disabled={teacherBusyId === t.id || !teacherPlanId}
+                                      onClick={() => handleActivateTeacher(t.id)}
+                                    >
+                                      {teacherBusyId === t.id ? 'Working…' : 'Activate PRO'}
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })}
+                      </TableBody>
+                    </Table>
+                  </SurfaceCard>
                 )}
               </div>
             )}

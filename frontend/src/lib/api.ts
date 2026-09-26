@@ -150,6 +150,20 @@ class ApiService {
     })
   }
 
+  async revokeIndividualTeacher(teacherId: string, reason = ''): Promise<any> {
+    return this.request(`/api/platform-admin/individual-teachers/${teacherId}/revoke`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    })
+  }
+
+  async extendIndividualTeacher(teacherId: string, durationDays: number): Promise<any> {
+    return this.request(`/api/platform-admin/individual-teachers/${teacherId}/extend`, {
+      method: 'POST',
+      body: JSON.stringify({ duration_days: durationDays }),
+    })
+  }
+
   async activateIndividualLicense(activationCode: string): Promise<any> {
     return this.request('/api/auth/activate-individual', {
       method: 'POST',
@@ -492,18 +506,28 @@ class ApiService {
    * LibreOffice availability for PDF); the status refines the generic cases.
    */
   private exportErrorMessage(status: number, detail: string | null): string {
+    // PART D: truthful, useful, non-technical messages. The backend's own
+    // detail wins when present because it names the real limitation; these
+    // branches cover the classes the backend cannot phrase for the teacher.
     if (status === 401) {
-      return detail || 'Download failed — your session has expired. Please sign in again.'
+      return detail || 'Your session has expired. Please sign in again and retry the download.'
     }
     if (status === 403) {
-      return detail || 'Download failed — this export is not available on your current plan.'
+      return detail || 'You do not have permission to download this plan.'
+    }
+    if (status === 404) {
+      // The one-time link expired/was already used, or the file is gone.
+      return detail || 'This download link is no longer valid. Please start the download again.'
+    }
+    if (status === 429) {
+      return detail || 'Too many download requests. Please wait a moment and try again.'
     }
     if (status === 503) {
-      return detail || 'PDF export is unavailable in this environment because LibreOffice is not installed.'
+      return detail || 'Export failed — the download service is temporarily unavailable. Please try again shortly.'
     }
     if (detail) return detail
     if (status >= 500) {
-      return `Export failed — the server could not generate the document (server error ${status}).`
+      return 'Export failed — the download service is temporarily unavailable. Please try again shortly.'
     }
     return `Export failed (${status})`
   }
@@ -513,9 +537,11 @@ class ApiService {
     try {
       response = await fetch(url, { method: 'POST', headers: this.authHeaders() })
     } catch (err) {
-      // PART T: distinguish a genuine network failure from an HTTP error so the
-      // teacher never sees a bare "Failed to fetch".
-      throw new Error("We couldn't reach the server. Check your connection and try again.")
+      // PART D: distinguish a genuine network failure from an HTTP error so the
+      // teacher never sees a bare "Failed to fetch". The real cause is logged
+      // for diagnostics and never rendered.
+      if (typeof console !== 'undefined') console.error('[download] network failure', url, err)
+      throw new Error('We could not complete the download. Please check your connection and try again.')
     }
     if (!response.ok) {
       // PART 22: surface the ACTUAL cause — auth expiry, permissions, server
@@ -578,7 +604,8 @@ class ApiService {
       // content) surfaces as TypeError("Failed to fetch"). Translate it to a
       // truthful message instead of letting the raw text reach the teacher.
       if (err instanceof TypeError) {
-        throw new Error("We couldn't reach the server. Check your connection and try again.")
+        if (typeof console !== 'undefined') console.error('[download-url] network failure', err)
+        throw new Error('We could not complete the download. Please check your connection and try again.')
       }
       throw err
     }
