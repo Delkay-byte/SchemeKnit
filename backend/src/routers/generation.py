@@ -164,6 +164,11 @@ async def preview_allocation(
             "week_ending_derived": bool(a.week_ending_derived),
             "teaching_week": a.teaching_week or a.week_number,
             "source_tlrs": list(a.source_resources or []),
+            # Special-period rows (PART R): the review UI shows the period
+            # banner and NO editable lesson fields for these.
+            "is_special_period": bool(getattr(a, "is_special_period", False)),
+            "special_period_label": getattr(a, "special_period_label", ""),
+            "special_period_type": getattr(a, "special_period_type", ""),
             "keywords": list((drafts.get(str(a.lesson_sequence)) or {}).get("keywords") or []),
             "other_tlrs": list((drafts.get(str(a.lesson_sequence)) or {}).get("other_tlrs") or []),
             "core_competencies": list((drafts.get(str(a.lesson_sequence)) or {}).get("core_competencies") or []),
@@ -174,7 +179,13 @@ async def preview_allocation(
             "wapef_gods_story": (drafts.get(str(a.lesson_sequence)) or {}).get("wapef_gods_story", ""),
             "remarks": (drafts.get(str(a.lesson_sequence)) or {}).get("remarks", ""),
         }
-        for a in sorted(coverage.allocations, key=lambda x: x.lesson_sequence)
+        # Special-period rows stay in the list so the review UI can show the
+        # period banner; normal lessons keep their curriculum order.
+        for a in sorted(
+            coverage.allocations,
+            key=lambda x: (0 if getattr(x, "is_special_period", False) else 1,
+                           x.lesson_sequence),
+        )
     ]
     return report
 
@@ -482,7 +493,7 @@ async def generate_lesson_plans(
         # Report the ACTUAL AI mode/provider that was used for this job, so the
         # UI can never claim "AI" while the backend generated deterministically.
         from ..engines.ai_provider import (
-            resolve_provider_mode, get_provider, provider_status,
+            resolve_provider_mode, get_provider, provider_status, NAMED_PROVIDERS,
         )
         ai_lessons = int(getattr(job, "ai_enrichment_succeeded", 0) or 0)
         ai_info = {
@@ -499,6 +510,7 @@ async def generate_lesson_plans(
             if resolved != "OFF":
                 prov = get_provider(resolved)
                 ai_info["provider"] = prov.get_name() if prov else None
+                ai_info["provider_key"] = resolved if resolved in NAMED_PROVIDERS else None
                 ai_info["state"] = provider_status(prov)
                 ai_info["active"] = bool(prov and prov.is_available())
             if not ai_info["active"]:
@@ -1261,6 +1273,10 @@ def _apply_lesson_review_draft(lp, drafts: dict) -> None:
             ReferenceEntry(**r) if isinstance(r, dict) else r
             for r in (draft.get("structured_references") or [])
         ]
+        # PART L/M: only NON-EMPTY references persist. The UI shows 3 empty
+        # slots by default; untouched/blank slots must never be stored as
+        # empty objects on the lesson.
+        refs = [r for r in refs if (getattr(r, "title", "") or "").strip()]
         lp.structured_references = refs
         labels = []
         for entry in refs:
@@ -1291,6 +1307,10 @@ def _serialize_lesson(lp) -> dict:
         "lesson_date": lp.lesson_date.isoformat() if lp.lesson_date else None,
         "lesson_number": lp.lesson_number,
         "period": getattr(lp, "period", "") or "",
+        # Special-period metadata (PART R): the review page uses this to render
+        # the period banner instead of fake curriculum fields.
+        "special_period_label": getattr(lp, "special_period_label", "") or "",
+        "special_period_type": getattr(lp, "special_period_type", "") or "",
         "class_level": lp.class_level,
         "subject": lp.subject,
         "class_size": lp.class_size,

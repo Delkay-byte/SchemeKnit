@@ -370,6 +370,17 @@ class GenerationPipeline:
         sorted_plans = sorted(lesson_plans, key=lambda lp: lp.lesson_sequence)
 
         for idx, lp in enumerate(sorted_plans):
+            # ── Special periods are never AI-generated (PART Q/R) ─────────
+            # A special-period allocation carries no instructional content and
+            # no fake curriculum fields, so there is nothing for a provider to
+            # enrich: sending "MID-TERM" placeholders to Gemini would ask it
+            # to invent a lesson that does not exist.
+            if bool(getattr(lp, "special_period_label", "") or ""):
+                logger.info(
+                    "Skipping AI enrichment for special-period lesson %s (%s)",
+                    lp.id, lp.special_period_label,
+                )
+                continue
             job.ai_enrichment_total_attempted += 1
             try:
                 # Determine previous and next lesson context
@@ -526,11 +537,10 @@ class GenerationPipeline:
                 if k and k.lower() not in {x.lower() for x in teacher_keywords}:
                     teacher_keywords.append(k)
         lesson_source_tlrs = list(getattr(lp, "source_tlrs", None) or [])
+        # OTHER TLRs are TEACHER-ADDED ONLY (PART I): the batch config seed is
+        # never copied into per-lesson other_tlrs — that would fabricate data
+        # the teacher never entered for this lesson. Empty stays empty.
         lesson_other_tlrs = list(getattr(lp, "other_tlrs", None) or [])
-        if config:
-            for r in (getattr(config, "teaching_learning_resources", []) or []):
-                if r and r.lower() not in {x.lower() for x in lesson_other_tlrs}:
-                    lesson_other_tlrs.append(r)
         lesson_competencies = list(lp.core_competencies or [])
         if config:
             for c in (getattr(config, "core_competencies", []) or []):
