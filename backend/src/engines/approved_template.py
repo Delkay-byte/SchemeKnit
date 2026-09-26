@@ -54,7 +54,10 @@ from .official_ges_template import (
 from .template_analyzer import analyze_docx_document
 
 TEMPLATE_ID = "tpl-approved-org-headteacher"
-TEMPLATE_NAME = "Approved Organizational Lesson Plan (Headteacher Source)"
+#: Retired display name (PART B/C): the legacy "Headteacher Source" wording is
+#: gone. This id is an internal alias of the Approved GES Plan (JHS form) and
+#: is no longer selectable; the name below is only used in diagnostics.
+TEMPLATE_NAME = "Approved Organizational Lesson Plan (retired alias)"
 TEMPLATE_VERSION = "1.0"
 
 #: The approved source document, bundled verbatim. Repo-relative path used by

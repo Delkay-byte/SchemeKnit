@@ -454,9 +454,9 @@ _OFFICIAL_GES_DESCRIPTIONS = {
     LEVEL_PRIMARY: "GES-style Lower Primary form (Basic 1-3): foundational skills, "
                    "teacher modelling and a Starter / Main / Plenary grid. PENDING "
                    "SOURCE VERIFICATION.",
-    LEVEL_JHS: "Approved Organizational Lesson Plan (verified headteacher source): "
-               "administrative metadata, curriculum syllabus alignment codes, "
-               "pedagogical foundations and the tridelivery lesson timeline.",
+    LEVEL_JHS: "Approved GES Plan (verified approved source): administrative "
+               "metadata, curriculum syllabus alignment codes, pedagogical "
+               "foundations and the tridelivery lesson timeline.",
     LEVEL_SHS: "GES-style Senior High School form: programme and prior knowledge "
                "fields with the CCP academic delivery grid. PENDING SOURCE "
                "VERIFICATION.",
@@ -519,7 +519,7 @@ def _official_ges_template(spec: GESLevelSpec) -> Template:
     provenance = provenance_for_template(spec.template_id)
     return Template(
         id=spec.template_id,
-        name=spec.name,
+        name=_official_ges_display_name(spec, provenance),
         family=family,
         educational_level=level,
         description=_OFFICIAL_GES_DESCRIPTIONS[spec.key],
@@ -531,6 +531,20 @@ def _official_ges_template(spec: GESLevelSpec) -> Template:
         author=("Approved organizational source via SchemeKnit" if provenance.official
                 else "Teacher supply (pending source verification)"),
     )
+
+
+def _official_ges_display_name(spec: GESLevelSpec, provenance) -> str:
+    """Teacher-facing display name for an official GES form (PART B).
+
+    Every GES-family template name explicitly contains "GES". The verified
+    JHS form is the canonical ``Approved GES Plan``; the other levels carry
+    their level so a teacher can tell the forms apart at a glance. Internal
+    template IDs are unchanged.
+    """
+    name = spec.name
+    if "GES" not in name:
+        name = f"Approved GES {spec.key.upper()} Plan"
+    return name
 
 
 DEFAULT_TEMPLATES: List[Template] = [
@@ -647,32 +661,51 @@ DEFAULT_TEMPLATES: List[Template] = [
         version=WAPEF_BASIC13_TEMPLATE_VERSION,
         author="Approved WAPEF source via SchemeKnit",
     ),
-    Template(
+]
+
+#: RETIRED from the active catalog (PART C): the legacy "Headteacher Source"
+#: alias of the verified JHS form. It is deliberately NOT part of
+#: ``DEFAULT_TEMPLATES`` any more, so it never appears in the teacher-facing
+#: template selector and no new lesson can be generated with it. Its internal
+#: id remains fully routable for HISTORY: ``get_template_by_id`` and
+#: ``spec_for_template_id`` still resolve it (same approved JHS source document
+#: via ``official_ges_levels``), and historical exports naming it keep working.
+RETIRED_TEMPLATE_IDS = ("tpl-approved-org-headteacher",)
+
+
+def _retired_headteacher_template() -> "Template":
+    """Registry entry for the retired alias (never listed for selection)."""
+    return Template(
         id="tpl-approved-org-headteacher",
-        name="Approved Organizational Lesson Plan (Headteacher Source)",
+        name="Approved Organizational Lesson Plan (retired alias)",
         family=TemplateFamily.JHS,
         educational_level=EducationalLevel.JHS,
-        description="Approved organizational weekly lesson plan supplied by the "
-                    "headteacher: administrative metadata, curriculum syllabus "
-                    "alignment, pedagogical foundations and the tridelivery "
-                    "timeline. Rendered from the verified approved source document "
-                    "itself, so the output matches its table topology exactly "
-                    "(see template_provenance.py).",
-        features=["Approved organizational source", "Tridelivery lesson timeline",
-                  "Curriculum alignment codes", "Verified against source"],
+        description=(
+            "Retired legacy alias of the Approved GES Plan (JHS). No longer "
+            "selectable; kept routable so historical lessons and exports that "
+            "reference it still render the same approved source document."
+        ),
+        features=["Retired template", "Historical routing only"],
         sections=_make_approved_sections(),
         is_default=False,
         is_official=True,
         version="1.0",
         author="Approved organizational source via SchemeKnit",
-    ),
-]
+    )
 
 
 def get_template_by_id(template_id: str) -> Optional[Template]:
+    """Registry lookup INCLUDING retired templates (historical routing).
+
+    Active selection lists use ``DEFAULT_TEMPLATES`` (retired ids absent);
+    exports and provenance for historical lessons still resolve the retired
+    headteacher alias to its verified source renderer.
+    """
     for t in DEFAULT_TEMPLATES:
         if t.id == template_id:
             return t
+    if template_id in RETIRED_TEMPLATE_IDS:
+        return _retired_headteacher_template()
     return None
 
 

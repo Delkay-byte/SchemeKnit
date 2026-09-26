@@ -113,9 +113,10 @@ PROVENANCE_REGISTRY: Dict[str, TemplateProvenance] = {
         verification_status=VERIFICATION_VERIFIED,
         official=True,
         source_document="backend/src/engines/assets/ges_jhs_lesson_plan_template.docx",
-        evidence=("Alias of the verified approved JHS source document: the same file is "
-                  "rendered in place, so no second hand-written layout exists that can "
-                  "drift from the golden master."),
+        evidence=("RETIRED alias of the verified approved JHS source document (PART C): "
+                  "no longer selectable for new lessons; kept routable so historical "
+                  "exports render the same verified file in place — no second "
+                  "hand-written layout exists that can drift from the golden master."),
         levels=("Basic 7", "Basic 8", "Basic 9"),
     ),
     "tpl-wapef-approved-plan": TemplateProvenance(
