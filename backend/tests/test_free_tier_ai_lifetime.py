@@ -1,9 +1,10 @@
 """
-Free Tier lifetime AI generation quota tests (§15, §16).
+Free Tier AI generation quota tests (§15, §16; real-use remediation PART 16-19).
 
-    The Free Tier receives 5 SUCCESSFUL AI generations for the LIFETIME of the
-    account. There is NO daily, weekly or monthly reset. Only a successfully
-    completed generation consumes an allowance.
+    The Free Tier receives 5 SUCCESSFUL AI generations per CALENDAR MONTH
+    (YYYY-MM server-clock bucket). A new month starts a fresh allowance
+    automatically — no manual reset. Only a successfully completed generation
+    consumes an allowance; failures and deterministic fallbacks consume none.
 """
 
 from datetime import date, datetime, timedelta
@@ -88,7 +89,10 @@ class TestFreeTierLifetimeAllowance:
             consume_ai_generation(user, db)
         with pytest.raises(HTTPException) as exc:
             require_ai_entitlement(user, db)
-        assert "You've used all 5 free AI generations included with the Free Tier." in exc.value.detail
+        # MONTHLY wording (PART 18): the allowance resets next month — the
+        # old "lifetime, does not reset" text is gone.
+        assert "You've used all 5 free AI generations for this month." in exc.value.detail
+        assert "lifetime" not in exc.value.detail.lower()
 
     def test_consumption_is_clamped(self, db):
         user, _ = _make_free_user(db)
@@ -99,12 +103,14 @@ class TestFreeTierLifetimeAllowance:
         assert consume_ai_generation(user, db) == 0
 
     def test_no_reset_across_time(self, db):
-        """The allowance never refills — no day/week/month reset."""
+        """Within the SAME calendar month the allowance never refills.
+        (A new month reads a fresh ledger row — covered by the monthly-
+        reset tests in the quota suite.)"""
         user, ent = _make_free_user(db)
         for _ in range(5):
             consume_ai_generation(user, db)
-        # Simulate the passage of time: nothing in the codebase resets usage.
-        ent.created_at = datetime.utcnow() - timedelta(days=90)
+        # Simulate the passage of days inside the month: nothing resets.
+        ent.created_at = datetime.utcnow() - timedelta(days=15)
         db.commit()
         db.expire_all()
         entitled, reason = ai_entitlement(user, db)
@@ -119,15 +125,16 @@ class TestIdempotentConsumption:
         second = consume_ai_generation(user, db, request_id="req-1")
         assert first == 4
         assert second == 4  # unchanged — same successful request
-        db.refresh(ent)
-        assert ent.ai_credits_used == 1
+        # MONTHLY ledger (PART 16): usage lives in ai_generation_periods.
+        from src.ai_quota import get_ai_units_used
+        assert get_ai_units_used(db, user.id) == 1
 
     def test_distinct_requests_consume_separately(self, db):
         user, ent = _make_free_user(db)
         consume_ai_generation(user, db, request_id="req-1")
         consume_ai_generation(user, db, request_id="req-2")
-        db.refresh(ent)
-        assert ent.ai_credits_used == 2
+        from src.ai_quota import get_ai_units_used
+        assert get_ai_units_used(db, user.id) == 2
 
 
 class TestEntitlementsNotAffected:

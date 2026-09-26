@@ -485,8 +485,8 @@ class AIUsageEventDB(Base):
     """Idempotency ledger for successful AI generations.
 
     Records that one successful AI generation request consumed an allowance.
-    It is NOT a second quota system — the quota itself lives on
-    EntitlementDB.ai_credits / ai_credits_used. This table only guarantees a
+    It is NOT a second quota system — the monthly quota itself lives in
+    ``ai_generation_periods`` (ai_quota.py). This table only guarantees a
     duplicate submission for the same request cannot double-consume
     (``request_id`` is supplied by the client per user action).
     """
@@ -504,6 +504,31 @@ class AIUsageEventDB(Base):
 
 
 # ── Usage Quota (calendar-period lesson-plan allowance) ───────────────────────
+
+class AIGenerationPeriodDB(Base):
+    """Aggregate AI generation usage for one user in one calendar month.
+
+    The Free Tier AI allowance is MONTHLY (real-use remediation PART 16):
+    keyed by (user_id, "ai_calendar_month", "YYYY-MM") from the SERVER clock,
+    so a new month reads a different row and usage resets to 0/N automatically.
+    A failed AI call never writes a row (PART 19) — only a successful
+    AI-assisted generation increments ``units_used`` via ai_quota.py.
+    """
+    __tablename__ = "ai_generation_periods"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    period_type = Column(String, nullable=False)   # "ai_calendar_month"
+    period_key = Column(String, nullable=False)    # e.g. "2026-09"
+    units_used = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "period_type", "period_key",
+                         name="uq_ai_generation_period"),
+    )
+
 
 class UsagePeriodDB(Base):
     """Aggregate lesson-plan usage for one user in one calendar period.
