@@ -495,7 +495,10 @@ def _lesson_field_value(lp, field: Optional[str]) -> str:
         except Exception:
             return str(raw)
     if isinstance(raw, str):
-        return raw
+        # CANONICAL TEXT (PART 5/11): a legacy serialized list must never be
+        # printed as literal display text.
+        from ..ai_resource_text import clean_serialized_text
+        return clean_serialized_text(raw)
     if isinstance(raw, (list, tuple)):
         parts = []
         for item in raw:

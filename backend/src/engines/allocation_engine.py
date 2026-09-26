@@ -30,6 +30,7 @@ from ..models import (
     AllocatedIndicator, CurriculumCoverage, LessonPlan,
     LessonStatus, Subject, ClassLevel
 )
+from ..ai_resource_text import normalize_text_items
 
 
 def is_special_period_text(text) -> bool:
@@ -227,7 +228,8 @@ class AllocationEngine:
                 week_number=item["source_week"],
                 week_ending=item["week_ending"],
                 week_ending_derived=bool(item.get("week_ending_derived", False)),
-                source_resources=list(item.get("source_resources") or []),
+                source_resources=normalize_text_items(
+                    list(item.get("source_resources") or [])),
                 lesson_date=lesson_date,
                 period_index=period_index,
                 allocated=True,
@@ -477,7 +479,12 @@ class AllocationEngine:
                 week_ending=week.end_date,
                 week_ending_derived=bool(
                     getattr(week, "week_ending_derived", False)),
-                source_resources=list(week.resources or []),
+                # CANONICAL RESOURCES (PART 6): week.resources may arrive as
+                # one comma-joined string (legacy rows persisted before the
+                # parser normalized). Split into individual entries here so
+                # every allocated lesson carries structured TLRs.
+                source_resources=normalize_text_items(
+                    list(week.resources or [])),
                 lesson_date=lesson_date,
                 period_index=1,
                 allocated=True,

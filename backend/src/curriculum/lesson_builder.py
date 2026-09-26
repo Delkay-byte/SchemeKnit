@@ -44,6 +44,7 @@ from ..models import (
     ClassLevel, LearningObjective, TeachingActivity,
 )
 from .pedagogy import profile_for_subject, SubjectPedagogy
+from ..ai_resource_text import normalize_text_items
 
 _CODE_RE = re.compile(r"^\s*[BbKk]?\d+(?:\.\d+){2,4}[.:]?\s*")
 
@@ -873,8 +874,11 @@ def build_lesson(
     # ── Resources — THIS lesson's scheme TLRs first, then activity extras ──
     # SOURCE TLRs: from the scheme for this subject + source week + indicator.
     # NEVER from another subject, another week, a static profile, or AI.
+    # CANONICAL RESOURCES (PART 6/7): normalize_text_items repairs legacy
+    # rows (one comma-joined / serialized string) into individual entries and
+    # guards against any accidental stringification reaching a lesson.
     source_tlrs: List[str] = []
-    for r in list(getattr(alloc, "source_resources", []) or []):
+    for r in normalize_text_items(list(getattr(alloc, "source_resources", []) or [])):
         r = (r or "").strip()
         if r and r.lower() not in [x.lower() for x in source_tlrs]:
             source_tlrs.append(r)

@@ -223,12 +223,15 @@ class TestEKGIndicatorRangeHandling:
 
 class TestFKGResourcePreservation:
     def test_source_tlrs_verbatim(self):
+        """Scheme resources reach the lesson as canonical entries (PART 6):
+        the source text is preserved verbatim inside the entry — only the
+        list structure is normalized, never the resource wording."""
         scheme = _kg2()
         config = _config(scheme)
         plans, _ = _plans(scheme, config)
         lp = plans[0]
         assert lp.source_tlrs
-        assert lp.source_tlrs[0].startswith("Poster/ cut out")
+        assert any(t.startswith("Poster/ cut out") for t in lp.source_tlrs)
         # Source resources are the display list's head — generation may add
         # "Other TLRs" but never replaces the source list.
         assert lp.teaching_learning_resources[0] == lp.source_tlrs[0]
