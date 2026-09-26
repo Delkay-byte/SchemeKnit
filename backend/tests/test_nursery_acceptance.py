@@ -357,9 +357,12 @@ class TestHISpecialPeriods:
         assert w13.week_type == WeekType.REVISION
         assert w14.week_type == WeekType.ASSESSMENT
         # Vacation shares the non-instruction bucket with SBA weeks: it is a
-        # special period, never a curriculum lesson.
+        # special period, never a curriculum lesson. PART O/P: the label is
+        # preserved as METADATA (special_period_label), not as a sub-strand —
+        # the curriculum field stays empty.
         assert w15.week_type != WeekType.INSTRUCTION
-        assert (w15.sub_strand or "").upper() == "VACATION"
+        assert "VACATION" in (w15.special_period_label or "").upper()
+        assert not (w15.sub_strand or "").strip()
 
     def test_no_lesson_generated_for_special_periods(self):
         """REVISION/EXAMINATION/VACATION must not become a normal curriculum
@@ -371,21 +374,24 @@ class TestHISpecialPeriods:
     def test_noisy_special_labels_normalized(self):
         """Source noise: Numeracy W15 is printed "AND VACATION", Creative Arts
         W13 is printed "REVISION1". Both normalise to their canonical period
-        WITHOUT any filename-specific rule."""
+        WITHOUT any filename-specific rule. PART O/P: the canonical label lands
+        in special_period_label; the sub-strand column stays empty."""
         numeracy = _parse("Numeracy")
         w15 = next(w for w in numeracy.weeks if w.week_number == 15)
-        assert "VACATION" in (w15.sub_strand or "").upper()
-        assert w15.sub_strand.upper() != "AND VACATION"
+        assert "VACATION" in (w15.special_period_label or "").upper()
+        assert "AND" not in (w15.special_period_label or "").upper()
+        assert not (w15.sub_strand or "").strip()
         arts = _parse("Creative Arts")
         w13 = next(w for w in arts.weeks if w.week_number == 13)
-        assert (w13.sub_strand or "").upper() == "REVISION"
-        assert w13.sub_strand != "REVISION1"
+        assert (w13.special_period_label or "").upper() == "REVISION"
+        assert not (w13.sub_strand or "").strip()
 
     def test_vacation_row_gets_no_fabricated_content(self):
         scheme = _parse("Our World Our People")
         w15 = next(w for w in scheme.weeks if w.week_number == 15)
-        assert (w15.sub_strand or "").upper() == "VACATION"
+        assert "VACATION" in (w15.special_period_label or "").upper()
         assert not w15.indicators
+        assert not (w15.sub_strand or "").strip()
 
 
 # ── I. Curriculum-to-lesson mapping (lesson-unit semantics) ─────────────────

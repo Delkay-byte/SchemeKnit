@@ -415,7 +415,10 @@ class TestEditIsolation:
 # ── 8. Period label ────────────────────────────────────────────────────
 
 class TestPeriodLabel:
-    def test_period_label_generated_when_not_configured(self, engine, calendar_engine):
+    def test_period_label_empty_when_not_configured(self, engine, calendar_engine):
+        """PART K: period/timing is teacher-entered per lesson. When the teacher
+        did not configure one the field stays EMPTY — never a generated
+        "Period N" placeholder."""
         weeks = [make_week(1, [
             "B9.1.1.1.1 Describe matter.",
             "B9.1.1.1.2 Classify materials.",
@@ -426,8 +429,10 @@ class TestPeriodLabel:
         coverage = engine.allocate(weeks, cal, config)
         plans = engine.generate_lesson_plans(coverage, config, "scheme-1")
 
-        assert plans[0].period == "Period 1"
-        assert plans[1].period == "Period 2"
+        assert plans[0].period == ""
+        assert plans[1].period == ""
+        # No placeholder punctuation ever leaks into the field.
+        assert plans[0].period not in ("0", "-", "—", "N/A", "none", "unknown")
 
     def test_teacher_configured_period_preserved(self, engine, calendar_engine):
         weeks = [make_week(1, [

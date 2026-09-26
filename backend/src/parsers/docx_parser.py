@@ -24,7 +24,7 @@ from docx.table import Table
 from ..models import (
     Week, WeekType, SchemeOfWork, Subject, ClassLevel,
     ParsedScheme, ParsedWeek, ParsedContentStandard, ParsedIndicator,
-    ValidationIssue, ValidationSeverity
+    ValidationIssue, ValidationSeverity, SpecialPeriodType
 )
 from .subject_keywords import (
     SUBJECT_KEYWORDS, MAX_HEADING_LENGTH, canonical_subject_from_heading,
@@ -111,6 +111,16 @@ SPECIAL_WEEK_KEYWORDS = [
     "vacation",
     "examination",
     "exam",
+    # Mid-term breaks are non-instructional periods (PART O): without this
+    # keyword a row labelled "MID-TERM (05-11-2026 to 06-11-2026)" parsed as
+    # ordinary instruction and the label leaked into strand/sub-strand/
+    # indicators, producing fake lessons like "Learners can MID-TERM...".
+    "mid-term",
+    "midterm",
+    "mid term",
+    "half-term",
+    "half term",
+    "halfterm",
 ]
 
 WEEK_NUMBER_PATTERN = re.compile(
@@ -904,8 +914,11 @@ class DOCXParser:
                 "date": self._parse_date(match.group(2)),
             }
 
-        if any(kw in cleaned.lower() for kw in SPECIAL_WEEK_KEYWORDS):
-            pass
+        # A special-period cell ("MID-TERM (05-11-2026 to 06-11-2026)",
+        # "REVISION", "VACATION") is NOT a week number: never match digits
+        # inside the parenthesised date range as "Week 5". (PART O)
+        if self._is_special_week_text(cleaned):
+            return None
 
         return None
 
@@ -981,9 +994,19 @@ class DOCXParser:
     #: "REVISION AND VACATION" that lost its first word), and the Creative Arts
     #: table prints week 13 as "REVISION1" (a stray digit). Normalising these
     #: to their canonical period name keeps the WEEK/period semantics without
-    #: teaching the parser any filename-specific rule.
+    #: teaching the parser any filename-specific rule. Mid-term labels are
+    #: included (PART O): "MID-TERM", "MID TERM (05-11-2026 to 06-11-2026)".
     _SPECIAL_ROW_TITLE_RE = re.compile(
-        r"^(?:and\s+)?(revision|examination|exam|vacation)(?:\s*\d+)?$",
+        r"^(?:and\s+)?(revision|examination|exam|vacation|mid[- ]?term|half[- ]?term)(?:\s*\d+)?$",
+        re.IGNORECASE,
+    )
+
+    #: Prefix form: the period name may be followed by a parenthesised date
+    #: range or other noise in the SAME cell ("MID-TERM (05-11-2026 to
+    #: 06-11-2026)"). Unanchored at the end so label + dates is recognized as
+    #: one special period.
+    _SPECIAL_ROW_PREFIX_RE = re.compile(
+        r"^(?:and\s+)?(revision|examination|exam|vacation|mid[- ]?term|half[- ]?term)\b",
         re.IGNORECASE,
     )
 
@@ -991,13 +1014,18 @@ class DOCXParser:
     def _normalize_special_week_label(cls, text: str) -> str:
         """Canonicalise a noisy special-period row label.
 
-        Only rows that are (after noise) exactly a special-period name are
-        rewritten — ordinary curriculum text is never touched.
+        Only rows that START with a special-period name (after noise) are
+        rewritten: the normalized period name plus any remaining source text
+        (e.g. the parenthesised date range) is returned verbatim — ordinary
+        curriculum text is never touched.
         """
         stripped = (text or "").strip()
         match = cls._SPECIAL_ROW_TITLE_RE.match(stripped)
         if match:
             return match.group(1).upper()
+        prefix = cls._SPECIAL_ROW_PREFIX_RE.match(stripped)
+        if prefix:
+            return f"{prefix.group(1).upper()}{stripped[prefix.end():]}"
         return stripped
 
     def _is_special_week_text(self, text: str) -> bool:
@@ -1023,6 +1051,29 @@ class DOCXParser:
         week_date = first.get("date")
         strand = first.get("strand")
         sub_strand = first.get("sub_strand")
+        # Special-period metadata: the verbatim source label of the period row
+        # is preserved as DATA (PART O/P). For a special week the curriculum
+        # fields are cleared — the label must never surface as a strand,
+        # sub-strand, content standard, indicator or lesson topic.
+        special_label = ""
+        special_type = ""
+        if week_type != WeekType.INSTRUCTION:
+            for row in rows:
+                # The period label may sit in ANY of the row's text cells
+                # (strand / sub-strand / resources), depending on how the
+                # source table prints the period row (PART O/P metadata).
+                for cell in (row.get("strand", ""), row.get("sub_strand", ""),
+                             row.get("resources", "")):
+                    if cell and self._is_special_week_text(cell):
+                        special_label = cell.strip()
+                        special_type = SpecialPeriodType.classify(cell).value
+                        break
+                if special_label:
+                    break
+            strand = None if self._is_special_week_text(strand or "") else strand
+            sub_strand = (
+                None if self._is_special_week_text(sub_strand or "") else sub_strand
+            )
 
         all_content_standards: List[ParsedContentStandard] = []
         all_indicators: List[ParsedIndicator] = []
@@ -1064,7 +1115,9 @@ class DOCXParser:
             sub_strand=sub_strand,
             content_standards=all_content_standards,
             indicators=all_indicators,
-            resources=list(all_resources)
+            resources=list(all_resources),
+            special_period_label=special_label,
+            special_period_type=special_type,
         )
 
     def _extract_code(self, text: str, pattern: re.Pattern) -> str:
@@ -1140,6 +1193,10 @@ class DOCXParser:
                 content_standards=content_std_texts,
                 indicators=indicator_texts,
                 resources=pw.resources,
+                # Special-period metadata flows through the ParsedWeek → Week
+                # conversion so review/export see the verbatim period label.
+                special_period_label=getattr(pw, "special_period_label", "") or "",
+                special_period_type=getattr(pw, "special_period_type", "") or "",
                 scheme_of_work_id=""
             )
             weeks.append(week)

@@ -204,19 +204,20 @@ class TestTemplateEngine:
         assert any(s.name == "header" for s in sections)
 
     def test_default_templates_count(self):
-        from src.engines.template_engine import DEFAULT_TEMPLATES
-        # 5 legacy + approved organizational + the four GES-style forms
-        # + the approved WAPEF plan (Basic 4-JHS) + the Basic 1-3 weekly plan
-        assert len(DEFAULT_TEMPLATES) == 12
-        assert any(t.id == "tpl-approved-org-headteacher" for t in DEFAULT_TEMPLATES)
+        from src.engines.template_engine import DEFAULT_TEMPLATES, RETIRED_TEMPLATE_IDS
+        # 5 legacy + the four GES-style forms + the approved WAPEF plan
+        # (Basic 4-JHS) + the Basic 1-3 weekly plan. The legacy headteacher
+        # alias is RETIRED from the selectable catalog (PART C).
+        assert len(DEFAULT_TEMPLATES) == 11
+        assert "tpl-approved-org-headteacher" in RETIRED_TEMPLATE_IDS
+        assert all(t.id != "tpl-approved-org-headteacher" for t in DEFAULT_TEMPLATES)
         assert any(t.id == "tpl-wapef-approved-plan" for t in DEFAULT_TEMPLATES)
         assert any(t.id == "tpl-wapef-basic13-weekly-plan" for t in DEFAULT_TEMPLATES)
         # Official flag is evidence-based: all four bundled GES/NaCCA forms are
-        # verified against their own source documents, plus the headteacher
-        # alias of the verified JHS source and the verified WAPEF sources.
+        # verified against their own source documents, and the verified WAPEF
+        # sources. The retired alias keeps its provenance but is not listed.
         assert {t.id for t in DEFAULT_TEMPLATES if t.is_official} == {
             "tpl-official-ges-nacca-jhs",
-            "tpl-approved-org-headteacher",
             "tpl-official-ges-nacca-kg",
             "tpl-official-ges-nacca-primary",
             "tpl-official-ges-nacca-shs",
