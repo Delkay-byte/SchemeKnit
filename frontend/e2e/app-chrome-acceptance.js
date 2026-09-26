@@ -451,7 +451,7 @@ function staticChecks() {
       if (!list) return null
       return { count: list.querySelectorAll('[role="tab"]').length }
     })
-    log(!!paTabs && paTabs.count === 9, 'platform-admin: tab row uses shared Tabs (9 tabs)',
+    log(!!paTabs && paTabs.count === 10, 'platform-admin: tab row uses shared Tabs (10 tabs incl. teachers)',
       paTabs ? `count=${paTabs.count}` : 'tablist missing')
 
     await pPage.locator('main [role="tab"]:has-text("schools")').first().click()

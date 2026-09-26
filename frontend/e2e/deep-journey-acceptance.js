@@ -1,7 +1,7 @@
 // Browser acceptance for the AUTHENTICATED TEACHER journey.
 // Covers §2 (dashboard logo), §3 (KG/SHS subjects), §4 (multi-subject detect +
 // confirm), §10 (allocation preview carry-forward), §12-13 (contacts),
-// §14/§16 (Free Tier label + lifetime AI display).
+// §14/§16 (Free Tier label + monthly AI quota display).
 const { chromium } = require('playwright');
 
 const BASE = process.argv[2] || 'http://localhost:3000';
@@ -38,7 +38,7 @@ async function check(fn, label) {
   await check(async () => markVisible && markVisible.width > 10 && markVisible.height > 10, 'dashboard: logo has real rendered size');
   await check(async () => (await page.getByText('Free Tier', { exact: true }).count()) + (await page.getByText('Teacher Pro', { exact: true }).count()) > 0, 'dashboard: plan label is Free Tier or Teacher Pro (account-state aware)');
   await check(async () => await page.getByText('Free Teacher').count() === 0, 'dashboard: no Free Teacher wording');
-  await check(async () => await page.getByText(/AI generations \(lifetime\)|AI generations remaining/).count() > 0, 'dashboard: AI allowance present');
+  await check(async () => await page.getByText(/AI generations \(lifetime\)|AI generations this month|AI generations remaining/).count() > 0, 'dashboard: AI allowance present');
   await check(async () => await page.getByText(/resets tomorrow|per day|Daily AI/i).count() === 0, 'dashboard: no daily/reset wording');
   await check(async () => await page.locator('header a[aria-label*="WhatsApp"]').count() > 0, 'dashboard: WhatsApp contact in header');
   await check(async () => await page.locator('header a[href^="mailto:bloomcoretechnologies@gmail.com"]').count() > 0, 'dashboard: email contact in header');
