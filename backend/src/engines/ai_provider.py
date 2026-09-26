@@ -1099,7 +1099,11 @@ def resolve_provider_mode(ai_mode: Any) -> str:
     if pinned in NAMED_PROVIDERS:
         return pinned
 
-    # Auto-select: key-only providers first (no network), Ollama last.
+    # Auto-select: the TEACHER-PINNED provider first when one is configured
+    # (PART E): ``ai_mode`` may carry a named provider through enrichment paths
+    # that predate the enum; honoring the request before generic auto-selection
+    # keeps the reported provider equal to the one actually used. Then key-only
+    # providers (no network), Ollama last.
     for candidate in _AUTO_PROVIDER_ORDER:
         if candidate == "ollama":
             # Only probe the network when nothing else is configured.

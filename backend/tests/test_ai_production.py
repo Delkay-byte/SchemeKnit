@@ -34,9 +34,12 @@ class TestPayloadRobustness:
         res = {"lesson_content": {"assessment": "Do X now."}}
         assert _extract_section_text(res, "assessment") == "Do X now."
 
-    def test_extract_falls_back_to_introduction(self):
+    def test_extract_does_not_cross_sections(self):
+        """PART W: an assessment regeneration must never silently return the
+        introduction text — the old cross-section fallback inserted the wrong
+        content into the wrong section."""
         res = {"introduction": "Welcome."}
-        assert _extract_section_text(res, "assessment") == "Welcome."
+        assert _extract_section_text(res, "assessment") == ""
 
     def test_extract_empty(self):
         assert _extract_section_text({}, "assessment") == ""
@@ -100,6 +103,9 @@ class TestFailureContracts:
         provider = MagicMock()
         provider.get_name.return_value = "ollama"
         provider.model = "test-model"
+        # PART W: last_error stays None on the first (empty) attempt so the
+        # ollama single-retry path runs instead of surfacing a 502 immediately.
+        provider.last_error = None
         provider.generate_lesson_content.side_effect = [
             {}, {"assessment": "Retried content wins."},
         ]
