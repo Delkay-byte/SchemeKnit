@@ -63,11 +63,16 @@ def free_tier_lesson_quota_message(remaining: int) -> str:
 
 
 def free_tier_ai_exhausted_message(limit: int = FREE_TIER_AI_GENERATIONS) -> str:
-    """The exact user-facing message after the lifetime allowance is used up."""
+    """User-facing message when this month's AI allowance is used up.
+
+    The Free Tier AI allowance is CALENDAR-MONTHLY (PART 16-18): it resets at
+    the start of the next month — the old 'lifetime, never resets' wording is
+    gone from the Free Tier UI.
+    """
     return (
-        f"You've used all {limit} free AI generations included with the Free Tier. "
-        "This is a one-time lifetime allowance — it does not reset. "
-        "Upgrade to Teacher Pro for ongoing AI assistance."
+        f"You've used all {limit} free AI generations for this month. "
+        "Your allowance resets at the start of the next month — or upgrade "
+        "to Teacher Pro for ongoing AI assistance."
     )
 
 
@@ -154,8 +159,10 @@ def resolve_entitlement(db: Session, user: User) -> Dict[str, Any]:
         "edition": "free",
         "subscription_type": None,
         "plan_name": FREE_TIER_PLAN_NAME,
-        #: Free Tier AI is a LIFETIME allowance (never reset).
-        "ai_lifetime": True,
+        #: The AI allowance is CALENDAR-MONTHLY for every plan now (PART 18):
+        #: no tier is lifetime-capped any more, so this legacy flag is always
+        #: False and the UI must read the monthly ``ai_quota_*`` fields.
+        "ai_lifetime": False,
         #: Free Tier LESSON PLANS are a CALENDAR-MONTH allowance.
         "generation_limit": FREE_TIER_LESSON_PLANS_PER_MONTH,
         "generations_used": 0,
@@ -171,7 +178,15 @@ def resolve_entitlement(db: Session, user: User) -> Dict[str, Any]:
         "history_limit": 10,
         "ai_enabled": False,
         "ai_credits": FREE_TIER_AI_GENERATIONS,
-        "ai_credits_used": ent.ai_credits_used if ent else 0,
+        "ai_credits_used": 0,
+        #: Monthly AI quota snapshot (PART 16-18): ``X / 5 AI generations this
+        #: month``. Same shape as the lesson-plan quota fields above.
+        "ai_quota_period": PERIOD_TYPE_CALENDAR_MONTH,
+        "ai_quota_period_key": "",
+        "ai_quota_unlimited": False,
+        "ai_quota_limit": FREE_TIER_AI_GENERATIONS,
+        "ai_quota_used": 0,
+        "ai_quota_remaining": FREE_TIER_AI_GENERATIONS,
         "expires_at": None,
         "is_active": True,
         "school_name": None,
@@ -185,7 +200,8 @@ def resolve_entitlement(db: Session, user: User) -> Dict[str, Any]:
         result["plan_name"] = "Teacher Pro" if ent.edition == "teacher" else FREE_TIER_PLAN_NAME
         #: Only the free edition is a lifetime AI allowance; paid plans keep
         #: their own (configurable) AI allowance and are never lifetime-capped.
-        result["ai_lifetime"] = (ent.edition or "free") == "free"
+        #: (Legacy flag — always False now; the AI allowance is monthly.)
+        result["ai_lifetime"] = False
         #: The Free Tier lesson-plan allowance is fixed at N per calendar month,
         #: independent of any legacy stored value. Paid plans use the stored
         #: generation_limit (0 = unlimited).
@@ -201,7 +217,7 @@ def resolve_entitlement(db: Session, user: User) -> Dict[str, Any]:
         result["history_limit"] = ent.history_limit or 100
         result["ai_enabled"] = bool(ent.ai_enabled)
         result["ai_credits"] = ent.ai_credits or 0
-        result["ai_credits_used"] = ent.ai_credits_used or 0
+        result["ai_credits_used"] = 0  # superseded by the monthly ledger
         result["expires_at"] = ent.expires_at
         result["is_active"] = True
 
@@ -214,10 +230,14 @@ def resolve_entitlement(db: Session, user: User) -> Dict[str, Any]:
             result["edition"] = "school"
             result["subscription_type"] = "school"
             result["plan_name"] = "School Subscription"
-        # A school license provides unlimited AI — not the lifetime free tier.
+        # A school license provides unlimited AI — not the free monthly tier.
         result["ai_lifetime"] = False
         result["ai_credits"] = 0
         result["ai_credits_used"] = 0
+        result["ai_quota_unlimited"] = True
+        result["ai_quota_limit"] = 0
+        result["ai_quota_used"] = 0
+        result["ai_quota_remaining"] = None
         result["school_name"] = school_name
 
         # School grants unlimited generation, batch, ZIP, PDF
@@ -230,7 +250,19 @@ def resolve_entitlement(db: Session, user: User) -> Dict[str, Any]:
 
         # School AI entitlement is handled by ai_entitlement() separately
 
-    # ── Calendar-period authoritative usage for finite lesson allowances ────
+    # ── Calendar-period authoritative usage for finite allowances ───────────
+    # AI: the Free Tier monthly allowance is read from the ai_generation_
+    # periods ledger keyed YYYY-MM (server clock) — never from the legacy
+    # lifetime counter on the entitlement row (PART 16).
+    ai_credits = result.get("ai_credits", 0) or 0
+    if result.get("ai_quota_unlimited"):
+        result["ai_quota_period_key"] = current_period_key()
+    elif ai_credits > 0:
+        from .ai_quota import get_ai_units_used
+        used = get_ai_units_used(db, user.id)
+        result["ai_quota_used"] = used
+        result["ai_quota_remaining"] = max(ai_credits - used, 0)
+        result["ai_quota_period_key"] = current_period_key()
     # The stored generations_used column is legacy; the real usage is the
     # calendar-month ledger. The month always comes from the SERVER clock.
     limit = result.get("generation_limit", 0) or 0
@@ -334,9 +366,11 @@ def can_use_ai(user: User, db: Session) -> Tuple[bool, str]:
     if not resolved["ai_enabled"]:
         return False, "AI assistance is not available on your current plan."
     credits = resolved["ai_credits"]
-    used = resolved["ai_credits_used"]
+    # MONTHLY ledger (PART 16): usage comes from the ai_generation_periods
+    # row for this month, never the legacy lifetime counter.
+    used = resolved.get("ai_quota_used", 0) or 0
     if credits > 0 and used >= credits:
-        return False, "Your AI allowance for this period has been reached."
+        return False, "Your AI allowance for this month has been reached."
     return True, "entitled"
 
 
@@ -385,15 +419,19 @@ def increment_ai_credits(user: User, db: Session, count: int = 1) -> None:
 def _entitlement_ai_decision(db: Session, ent) -> Tuple[bool, str]:
     """AI decision for an individual EntitlementDB row.
 
-    A finite ``ai_credits`` (the Free Tier lifetime allowance) is enforced as a
-    LIFETIME cap. ``ai_credits == 0`` means unlimited and is never decremented.
+    A finite ``ai_credits`` (the Free Tier allowance) is enforced as a
+    CALENDAR-MONTH cap through the ``ai_generation_periods`` ledger (PART 16):
+    usage resets automatically every month because each month reads its own
+    ledger row. ``ai_credits == 0`` means unlimited and is never decremented.
     """
     if not ent or not (ent.ai_enabled or ent.advanced_ai_enabled):
         return False, "no_entitlement"
     credits = ent.ai_credits or 0
-    used = ent.ai_credits_used or 0
-    if credits > 0 and used >= credits:
-        return False, "credits_exhausted"
+    if credits > 0:
+        from .ai_quota import get_ai_units_used
+        used = get_ai_units_used(db, ent.user_id)
+        if used >= credits:
+            return False, "credits_exhausted"
     if (ent.edition or "free") == "free":
         return True, "free_trial"
     return True, "paid_entitlement"
@@ -405,14 +443,14 @@ def ai_entitlement(user: User, db: Session) -> Tuple[bool, str]:
     Returns (entitled, reason). Reason is stable and safe to log, not to show:
       school_license     — the teacher's school holds an active, in-date license
       paid_entitlement   — an unexpired paid EntitlementDB row grants AI
-      free_trial         — Free Tier has lifetime AI generations remaining
+      free_trial         — Free Tier has AI generations remaining THIS MONTH
       no_entitlement     — no paid entitlement, no school, no trial
       no_active_license  — school membership but no active license row
       license_expired    — active license row whose expiry date has passed
-      credits_exhausted  — the lifetime allowance is used up
+      credits_exhausted  — this calendar month's allowance is used up
 
     Precedence: an active school license grants unlimited AI and is NEVER
-    lifetime-limited. Otherwise the individual entitlement decides.
+    monthly-limited. Otherwise the individual entitlement decides.
     """
     school_id = getattr(user, "school_id", None)
     if school_id:
@@ -457,15 +495,23 @@ def require_ai_entitlement(user: User, db: Session) -> User:
 
 
 def consume_ai_generation(user: User, db: Session, request_id: Optional[str] = None) -> int:
-    """Record ONE successfully completed AI generation against the user.
+    """Record ONE successfully completed AI generation for the CURRENT MONTH.
 
-    Only a FINITE allowance is consumed (the Free Tier lifetime allowance).
-    Unlimited entitlements — a school license or a paid plan with
-    ``ai_credits == 0`` — are never decremented and return -1.
+    The Free Tier AI allowance is a CALENDAR-MONTH cap (PART 16-18), enforced
+    through the ``ai_generation_periods`` ledger (see ai_quota.py): each month
+    keeps its own row keyed ``YYYY-MM`` from the SERVER clock, so usage resets
+    to 0/N automatically at the start of a new month. Unlimited entitlements —
+    a school license or a paid plan with ``ai_credits == 0`` — consume nothing
+    and return -1.
+
+    ONE unit == one successful AI-assisted generation REQUEST (the unit
+    definition the lifetime counter already used — NOT one per lesson).
+    Failures never reach this function: callers invoke it only after a
+    generation actually succeeded with AI content (PART 17/19).
 
     Returns the remaining count (or -1 when unlimited). Idempotent for a given
-    ``request_id`` so a duplicate frontend submission cannot double-consume the
-    allowance for the same successful generation request.
+    ``request_id`` so a duplicate frontend submission cannot double-consume
+    the same successful generation request.
     """
     # School license → unlimited; nothing to consume.
     school_id = getattr(user, "school_id", None)
@@ -484,7 +530,7 @@ def consume_ai_generation(user: User, db: Session, request_id: Optional[str] = N
     if credits <= 0:
         return -1  # unlimited
 
-    used = ent.ai_credits_used or 0
+    from . import ai_quota
 
     # Idempotency: the same successful request must never consume twice.
     if request_id:
@@ -493,21 +539,21 @@ def consume_ai_generation(user: User, db: Session, request_id: Optional[str] = N
             AIUsageEventDB.request_id == request_id,
         ).first()
         if already:
-            return max(credits - used, 0)
+            return max(credits - ai_quota.get_ai_units_used(db, user.id), 0)
 
+    used = ai_quota.get_ai_units_used(db, user.id)
     if used >= credits:
-        # Defensive: never exceed the lifetime cap.
+        # Defensive: never exceed the monthly cap.
         return 0
 
-    ent.ai_credits_used = used + 1
     if request_id:
         db.add(AIUsageEventDB(
             user_id=user.id,
             request_id=request_id,
             consumed=True,
         ))
-    db.commit()
-    return max(credits - (used + 1), 0)
+        db.commit()
+    return ai_quota.consume_ai_generation(db, user.id, credits)
 
 
 def require_feature(feature: str):

@@ -528,8 +528,13 @@ class TestAIEntitlement:
         assert reason == "paid_entitlement"
 
     def test_ai_credits_exhausted(self, db):
+        """MONTHLY (PART 16): exhaustion is read from the ai_generation_
+        periods ledger for the current month, not the legacy lifetime
+        counter on the entitlement row."""
         u, ent = _make_individual_teacher(db, "ai-exhausted@test.com")
-        ent.ai_credits_used = 5
+        from src.ai_quota import consume_ai_generation
+        for _ in range(ent.ai_credits or 5):
+            consume_ai_generation(db, u.id, credits=ent.ai_credits or 5)
         db.commit()
         entitled, reason = ai_entitlement(u, db)
         assert not entitled
