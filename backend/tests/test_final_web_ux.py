@@ -19,7 +19,7 @@ milestone's security claims:
 import os
 import sys
 import time
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -285,7 +285,7 @@ class TestOneTimeDownloadUrl:
         res = await gen_router.issue_download_url(job.id, "docx", "GES-style", None, u, db)
         token = res["download_url"].rsplit("/", 1)[-1]
 
-        first = await gen_router.download_by_token(token, u)
+        first = await gen_router.download_by_token(token, u, db)
         assert isinstance(first, FileResponse)
         assert first.media_type == DOCX_MIME
         # The token endpoint uses attachment (it is a navigation, not a fetch),
@@ -295,7 +295,7 @@ class TestOneTimeDownloadUrl:
 
         # Single use: the same token is dead now.
         with pytest.raises(HTTPException) as e:
-            await gen_router.download_by_token(token, u)
+            await gen_router.download_by_token(token, u, db)
         assert e.value.status_code == 404
 
     @pytest.mark.asyncio
@@ -309,7 +309,7 @@ class TestOneTimeDownloadUrl:
         token = res["download_url"].rsplit("/", 1)[-1]
 
         with pytest.raises(HTTPException) as e:
-            await gen_router.download_by_token(token, other)
+            await gen_router.download_by_token(token, other, db)
         assert e.value.status_code == 404
 
     @pytest.mark.asyncio
@@ -327,12 +327,12 @@ class TestOneTimeDownloadUrl:
         token = res["download_url"].rsplit("/", 1)[-1]
 
         # No authenticated user (browser navigation) still delivers once...
-        delivered = await gen_router.download_by_token(token, None)
+        delivered = await gen_router.download_by_token(token, None, db)
         assert isinstance(delivered, FileResponse)
         assert delivered.headers["content-disposition"].startswith("attachment;")
         # ...and only once.
         with pytest.raises(HTTPException) as e:
-            await gen_router.download_by_token(token, None)
+            await gen_router.download_by_token(token, None, db)
         assert e.value.status_code == 404
 
     @pytest.mark.asyncio
@@ -344,10 +344,14 @@ class TestOneTimeDownloadUrl:
         res = await gen_router.issue_download_url(job.id, "docx", "GES-style", None, u, db)
         token = res["download_url"].rsplit("/", 1)[-1]
 
-        # Rewind the issued token past its TTL.
-        gen_router._DOWNLOAD_TOKENS[token]["expires_at"] = time.time() - 1
+        # Rewind the issued token past its TTL (now persisted in the DB).
+        from src.database import DownloadTokenDB
+        row = db.query(DownloadTokenDB).filter(DownloadTokenDB.token == token).first()
+        assert row is not None
+        row.expires_at = datetime.utcnow() - timedelta(minutes=5)
+        db.commit()
         with pytest.raises(HTTPException) as e:
-            await gen_router.download_by_token(token, u)
+            await gen_router.download_by_token(token, u, db)
         assert e.value.status_code == 404
 
     @pytest.mark.asyncio
