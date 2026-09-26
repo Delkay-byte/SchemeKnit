@@ -90,7 +90,9 @@ class TestApprovedStructure:
 
     def test_template_id_stable(self):
         assert TEMPLATE_ID == "tpl-approved-org-headteacher"
-        assert "Headteacher" in TEMPLATE_NAME
+        # PART B/C: the legacy "Headteacher Source" wording is retired; the
+        # internal id stays stable for historical routing.
+        assert "Headteacher" not in TEMPLATE_NAME
 
 
 class TestApprovedSchema:
