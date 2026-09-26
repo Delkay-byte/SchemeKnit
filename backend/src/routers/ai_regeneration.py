@@ -43,6 +43,37 @@ REGENERATABLE_SECTIONS = [
     "teaching_learning_resources", "previous_knowledge",
 ]
 
+#: Provider output schema keys for each regeneratable lesson section (PART W).
+#: The V2 provider contract returns ``starter``/``main_learning``/``plenary``
+#: (and the template validators map phases), NOT the lesson-row column names —
+#: so extracting ``result["introduction"]`` from a Gemini/Groq response found
+#: nothing, fell back to ``result["introduction"]`` (still empty), and the old
+#: generic ``len(...) < 10`` heuristic then reported "AI response too short or
+#: empty" even though the model HAD returned a valid structured lesson.
+SECTION_TO_PROVIDER_KEYS = {
+    "introduction": ("starter", "introduction"),
+    "starter_activity": ("starter", "introduction"),
+    "main_activities": ("main_learning", "main_activities"),
+    "learner_activities": ("learner_activities", "main_learning"),
+    "teacher_activities": ("teacher_activities", "main_learning"),
+    "assessment": ("assessment",),
+    "differentiation": ("differentiation", "assessment"),
+    "remediation": ("differentiation", "assessment"),
+    "extension": ("differentiation", "assessment"),
+    "conclusion": ("plenary", "conclusion"),
+    "reflection": ("plenary", "reflection", "conclusion"),
+    "homework": ("homework_or_extension", "homework", "assessment"),
+    "essential_questions": ("essential_questions", "learning_objectives"),
+    "learning_objectives": ("learning_objectives",),
+    "teaching_learning_resources": ("teaching_learning_resources", "resources"),
+    "previous_knowledge": ("previous_knowledge", "teacher_notes"),
+}
+
+#: Minimum usable length for a REGENERATED SECTION (not the whole response).
+#: Applied AFTER the provider payload is parsed and mapped; a valid structured
+#: JSON response is never rejected because some OTHER field is short.
+MIN_SECTION_CHARS = 10
+
 
 class SectionRegenerateRequest(BaseModel):
     lesson_plan_id: str
@@ -130,15 +161,48 @@ async def regenerate_section(
             gen_kwargs["section"] = req.section
         result = provider.generate_lesson_content(**gen_kwargs)
         new_content = _extract_section_text(result, req.section)
-        if (not new_content or len(new_content.strip()) < 10) and provider.get_name() == "ollama":
-            # One retry: local models occasionally return empty/truncated output.
-            # Bounded (single retry) so failures stay fast and controlled.
+
+        # One bounded retry for empty/short results BEFORE surfacing a provider
+        # diagnostic: local models occasionally return empty/truncated output,
+        # and a transient failure should be retried, not reported.
+        if (not new_content or len(new_content.strip()) < MIN_SECTION_CHARS) and provider.get_name() == "ollama":
             logger.warning("ai_empty_retry", section=req.section)
             result = provider.generate_lesson_content(**gen_kwargs)
             new_content = _extract_section_text(result, req.section)
 
-        if not new_content or len(new_content.strip()) < 10:
-            raise ValueError("AI response too short or empty")
+        # A still-empty payload is a provider DIAGNOSTIC, not a generic "too
+        # short" failure (PART W): surface the recorded error code (rate_limit /
+        # malformed_json / empty_output …) through the normal error contract.
+        if not result or not new_content or not new_content.strip():
+            from ..engines.ai_provider import provider_status
+            state = provider_status(provider)
+            detail = {
+                "rate_limit": (
+                    f"AI provider '{provider.get_name()}' was rate-limited. "
+                    "Please retry in a moment. Previous content preserved."
+                ),
+                "malformed_json": (
+                    f"AI provider '{provider.get_name()}' returned an unparseable "
+                    "response. Previous content preserved."
+                ),
+                "empty_output": (
+                    f"AI provider '{provider.get_name()}' returned an empty "
+                    "response. Previous content preserved."
+                ),
+            }.get(provider.last_error,
+                  f"AI provider '{provider.get_name()}' returned no usable content "
+                  f"(state: {state}). Previous content preserved.")
+            raise HTTPException(status_code=502, detail=detail)
+
+        # The length floor applies to the REGENERATED SECTION text only, after
+        # the structured payload was mapped (PART W) — never to the raw model
+        # output, and never to unrelated fields of a valid JSON response.
+        if len(new_content.strip()) < MIN_SECTION_CHARS:
+            raise ValueError(
+                f"The provider did not return usable text for section "
+                f"'{req.section}' (model output was a valid response, but no "
+                f"content mapped to this section)."
+            )
 
         _save_enrichment_cache(db, lp.id, req.section, new_content, provider.__class__.__name__, mode_label)
 
@@ -161,6 +225,10 @@ async def regenerate_section(
             source=ContentSource.AI.value,
         )
 
+    except HTTPException:
+        # Surfaced provider diagnostics (rate limit, empty output) keep the
+        # lesson untouched and pass through unchanged.
+        raise
     except Exception as e:
         logger.error("section_regeneration_failed",
                      section=req.section, error=str(e))
@@ -249,9 +317,24 @@ def _flatten_text(value) -> str:
 
 def _extract_section_text(result: dict, section: str) -> str:
     """Find section text in a provider payload, unwrapping common wrappers
-    (e.g. {"lesson_content": {"assessment": ...}}) and dict fragments."""
+    (e.g. {"lesson_content": {"assessment": ...}}) and dict fragments.
+
+    ``section`` is the LESSON-row name (e.g. ``introduction``); the provider V2
+    schema uses different keys (``starter``, ``main_learning``, ``plenary``).
+    The mapping in ``SECTION_TO_PROVIDER_KEYS`` (PART W) resolves the provider
+    keys BEFORE the old direct/nested lookups, so a valid structured Gemini or
+    Groq response is never treated as empty just because the row column name
+    does not literally appear in the JSON.
+    """
     if not isinstance(result, dict):
         return ""
+    # 1. Provider-schema keys for this section (V2 contract).
+    for key in SECTION_TO_PROVIDER_KEYS.get(section, ()):  # mapped first
+        if key in result:
+            text = _flatten_text(result.get(key, ""))
+            if text.strip():
+                return text
+    # 2. Legacy literal-key payloads (older providers/tests).
     direct = _flatten_text(result.get(section, ""))
     if direct.strip():
         return direct
@@ -260,7 +343,7 @@ def _extract_section_text(result: dict, section: str) -> str:
         inner = _flatten_text(nested.get(section, ""))
         if inner.strip():
             return inner
-    return _flatten_text(result.get("introduction", ""))
+    return ""
 
 
 def _build_section_prompt(lp, section: str, current_content: str, additional_context: str) -> str:
