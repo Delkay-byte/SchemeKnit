@@ -65,7 +65,8 @@ export default function GeneratePage() {
   // Actual AI resolution (mode/provider/available) reported by the backend —
   // so the UI never shows a mode that disagrees with real behaviour.
   const [aiStatus, setAiStatus] = useState<{
-    mode: string; active: boolean; provider: string | null; state: string; reason: string | null;
+    mode: string; active: boolean; provider: string | null; state: string;
+    reason: string | null; provider_label?: string | null;
   } | null>(null)
   const [aiResult, setAiResult] = useState<{
     mode: string; active: boolean; provider: string | null;
@@ -704,11 +705,15 @@ export default function GeneratePage() {
                           {/* PART E: this label reports the backend-RESOLVED
                               provider for the current generation context — the
                               same resolution the generate request itself uses. */}
+                          {/* PART 13/14: the backend-resolved provider is the
+                              single source of truth. CASE A shows the actually
+                              resolved provider; CASE B names the provider that
+                              was tried and unavailable. */}
                           {aiStatus.active
-                            ? `AI active · provider: ${aiStatus.provider}`
+                            ? `AI active · provider: ${aiStatus.provider_label || aiStatus.provider}`
                             : config.ai_mode === 'OFF'
                               ? 'Deterministic engine · AI provider active: No'
-                              : `No usable AI provider for mode '${aiStatus.mode}' — lessons will be deterministic.`}
+                              : `AI unavailable${aiStatus.provider ? ` · ${aiStatus.provider}` : ''} — lessons will be deterministic.`}
                         </p>
                       )}
                     </Field>
@@ -1333,9 +1338,10 @@ export default function GeneratePage() {
 
               {/* Export/generation failures surface here. Without this the controlled
                   server messages (403 licence, 500 conversion, 503 converter missing)
-                  were invisible: the click simply appeared to do nothing. */}
+                  were invisible: the click simply appeared to do nothing. The title
+                  stays generic because this banner serves BOTH flows (PART 22). */}
               {error && scheme && (
-                <Banner tone="danger" className="mt-3" title="Generation problem">
+                <Banner tone="danger" className="mt-3" title="Action failed">
                   {error}
                 </Banner>
               )}
@@ -1439,7 +1445,7 @@ export default function GeneratePage() {
                         ? `AI (${aiResult.provider}) enriched ${aiResult.lessons_ai} lesson${aiResult.lessons_ai === 1 ? '' : 's'}; ${aiResult.lessons_deterministic} used the deterministic engine.`
                         : aiResult.mode === 'OFF'
                           ? 'All lessons generated deterministically (AI OFF).'
-                          : 'No AI provider was available — all lessons generated deterministically.'}
+                          : `AI unavailable${aiResult.provider ? ` · ${aiResult.provider}` : ''} — all lessons generated deterministically.`}
                     </p>
                   )}
                   <Button className="w-full" asChild>

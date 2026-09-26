@@ -201,7 +201,7 @@ async def ai_status(ai_mode: str = "OFF"):
     if requested.upper() == "OFF":
         return {
             "mode": "OFF", "active": False, "provider": None,
-            "provider_key": None, "state": "OFF",
+            "provider_key": None, "state": "OFF", "provider_label": None,
             "reason": "AI is off — lessons come from the deterministic engine.",
         }
 
@@ -209,8 +209,23 @@ async def ai_status(ai_mode: str = "OFF"):
     if resolved == "OFF":
         return {
             "mode": requested, "active": False, "provider": None,
-            "provider_key": None, "state": "OFF",
+            "provider_key": None, "state": "OFF", "provider_label": None,
             "reason": "AI is off — lessons come from the deterministic engine.",
+        }
+    if resolved not in NAMED_PROVIDERS:
+        # Auto-selection found NO real provider (CASE B/C): the "ENHANCED"
+        # token here means the deterministic fallback, NOT the MockProvider
+        # that get_provider maps it to. Reporting "mock" as an active
+        # provider would be exactly the lie this endpoint exists to prevent.
+        return {
+            "mode": requested, "active": False, "provider": None,
+            "provider_key": None, "state": "NOT_CONFIGURED",
+            "provider_label": None,
+            "reason": (
+                f"No usable AI provider is configured for mode '{requested}'. "
+                "Lessons will be generated deterministically. Configure a provider "
+                "key (Gemini, Groq, OpenAI) or start a local Ollama server to enable AI."
+            ),
         }
     provider = get_provider(resolved)
     available = bool(provider and provider.is_available())
@@ -222,13 +237,25 @@ async def ai_status(ai_mode: str = "OFF"):
             "Lessons will be generated deterministically. Configure a provider "
             "key (Gemini, Groq, OpenAI) or start a local Ollama server to enable AI."
         )
+    provider_name = provider.get_name() if provider else None
+    #: CASE A (PART 14): display-quality name ("Gemini", not "gemini").
+    display = {
+        "gemini": "Gemini", "groq": "Groq", "openai": "OpenAI",
+        "opencode-zen": "OpenCode Zen", "ollama": "Ollama (local)",
+        "minimax": "MiniMax",
+    }.get(resolved, provider_name)
     return {
         "mode": requested,
         "active": available,
-        "provider": provider.get_name() if provider else None,
+        "provider": provider_name,
         "provider_key": resolved if resolved in NAMED_PROVIDERS else None,
         "state": state,
         "reason": reason,
+        # SINGLE SOURCE OF TRUTH (PART 13/14): one backend-computed display
+        # label for CASE A/B — the resolved provider when available, otherwise
+        # the unavailable provider named honestly. The UI renders this verbatim
+        # instead of re-deriving (and possibly disagreeing with) backend truth.
+        "provider_label": display if available else None,
     }
 
 

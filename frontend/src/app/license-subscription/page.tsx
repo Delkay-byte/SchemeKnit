@@ -26,7 +26,7 @@ export default function LicenseSubscriptionPage() {
             <tr>
               <td className="py-2 pr-4">Free Tier</td>
               <td className="py-2 pr-4">5 lesson plans per calendar month</td>
-              <td className="py-2 pr-4">5 lifetime AI credits</td>
+              <td className="py-2 pr-4">5 AI generations per month</td>
             </tr>
             <tr>
               <td className="py-2 pr-4">Teacher Pro</td>

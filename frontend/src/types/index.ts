@@ -331,8 +331,16 @@ export interface PlanResolution {
   ai_enabled: boolean
   ai_credits: number
   ai_credits_used: number
-  //: True when AI credits are a one-time lifetime allowance (Free Tier).
+  //: Legacy flag kept for API compatibility — always false now: the AI
+  //: allowance is CALENDAR-MONTHLY for every tier (no lifetime caps).
   ai_lifetime?: boolean
+  //: Monthly AI quota snapshot (server-derived, mirrors lesson_quota_*).
+  ai_quota_period?: string
+  ai_quota_period_key?: string
+  ai_quota_unlimited?: boolean
+  ai_quota_limit?: number
+  ai_quota_used?: number
+  ai_quota_remaining?: number | null
   //: Free Tier lesson-plan allowance is a CALENDAR-MONTH quota (server-derived).
   lesson_quota_period?: string
   lesson_quota_period_key?: string

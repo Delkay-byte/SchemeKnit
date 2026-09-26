@@ -140,7 +140,7 @@ export default function LessonDetailPage() {
       setRegenNote(null)
       setError(null)
       // Stable idempotency key for this user action so a retried submission
-      // cannot consume a second lifetime AI generation.
+      // cannot consume a second monthly AI generation.
       const requestId = `${lesson.id}:${section}:${Date.now()}`
       // Use the teacher's last chosen AI mode. This is NOT hard-coded to a
       // single provider: OFF (or unset) resolves to BASIC, which lets the
@@ -327,8 +327,8 @@ export default function LessonDetailPage() {
             <span className="text-xs text-muted-foreground">
               {aiStatus
                 ? aiStatus.active
-                  ? `AI active · provider: ${aiStatus.provider}`
-                  : 'No AI provider available — suggestions are disabled until one is configured.'
+                  ? `AI active · provider: ${(aiStatus as any).provider_label || aiStatus.provider}`
+                  : `AI unavailable${aiStatus.provider ? ` · ${aiStatus.provider}` : ''} — suggestions are disabled until one is available.`
                 : ''}
             </span>
           </div>
