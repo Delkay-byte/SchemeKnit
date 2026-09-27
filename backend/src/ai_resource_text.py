@@ -37,6 +37,7 @@ __all__ = [
     "normalize_text_items",
     "normalize_text",
     "clean_serialized_text",
+    "normalize_structured_references",
 ]
 
 #: Fragments too weak to stand alone as a resource after a comma split.
@@ -298,3 +299,61 @@ def normalize_text(value: Any) -> str:
         return ""
     text = value if isinstance(value, str) else str(value)
     return clean_serialized_text(text).strip()
+
+
+def normalize_structured_references(value: Any) -> List[Any]:
+    """Canonical structured-reference entries from ANY stored shape.
+
+    Production rows stored ``structured_references`` in corrupted shapes —
+    a JSON-encoded string (``"[]"`` / ``"[{...}]"``), a string that was
+    iterated into characters (``["[", "]"]``), or a mix of dicts and junk.
+    A raw read of any of those crashed exports with a pydantic
+    ValidationError (unhandled 500). Every layer that reads this field
+    funnels through here so only real entries (dicts or pydantic models)
+    ever reach the UI or an export.
+
+    * ``None`` / non-list shapes         -> ``[]``
+    * JSON string (``"[...]"``, ``"[]"``) -> parsed entries
+    * char-split garbage (``["[", "]"]``) -> recovered when possible, else `[]`
+    * dict / pydantic entries            -> passed through untouched
+    * anything else                      -> dropped
+    """
+    if value is None:
+        return []
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except Exception:
+            # Not JSON at all (plain text was stored) — not an entry.
+            return []
+        if isinstance(parsed, str):
+            # Guard against pathological re-parses: a string never nests.
+            return []
+        return normalize_structured_references(parsed)
+    if not isinstance(value, (list, tuple)):
+        return []
+    value = list(value)
+    if value and all(isinstance(i, str) and len(i) <= 1 for i in value):
+        # A string iterated into characters (list("[]") / list("[{...}]")).
+        # Real entries are always dicts, so a list of 1-char strings can only
+        # be this corruption — rejoin and re-parse.
+        return normalize_structured_references("".join(value))
+    out: List[Any] = []
+    for item in value:
+        if isinstance(item, dict):
+            out.append(item)
+        elif isinstance(item, str):
+            # Char-split garbage ('[', ']', '"', ...) or an embedded
+            # JSON-encoded entry. Only a parseable dict/list is recoverable.
+            try:
+                parsed = json.loads(item)
+            except Exception:
+                continue
+            if isinstance(parsed, dict):
+                out.append(parsed)
+            elif isinstance(parsed, list):
+                out.extend(normalize_structured_references(parsed))
+        elif hasattr(item, "model_dump"):
+            # Pydantic ReferenceEntry instances (in-memory pipeline values).
+            out.append(item)
+    return out

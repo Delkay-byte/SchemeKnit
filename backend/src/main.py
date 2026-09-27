@@ -213,10 +213,27 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
-    log_error("unhandled_exception", error=str(exc), path=str(request.url.path))
+    import traceback
+    log_error("unhandled_exception", error=str(exc), path=str(request.url.path),
+              traceback=traceback.format_exc())
+    # Starlette executes the generic Exception handler in ServerErrorMiddleware,
+    # OUTSIDE every user middleware — including CORSMiddleware. Without echoing
+    # the request origin here the browser reports an opaque CORS/network
+    # failure ("We could not complete the download...") instead of the real
+    # error, and harnesses see no response at all. Echo the origin when it is
+    # configured exactly as CORSMiddleware would.
+    headers = {}
+    origin = request.headers.get("origin")
+    if origin and origin in settings.CORS_ORIGINS:
+        headers = {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Vary": "Origin",
+        }
     return JSONResponse(
         status_code=500,
         content={"error": True, "detail": "Internal server error"},
+        headers=headers,
     )
 
 

@@ -21,6 +21,7 @@ from .models import (
     AIMode, ValidationIssue, EducationalLevel, TemplateType,
     CLASS_LEVEL_TO_EDUCATIONAL_LEVEL,
 )
+from .ai_resource_text import normalize_text_items, normalize_structured_references
 
 
 WORKFLOW_STAGES = ["upload", "review", "configure", "generate", "export"]
@@ -414,8 +415,28 @@ class DataService:
                 "learning_objectives": lp.learning_objectives,
             }
 
+        # Shape-coerce list-typed JSON fields at the write boundary: a client
+        # sending a serialized string would otherwise be double-encoded into
+        # the JSON column (the production structured_references corruption
+        # that crashed every export). Anything that cannot canonicalize to a
+        # list of entries is dropped rather than stored.
+        text_list_fields = {
+            "keywords", "other_tlrs", "core_competencies", "source_tlrs",
+            "teaching_learning_resources", "references", "indicators",
+            "indicator_codes", "wapef_through_lines",
+        }
+        activity_list_fields = {
+            "main_activities", "learner_activities", "teacher_activities",
+            "learning_objectives",
+        }
         for key, value in updates.items():
             if hasattr(lp, key) and key not in ("id", "job_id", "owner_id", "scheme_id", "created_at"):
+                if key == "structured_references":
+                    value = normalize_structured_references(value)
+                elif key in text_list_fields:
+                    value = normalize_text_items(value)
+                elif key in activity_list_fields and not isinstance(value, list):
+                    continue
                 setattr(lp, key, value)
 
         # WAPEF teacher-selected fields are normalized through the approved

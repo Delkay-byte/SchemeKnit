@@ -24,6 +24,7 @@ from ..models import (
     ReferenceEntry,
 )
 from ..engines.generation_pipeline import GenerationPipeline
+from ..ai_resource_text import normalize_text_items, normalize_structured_references
 from ..logging_config import get_logger, log_event, log_error
 
 router = APIRouter()
@@ -169,13 +170,15 @@ async def preview_allocation(
             "is_special_period": bool(getattr(a, "is_special_period", False)),
             "special_period_label": getattr(a, "special_period_label", ""),
             "special_period_type": getattr(a, "special_period_type", ""),
-            "keywords": list((drafts.get(str(a.lesson_sequence)) or {}).get("keywords") or []),
-            "other_tlrs": list((drafts.get(str(a.lesson_sequence)) or {}).get("other_tlrs") or []),
-            "core_competencies": list((drafts.get(str(a.lesson_sequence)) or {}).get("core_competencies") or []),
-            "structured_references": list((drafts.get(str(a.lesson_sequence)) or {}).get("structured_references") or []),
+            # Draft fields normalize at the API boundary too: a serialized
+            # string draft must never reach the UI as split characters.
+            "keywords": normalize_text_items((drafts.get(str(a.lesson_sequence)) or {}).get("keywords")),
+            "other_tlrs": normalize_text_items((drafts.get(str(a.lesson_sequence)) or {}).get("other_tlrs")),
+            "core_competencies": normalize_text_items((drafts.get(str(a.lesson_sequence)) or {}).get("core_competencies")),
+            "structured_references": normalize_structured_references((drafts.get(str(a.lesson_sequence)) or {}).get("structured_references")),
             "wapef_deep_hope": (drafts.get(str(a.lesson_sequence)) or {}).get("wapef_deep_hope", ""),
             "wapef_storyline": (drafts.get(str(a.lesson_sequence)) or {}).get("wapef_storyline", ""),
-            "wapef_through_lines": list((drafts.get(str(a.lesson_sequence)) or {}).get("wapef_through_lines") or []),
+            "wapef_through_lines": normalize_text_items((drafts.get(str(a.lesson_sequence)) or {}).get("wapef_through_lines")),
             "wapef_gods_story": (drafts.get(str(a.lesson_sequence)) or {}).get("wapef_gods_story", ""),
             "remarks": (drafts.get(str(a.lesson_sequence)) or {}).get("remarks", ""),
         }
@@ -1328,8 +1331,12 @@ def _apply_lesson_review_draft(lp, drafts: dict) -> None:
         lp.core_competencies = list(draft.get("core_competencies") or [])
     if "structured_references" in draft:
         refs = [
-            ReferenceEntry(**r) if isinstance(r, dict) else r
-            for r in (draft.get("structured_references") or [])
+            entry
+            for entry in (
+                _reference_entry(r)
+                for r in normalize_structured_references(draft.get("structured_references"))
+            )
+            if entry is not None
         ]
         # PART L/M: only NON-EMPTY references persist. The UI shows 3 empty
         # slots by default; untouched/blank slots must never be stored as
@@ -1343,6 +1350,28 @@ def _apply_lesson_review_draft(lp, drafts: dict) -> None:
                 labels.append(label)
         if labels:
             lp.references = labels
+
+
+def _reference_entry(entry):
+    """Coerce one stored entry to a ReferenceEntry — never raises.
+
+    Corrupted rows can hold dicts with non-string values (lists, numbers,
+    nested objects). A raw ``ReferenceEntry(**entry)`` would raise a
+    pydantic ValidationError and take the whole export down; here anything
+    that isn't a usable scalar is dropped to the model default instead.
+    """
+    if isinstance(entry, ReferenceEntry):
+        return entry
+    if not isinstance(entry, dict):
+        return None
+    safe = {}
+    for key, value in entry.items():
+        if isinstance(value, str):
+            safe[key] = value
+        elif isinstance(value, (int, float)) and not isinstance(value, bool):
+            safe[key] = str(value)
+        # None / bool / list / dict values: fall back to the field default.
+    return ReferenceEntry(**safe)
 
 
 def _serialize_lesson(lp) -> dict:
@@ -1405,7 +1434,8 @@ def _serialize_lesson(lp) -> dict:
         "assessment": lp.assessment,
         "conclusion": lp.conclusion,
         "references": normalize_text_items(lp.references),
-        "structured_references": list(getattr(lp, "structured_references", None) or []),
+        "structured_references": normalize_structured_references(
+            getattr(lp, "structured_references", None)),
         "keywords": normalize_text_items(lp.keywords),
         "status": lp.status,
         "ai_generated": lp.ai_generated,
@@ -1490,8 +1520,13 @@ def _db_to_lesson_model(lp) -> LessonPlan:
         conclusion=lp.conclusion,
         references=normalize_text_items(lp.references),
         structured_references=[
-            ReferenceEntry(**r) if isinstance(r, dict) else r
-            for r in (getattr(lp, "structured_references", None) or [])
+            entry
+            for entry in (
+                _reference_entry(entry)
+                for entry in normalize_structured_references(
+                    getattr(lp, "structured_references", None))
+            )
+            if entry is not None
         ],
         keywords=normalize_text_items(lp.keywords),
     )
