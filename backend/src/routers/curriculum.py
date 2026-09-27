@@ -76,6 +76,33 @@ async def approve_scheme(
     return {"message": "Scheme approved for lesson plan generation"}
 
 
+@router.get("/{scheme_id}/spine")
+async def get_curriculum_spine(
+    scheme_id: str,
+    user: User = Depends(get_current_user),
+    db=Depends(get_db),
+):
+    """The canonical curriculum spine for one scheme.
+
+    Derived from the persisted, authoritative weeks (written once at upload /
+    subject-confirmation). Later lessons, exports and the review workspace all
+    refer to this SAME representation instead of rediscovering the curriculum.
+    ``spine_version`` changes whenever the stored curriculum changes, so a
+    source replacement invalidates derived views instead of going stale.
+    """
+    scheme_db = data_service.get_scheme(db, scheme_id, user.id)
+    if not scheme_db:
+        if data_service.scheme_exists(db, scheme_id):
+            raise HTTPException(
+                status_code=403,
+                detail="You do not have access to this scheme",
+            )
+        raise HTTPException(status_code=404, detail="Scheme not found")
+
+    from ..curriculum.spine import build_curriculum_spine
+    return build_curriculum_spine(scheme_db)
+
+
 @router.get("/{scheme_id}/summary")
 async def get_scheme_summary(
     scheme_id: str,

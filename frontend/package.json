@@ -16,7 +16,8 @@
     "e2e:phase17:chrome": "node e2e/phase17-teacher-journey.js chrome",
     "e2e:phase17:edge": "node e2e/phase17-teacher-journey.js msedge",
     "e2e:entitlement:chrome": "node e2e/entitlement-download-acceptance.js chrome",
-    "e2e:entitlement:edge": "node e2e/entitlement-download-acceptance.js msedge"
+    "e2e:entitlement:edge": "node e2e/entitlement-download-acceptance.js msedge",
+    "e2e:workspace": "node e2e/curriculum-workspace-acceptance.js"
   },
   "keywords": [],
   "author": "",

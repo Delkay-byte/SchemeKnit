@@ -293,12 +293,19 @@ async def get_scheme_weeks(
 ):
     scheme_db = _resolve_scheme_or_raise(db, scheme_id, user.id)
 
+    # The extraction-verification surface reads the SAME curriculum spine the
+    # generator uses: per-week review status + teacher-facing reasons, derived
+    # from the already-persisted weeks (no second parse, no second store).
+    from ..curriculum.spine import build_week_spine
+
     weeks = []
     for w in scheme_db.weeks:
+        spine_week = build_week_spine(w)
         weeks.append({
             "id": w.id,
             "week_number": w.week_number,
             "week_type": w.week_type,
+            "week_type_label": spine_week["week_type_label"],
             "start_date": w.start_date.isoformat() if w.start_date else None,
             "end_date": w.end_date.isoformat() if w.end_date else None,
             "week_ending_derived": bool(getattr(w, "week_ending_derived", False)),
@@ -307,6 +314,10 @@ async def get_scheme_weeks(
             "content_standards": w.content_standards or [],
             "indicators": w.indicators or [],
             "resources": w.resources or [],
+            "special_period_label": getattr(w, "special_period_label", "") or "",
+            "special_period_type": getattr(w, "special_period_type", "") or "",
+            "review_status": spine_week["review_status"],
+            "review_reasons": spine_week["review_reasons"],
         })
 
     return {"weeks": weeks}
