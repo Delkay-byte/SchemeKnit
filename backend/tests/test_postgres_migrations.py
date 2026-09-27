@@ -66,6 +66,29 @@ def test_v021_and_v022_use_false_default():
     assert "DEFAULT 0" not in normalised_v022
 
 
+def test_no_sqlite_only_datetime_ddl_types():
+    """PostgreSQL rejects the SQLite-only DATETIME type name.
+
+    Regression guard: v028 crashed the Render deploy with psycopg
+    UndefinedObject (type "datetime" does not exist) on
+    ``ALTER TABLE entitlements ADD COLUMN starts_at DATETIME`` and the
+    service failed its health check. TIMESTAMP is portable across SQLite
+    and PostgreSQL (the v008 convention).
+    """
+    offenders = []
+    for path in sorted(MIGRATIONS_DIR.glob("v*.py")):
+        src = path.read_text(encoding="utf-8")
+        # Ignore docstrings and comments: only literal DDL counts.
+        src = re.sub(r'"""[\s\S]*?"""|\'\'\'[\s\S]*?\'\'\'', "", src)
+        src = re.sub(r"#.*", "", src)
+        if re.search(r"\bDATETIME\b", src):
+            offenders.append(path.name)
+    assert not offenders, (
+        "SQLite-only DATETIME in migration DDL (breaks PostgreSQL): "
+        + ", ".join(offenders)
+    )
+
+
 @pytest.mark.skipif(
     _postgres_url() is None,
     reason="Set POSTGRES_MIGRATION_TEST_URL (scratch PostgreSQL) to run the live harness",
