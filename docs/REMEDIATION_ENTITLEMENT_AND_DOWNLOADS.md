@@ -164,3 +164,57 @@ applied by the standard migration runner at backend start.
   additionally check job ownership at issue time.
 * Errors returned to teachers are stable, user-facing strings; internal
   reasons (e.g. `no_entitlement`, `credits_exhausted`) stay in logs.
+
+## 10. Production incidents found by the live harness
+
+The first production run of the harness failed 10 of 22 checks and exposed
+three stacked defects that no local test could see (local SQLite stored the
+data cleanly and local Windows has Word):
+
+1. **Corrupted `structured_references` on PostgreSQL.** Production rows held
+   a double-encoded JSON string (`"[]"` stored as `'"[]"'`) or a char-split
+   list (`["[", "]"]`). Every export path crashed in `_db_to_lesson_model`
+   with a pydantic `ValidationError` — an unhandled 500.
+2. **The 500 had no CORS headers.** Starlette runs the generic `Exception`
+   handler in `ServerErrorMiddleware`, outside `CORSMiddleware`, so the
+   browser reported an opaque network failure instead of the real error.
+   Fixed in `main.py` by echoing the configured origin from the handler
+   itself (plus logging the traceback).
+3. **PDF had no converter on Render.** Neither MS Word nor LibreOffice
+   exists there, so every PDF was a controlled 500 and could never produce
+   verified bytes.
+
+Fixes:
+
+| Layer | Change |
+|---|---|
+| Read path | `normalize_structured_references` funnels every read (export model, API serializer, drafts) through one canonicalizer; `_reference_entry` never raises on junk |
+| Write path | `update_lesson_plan` coerces list-typed payload fields; the generation pipeline no longer re-splits strings |
+| Data | `v030_repair_json_list_fields` repairs the four v023-era list columns in Python (driver-aware: PostgreSQL `json` values arrive parsed, SQLite/TEXT arrive as stored text); idempotent, dialect-portable |
+| Errors | Generic 500 handler returns `Access-Control-Allow-Origin` for configured origins |
+| PDF | PyMuPDF (`pymupdf`, already pinned) joins the backend chain last: Word -> LibreOffice -> PyMuPDF. No infra change; Render now produces real PDFs |
+| Harness | Admin step waits for the Teachers panel and row, selects a plan before activating (the button is plan-gated), and polls my-plan results |
+
+## 11. Final production acceptance
+
+`node frontend/e2e/entitlement-download-acceptance.js bundled` against
+`https://schemeknit-frontend.onrender.com` + `https://schemeknit-api.onrender.com`:
+**28/28 checks passed**, including:
+
+* DOCX browser download — 38,914 bytes, `PK` zip signature, correct MIME,
+  `.docx` filename, second authenticated tab.
+* PDF browser download — 58,686 bytes, `%PDF-` signature,
+  `application/pdf`, `.pdf` filename.
+* Server-authoritative entitlement cycle: FREE before activation -> admin
+  activates PRO -> teacher sees `PRO / active` -> revoke -> `FREE`.
+* No `Failed to fetch`, no generic `Action failed`, self-upgrade and
+  self-revoke blocked with 403.
+
+Scratch-PostgreSQL verification: full migration chain `v001`-`v030` applies
+on a fresh database, corrupt rows repair, and a second run is a no-op.
+Backend suite: 1524 passed, 12 skipped.
+
+Commits for this remediation (oldest first): `9ca2f71`, `4ceb046`,
+`363d3b6`, `5993cf9`, `0c5334b`, `c586238` (migration portability),
+`cc5fc6e` (structured references + CORS), `f2b84a5` (PyMuPDF),
+`03f21f6` (harness waits).
