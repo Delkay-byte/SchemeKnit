@@ -34,6 +34,7 @@ from ..models import (
     Subject, ClassLevel,
 )
 from .calendar_engine import CalendarEngine
+from ..ai_resource_text import normalize_structured_references
 from .allocation_engine import AllocationEngine
 from .coverage_validator import CoverageValidator
 from .docx_export import DOCXExportEngine, default_template_for_lessons
@@ -551,7 +552,8 @@ class GenerationPipeline:
             for r in (getattr(config, "references", []) or []):
                 if r and r.lower() not in {x.lower() for x in lesson_references}:
                     lesson_references.append(r)
-        lesson_structured_refs = list(getattr(lp, "structured_references", None) or [])
+        lesson_structured_refs = normalize_structured_references(
+            getattr(lp, "structured_references", None))
         # Authoritative curriculum facts — AI must never change these.
         authoritative = {
             "indicator_codes": list(lp.indicator_codes or []),
