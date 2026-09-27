@@ -31,9 +31,9 @@ def up(db):
             path VARCHAR NOT NULL,
             media_type VARCHAR NOT NULL,
             filename VARCHAR NOT NULL,
-            expires_at DATETIME NOT NULL,
-            used_at DATETIME,
-            created_at DATETIME
+            expires_at TIMESTAMP NOT NULL,
+            used_at TIMESTAMP,
+            created_at TIMESTAMP
         )
         """
     ))

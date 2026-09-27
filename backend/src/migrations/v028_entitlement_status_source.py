@@ -39,11 +39,13 @@ def up(db):
 
     _add_column(db, "entitlements", "status", "VARCHAR DEFAULT 'active'", inspector)
     _add_column(db, "entitlements", "source", "VARCHAR DEFAULT 'free'", inspector)
-    _add_column(db, "entitlements", "starts_at", "DATETIME", inspector)
+    # TIMESTAMP, not DATETIME: SQLite accepts either name, PostgreSQL has no
+    # "datetime" type and rejects ALTER TABLE with UndefinedObject (v008 note).
+    _add_column(db, "entitlements", "starts_at", "TIMESTAMP", inspector)
     _add_column(db, "entitlements", "activated_by", "VARCHAR", inspector)
-    _add_column(db, "entitlements", "activated_at", "DATETIME", inspector)
+    _add_column(db, "entitlements", "activated_at", "TIMESTAMP", inspector)
     _add_column(db, "entitlements", "revoked_by", "VARCHAR", inspector)
-    _add_column(db, "entitlements", "revoked_at", "DATETIME", inspector)
+    _add_column(db, "entitlements", "revoked_at", "TIMESTAMP", inspector)
     _add_column(db, "entitlements", "revoked_reason", "TEXT DEFAULT ''", inspector)
 
     if not inspector.has_table("entitlements"):

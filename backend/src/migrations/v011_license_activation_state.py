@@ -26,7 +26,8 @@ def up(db):
         cols = [c["name"] for c in inspector.get_columns("school_licenses")]
 
     wanted = {
-        "activated_at": "DATETIME",
+        # TIMESTAMP (not DATETIME): PostgreSQL has no "datetime" type.
+        "activated_at": "TIMESTAMP",
         "activation_code_id": "VARCHAR",
     }
     for col, ddl in wanted.items():

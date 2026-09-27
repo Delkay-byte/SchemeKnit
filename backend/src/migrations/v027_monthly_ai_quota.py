@@ -30,8 +30,8 @@ def up(db):
             period_type VARCHAR NOT NULL,
             period_key VARCHAR NOT NULL,
             units_used INTEGER,
-            created_at DATETIME,
-            updated_at DATETIME,
+            created_at TIMESTAMP,
+            updated_at TIMESTAMP,
             CONSTRAINT uq_ai_generation_period
                 UNIQUE (user_id, period_type, period_key)
         )
