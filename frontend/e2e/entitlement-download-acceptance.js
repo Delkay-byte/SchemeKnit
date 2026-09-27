@@ -315,33 +315,64 @@ function watchFinalDownloads(page, sink) {
       const adminPage = await login(adminCtx, ADMIN)
       record('Admin login', true, adminPage.url())
       await adminPage.goto(`${BASE}/platform-admin/`, { waitUntil: 'domcontentloaded' })
+      // Switch to the Teachers tab and wait for its data to render. A fixed
+      // 1.5s sleep raced the loading spinner and the teachers API (cold
+      // starts), so the row check fired while the panel was not mounted.
       await adminPage.click('button:has-text("teachers")').catch(() => {})
-      await adminPage.waitForTimeout(1500)
+      try {
+        await adminPage.waitForSelector('h2:has-text("Individual Teachers")', { timeout: 20000 })
+      } catch {
+        await adminPage.click('button:has-text("teachers")').catch(() => {})
+        await adminPage.waitForSelector('h2:has-text("Individual Teachers")', { timeout: 20000 })
+      }
 
       const row = adminPage.locator(`[data-teacher-row="${TEACHER.email}"]`)
+      try {
+        await row.first().waitFor({ state: 'attached', timeout: 15000 })
+      } catch {
+        // Reported below via the count check.
+      }
       if (!(await row.count())) {
         record('Admin sees the teacher', false, `row not found for ${TEACHER.email}`)
       } else {
         record('Admin sees the teacher', true, '')
         const activateBtn = row.locator('[data-teacher-activate]')
         if (await activateBtn.count()) {
+          // Activation is plan-gated in the UI (button stays disabled without
+          // a plan) — pick the first real plan (index 0 is the placeholder).
+          const planSelect = adminPage.locator('[data-teacher-plan]')
+          const options = await planSelect.locator('option').count().catch(() => 0)
+          if (options > 1) {
+            await planSelect.selectOption({ index: 1 }).catch(() => {})
+          }
           const enabled = await activateBtn.first().isEnabled().catch(() => false)
           if (!enabled) {
-            record('Admin activated PRO', false, 'activate button disabled (no plan selected?)')
+            record('Admin activated PRO', false, 'activate button disabled after plan select')
           } else {
             await activateBtn.first().click()
-            await adminPage.waitForTimeout(2500)
-            record('Admin activated PRO', true, '')
+            // PRO is proven by the row swapping Activate -> Revoke/Extend.
+            try {
+              await row.locator('[data-teacher-revoke]').first()
+                .waitFor({ state: 'attached', timeout: 15000 })
+              record('Admin activated PRO', true, '')
+            } catch {
+              record('Admin activated PRO', false, 'row still shows Activate 15s after click')
+            }
           }
         } else {
           record('Admin activated PRO', false, 'activate button not offered (already PRO?)')
         }
       }
 
-      // Teacher refreshes and now sees PRO.
-      await page.reload({ waitUntil: 'domcontentloaded' })
-      await page.waitForTimeout(1500)
-      const after = await readPlan(page)
+      // Teacher refreshes and now sees PRO (poll: my-plan can lag the
+      // activation write by a moment on a cold instance).
+      let after = { plan: '', status: '' }
+      for (let i = 0; i < 8; i++) {
+        await page.reload({ waitUntil: 'domcontentloaded' })
+        await page.waitForTimeout(1500)
+        after = await readPlan(page)
+        if (after.plan === 'PRO' && after.status === 'active') break
+      }
       record('Teacher entitlement now PRO after refresh', after.plan === 'PRO' && after.status === 'active',
         `${after.plan} · ${after.status}`)
 
@@ -359,10 +390,13 @@ function watchFinalDownloads(page, sink) {
         } else {
           await adminPage.click('button:has-text("Revoke")').catch(() => {})
         }
-        await adminPage.waitForTimeout(2500)
-        await page.reload({ waitUntil: 'domcontentloaded' })
-        await page.waitForTimeout(1500)
-        const revoked = await readPlan(page)
+        let revoked = { plan: '', status: '' }
+        for (let i = 0; i < 8; i++) {
+          await page.reload({ waitUntil: 'domcontentloaded' })
+          await page.waitForTimeout(1500)
+          revoked = await readPlan(page)
+          if (revoked.plan === 'FREE') break
+        }
         record('Revoking PRO returns teacher to FREE', revoked.plan === 'FREE',
           `${revoked.plan} · ${revoked.status}`)
       }
