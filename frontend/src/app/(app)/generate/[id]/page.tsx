@@ -14,6 +14,7 @@ import { api } from '@/lib/api'
 import { resolveRouteId } from '@/lib/route-params'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatusPill } from '@/components/ui/badge'
+import { LessonWorkspace } from '@/components/lesson-workspace'
 import { SchemeOfWork, TermConfig, CurriculumCoverage, Template, CurriculumProfile, WapefOptions } from '@/types'
 
 // The Approved WAPEF Plan is one shared form for Nursery/KG/Basic/JHS; its
@@ -40,6 +41,11 @@ export default function GeneratePage() {
   const [previewing, setPreviewing] = useState(false)
   const [allocationConfirmed, setAllocationConfirmed] = useState(false)
   const [selectedCodes, setSelectedCodes] = useState<string[]>([])
+  // Generation experience (Pattern 7): Quick Generate is the default; Build
+  // with me reveals the generated lesson one section at a time. Persisted so
+  // the teacher's choice survives a reload.
+  const [genMode, setGenMode] = useState<'quick' | 'guided'>('quick')
+  const [reviewedLessons, setReviewedLessons] = useState<number | null>(null)
   // Per-lesson review drafts (keywords / Other TLRs / competencies / refs)
   // edited BEFORE generation and applied when lessons are built.
   const [lessonReview, setLessonReview] = useState<any[]>([])
@@ -116,6 +122,8 @@ export default function GeneratePage() {
     try {
       const saved = window.localStorage.getItem('schemeknit.ai_mode')
       if (saved) setConfig(prev => ({ ...prev, ai_mode: saved as any }))
+      const savedGenMode = window.localStorage.getItem('schemeknit.gen_mode')
+      if (savedGenMode === 'guided' || savedGenMode === 'quick') setGenMode(savedGenMode)
     } catch { /* storage unavailable */ }
     loadData()
     // WAPEF dropdown options are canonical; a failure just means the WAPEF
@@ -304,6 +312,9 @@ export default function GeneratePage() {
       const drafts: Record<string, any> = {}
       for (const row of lessonReview) {
         drafts[String(row.lesson_sequence)] = {
+          // Teacher-adjusted timetable slot for this lesson (Pattern 1).
+          // Applied to the built lesson; blank is preserved as blank.
+          period: row.period || '',
           keywords: row.keywords || [],
           other_tlrs: row.other_tlrs || [],
           core_competencies: row.core_competencies || [],
@@ -515,8 +526,20 @@ export default function GeneratePage() {
         />
 
         <div className="grid gap-6 lg:grid-cols-3">
-          {/* MAIN COLUMN — source facts, configuration, allocation, review. */}
+          {/* MAIN COLUMN — after generation the CURRICULUM-GROUNDED LESSON
+              WORKSPACE leads, so the first thing the teacher sees is the real
+              generated lesson (never an empty editor or a bare success toast).
+              The configuration surfaces remain below for regeneration. */}
           <div className="space-y-6 lg:col-span-2">
+          {jobId && (
+            <LessonWorkspace
+              jobId={jobId}
+              guided={genMode === 'guided'}
+              onExport={handleExport}
+              exporting={exporting}
+              onLessonsLoaded={setReviewedLessons}
+            />
+          )}
             {/* A. What exact lessons am I about to generate? Source facts first. */}
             <SurfaceCard
               data-generate-summary
@@ -1063,6 +1086,29 @@ export default function GeneratePage() {
                       )}
                       {!row.is_special_period && (
                         <>
+                          {/* ALLOCATION (Pattern 1): the teacher reviews the
+                              auto-assigned slot and adjusts it. Mostly reviewing,
+                              rarely typing — an intelligent default, editable. */}
+                          <div className="flex flex-wrap items-end gap-2">
+                            <div className="flex-1 min-w-[10rem]">
+                              <label
+                                htmlFor={`period-${row.lesson_sequence}`}
+                                className="mb-1 block text-[11px] font-medium text-muted-foreground"
+                              >
+                                Teaching period / day
+                              </label>
+                              <input
+                                id={`period-${row.lesson_sequence}`}
+                                type="text"
+                                value={row.period || ''}
+                                onChange={(e) => updateLessonReviewRow(row.lesson_sequence, {
+                                  period: e.target.value,
+                                })}
+                                placeholder="e.g. Monday · Period 1"
+                                className="w-full rounded-md border border-input px-2 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#04A9CE]/45 focus-visible:border-[#04A9CE]/70"
+                              />
+                            </div>
+                          </div>
                           {/* CURRICULUM CONTEXT — read-only authoritative source
                               data (PART X/Y). */}
                           <p className="text-[11px] leading-snug text-muted-foreground">
@@ -1348,6 +1394,42 @@ export default function GeneratePage() {
 
               {!jobId ? (
                 <>
+                  {/* Generation experience (Pattern 7). Quick Generate remains
+                      the default; Build with me is opt-in and never asks the
+                      teacher ten questions before delivering a lesson. */}
+                  <div data-generate-mode className="mt-3 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Generation mode">
+                    {([
+                      { key: 'quick', label: 'Quick Generate' },
+                      { key: 'guided', label: 'Build with me' },
+                    ] as const).map((m) => {
+                      const active = genMode === m.key
+                      return (
+                        <button
+                          key={m.key}
+                          type="button"
+                          role="radio"
+                          aria-checked={active}
+                          onClick={() => {
+                            setGenMode(m.key)
+                            try { window.localStorage.setItem('schemeknit.gen_mode', m.key) } catch { /* ignore */ }
+                          }}
+                          className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                            active
+                              ? 'border-[#102A43] bg-[#102A43] text-white'
+                              : 'border-slate-200 bg-white text-[#102A43] hover:bg-slate-50'
+                          }`}
+                        >
+                          {m.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <p className="mt-1 text-center text-xs text-muted-foreground">
+                    {genMode === 'guided'
+                      ? 'Build with me — review one section at a time after generating.'
+                      : 'Quick Generate — one complete draft from your scheme.'}
+                  </p>
+
                   {!allocationPreview && !allocationConfirmed && (
                     <Banner tone="info" className="mt-3" title="Step 1: preview the allocation">
                       Preview shows exactly which lessons will be generated — dates, periods and
@@ -1436,7 +1518,7 @@ export default function GeneratePage() {
                   <div className="flex items-center rounded-lg bg-green-50 p-3 text-green-700">
                     <CheckCircle className="mr-2 h-5 w-5 shrink-0" />
                     <span className="font-medium">
-                      {coverage?.total_generated_lessons || 0} lesson plans generated
+                      {reviewedLessons ?? coverage?.total_generated_lessons ?? 0} lesson plans generated — shown on the left
                     </span>
                   </div>
                   {aiResult && (
@@ -1448,10 +1530,10 @@ export default function GeneratePage() {
                           : `AI unavailable${aiResult.provider ? ` · ${aiResult.provider}` : ''} — all lessons generated deterministically.`}
                     </p>
                   )}
-                  <Button className="w-full" asChild>
+                  <Button className="w-full" variant="outline" asChild>
                     <Link href="/lessons">
                       <Eye className="mr-2 h-4 w-4" />
-                      Review Lesson Plans
+                      See all lesson plans
                     </Link>
                   </Button>
                   <Button onClick={() => handleExport('docx')} disabled={exporting === 'docx'} className="w-full" variant="outline">

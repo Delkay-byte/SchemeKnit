@@ -220,9 +220,12 @@ class DataService:
         scheme = self.get_scheme(db, scheme_id, owner_id)
         if not scheme:
             return {}
+        # ``period`` is the teacher-editable timetable slot for this lesson
+        # (Pattern 1: the allocation preview lets the teacher adjust it).
+        # Source-authoritative fields stay out of this list.
         allowed = ("keywords", "other_tlrs", "core_competencies", "structured_references",
                    "wapef_deep_hope", "wapef_storyline", "wapef_through_lines",
-                   "wapef_gods_story", "remarks")
+                   "wapef_gods_story", "remarks", "period")
         clean = {k: draft[k] for k in allowed if k in (draft or {})}
         store = getattr(scheme, "lesson_review_drafts", None)
         if not isinstance(store, dict):
@@ -243,7 +246,7 @@ class DataService:
             return {}
         allowed = ("keywords", "other_tlrs", "core_competencies", "structured_references",
                    "wapef_deep_hope", "wapef_storyline", "wapef_through_lines",
-                   "wapef_gods_story", "remarks")
+                   "wapef_gods_story", "remarks", "period")
         store = {}
         for key, draft in (drafts or {}).items():
             if isinstance(draft, dict):

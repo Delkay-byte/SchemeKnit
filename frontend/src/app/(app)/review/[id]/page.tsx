@@ -18,11 +18,27 @@ interface WeekData {
   start_date: string
   end_date: string
   week_type: string
+  week_type_label?: string
   strand: string | null
   sub_strand: string | null
   content_standards: string[]
   indicators: string[]
   resources: string[]
+  special_period_label?: string
+  // Teacher-facing extraction review state (from the curriculum spine).
+  // Never raw parser diagnostics.
+  review_status?: 'ok' | 'needs_review' | 'special'
+  review_reasons?: string[]
+}
+
+function firstIndicatorCode(text: string): string {
+  const m = /[A-Za-z]?\d+\.\d+\.\d+\.\d+(?:\.\d+)?/.exec(text || '')
+  return m ? m[0] : ''
+}
+
+function firstIndicatorText(text: string): string {
+  const code = firstIndicatorCode(text)
+  return code ? (text || '').slice((text || '').indexOf(code) + code.length).replace(/^[:.\s]+/, '') : (text || '')
 }
 
 interface SchemeData {
@@ -126,6 +142,22 @@ export default function ReviewPage() {
   }
   const instructionalCount = weeks.filter(w => w.week_type === 'instruction').length
   const specialCount = weeks.length - instructionalCount
+  const needsReviewWeeks = weeks.filter(w => w.review_status === 'needs_review')
+  const needsReviewNumbers = needsReviewWeeks.map(w => w.week_number)
+
+  const reviewStatusPill = (week: WeekData) => {
+    if (week.review_status === 'needs_review') {
+      return <StatusPill tone="warning">⚠ Needs review</StatusPill>
+    }
+    if (week.review_status === 'special' || week.week_type !== 'instruction') {
+      return (
+        <StatusPill tone={weekTypeTone(week.week_type)}>
+          {week.week_type_label || WEEK_TYPE_LABELS[week.week_type] || week.week_type}
+        </StatusPill>
+      )
+    }
+    return <StatusPill tone="success">✓ Parsed</StatusPill>
+  }
 
   if (loading) {
     return (
@@ -266,6 +298,116 @@ export default function ReviewPage() {
                 ))}
               </ul>
             </Banner>
+          )}
+        </SurfaceCard>
+
+        {/* Extraction verification table — the teacher sees exactly what was
+            read from their scheme and which weeks need a second look BEFORE
+            trusting generation. Clicking a row selects that week. */}
+        <SurfaceCard data-extraction-table className="mb-6 overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-5 py-4 sm:px-6">
+            <div>
+              <h2 className="text-lg font-semibold text-[#102A43]">Extracted curriculum</h2>
+              <p className="text-sm text-muted-foreground">
+                What SchemeKnit read from your document. Select a week to review it.
+              </p>
+            </div>
+            {needsReviewWeeks.length > 0 && (
+              <StatusPill tone="warning">
+                {needsReviewWeeks.length} week{needsReviewWeeks.length === 1 ? '' : 's'} need review
+              </StatusPill>
+            )}
+          </div>
+
+          {weeks.length === 0 ? (
+            <p className="px-5 py-6 text-sm text-muted-foreground sm:px-6">
+              No weeks were extracted from this document.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[36rem] border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
+                    <th className="px-4 py-2 font-semibold">Week</th>
+                    <th className="px-4 py-2 font-semibold">Strand</th>
+                    <th className="px-4 py-2 font-semibold">Sub-strand</th>
+                    <th className="px-4 py-2 font-semibold">Indicator</th>
+                    <th className="px-4 py-2 font-semibold">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {weeks.map((week) => {
+                    const selected = week.week_number === selectedWeek
+                    return (
+                      <tr
+                        key={`xt-${week.id}`}
+                        onClick={() => setSelectedWeek(week.week_number)}
+                        aria-selected={selected}
+                        className={`cursor-pointer border-b border-slate-50 transition-colors ${
+                          selected ? 'bg-[#102A43]/5' : 'hover:bg-slate-50'
+                        }`}
+                      >
+                        <td className="whitespace-nowrap px-4 py-2.5 font-medium text-[#102A43]">
+                          Week {week.week_number}
+                          {week.special_period_label && (
+                            <span className="ml-2 text-xs text-muted-foreground">
+                              {week.special_period_label}
+                            </span>
+                          )}
+                        </td>
+                        <td className="max-w-[10rem] truncate px-4 py-2.5 text-muted-foreground" title={week.strand || ''}>
+                          {week.strand || '—'}
+                        </td>
+                        <td className="max-w-[10rem] truncate px-4 py-2.5 text-muted-foreground" title={week.sub_strand || ''}>
+                          {week.sub_strand || '—'}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          {week.indicators.length > 0 ? (
+                            <span className="text-[#102A43]" title={week.indicators[0]}>
+                              <span className="font-mono text-xs">
+                                {firstIndicatorCode(week.indicators[0]) || '—'}
+                              </span>
+                              <span className="ml-1.5 text-muted-foreground">
+                                {firstIndicatorText(week.indicators[0]).slice(0, 48)}
+                                {firstIndicatorText(week.indicators[0]).length > 48 ? '…' : ''}
+                              </span>
+                              {week.indicators.length > 1 && (
+                                <span className="ml-1.5 text-xs text-muted-foreground">
+                                  +{week.indicators.length - 1} more
+                                </span>
+                              )}
+                            </span>
+                          ) : (
+                            <span className="italic text-muted-foreground">
+                              {week.week_type === 'instruction' ? 'No indicator read' : '—'}
+                            </span>
+                          )}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-2.5">{reviewStatusPill(week)}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {needsReviewWeeks.length > 0 && (
+            <div className="px-5 pb-5 sm:px-6">
+              <Banner tone="warning" title="Some weeks need your review" className="mt-1">
+                <ul className="list-disc space-y-1 pl-4">
+                  {needsReviewWeeks.map((w) => (
+                    <li key={`nr-${w.id}`}>
+                      Week {w.week_number}: {(w.review_reasons || []).join(' ') || 'Check this week.'}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-1">
+                  You can still continue — these weeks stay exactly as read and are
+                  never filled in with guessed content.
+                </p>
+              </Banner>
+            </div>
           )}
         </SurfaceCard>
 

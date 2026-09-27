@@ -151,6 +151,14 @@ async def preview_allocation(
     # exists, otherwise empty for the teacher to fill before generation.
     drafts = data_service.get_lesson_review_drafts(db, scheme_id, user.id) or {}
     report["lesson_review_drafts"] = drafts
+    # Spine-derived review state per curriculum week (Patterns 2/6): a week whose
+    # extraction was uncertain is shown as "Needs review" on the allocation
+    # screen. Nothing is re-parsed and nothing is invented.
+    from ..curriculum.spine import classify_week_review
+    week_review = {
+        w.week_number: classify_week_review(w)[0]
+        for w in (scheme_db.weeks or [])
+    }
     report["lesson_review"] = [
         {
             "lesson_sequence": a.lesson_sequence,
@@ -170,6 +178,32 @@ async def preview_allocation(
             "is_special_period": bool(getattr(a, "is_special_period", False)),
             "special_period_label": getattr(a, "special_period_label", ""),
             "special_period_type": getattr(a, "special_period_type", ""),
+            # Teacher-editable timetable slot for THIS lesson (Pattern 1).
+            # Starts from any saved draft, else blank — never invented.
+            "period": (drafts.get(str(a.lesson_sequence)) or {}).get("period", ""),
+            # Allocation review state: the engine flags an allocation whose
+            # placement could not be confirmed (e.g. no teaching date). Special
+            # periods are a real curriculum state, not a review failure.
+            "needs_review": bool(getattr(a, "needs_review", False))
+                            and not bool(getattr(a, "is_special_period", False)),
+            # "Why this lesson?" provenance (Patterns 3/6). Compact, teacher-facing;
+            # every value comes from the stored curriculum, nothing is fabricated.
+            "source_provenance": {
+                "scheme": getattr(scheme_db, "filename", "") or "",
+                "curriculum_source": "Teacher scheme",
+                "source_week": a.week_number,
+                "teaching_week": a.teaching_week or a.week_number,
+                "strand": a.strand or "",
+                "sub_strand": a.sub_strand or "",
+                "content_standard": a.content_standard_description or "",
+                "content_standard_code": a.content_standard_code or "",
+                "indicator": a.indicator_code or "",
+                "indicator_text": a.indicator_description or "",
+                "carry_forward": bool(getattr(a, "carry_forward", False)),
+                "source_review_status": week_review.get(a.week_number),
+                "allocation": f"Week {a.teaching_week or a.week_number} \u00b7 Period "
+                              f"{getattr(a, 'period_index', '')}".strip(),
+            },
             # Draft fields normalize at the API boundary too: a serialized
             # string draft must never reach the UI as split characters.
             "keywords": normalize_text_items((drafts.get(str(a.lesson_sequence)) or {}).get("keywords")),
@@ -601,8 +635,9 @@ async def get_generated_lessons(
         raise HTTPException(status_code=404, detail="Job not found")
 
     lessons = data_service.get_lesson_plans_for_job(db, job_id, user.id)
+    scheme_db = data_service.get_scheme(db, job.scheme_id, user.id)
     return {
-        "lesson_plans": [_serialize_lesson(lp) for lp in lessons],
+        "lesson_plans": [_serialize_lesson(lp, scheme_db) for lp in lessons],
         "total": len(lessons),
     }
 
@@ -616,7 +651,28 @@ async def get_lesson_plan(
     lp = data_service.get_lesson_plan(db, lesson_id, user.id)
     if not lp:
         raise HTTPException(status_code=404, detail="Lesson not found")
-    return _serialize_lesson(lp)
+    scheme_db = data_service.get_scheme(db, lp.scheme_id, user.id)
+    return _serialize_lesson(lp, scheme_db)
+
+
+@router.get("/lessons/{lesson_id}/provenance")
+async def get_lesson_provenance(
+    lesson_id: str,
+    user: User = Depends(get_current_user),
+    db=Depends(get_db),
+):
+    """The source/alignment record for one lesson ("Why this lesson?").
+
+    Owner-enforced: another user's lesson is never readable. A lesson with no
+    resovable source still returns a truthful record (empty scheme, the stored
+    week/indicator) — the panel never fabricates a source.
+    """
+    lp = data_service.get_lesson_plan(db, lesson_id, user.id)
+    if not lp:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+    scheme_db = data_service.get_scheme(db, lp.scheme_id, user.id)
+    from ..curriculum.spine import lesson_provenance
+    return lesson_provenance(lp, scheme_db)
 
 
 @router.put("/lessons/{lesson_id}")
@@ -630,7 +686,8 @@ async def update_lesson_plan(
     if not lp:
         raise HTTPException(status_code=404, detail="Lesson not found")
     log_event("lesson_edited", user_id=user.id, lesson_id=lesson_id)
-    return _serialize_lesson(lp)
+    scheme_db = data_service.get_scheme(db, lp.scheme_id, user.id)
+    return _serialize_lesson(lp, scheme_db)
 
 
 @router.get("/scheme/{scheme_id}/status")
@@ -1225,8 +1282,8 @@ async def list_all_lessons(
 
     result = []
     for lp in lessons:
-        serialized = _serialize_lesson(lp)
         scheme = schemes_map.get(lp.scheme_id)
+        serialized = _serialize_lesson(lp, scheme)
         serialized["scheme_filename"] = scheme.filename if scheme else "Unknown"
         serialized["scheme_subject"] = scheme.subject if scheme else "Unknown"
         result.append(serialized)
@@ -1244,8 +1301,9 @@ async def get_lessons_for_scheme(
     db=Depends(get_db),
 ):
     lessons = data_service.get_lesson_plans_for_scheme(db, scheme_id, user.id)
+    scheme_db = data_service.get_scheme(db, scheme_id, user.id)
     return {
-        "lesson_plans": [_serialize_lesson(lp) for lp in lessons],
+        "lesson_plans": [_serialize_lesson(lp, scheme_db) for lp in lessons],
         "total": len(lessons),
     }
 
@@ -1308,6 +1366,10 @@ def _apply_lesson_review_draft(lp, drafts: dict) -> None:
         lp.wapef_gods_story = canonical["gods_story"]
     if "remarks" in draft:
         lp.remarks = str(draft.get("remarks") or "")
+    if "period" in draft:
+        # Teacher-adjusted timetable slot for this lesson (Pattern 1). Blank is
+        # permitted (the source/config supplied no period); never invented.
+        lp.period = str(draft.get("period") or "")
     if "keywords" in draft:
         # CANONICAL (PART 9/11): the client may send a string or dirty list;
         # always store the normalized list form, and never store empty-string
@@ -1374,12 +1436,15 @@ def _reference_entry(entry):
     return ReferenceEntry(**safe)
 
 
-def _serialize_lesson(lp) -> dict:
+def _serialize_lesson(lp, scheme_db=None) -> dict:
     from ..database import LessonPlanDB
     # CANONICAL LIST FIELDS (PART 8/9/11): normalize at the API boundary so
     # the review UI never receives serialized/legacy list text for any
     # array-typed field.
     from ..ai_resource_text import normalize_text_items
+    # "Why this lesson?" — the source/provenance record every lesson carries so
+    # the workspace can answer which part of the teacher's scheme produced it.
+    from ..curriculum.spine import lesson_provenance
     return {
         "id": lp.id,
         "scheme_id": lp.scheme_id,
@@ -1440,6 +1505,7 @@ def _serialize_lesson(lp) -> dict:
         "status": lp.status,
         "ai_generated": lp.ai_generated,
         "teacher_edited": lp.teacher_edited,
+        "provenance": lesson_provenance(lp, scheme_db),
     }
 
 

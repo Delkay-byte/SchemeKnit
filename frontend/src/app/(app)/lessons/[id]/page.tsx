@@ -14,6 +14,7 @@ import { api } from '@/lib/api'
 import { aiFailure } from '@/lib/ai-feedback'
 import { resolveRouteId } from '@/lib/route-params'
 import { PageHeader } from '@/components/ui/page-header'
+import { SourceAlignment, type LessonProvenance } from '@/components/source-alignment'
 
 /** Canonical main-learning activity (PART X): never flattened to raw JSON. */
 interface MainActivity {
@@ -82,6 +83,8 @@ interface LessonData {
   references?: string[]
   status: string
   teacher_edited: boolean
+  /** "Why this lesson?" — source/alignment record from the curriculum spine. */
+  provenance?: LessonProvenance
 }
 
 export default function LessonDetailPage() {
@@ -406,6 +409,16 @@ export default function LessonDetailPage() {
               </p>
             )}
           </div>
+
+          {/* Why this lesson? Which part of the teacher's scheme produced it.
+              Collapsed by default so technical detail never crowds the lesson. */}
+          <SourceAlignment className="mt-4" title="Source & alignment" provenance={lesson.provenance} />
+          {lesson.provenance?.source_review_status === 'needs_review' && (
+            <Banner tone="warning" title="This week needs review" className="mt-3">
+              SchemeKnit could not fully read this week of your scheme. Your lesson is
+              still editable — nothing has been guessed or filled in for you.
+            </Banner>
+          )}
         </SurfaceCard>
 
         {/* The lesson document — phased hierarchy, editable in place. */}
