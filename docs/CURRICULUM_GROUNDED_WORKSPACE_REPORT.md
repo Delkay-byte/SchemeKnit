@@ -7,10 +7,13 @@ Gemini, or weakening curriculum authority, WAPEF, auth or exports.
 
 > **Status: NOT READY — PRODUCTION ACCEPTANCE INCOMPLETE.**
 > The full teacher journey is verified end-to-end against a locally running
-> production build (60/60 browser checks, real DOCX and PDF bytes). The live
-> Render acceptance run could **not** be executed from this environment because
-> the deployed teacher credentials are not present in the repository. See
-> §15–17 and §23. Do not treat this as launch-ready.
+> production build (60/60 browser checks, real DOCX and PDF bytes). The change
+> set is committed and pushed (`dd43d34`, `HEAD == origin/main`), but the
+> deployed Render environment is **still serving the previous build** ten
+> minutes after the push — the new `curriculum spine` route returns 404 and the
+> weeks payload has no `review_status`. No Render deploy hook exists in the
+> repo and the dashboard is not reachable from this environment, so the
+> redeploy must be triggered owner-side. See §15 and §23.
 
 ---
 
@@ -220,16 +223,40 @@ change. Re-verified here: 141,095 bytes, `%PDF-` header, `application/pdf`,
 
 ## 15. Production browser acceptance
 
-**NOT PERFORMED against the deployed environment in this run.**
-`schemeknit-api.onrender.com/api/health` answers `200` (the deployment is
-reachable), but the acceptance teacher credential is not present in the
-repository and `accept.teacher@schemeknit.test / Accept#2026` returns `401` in
-production. The harness is written and runnable:
+**BLOCKED — the deployed build does not contain this change set.**
+
+What *is* verified against the live environment:
+
+* `GET https://schemeknit-api.onrender.com/api/health` → **200** (reachable).
+* `GET https://schemeknit-frontend.onrender.com/login/` → **200**.
+* The provided production teacher account logs in successfully (`POST
+  /api/auth/login` → **200**, role `teacher`), so live auth works.
+* Account state at run time: `FREE / active`, lessons `0/5` this month, AI
+  `2/5`.
+
+What is **not** verified, with evidence:
+
+* After pushing `dd43d34` to `main`, the live backend was polled for ~10
+  minutes:
+  * `GET /api/curriculum/{scheme_id}/spine` → **404** on every attempt
+    (route absent in the running build);
+  * `GET /api/documents/{scheme_id}/weeks` → weeks returned **without**
+    `review_status` on every attempt.
+* Therefore the deployed environment still runs the pre-change commit, and the
+  curriculum-grounded journey (extraction table, review statuses, allocation
+  provenance, workspace, spine/provenance endpoints) cannot be exercised there.
+* `docs/RENDER_DEPLOYMENT_FIX_REPORT.md` records the same environment
+  limitation: no Render deploy hook exists in the repo or `.env`, and Render
+  dashboard access is unavailable from this environment. A redeploy must be
+  triggered owner-side.
+
+The harness is implemented and runnable the moment the new build is live:
 
 ```bash
 TF_WEB_URL=https://schemeknit-frontend.onrender.com \
 TF_API_URL=https://schemeknit-api.onrender.com \
 TF_TEACHER_EMAIL=… TF_TEACHER_PASSWORD=… \
+TF_UPLOAD_FILE="…/BASIC 7 ENGLISH SCHEME OF LEARNING.docx" \
 node frontend/e2e/curriculum-workspace-acceptance.js
 ```
 
@@ -297,22 +324,26 @@ Artifacts: `frontend/e2e/curriculum-workspace-acceptance/`
 
 ## 22. Commit hashes
 
-**Not committed.** This change set is uncommitted in the working tree; no
-`git commit` was run because committing was not explicitly authorised. Files
-changed/added: see §3, plus `frontend/package.json`
-(`e2e:workspace` script).
+* `dd43d34` — `feat(curriculum): ground every lesson in the teacher's own scheme`
+  (15 files, +2664/−14) — the only commit for this change set, on top of
+  `6dc6b9a`.
 
 ## 23. HEAD == origin/main
 
-**Unknown/pending.** No `git push` was run (pushing can break production and was
-not explicitly authorised). The local branch is `main` with uncommitted changes,
-so `HEAD == origin/main` cannot be asserted for this work.
+**Yes.** `git push origin main` moved `6dc6b9a..dd43d34`; both
+`git rev-parse HEAD` and `git rev-parse origin/main` return
+`dd43d345ea33fbfbe700ec52d6ead9478d238ade`.
+
+Note the distinction: the *code* is on `origin/main`; the *deployed build* is
+not (see §15).
 
 ## 24. Tracked tree clean
 
-**No.** The tracked tree has 8 modified files plus 7 new source files (the rest
-of the untracked list is generated acceptance output and scratch files from
-earlier phases).
+**Yes.** `git status --short` reports no modified or staged tracked files. The
+remaining untracked entries are generated acceptance output (`e2e/*-acceptance/`,
+`e2e/downloads-*`, `.png`/`.txt`/`.docx`/`.pdf` artifacts) and scratch logs from
+earlier phases, all of which predate or accompany the harness and none of which
+are source.
 
 ---
 
@@ -329,8 +360,12 @@ repeatable benchmark — that remains outstanding.
 
 ## Honest gaps
 
-1. **Live production acceptance was not run** (credentials unavailable) — the
-   single most important outstanding item.
+1. **Live production acceptance is blocked on a redeploy.** The code is pushed;
+   the deployed Render build is stale. Until the owner triggers a deploy and the
+   harness is re-run against the live origin, the product must not be called
+   launch-ready.
 2. The regression benchmark corpus named in the spec is not yet a single
-   repeatable fixture set.
-3. Nothing has been committed or pushed.
+   repeatable fixture set (one real scheme is traced end to end; the rest are
+   covered piecewise by the backend suite).
+3. `frontend/tsconfig.tsbuildinfo` is a tracked build artifact and therefore
+   changes on every build; it was included to keep the tree clean.
