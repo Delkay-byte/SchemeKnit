@@ -2,7 +2,9 @@
 SchemeKnit PDF Export Engine
 
 Converts DOCX to PDF using docx2pdf (which drives Microsoft Word on
-Windows/macOS) or LibreOffice for cross-platform/server use.
+Windows/macOS), LibreOffice for cross-platform/server use, or PyMuPDF
+(pure pip, no system packages — the server fallback where neither Word
+nor LibreOffice exists, e.g. Render).
 
 In desktop mode, a bundled LibreOffice runtime is resolved via the
 ``LIBREOFFICE_PATH`` environment variable (set by main.js).  Each
@@ -14,9 +16,9 @@ Failure contract
 PDF export has two distinct failure layers and callers must be able to tell
 them apart:
 
-1. The converter is not installed on this server -> `PDF_CONVERTER_REQUIREMENT`
-   (reported as 503 by the API).
-2. The converter is present but the conversion did not yield a real PDF ->
+1. No converter backend is importable on this server ->
+   `PDF_CONVERTER_REQUIREMENT` (reported as 503 by the API).
+2. The backends were attempted but the conversion did not yield a real PDF ->
    `PDFConversionError` (reported as 500 with a controlled message).
 
 This module never returns a DOCX path from a PDF entry point. Returning the
@@ -110,6 +112,11 @@ class PDFExportEngine:
             return True
         except Exception:
             pass
+        try:
+            import pymupdf  # noqa: F401
+            return True
+        except Exception:
+            pass
         return _resolve_libreoffice() is not None
 
     def __init__(self):
@@ -170,9 +177,12 @@ class PDFExportEngine:
         """Convert and verify. Raises PDFConversionError if no valid PDF results."""
         # Explicit labels: `fn.__name__` is unavailable when a backend is
         # patched out in tests, and a label is what an operator needs anyway.
+        # Order: Word (desktop maturity) -> LibreOffice (best server fidelity)
+        # -> PyMuPDF (pure pip, works where neither exists, e.g. Render).
         attempts = [
             ("docx2pdf", self._try_docx2pdf),
             ("libreoffice", self._try_libreoffice),
+            ("pymupdf", self._try_pymupdf),
         ]
         errors: List[str] = []
 
@@ -245,3 +255,23 @@ class PDFExportEngine:
                 generated.replace(pdf_path)
             return pdf_path
         raise RuntimeError("LibreOffice conversion produced no output")
+
+    def _try_pymupdf(self, docx_path: Path, pdf_path: Path) -> Path:
+        """Pure-pip DOCX -> PDF via PyMuPDF (no system packages required).
+
+        Server fallback for hosts with neither MS Word nor LibreOffice (the
+        production Render instance): MuPDF reads DOCX directly and writes a
+        real PDF in-process. Fidelity trails LibreOffice, so this runs last
+        and never replaces a Word or LibreOffice result — it only converts
+        when both of those failed, which previously meant PDF export was
+        dead on production.
+        """
+        import pymupdf
+        doc = pymupdf.open(str(docx_path))
+        try:
+            if doc.page_count == 0:
+                raise RuntimeError("PyMuPDF found no pages in the DOCX")
+            doc.save(str(pdf_path))
+        finally:
+            doc.close()
+        return pdf_path
