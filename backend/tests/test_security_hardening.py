@@ -104,59 +104,109 @@ class TestRateLimiter:
         assert rl.is_allowed("9.9.9.9", "/api/generation/abc/export/zip", now=6.0)[0] is False
 
 
-class TestDownloadDeliveryRateExempt:
-    """Export reliability: the DOCX/PDF handoff is a plain anchor navigation,
-    so a 429 on the one-time file GET would render raw limiter JSON in place
-    of the file (no banner, no retry). The token-guarded delivery route is
-    exempt from budgets; every other /api/generation/ route stays limited.
-    Regressions seen in production: the journey's polling exhausted the
-    30/60s bucket right before export and the file GET came back 429."""
+class TestBudgetPolicyAndCorsOn429:
+    """Production acceptance regression: the workspace journey's status
+    polling exhausted the /api/generation/ 30-per-60s budget mid-flight, and
+    because RateLimitMiddleware sat outside CORSMiddleware the 429 arrived
+    without Access-Control-Allow-Origin — the browser hid it as an opaque
+    network error, the workspace lost its scheme-status response and fell
+    back to the generate form. Reads must bypass budgets, mutations must
+    stay limited, and a 429 must be JS-readable."""
 
     @staticmethod
     def _app():
         from fastapi import FastAPI
+        from fastapi.middleware.cors import CORSMiddleware
 
         app = FastAPI()
+        # Production order (main.py): RateLimit registered first, so CORS
+        # wraps it and decorates its 429 responses.
         app.add_middleware(RateLimitMiddleware)
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["https://schemeknit-frontend.onrender.com"],
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+
+        @app.get("/api/generation/preview")
+        async def preview_get():
+            return {"ok": True}
+
+        @app.post("/api/generation/preview")
+        async def preview_post():
+            return {"ok": True}
 
         @app.get("/api/generation/downloads/{token}")
         async def download(token: str):
             return {"bytes": 1}
 
-        @app.get("/api/generation/preview")
-        async def preview():
-            return {"ok": True}
-
         return app
 
-    def test_file_delivery_survives_exhausted_budget_others_do_not(self):
+    @staticmethod
+    def _exhaust(bucket_host: str):
+        budget = max(m for p, m, _w in RATE_LIMITS if p == "/api/generation/")
+        for _ in range(budget + 1):
+            rate_limiter.is_allowed(bucket_host, "/api/generation/x")
+
+    def test_reads_bypass_an_exhausted_budget(self):
         from fastapi.testclient import TestClient
 
         rate_limiter.reset()
         try:
             client = TestClient(self._app())
-            # TestClient's host is "testclient" — deliberately NOT one of the
-            # localhost-exempt IPs, so budgets apply exactly as in production.
-            budget = max(m for p, m, _w in RATE_LIMITS if p == "/api/generation/")
-            for _ in range(budget + 1):
-                rate_limiter.is_allowed("testclient", "/api/generation/x")
-
-            assert client.get("/api/generation/preview").status_code == 429
+            # TestClient's host is "testclient" — deliberately not a
+            # localhost-exempt IP, so budgets apply as in production.
+            self._exhaust("testclient")
+            assert client.get("/api/generation/preview").status_code == 200
             assert client.get("/api/generation/downloads/sometoken").status_code == 200
-            # The exempt GET must not consume budget: still exhausted after.
-            assert client.get("/api/generation/preview").status_code == 429
+            # ...and reads must not have consumed budget: mutations still 429.
+            assert client.post("/api/generation/preview").status_code == 429
         finally:
             rate_limiter.reset()
 
-    def test_file_delivery_allows_before_budget_too(self):
+    def test_mutations_stay_budgeted(self):
         from fastapi.testclient import TestClient
 
         rate_limiter.reset()
         try:
             client = TestClient(self._app())
-            assert client.get("/api/generation/downloads/sometoken").status_code == 200
+            assert client.post("/api/generation/preview").status_code == 200
+            self._exhaust("testclient")
+            assert client.post("/api/generation/preview").status_code == 429
         finally:
             rate_limiter.reset()
+
+    def test_429_carries_cors_headers(self):
+        from fastapi.testclient import TestClient
+
+        rate_limiter.reset()
+        try:
+            client = TestClient(self._app())
+            self._exhaust("testclient")
+            r = client.post(
+                "/api/generation/preview",
+                headers={"Origin": "https://schemeknit-frontend.onrender.com"},
+            )
+            assert r.status_code == 429
+            assert r.headers.get("access-control-allow-origin") == \
+                "https://schemeknit-frontend.onrender.com"
+            assert "Too many requests" in r.json()["detail"]
+        finally:
+            rate_limiter.reset()
+
+    def test_production_registers_rate_limit_inside_cors(self):
+        # The mirror app above only proves Starlette semantics; this pins the
+        # real wiring in main.py. user_middleware is outermost-first
+        # (Starlette prepends on add_middleware), so CORS must appear before
+        # RateLimit — otherwise the limiter's 429s bypass CORS and lose
+        # Access-Control-Allow-Origin.
+        from src.main import app
+
+        order = [m.cls.__name__ for m in app.user_middleware]
+        assert "RateLimitMiddleware" in order, order
+        assert "CORSMiddleware" in order, order
+        assert order.index("CORSMiddleware") < order.index("RateLimitMiddleware"), order
 
 
 class TestConfigFailSafe:

@@ -191,6 +191,25 @@ async function runDesktop(browser, state) {
   const page = await context.newPage()
   const pageErrors = []
   page.on('pageerror', (e) => pageErrors.push(e.message))
+  // Any HTTP >= 400 seen in the journey — production throttling (429) and
+  // auth/API regressions both show up here when a step later times out.
+  const httpErrors = []
+  page.on('response', (r) => {
+    if (r.status() >= 400) {
+      httpErrors.push(`${r.status()} ${r.url().startsWith(WEB) ? r.url().slice(WEB.length) : r.url()}`.slice(0, 140))
+    }
+  })
+  // Log every scheme-status response body: the workspace restore hinges on
+  // status === 'completed', and the failure mode was observed only in
+  // production right after a download-triggered reload.
+  page.on('response', (r) => {
+    if (/\/api\/generation\/scheme\/[^/]+\/status/.test(r.url())) {
+      r.text().then((t) => console.log('  [scheme-status]', r.status(), t.slice(0, 220))).catch(() => {})
+    }
+  })
+  page.on('console', (m) => {
+    if (m.type() === 'error') console.log('  [console.error]', m.text().replace(/\s+/g, ' ').slice(0, 220))
+  })
 
   try {
     // ── 1. Login through the real form ─────────────────────────────────────
@@ -607,6 +626,7 @@ async function runDesktop(browser, state) {
     }
 
     // The PDF export uses its own fresh page load for the same reason.
+    console.log('  pdf step: reloading from', page.url())
     await page.reload({ waitUntil: 'domcontentloaded', timeout: 120000 })
     await page.waitForSelector('[data-lesson-workspace]', { timeout: 120000 })
     await page.waitForSelector('[data-lesson-content]', { timeout: 60000 })
@@ -635,7 +655,25 @@ async function runDesktop(browser, state) {
 
     await page.screenshot({ path: path.join(OUT, 'workspace-1440.png'), fullPage: false })
   } catch (e) {
-    record('desktop journey completed without throwing', false, e.message)
+    // Forensics: what the teacher would actually see at the failure point.
+    const forensics = await page.evaluate(() => ({
+      readyState: document.readyState,
+      text: (document.body && document.body.innerText || '').replace(/\s+/g, ' ').slice(0, 300),
+      pending: performance.getEntriesByType('resource')
+        .filter(r => !r.responseEnd)
+        .map(r => r.name.split('/').slice(-2).join('/')).slice(0, 8),
+      last: performance.getEntriesByType('resource')
+        .sort((a, b) => b.responseEnd - a.responseEnd).slice(0, 6)
+        .map(r => `${Math.round(r.duration)}ms ${r.name.split('/').slice(-2).join('/')}`),
+    })).catch(() => ({}))
+    await page.screenshot({ path: path.join(OUT, 'desktop-failure.png') }).catch(() => {})
+    record('desktop journey completed without throwing', false,
+      `${e.message} :: url=${page.url().replace(WEB, '')} :: state=${forensics.readyState}` +
+      ` :: text=${JSON.stringify(forensics.text || '')}` +
+      ` :: pending=${JSON.stringify(forensics.pending || [])}` +
+      ` :: last=${JSON.stringify(forensics.last || [])}` +
+      ` :: pageErrors=${JSON.stringify(pageErrors.slice(-3))}` +
+      ` :: recentHTTP=${httpErrors.slice(-10).join(' | ') || 'none'}`)
   } finally {
     await context.close().catch(() => {})
   }
