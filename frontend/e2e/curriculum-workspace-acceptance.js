@@ -430,9 +430,32 @@ async function runDesktop(browser, state) {
       record('teacher can adjust the allocation period', true, 'set Monday · Period 1')
     }
 
+    // Capture the generate request itself so a failure names its real cause
+    // (HTTP status + the backend's teacher-facing detail) instead of only
+    // timing out on the workspace selector.
+    let generate = null
+    const onGenerate = async (r) => {
+      if (!/\/generate$/.test(new URL(r.url()).pathname)) return
+      try { generate = { status: r.status(), body: await r.json() } } catch { /* not json */ }
+    }
+    page.on('response', onGenerate)
     await page.getByRole('button', { name: /confirm & generate/i }).first().click()
-    await page.waitForSelector('[data-lesson-workspace]', { timeout: 300000 })
-    record('generation completes and opens the workspace', true)
+    try {
+      await page.waitForSelector('[data-lesson-workspace]', { timeout: 300000 })
+      record('generation completes and opens the workspace', true,
+        generate ? `HTTP ${generate.status}` : '')
+    } catch (e) {
+      const banner = (await page.locator('body').innerText())
+        .split('\n').map((s) => s.trim())
+        .filter((s) => s && !/^(Home|Dashboard|Lesson Plans|Weekly Plan|Templates|Settings|Upload)$/.test(s))
+        .slice(0, 6).join(' | ')
+      record('generation completes and opens the workspace', false,
+        `generate HTTP ${generate?.status ?? 'no response'} `
+        + `${JSON.stringify(generate?.body || {}).slice(0, 160)} :: ${banner.slice(0, 160)}`)
+      throw e
+    } finally {
+      page.off('response', onGenerate)
+    }
 
     // ── 6. Workspace: the generated lesson is visible immediately ──────────
     await page.waitForSelector('[data-lesson-content]', { timeout: 60000 })
