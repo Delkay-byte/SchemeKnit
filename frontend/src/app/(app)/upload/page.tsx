@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useState, useRef, useEffect } from 'react'
+import { Fragment, useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -35,6 +35,7 @@ export default function UploadPage() {
   // confirmation is authoritative.
   const [confirmClass, setConfirmClass] = useState<string>('')
   const [classLevels, setClassLevels] = useState<string[]>([])
+  const [classLevelsError, setClassLevelsError] = useState(false)
   // Whole-level schemes (the WAPEF KG/Nursery shape) carry no subject headings
   // at all. The teacher must still tell SchemeKnit which subject they teach, so
   // offer the subject catalogue for the detected class level.
@@ -127,15 +128,18 @@ export default function UploadPage() {
   const detectClassOk = (level?: string) => Boolean(level && level !== 'Unknown')
   const needsClassConfirmation = needsSubjectConfirmation && !detectClassOk(result?.class_level)
 
+  const loadClassLevels = useCallback(() => {
+    setClassLevelsError(false)
+    api.listClassLevels()
+      .then((data) => setClassLevels(data.class_levels || []))
+      .catch(() => setClassLevelsError(true))
+  }, [])
+
   useEffect(() => {
     if (!needsClassConfirmation || classLevels.length > 0) return
-    let cancelled = false
-    api.listClassLevels()
-      .then((data) => { if (!cancelled) setClassLevels(data.class_levels || []) })
-      .catch(() => { if (!cancelled) setClassLevels([]) })
-    return () => { cancelled = true }
+    loadClassLevels()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [needsClassConfirmation])
+  }, [needsClassConfirmation, classLevels.length])
 
   // A document with weeks but no subject headings (WAPEF KG/Nursery shape):
   // load the subject catalogue for the detected class level so the teacher can
@@ -341,15 +345,31 @@ export default function UploadPage() {
                           <Select
                             id="confirm-class-level"
                             value={confirmClass}
-                            disabled={confirmingSubject !== null}
+                            disabled={confirmingSubject !== null || classLevels.length === 0}
                             onChange={(e) => setConfirmClass(e.target.value)}
                           >
-                            <option value="">— Select class —</option>
+                            <option value="">
+                              {classLevels.length === 0
+                                ? (classLevelsError ? 'Class list unavailable' : 'Loading classes…')
+                                : '— Select class —'}
+                            </option>
                             {classLevels.map((c) => (
                               <option key={c} value={c}>{c}</option>
                             ))}
                           </Select>
                         </Field>
+                        {classLevelsError && (
+                          <p className="mt-2 text-center text-sm text-destructive">
+                            Could not load the class list.{' '}
+                            <button
+                              type="button"
+                              className="underline"
+                              onClick={loadClassLevels}
+                            >
+                              Try again
+                            </button>
+                          </p>
+                        )}
                       </div>
                     </div>
                   )}
