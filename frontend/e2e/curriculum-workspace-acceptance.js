@@ -58,12 +58,39 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 function configured(v) { return v ? 'CONFIGURED' : 'NOT SET' }
 
 async function login(page) {
-  await page.goto(`${WEB}/login/`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${WEB}/login/`, { waitUntil: 'domcontentloaded', timeout: 120000 })
   await page.fill('input[type="email"]', TEACHER.email)
   await page.fill('input[type="password"]', TEACHER.password)
   await page.click('button[type="submit"]')
-  await page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 45000 })
+  await page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 90000 })
   return page
+}
+
+/**
+ * A hosted instance can cold-start for longer than the journey timeouts (the
+ * Render frontend spins down on idle), which surfaced as an opaque
+ * "page.goto: Timeout" on the very first navigation. Warm it once, retrying,
+ * so the measured checks are about the app rather than instance start-up.
+ */
+async function warmUp(browser) {
+  const page = await browser.newPage()
+  try {
+    for (let attempt = 1; attempt <= 4; attempt++) {
+      try {
+        const res = await page.goto(`${WEB}/login/`, { waitUntil: 'domcontentloaded', timeout: 120000 })
+        if (res && res.status() < 500) {
+          await page.waitForSelector('input[type="email"]', { timeout: 120000 })
+          return true
+        }
+      } catch (e) {
+        console.log(`  warm-up attempt ${attempt} failed: ${e.message.split('\n')[0]}`)
+      }
+      await sleep(3000)
+    }
+    return false
+  } finally {
+    await page.close().catch(() => {})
+  }
 }
 
 async function api(page, apiPath) {
@@ -98,6 +125,13 @@ async function saveDownload(page, label, action, timeout = 90000) {
     hits.push({ status: r.status(), contentType: ct, head })
   }
   page.on('response', onResponse)
+  // Console noise from the export path (api.ts logs network failures before
+  // rethrowing) tells us whether the POST never left the page.
+  const consoleMsgs = []
+  const onConsole = (m) => {
+    if (/download|export|network failure/i.test(m.text())) consoleMsgs.push(m.text().slice(0, 160))
+  }
+  page.on('console', onConsole)
   try {
     const [download] = await Promise.all([
       page.waitForEvent('download', { timeout }),
@@ -118,14 +152,21 @@ async function saveDownload(page, label, action, timeout = 90000) {
     }
   } catch (e) {
     const issue = issues[issues.length - 1]
+    const hit = hits[hits.length - 1]
     return {
       ok: false,
       error: e.message,
-      mime: hits.length ? hits[hits.length - 1].contentType : '',
-      detail: issue ? `download-url HTTP ${issue.status} ${issue.body}` : 'no download-url response',
+      mime: hit ? hit.contentType : '',
+      detail: [
+        issue ? `download-url HTTP ${issue.status} ${issue.body}` : 'no download-url response',
+        hit ? `file GET ${hit.status}` : 'no file GET',
+        `frame=${page.url().slice(0, 90)}`,
+        consoleMsgs.length ? `console=${consoleMsgs.join(' ~ ')}` : null,
+      ].filter(Boolean).join(' | '),
     }
   } finally {
     page.off('response', onResponse)
+    page.off('console', onConsole)
   }
 }
 
@@ -544,9 +585,18 @@ async function runDesktop(browser, state) {
     }
 
     // ── 9. Export: DOCX + PDF from the workspace ──────────────────────────
+    // Each export starts from a fresh page load. Chrome suppresses a second
+    // automatic download triggered from the same page session, so the export
+    // that follows another one never produced a download event even though the
+    // server served the file (verified independently). Reloading clears that
+    // per-page state without changing what the teacher clicks.
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: 120000 })
+    await page.waitForSelector('[data-lesson-workspace]', { timeout: 120000 })
+    await page.waitForSelector('[data-lesson-content]', { timeout: 60000 })
     const docx = await saveDownload(page, 'workspace.docx', () =>
-      page.getByRole('button', { name: /export docx/i }).first().click())
-    record('DOCX download reaches disk', docx.ok, docx.ok ? `${docx.suggested} (${docx.size} bytes)` : docx.error)
+      page.getByRole('button', { name: /export docx/i }).first().click(), 240000)
+    record('DOCX download reaches disk', docx.ok,
+      docx.ok ? `${docx.suggested} (${docx.size} bytes)` : `${docx.error} :: ${docx.detail}`)
     if (docx.ok) {
       record('DOCX HTTP 200', docx.http === 200, `HTTP ${docx.http}`)
       record('DOCX is a real zip package (PK signature)', docx.head.startsWith('PK'), JSON.stringify(docx.head))
@@ -556,12 +606,8 @@ async function runDesktop(browser, state) {
       state.docxOk = true
     }
 
-    // Export the PDF from a FRESH page load. Chrome suppresses a second
-    // automatic download triggered from the same page session, so the PDF
-    // click after the DOCX one never produced a download event even though the
-    // server served the file (verified independently). Reloading clears that
-    // per-page download state without changing what the teacher's click does.
-    await page.reload({ waitUntil: 'domcontentloaded' })
+    // The PDF export uses its own fresh page load for the same reason.
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: 120000 })
     await page.waitForSelector('[data-lesson-workspace]', { timeout: 120000 })
     await page.waitForSelector('[data-lesson-content]', { timeout: 60000 })
     const pdf = await saveDownload(page, 'workspace.pdf', () =>
@@ -654,6 +700,8 @@ async function runMobile(browser, state) {
   const browser = await chromium.launch(launchOpts)
   const state = {}
   try {
+    const warm = await warmUp(browser)
+    console.log(`  warm-up=${warm ? 'READY' : 'SLOW (continuing)'}`)
     await runDesktop(browser, state)
     await runMobile(browser, state)
   } finally {

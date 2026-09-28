@@ -95,6 +95,16 @@ RATE_LIMITS: List[Tuple[str, int, int]] = [
 
 RATE_LIMIT_EXEMPT_IPS = {"127.0.0.1", "::1", "localhost"}
 
+# Single-use file delivery is exempt from route budgets. The URL carries an
+# unguessable one-time token and the issuing POST (/download-url) is still
+# budgeted under /api/generation/ above, so abuse stays controlled. A 429 on
+# the GET itself cannot reach a teacher as an error banner: the export is a
+# plain anchor navigation, so the browser would render raw limiter JSON in
+# place of the DOCX/PDF. Budgets are per-IP sliding windows, and a busy
+# workspace (status polling + preview + provenance in the same minute) can
+# legitimately exhaust them right before an export.
+RATE_LIMIT_EXEMPT_PATHS = ("/api/generation/downloads/",)
+
 
 class RateLimiter:
     """Minimal sliding-window limiter. hits: {(key): [timestamps]}."""
@@ -136,11 +146,17 @@ rate_limiter = RateLimiter()
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
-    """429 JSON on exceeded sensitive-route budgets. Localhost exempt (dev/test)."""
+    """429 JSON on exceeded sensitive-route budgets.
+
+    Localhost is exempt (dev/test), as is single-use file delivery
+    (RATE_LIMIT_EXEMPT_PATHS) — see the comment there.
+    """
 
     async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        if path.startswith(RATE_LIMIT_EXEMPT_PATHS):
+            return await call_next(request)
         try:
-            path = request.url.path
             if rate_limiter._rules_for(path):
                 client = request.client.host if request.client else "unknown"
                 if client not in RATE_LIMIT_EXEMPT_IPS:
