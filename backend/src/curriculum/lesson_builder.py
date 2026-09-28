@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
+from datetime import date
 from typing import Dict, List, Optional, Tuple
 
 from ..models import (
@@ -1007,7 +1008,17 @@ def build_lesson(
         teaching_week=alloc.teaching_week or alloc.week_number,
         carry_forward=bool(alloc.carry_forward),
         lesson_sequence=0,  # assigned by the caller (curriculum order)
-        lesson_date=alloc.lesson_date or config.term_start_date,
+        # The lesson date is the allocation's own teaching date; failing that
+        # the source week's ending date; only then the term window. A TermConfig
+        # whose term dates the teacher left unset is resolved from the scheme by
+        # the routers, but the builder must still never emit a null lesson date
+        # (real-use remediation, Defect 6/7).
+        lesson_date=(
+            alloc.lesson_date
+            or alloc.week_ending
+            or config.term_start_date
+            or date.today()
+        ),
         lesson_number=alloc.period_index,
         period="",  # caller sets the period label
         class_level=config.class_level,

@@ -719,8 +719,20 @@ class DOCXParser:
                 else:
                     primary_weeks.add(current_week)
 
-            strand_text = self._normalize_special_week_label(
-                normalized.get("strand", "").strip())
+            # The strand cell of a special-period row is the authoritative
+            # source label: the period NAME plus, for mid-terms, the source's
+            # own date range — "MID-TERM (05-11-2026 to 06-11-2026)". The
+            # normaliser strips source noise ("AND VACATION" → "VACATION",
+            # "REVISION1" → "REVISION") while KEEPING the date range, which the
+            # segment model reads for Defect 5. Matching a bare cell elsewhere
+            # in the row (the sub-strand often repeats just "MID-TERM") must
+            # never be preferred over this one.
+            raw_strand_cell = normalized.get("strand", "").strip()
+            special_label_cell = (
+                self._normalize_special_week_label(raw_strand_cell)
+                if self._is_special_week_text(raw_strand_cell) else ""
+            )
+            strand_text = self._normalize_special_week_label(raw_strand_cell)
             if strand_text:
                 if self._is_special_week_text(strand_text):
                     current_week_type = self._classify_special_week(strand_text)
@@ -758,6 +770,9 @@ class DOCXParser:
                     "content_standard": normalized.get("content_standard", "").strip(),
                     "indicators": normalized.get("indicators", "").strip(),
                     "resources": current_resources[-1] if current_resources else "",
+                    # Source label for a special-period row (Defect 5): period
+                    # name + the source's own date range, noise-normalised.
+                    "special_label_cell": special_label_cell,
                     "raw_row": row,
                 }
                 week_rows[current_week].append(row_data)
@@ -1056,21 +1071,38 @@ class DOCXParser:
         # is preserved as DATA (PART O/P). For a special week the curriculum
         # fields are cleared — the label must never surface as a strand,
         # sub-strand, content standard, indicator or lesson topic.
+        # A week that holds BOTH a special period and real teaching content
+        # becomes MIXED (Defect 4): neither segment is discarded.
+        # The label scan covers EVERY row of the week: a special row can share
+        # its week cell with a teaching row (the Week-9 mixed-midterm shape),
+        # and the week's type must not depend on which row happened to come
+        # first.
         special_label = ""
         special_type = ""
-        if week_type != WeekType.INSTRUCTION:
+        special_week_type: Optional[WeekType] = None
+        # Prefer the strand cell of a special-period row: it carries the
+        # source's own period name plus its date range ("MID-TERM (05-11-2026 to
+        # 06-11-2026)"), which a bare sub-strand cell repeats without the dates.
+        for row in rows:
+            cell = (row.get("special_label_cell") or "").strip()
+            if cell:
+                special_label = cell
+                special_type = SpecialPeriodType.classify(cell).value
+                special_week_type = row.get("week_type", WeekType.INSTRUCTION)
+                break
+        if not special_label:
             for row in rows:
-                # The period label may sit in ANY of the row's text cells
-                # (strand / sub-strand / resources), depending on how the
-                # source table prints the period row (PART O/P metadata).
                 for cell in (row.get("strand", ""), row.get("sub_strand", ""),
                              row.get("resources", "")):
                     if cell and self._is_special_week_text(cell):
                         special_label = cell.strip()
                         special_type = SpecialPeriodType.classify(cell).value
+                        special_week_type = row.get("week_type", WeekType.INSTRUCTION)
                         break
                 if special_label:
                     break
+        if special_week_type is not None:
+            week_type = special_week_type
             strand = None if self._is_special_week_text(strand or "") else strand
             sub_strand = (
                 None if self._is_special_week_text(sub_strand or "") else sub_strand
@@ -1096,13 +1128,30 @@ class DOCXParser:
 
             ind_text = row.get("indicators", "")
             if ind_text:
-                ind_code = self._extract_code(ind_text, INDICATOR_CODE_PATTERN)
-                ind_desc = self._clean_description(ind_text, ind_code)
-                if ind_code and ind_desc and not any(i.code == ind_code for i in all_indicators):
-                    all_indicators.append(ParsedIndicator(
-                        code=ind_code,
-                        description=ind_desc
-                    ))
+                # A special-period row prints its label in the Indicator cell
+                # too ("END OF TERM ASSESSMENT"). The label has NO indicator
+                # code; keep it out of the indicator list so it can never
+                # become a lesson (PART O/P metadata, Defect 4).
+                # The guard is deliberately narrow: the row itself must be a
+                # non-instructional period row. Matching the label keywords
+                # against an ordinary indicator's text would silently drop real
+                # curriculum ("Examine ..." contains "exam", "SBA" appears in
+                # ordinary descriptions).
+                is_special_row = (
+                    row.get("week_type", WeekType.INSTRUCTION) != WeekType.INSTRUCTION
+                )
+                label_only = (
+                    is_special_row
+                    and not INDICATOR_CODE_PATTERN.search(ind_text)
+                )
+                if not label_only:
+                    ind_code = self._extract_code(ind_text, INDICATOR_CODE_PATTERN)
+                    ind_desc = self._clean_description(ind_text, ind_code)
+                    if ind_code and ind_desc and not any(i.code == ind_code for i in all_indicators):
+                        all_indicators.append(ParsedIndicator(
+                            code=ind_code,
+                            description=ind_desc
+                        ))
 
             res = row.get("resources", "")
             if res and res.lower() not in ("", "resources", "resource"):
@@ -1113,6 +1162,50 @@ class DOCXParser:
                 # structured entries — never one serialized string.
                 for item in normalize_text_items(res):
                     all_resources.add(item)
+
+        # ── Mixed week detection (Defect 4) ──────────────────────────
+        # MIXED = the week holds BOTH a non-instructional period row (e.g. the
+        # Week-9 "MID-TERM" row) AND a separate row carrying real teaching
+        # content. The special segment is metadata; the teaching segment stays
+        # curriculum and remains allocatable.
+        #
+        # A week whose ONLY row is a special period that itself carries content
+        # (e.g. a REVISION week with real indicators) keeps its own type: the
+        # allocation engine already treats "special period WITH teaching
+        # content" as allocatable, so re-typing it would lose the source label.
+        special_rows = [
+            r for r in rows
+            if r.get("week_type", WeekType.INSTRUCTION) != WeekType.INSTRUCTION
+        ]
+        teaching_rows = [
+            r for r in rows
+            if r.get("week_type", WeekType.INSTRUCTION) == WeekType.INSTRUCTION
+            and (
+                INDICATOR_CODE_PATTERN.search(r.get("indicators") or "")
+                or (r.get("strand") or "").strip()
+                or (r.get("sub_strand") or "").strip()
+            )
+        ]
+        if special_label and teaching_rows and (special_rows or len(rows) > 1):
+            week_type = WeekType.MIXED
+            # The teaching segment's own strand/sub-strand are the week's
+            # curriculum framing — the special row's label cells never are
+            # (the label is metadata, Defect 4/5).
+            t_row = teaching_rows[0]
+            strand = (t_row.get("strand") or "").strip() or strand
+            sub_strand = (t_row.get("sub_strand") or "").strip() or sub_strand
+            # The week's own calendar span follows the TEACHING row, not the
+            # special-period row: the special segment keeps its own source
+            # dates in ``special_period_label``, while the allocatable teaching
+            # segment is dated by the source teaching row (Defect 5 — no
+            # invented Mon-Fri range on either side).
+            week_date = t_row.get("date") or week_date
+        elif special_rows:
+            week_type = special_rows[0].get("week_type", WeekType.INSTRUCTION)
+        elif special_label:
+            # The label leaked into an instruction-classified row with no
+            # teaching content of its own — the row IS the special period.
+            week_type = WeekType.OTHER
 
         return ParsedWeek(
             week_number=week_num,

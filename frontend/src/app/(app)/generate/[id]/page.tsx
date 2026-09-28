@@ -10,7 +10,8 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Field, TextArea } from '@/components/ui/field'
 import { Download, Settings, Play, CheckCircle, FileText, FileSpreadsheet, FileArchive, Loader2, Eye, Save } from 'lucide-react'
-import { api } from '@/lib/api'
+import { api, sanitizeTermConfig } from '@/lib/api'
+import { normalizeError } from '@/lib/error-normalizer'
 import { resolveRouteId } from '@/lib/route-params'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatusPill } from '@/components/ui/badge'
@@ -156,6 +157,12 @@ export default function GeneratePage() {
         api.getGenerationStatusForScheme(schemeId).catch(() => null),
       ])
       setScheme(schemeData)
+      // Keep the scheme's own curriculum span for payload fallbacks (date
+      // inputs the teacher cleared must never reach the backend as '').
+      try {
+        const weeksData = await api.getSchemeWeeks(schemeId)
+        ;(schemeData as any).weeks = weeksData.weeks || []
+      } catch { /* fallback stays undefined; sanitizer uses safe defaults */ }
       setTemplates(templatesData.templates || [])
       setProfiles(profilesData.profiles || [])
 
@@ -219,12 +226,28 @@ export default function GeneratePage() {
     }
   }
 
+  // Term-date / identity fallback for the allocation payload: when the teacher
+  // cleared a date input (or a detection field stayed blank), the payload falls
+  // back to the scheme's own extracted curriculum span and identity instead of
+  // failing backend validation with an opaque 422 (real-use remediation).
+  const configFallback = () => {
+    const weeks = (scheme as any)?.weeks || []
+    const starts = weeks.map((w: any) => w.start_date).filter(Boolean).sort()
+    const ends = weeks.map((w: any) => w.end_date).filter(Boolean).sort()
+    return {
+      term_start_date: starts[0],
+      term_end_date: ends[ends.length - 1],
+      class_level: scheme?.class_level,
+      subject: scheme?.subject,
+    }
+  }
+
   const handlePreviewAllocation = async () => {
     try {
       setPreviewing(true)
       setError(null)
       setAllocationConfirmed(false)
-      const preview = await api.getAllocationPreview(schemeId, config)
+      const preview = await api.getAllocationPreview(schemeId, sanitizeTermConfig(config, configFallback()))
       setAllocationPreview(preview)
       // PART T: per-lesson review rows arrive with GENERATED DEFAULTS
       // (lesson-specific keywords from the indicator/sub-strand, competencies
@@ -262,7 +285,9 @@ export default function GeneratePage() {
         setConfig(prev => ({ ...prev, selected_indicator_codes: [] }))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to preview allocation')
+      // Teacher-facing copy: a validation failure explains WHAT to fix, never
+      // the raw "Validation failed" (real-use remediation).
+      setError(normalizeError(err).message)
     } finally {
       setPreviewing(false)
     }
@@ -395,7 +420,7 @@ export default function GeneratePage() {
       setError(null)
       setGenProgress('Preparing curriculum allocation...')
 
-      const response = await api.generateLessonPlans(schemeId, config)
+      const response = await api.generateLessonPlans(schemeId, sanitizeTermConfig(config, configFallback()))
       setJobId(response.job_id)
       setAiResult(response.ai || null)
       setGenProgress('Lesson plans generated successfully!')
@@ -403,7 +428,7 @@ export default function GeneratePage() {
       const coverageData = await api.getCurriculumCoverage(response.job_id)
       setCoverage(coverageData)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Generation failed')
+      setError(normalizeError(err).message)
     } finally {
       setGenerating(false)
     }

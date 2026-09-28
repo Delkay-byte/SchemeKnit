@@ -56,7 +56,21 @@ def week_is_non_instructional(week) -> bool:
       * NON-INSTRUCTIONAL SPECIAL PERIOD — a MID-TERM/VACATION/EXAM label row
         (reclassification cleared its curriculum fields) or a special week
         with no indicator/strand content at all → True: never a fake lesson.
+      * MIXED week — the source row holds a special period AND real teaching
+        content (Defect 4). The special segment is metadata only; the teaching
+        content remains allocatable → False. The special segment itself is
+        never turned into a lesson.
     """
+    if getattr(week, "week_type", None) == WeekType.MIXED:
+        # Mixed weeks carry teaching content by definition; only the special
+        # segment is excluded. A "mixed" week with no teaching content at all
+        # is really a pure special period.
+        has_content = (
+            bool(list(getattr(week, "indicators", None) or []))
+            or bool((getattr(week, "strand", None) or "").strip())
+            or bool((getattr(week, "sub_strand", None) or "").strip())
+        )
+        return not has_content
     if getattr(week, "special_period_label", ""):
         return True
     if getattr(week, "week_type", WeekType.INSTRUCTION) == WeekType.INSTRUCTION:
@@ -106,6 +120,9 @@ def reclassify_special_weeks(weeks):
             c for c in (w.content_standards or []) if not _is_label(c)
         ]
         # Weeks whose ONLY content was the label become special periods.
+        # Weeks that ALSO carry real teaching content are MIXED (Defect 4):
+        # the special segment stays a period, the teaching segment stays
+        # allocatable — neither is discarded.
         still_content = (
             bool(w.indicators)
             or bool((w.strand or "").strip())
@@ -113,6 +130,8 @@ def reclassify_special_weeks(weeks):
         )
         if not still_content:
             w.week_type = WeekType.OTHER
+        else:
+            w.week_type = WeekType.MIXED
     return weeks
 
 
@@ -125,7 +144,11 @@ def scheme_has_indicators(weeks) -> bool:
     curriculum data, which the product never does.
     """
     for w in weeks or []:
-        if getattr(w, "week_type", WeekType.INSTRUCTION) != WeekType.INSTRUCTION:
+        # MIXED weeks carry real teaching content, so their indicators count
+        # (Defect 7: a mixed week's teaching segment stays allocatable).
+        if getattr(w, "week_type", WeekType.INSTRUCTION) not in (
+            WeekType.INSTRUCTION, WeekType.MIXED
+        ):
             continue
         if w.indicators:
             return True
@@ -179,9 +202,14 @@ class AllocationEngine:
         # (PART S: the product treats an explicitly included revision week as
         # real teaching), while a MID-TERM label row never does — see the
         # special-period skip inside the loop below.
+        # MIXED weeks (special period + real teaching content in the same
+        # source row, Defect 4/7) always stay in the allocation: their special
+        # segment is excluded from lesson allocation, their teaching segment
+        # remains fully allocatable.
         instruction_weeks = sorted(
             (w for w in weeks
-             if include_special_weeks or w.week_type == WeekType.INSTRUCTION),
+             if include_special_weeks
+             or w.week_type in (WeekType.INSTRUCTION, WeekType.MIXED)),
             key=lambda w: w.week_number,
         )
 

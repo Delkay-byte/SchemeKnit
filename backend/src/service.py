@@ -259,12 +259,21 @@ class DataService:
     # ── Term Configs ──────────────────────────────────────────────────────────
 
     def create_term_config(self, db: Session, owner_id: str, scheme_id: str, config: TermConfig) -> TermConfigDB:
+        scheme = self.get_scheme(db, scheme_id, owner_id)
+        scheme_weeks = list(getattr(scheme, "weeks", None) or [])
+        scheme_starts = [w.start_date for w in scheme_weeks if getattr(w, "start_date", None)]
+        scheme_ends = [w.end_date for w in scheme_weeks if getattr(w, "end_date", None)]
+        scheme_start = min(scheme_starts) if scheme_starts else None
+        scheme_end = max(scheme_ends) if scheme_ends else scheme_start
         db_config = TermConfigDB(
             id=config.id,
             owner_id=owner_id,
             scheme_id=scheme_id,
-            term_start_date=config.term_start_date,
-            term_end_date=config.term_end_date,
+            # The column is NOT NULL: an unset term window (teacher cleared the
+            # date inputs) falls back to the scheme's own curriculum dates, or
+            # the server date when the scheme carries none.
+            term_start_date=(config.term_start_date or scheme_start or date.today()),
+            term_end_date=(config.term_end_date or scheme_end or date.today()),
             lessons_per_week=config.lessons_per_week,
             lesson_duration_minutes=config.lesson_duration_minutes,
             class_size=config.class_size,

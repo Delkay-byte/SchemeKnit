@@ -110,6 +110,12 @@ export default function UploadPage() {
     result?.detection?.sections?.length
       ? result.detection.sections
       : (result?.detection?.subjects || []).map((s: string) => ({ subject: s }))
+  // Defect 1: a document is MULTI-SUBJECT only when the parser identified two
+  // or more distinct subject sections. One section (or a metadata-only hint)
+  // must never show "multiple subjects detected" — the success card already
+  // reports "1 subject detected" via the parsed subject name.
+  const isMultiSubject =
+    result?.detection?.status === 'multiple' && detectedSections.length >= 2
 
   // A document with weeks but no subject headings (WAPEF KG/Nursery shape):
   // load the subject catalogue for the detected class level so the teacher can
@@ -244,13 +250,12 @@ export default function UploadPage() {
                 <div className="text-center">
                   <AlertTriangle className="mx-auto mb-3 h-10 w-10 text-amber-500" aria-hidden="true" />
                   <h2 className="text-xl font-bold text-[#102A43]">
-                    {detectedSections.length > 0 ? 'Multiple subjects detected' : 'Confirm the subject'
-                    }
+                    {isMultiSubject ? 'Multiple subjects detected' : 'Confirm the subject'}
                   </h2>
                   <p className="mt-1 text-sm font-medium">
                     {result.detection?.title || result.filename || file?.name}
                   </p>
-                  {detectedSections.length > 0 ? (
+                  {isMultiSubject ? (
                     <p className="mt-1 text-sm text-muted-foreground">
                       This document contains more than one subject. Choose the
                       subject you are teaching — SchemeKnit will use only that
@@ -343,6 +348,14 @@ export default function UploadPage() {
                     {result.class_level && <p><strong>Class:</strong> {result.class_level}</p>}
                     {result.term && <p><strong>Term:</strong> {result.term}</p>}
                     {result.weeks_count && <p><strong>Weeks detected:</strong> {result.weeks_count}</p>}
+                    {/* Defect 1: the subject count comes from the parsed
+                        structural sections — exactly one for a single-subject
+                        document, never a metadata-inferred multiple. */}
+                    <p className="text-xs" data-subject-count>
+                      {isMultiSubject
+                        ? `${detectedSections.length} subjects detected`
+                        : '1 subject detected'}
+                    </p>
                     {result.detection?.status === 'single' && (
                       <p className="text-xs">Subject section identified.</p>
                     )}

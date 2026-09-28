@@ -5,7 +5,7 @@ Complete curriculum taxonomy, curriculum profiles, advanced templates,
 entitlements, content packs, and provenance tracking.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional, Dict, Any
 from datetime import datetime, date, time
 from enum import Enum
@@ -253,6 +253,10 @@ class WeekType(str, Enum):
     REVISION = "revision"
     ASSESSMENT = "assessment"
     SBA = "sba"
+    #: A week that contains BOTH a special period (e.g. MID-TERM) and real
+    #: teaching content in the same source row (Defect 4). The special segment
+    #: is never a lesson; the teaching segment stays fully allocatable.
+    MIXED = "mixed"
     OTHER = "other"
 
 
@@ -537,8 +541,14 @@ class TermConfig(BaseModel):
     class_size: int = 24
     lesson_duration_minutes: int = 60
     lessons_per_week: int = 3
-    term_start_date: date = Field(default_factory=date.today)
-    term_end_date: date = Field(default_factory=date.today)
+    #: The term window is a REQUIRED generation invariant, but the teacher may
+    #: leave the date inputs empty (an HTML date input cleared by the teacher
+    #: submits ""). An empty value is "not set", not a malformed payload — the
+    #: routers derive the real window from the scheme's own curriculum dates
+    #: (``resolve_term_window``) instead of rejecting the whole allocation with
+    #: an opaque 422 (real-use remediation, Defect 6/7).
+    term_start_date: Optional[date] = None
+    term_end_date: Optional[date] = None
     teaching_days: List[int] = [0, 2, 4]
     holidays: List[Holiday] = []
     school_name: Optional[str] = None
@@ -560,6 +570,24 @@ class TermConfig(BaseModel):
     core_competencies: List[str] = []
     references: List[str] = []
     created_date: datetime = Field(default_factory=datetime.now)
+
+    @field_validator("term_start_date", "term_end_date", mode="before")
+    @classmethod
+    def _blank_term_dates_are_unset(cls, value):
+        """Treat an emptied date input as "not set" rather than a crash.
+
+        The teacher clearing Term Start / Term End submits ``""``; Pydantic's
+        date parser rejected it with ``body -> term_start_date: Input should be
+        a valid date``, which the UI showed as "Validation failed" on BOTH
+        Quick Generate and Build with me. The missing invariant is then filled
+        from the scheme itself, so a blank optional input never blocks a valid
+        allocation.
+        """
+        if value is None:
+            return None
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
 
 # ── Teaching Calendar ─────────────────────────────────────────────────────────

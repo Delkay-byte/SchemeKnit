@@ -296,11 +296,12 @@ async def get_scheme_weeks(
     # The extraction-verification surface reads the SAME curriculum spine the
     # generator uses: per-week review status + teacher-facing reasons, derived
     # from the already-persisted weeks (no second parse, no second store).
-    from ..curriculum.spine import build_week_spine
+    from ..curriculum.spine import build_week_spine, scheme_provides_indicators
 
     weeks = []
+    scheme_weeks = list(scheme_db.weeks or [])
     for w in scheme_db.weeks:
-        spine_week = build_week_spine(w)
+        spine_week = build_week_spine(w, scheme_weeks)
         weeks.append({
             "id": w.id,
             "week_number": w.week_number,
@@ -316,11 +317,21 @@ async def get_scheme_weeks(
             "resources": w.resources or [],
             "special_period_label": getattr(w, "special_period_label", "") or "",
             "special_period_type": getattr(w, "special_period_type", "") or "",
+            # Source-defined segments (Defect 5): the special period(s) and the
+            # teaching span of the week, exactly as the source defines them.
+            "special_segments": spine_week["special_segments"],
+            "teaching_segments": spine_week["teaching_segments"],
             "review_status": spine_week["review_status"],
             "review_reasons": spine_week["review_reasons"],
         })
 
-    return {"weeks": weeks}
+    # Defect 2: whether the SOURCE carries an indicator column at all. Lets the
+    # UI say "Not provided in source" instead of implying a parser failure on
+    # whole-level schemes (WAPEF Nursery/KG) that have no Indicator column.
+    return {
+        "weeks": weeks,
+        "source_provides_indicators": scheme_provides_indicators(scheme_weeks),
+    }
 
 
 @router.get("/{scheme_id}/detection")
