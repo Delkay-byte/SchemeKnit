@@ -274,7 +274,7 @@ fabrication.
 
 | Gate | Result |
 |---|---|
-| Backend suite | **1600 passed, 12 skipped, 0 failed** (baseline before this pass: 1549 passed, 11 skipped) |
+| Backend suite | **1604 passed, 12 skipped, 0 failed** (baseline before this pass: 1549 passed, 11 skipped) |
 | Frontend typecheck | `npx tsc --noEmit` clean |
 | Frontend build | `NEXT_PUBLIC_BUILD_TARGET=web npx next build` — compiled successfully |
 | Browser acceptance (the teacher's real `BS7-1st-Term-Computing-Scheme.docx`, Approved WAPEF Plan) | **79/79 checks passed** |
@@ -305,27 +305,72 @@ backend :8000):
 
 ## 5. Production acceptance
 
-**Status: blocked — not claimed.** The Render deployment does not auto-deploy
-on push, and the deployed build still serves the pre-remediation code (its week
-payload has no `review_status`, the spine route 404s and the live BS7 RME rows
-still show the stale extraction). The same blocker applied to the previous
-task.
-
-Once the owner triggers a redeploy, the verification run is:
+**Status: PASSED — 81/81 checks on the deployed Render environment**
+(`https://schemeknit-frontend.onrender.com` + `https://schemeknit-api.onrender.com`),
+run with the remediation fixture the real upload flows use:
 
 ```
 cd frontend
-TF_WEB_URL=https://schemeknit-frontend.onrender.com \
-TF_API_URL=https://schemeknit-api.onrender.com \
-TF_UPLOAD_FILE="<the teacher's single-subject scheme>.docx" \
+TF_WEB_URL=https://schemeknit-frontend.onrender.com
+TF_API_URL=https://schemeknit-api.onrender.com
+TF_BASE_URL=https://schemeknit-frontend.onrender.com
+TF_TEACHER_EMAIL=accept.download.test@schemeknit.test
+TF_UPLOAD_FILE=backend/tests/fixtures/remediation/bs7_mixed_midterm_scheme.docx
 node e2e/curriculum-workspace-acceptance.js
 ```
 
-which drives UPLOAD → subject count → week/indicator extraction → review states
-→ mixed week → review interaction → Preview Allocation (both modes) → the real
-lesson workspace. Per the spec, this task is **not** declared complete until
-Preview Allocation succeeds in the deployed environment.
+Highlights from the green run (scheme `8321453e-...`, job `a43a2388-...`):
 
-Locally the same command with `TF_TEMPLATE="WAPEF"` and the teacher's real file
-(`C:\Users\SAVIOUR\Downloads\BS7-1st-Term-Computing-Scheme.docx`) passes all 79
-checks against the built frontend and local backend.
+* **Quick Generate → Preview Allocation: HTTP 200 in production**
+* **Build with me → Preview Allocation: HTTP 200 in production**
+* emptied term dates accepted (no "Validation failed" anywhere)
+* single-subject card ("1 subject detected"), 11/13 weeks keep indicators,
+  "Needs review" opens the week context, "Mixed week" never "Other",
+  midterm source dates `05-11-2026 → 06-11-2026`
+* workspace opens on real lesson content; provenance answers
+  `Curriculum-first (deterministic)`; Main Learning edit persists across reload
+* **DOCX reaches disk from production** — `Lesson_Plans_bs7_mixed_midterm_scheme.docx`
+  (41,072 bytes, `PK`, valid OOXML), HTTP 200, correct MIME
+* **PDF reaches disk from production** — 67,751 bytes, `%PDF-`, header+xref+EOF
+* after each reload the scheme-status restore returns
+  `{"status":"completed"}` and the workspace reappears (never the generate form)
+* mobile viewport: no horizontal overflow, Save/Export reachable
+
+### Two production-only failures found (and fixed) during this acceptance
+
+Both were invisible locally because the rate limiter exempts localhost, and
+both were traced to root cause before any claim of completion:
+
+1. **429 on the export file GET (commits `95038ea`, superseded by `844894c`).**
+   `RATE_LIMITS` charged everything under `/api/generation/` to one
+   30-requests-per-60s per-IP bucket: generation status polling, preview,
+   provenance, the download-url POST **and the one-time file GET itself**. The
+   journey's polling exhausted the bucket right before export, and because the
+   DOCX/PDF handoff is a plain anchor navigation, the browser rendered the raw
+   limiter JSON in place of the file (no banner, no retry). Local runs never
+   tripped it (`RATE_LIMIT_EXEMPT_IPS`). Fix: budgets now apply to **mutating
+   methods only** — status, provenance, coverage and file delivery are reads;
+   generate, preview, export, upload and auth stay limited.
+
+2. **429 responses were CORS-invisible (commit `844894c`).**
+   `RateLimitMiddleware` was registered *outside* `CORSMiddleware`
+   (`main.py`), so a 429 built by the limiter reached the browser **without
+   `Access-Control-Allow-Origin`**. The client saw an opaque
+   `TypeError: Failed to fetch`, `getGenerationStatusForScheme(...).catch(() => null)`
+   swallowed it, `jobId` was never restored and — deterministically after the
+   DOCX export reload — the page fell back to the generation form instead of
+   the workspace (harness forensics: scheme-status fetch blocked by CORS,
+   `recentHTTP=none`). Fix: the limiter is now registered *inside* CORS (the
+   same reasoning the codebase already documents for its generic exception
+   handler in `main.py`), so any remaining 429 is readable by JS and surfaces
+   as a real error message.
+
+Regression tests pin both policies in `backend/tests/test_security_hardening.py`
+(`TestBudgetPolicyAndCorsOn429`): reads bypass an exhausted budget, mutations
+still return 429, the 429 carries `Access-Control-Allow-Origin`, and
+`main.py` wires the limiter inside CORS. Final gates: backend
+**1604 passed, 12 skipped**, `tsc --noEmit` clean, local acceptance **81/81**,
+production acceptance **81/81**.
+
+Per the spec, this task is complete only because Preview Allocation succeeded
+in the deployed environment — it did, on both generation paths.
