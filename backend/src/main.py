@@ -174,6 +174,16 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+from .security import RateLimitMiddleware, SecurityHeadersMiddleware
+
+# Rate limiting is registered BEFORE CORS (Starlette: last added = outermost,
+# so RateLimit ends up INSIDE CORSMiddleware). A 429 built outside CORS reaches
+# the browser without Access-Control-Allow-Origin and the client sees an
+# opaque network error instead of the throttle message — the workspace then
+# silently loses its scheme-status response and falls back to the generate
+# form (production acceptance caught exactly this).
+app.add_middleware(RateLimitMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -186,8 +196,6 @@ app.add_middleware(
     expose_headers=["X-TeachFlow-Filename"],
 )
 
-from .security import RateLimitMiddleware, SecurityHeadersMiddleware
-app.add_middleware(RateLimitMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 
 

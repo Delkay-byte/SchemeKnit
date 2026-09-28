@@ -95,15 +95,14 @@ RATE_LIMITS: List[Tuple[str, int, int]] = [
 
 RATE_LIMIT_EXEMPT_IPS = {"127.0.0.1", "::1", "localhost"}
 
-# Single-use file delivery is exempt from route budgets. The URL carries an
-# unguessable one-time token and the issuing POST (/download-url) is still
-# budgeted under /api/generation/ above, so abuse stays controlled. A 429 on
-# the GET itself cannot reach a teacher as an error banner: the export is a
-# plain anchor navigation, so the browser would render raw limiter JSON in
-# place of the DOCX/PDF. Budgets are per-IP sliding windows, and a busy
-# workspace (status polling + preview + provenance in the same minute) can
-# legitimately exhaust them right before an export.
-RATE_LIMIT_EXEMPT_PATHS = ("/api/generation/downloads/",)
+# Safe methods are never budgeted. The workspace legitimately fires dozens of
+# reads a minute (scheme status polling while lessons render, per-reload
+# status + options + provenance fetches), so counting them against the same
+# per-minute budget as generate/upload made a normal production journey trip
+# 429 mid-flight — and a throttled read was invisible to the client (the
+# workspace just failed to restore and fell back to the generate form).
+# Budgets guard what mutates: generate, preview, exports, uploads, auth.
+SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
 
 class RateLimiter:
@@ -148,13 +147,14 @@ rate_limiter = RateLimiter()
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """429 JSON on exceeded sensitive-route budgets.
 
-    Localhost is exempt (dev/test), as is single-use file delivery
-    (RATE_LIMIT_EXEMPT_PATHS) — see the comment there.
+    Safe methods bypass budgets (SAFE_METHODS), localhost stays exempt
+    (dev/test), and the middleware is registered inside CORSMiddleware so a
+    429 reaches JS with its headers intact (see main.py).
     """
 
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
-        if path.startswith(RATE_LIMIT_EXEMPT_PATHS):
+        if request.method in SAFE_METHODS:
             return await call_next(request)
         try:
             if rate_limiter._rules_for(path):
