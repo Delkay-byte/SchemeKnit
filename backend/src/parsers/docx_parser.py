@@ -124,9 +124,77 @@ SPECIAL_WEEK_KEYWORDS = [
     "halfterm",
 ]
 
+#: Vocabulary a special-period LABEL may be built from: the period names
+#: above plus the words sources print around one (date ranges, month names,
+#: term/level words, connectives). A cell that hits a keyword but also uses
+#: ordinary curriculum words ("Examine the nature of God", "Examples:
+#: ironing in bulk") is CONTENT, not a label — see
+#: :func:`is_special_label_text`.
+SPECIAL_LABEL_WORDS = frozenset({
+    # Period names (from SPECIAL_WEEK_KEYWORDS, split into words).
+    "revision", "examination", "exam", "exams", "assessment", "assessments",
+    "mid", "midterm", "half", "halfterm", "term", "terms", "vacation",
+    "sba", "activities", "activity", "break", "holiday", "holidays",
+    "test", "tests", "week", "weeks", "period", "periods",
+    # Connectives and framing a label carries.
+    "end", "of", "and", "or", "the", "to", "a", "an", "for", "in", "on",
+    "at", "all", "day", "days", "date", "dates", "work", "mock", "final",
+    "report", "reporting", "closure", "opening", "closing",
+    "first", "second", "third", "st", "nd", "rd", "th",
+    # Level and calendar markers that share the label cell.
+    "basic", "jhs", "shs", "jss", "sss",
+    "january", "february", "march", "april", "may", "june", "july",
+    "august", "september", "october", "november", "december",
+    "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "sept",
+    "oct", "nov", "dec",
+})
+
+
+def is_special_label_text(text) -> bool:
+    """True only when ``text`` IS a special-period label (Defect D2/D3).
+
+    Shares :data:`SPECIAL_WEEK_KEYWORDS` with the parser so parse, allocation
+    and review agree on what a special period is, then requires the WHOLE cell
+    to be period vocabulary:
+
+    * ``"REVISION"``                      → label
+    * ``"MID-TERM (05-11-2026 to 06-11-2026)"`` → label
+    * ``"END OF TERM ASSESSMENT"``        → label
+    * ``"Examine the nature of God"``     → not a label (curriculum prose
+      that merely CONTAINS ``exam``)
+    * ``"B7.1.1.1.1 Examples: ironing"``  → not a label (carries a code)
+
+    Keyword detection alone can never decide this: ``exam`` is a substring of
+    ``examine`` and ``Examples``, so a broad match turns real indicators into
+    periods and silently drops them.
+    """
+    stripped = (text or "").strip()
+    if not stripped or INDICATOR_CODE_PATTERN.search(stripped):
+        return False
+    lowered = stripped.lower()
+    if not any(kw in lowered for kw in SPECIAL_WEEK_KEYWORDS):
+        return False
+    words = re.findall(r"[a-z]+", lowered)
+    return bool(words) and all(w in SPECIAL_LABEL_WORDS for w in words)
+
 WEEK_NUMBER_PATTERN = re.compile(
     r'^(\d{1,2})\s*[\|\n\r]+\s*(.+)$', re.DOTALL
 )
+
+#: Cell fillers a scheme prints where it has nothing to say. A lone dash is not
+#: curriculum prose, so it must never be read as teaching evidence.
+PLACEHOLDER_CELLS = frozenset({
+    "-", "--", "---", "–", "—", ".", "..", "...", "n/a", "N/A", "na",
+    "none", "nil", "tbd", "TBD", "x", "X", "?", "??",
+})
+
+
+def _is_placeholder_cell(text: str) -> bool:
+    """True when a cell only carries a placeholder filler such as ``-``."""
+    stripped = (text or "").strip()
+    if not stripped:
+        return True
+    return stripped in PLACEHOLDER_CELLS
 WEEK_ONLY_PATTERN = re.compile(r'^(\d{1,2})$')
 DATE_SLASH_PATTERN = re.compile(r'(\d{1,2})/(\d{1,2})/(\d{2,4})')
 DATE_DASH_PATTERN = re.compile(r'(\d{1,2})-(\d{1,2})-(\d{2,4})')
@@ -709,6 +777,11 @@ class DOCXParser:
                 current_strand = None
                 current_sub_strand = None
                 current_resources = []
+                # A new week never inherits the PREVIOUS week's period type:
+                # stickiness may only continue a period inside its own week
+                # (Defect D3), never leak "REVISION" into week N+1 just
+                # because its first row prints an empty strand cell.
+                current_week_type = WeekType.INSTRUCTION
 
                 if current_week not in week_rows:
                     week_rows[current_week] = []
@@ -727,14 +800,22 @@ class DOCXParser:
             # segment model reads for Defect 5. Matching a bare cell elsewhere
             # in the row (the sub-strand often repeats just "MID-TERM") must
             # never be preferred over this one.
+            #
+            # Only a cell that IS a label (every word period vocabulary) may
+            # reclassify the row: curriculum prose that CONTAINS a keyword
+            # ("Examine the nature of God") must stay instruction — a broad
+            # keyword match here turned real indicators into periods and
+            # dropped them (Defect D2).
             raw_strand_cell = normalized.get("strand", "").strip()
+            strand_is_label = is_special_label_text(
+                self._normalize_special_week_label(raw_strand_cell))
             special_label_cell = (
                 self._normalize_special_week_label(raw_strand_cell)
-                if self._is_special_week_text(raw_strand_cell) else ""
+                if strand_is_label else ""
             )
             strand_text = self._normalize_special_week_label(raw_strand_cell)
             if strand_text:
-                if self._is_special_week_text(strand_text):
+                if strand_is_label:
                     current_week_type = self._classify_special_week(strand_text)
                 else:
                     current_week_type = WeekType.INSTRUCTION
@@ -742,7 +823,7 @@ class DOCXParser:
             elif current_week is not None and current_week_type == WeekType.INSTRUCTION:
                 pass
 
-            if strand_text and self._is_special_week_text(strand_text):
+            if strand_text and strand_is_label:
                 # A special-period row declares the period in every cell:
                 # normalise the noisy label ("AND VACATION", "REVISION1") in
                 # the sub-strand and resource positions too. Curriculum rows
@@ -1058,6 +1139,42 @@ class DOCXParser:
             return WeekType.SBA
         return WeekType.OTHER
 
+    def _row_is_teaching(self, row: Dict[str, Any]) -> bool:
+        """True when a row's OWN cells carry teaching evidence (Defect D3).
+
+        The row's inherited ``week_type`` is deliberately ignored: within one
+        week that flag is sticky, so every row AFTER a period row inherits the
+        period type even when its cells print real curriculum. Deciding on cell
+        evidence instead means a period row can never swallow the teaching rows
+        that follow it, and a period label can never masquerade as curriculum.
+
+        Evidence, in order:
+          * the row declares a period LABEL in its own cells -> not teaching
+            (its remaining prose is period-scoped review/assessment, e.g. the
+            KG "REVISION" week whose sub-strand reads "Integrated review");
+          * an indicator code                            -> teaching
+          * real (non-placeholder) strand / sub-strand /
+            content-standard prose                       -> teaching
+          * a resources-only row (no curriculum cells,
+            no label)                                    -> teaching, so its
+            resources are still collected
+        """
+        # 1. A row that declares the period itself IS the period.
+        if (row.get("special_label_cell") or "").strip():
+            return False
+        indicator_cell = (row.get("indicators") or "").strip()
+        if is_special_label_text(indicator_cell):
+            return False
+        if INDICATOR_CODE_PATTERN.search(indicator_cell):
+            return True
+        for key in ("content_standard", "strand", "sub_strand"):
+            cell = (row.get(key) or "").strip()
+            if _is_placeholder_cell(cell) or is_special_label_text(cell):
+                continue
+            return True
+        resources = (row.get("resources") or "").strip()
+        return bool(resources) and not is_special_label_text(resources)
+
     def _merge_week_rows(self, week_num: int, rows: List[Dict[str, Any]]) -> ParsedWeek:
         if not rows:
             return ParsedWeek(week_number=week_num)
@@ -1094,7 +1211,12 @@ class DOCXParser:
             for row in rows:
                 for cell in (row.get("strand", ""), row.get("sub_strand", ""),
                              row.get("resources", "")):
-                    if cell and self._is_special_week_text(cell):
+                    # Strict label test (Defect D2): only a cell that IS a
+                    # period label declares the period. The broad keyword scan
+                    # matched curriculum prose that merely CONTAINS a keyword
+                    # ("Examine the nature of God") and turned it into a
+                    # period, dropping the real content with it.
+                    if cell and is_special_label_text(cell):
                         special_label = cell.strip()
                         special_type = SpecialPeriodType.classify(cell).value
                         special_week_type = row.get("week_type", WeekType.INSTRUCTION)
@@ -1103,16 +1225,33 @@ class DOCXParser:
                     break
         if special_week_type is not None:
             week_type = special_week_type
-            strand = None if self._is_special_week_text(strand or "") else strand
+            strand = None if is_special_label_text(strand or "") else strand
             sub_strand = (
-                None if self._is_special_week_text(sub_strand or "") else sub_strand
+                None if is_special_label_text(sub_strand or "") else sub_strand
             )
+
+        # ── Defect D3: teaching is decided by each row's OWN cells ──────
+        # A sticky week_type continues a period INSIDE its own week: rows
+        # AFTER the period row inherit the period type even though their cells
+        # print the week's real curriculum ("B7.3.1.2.2 Describe ..."). So a
+        # row is classified by cell evidence — declared label cells make it a
+        # period row; an indicator code or ordinary strand / sub-strand /
+        # content-standard prose makes it teach. Curriculum is collected from
+        # the teaching rows only, which is why a fully special week ends up
+        # with no curriculum at all instead of its label echoed as content.
+        teaching_rows: List[Dict[str, Any]] = []
+        special_rows: List[Dict[str, Any]] = []
+        for row in rows:
+            if self._row_is_teaching(row):
+                teaching_rows.append(row)
+            else:
+                special_rows.append(row)
 
         all_content_standards: List[ParsedContentStandard] = []
         all_indicators: List[ParsedIndicator] = []
         all_resources: set = set()
 
-        for row in rows:
+        for row in teaching_rows:
             cs_text = row.get("content_standard", "")
             if cs_text:
                 cs_code = self._extract_code(cs_text, CONTENT_STANDARD_CODE_PATTERN)
@@ -1132,18 +1271,12 @@ class DOCXParser:
                 # too ("END OF TERM ASSESSMENT"). The label has NO indicator
                 # code; keep it out of the indicator list so it can never
                 # become a lesson (PART O/P metadata, Defect 4).
-                # The guard is deliberately narrow: the row itself must be a
-                # non-instructional period row. Matching the label keywords
-                # against an ordinary indicator's text would silently drop real
-                # curriculum ("Examine ..." contains "exam", "SBA" appears in
-                # ordinary descriptions).
-                is_special_row = (
-                    row.get("week_type", WeekType.INSTRUCTION) != WeekType.INSTRUCTION
-                )
-                label_only = (
-                    is_special_row
-                    and not INDICATOR_CODE_PATTERN.search(ind_text)
-                )
+                # Strict test (Defect D2): only a cell that IS the label is
+                # excluded. Curriculum prose that CONTAINS a keyword
+                # ("Examine ...", "Examples: ...") is content and stays — the
+                # old row-type guard dropped real indicators of period-typed
+                # rows on a mere substring match.
+                label_only = is_special_label_text(ind_text)
                 if not label_only:
                     # A cell may print SEVERAL distinct indicator codes — the
                     # source lists them separately ("B7.1.2.1.1\nB7.1.2.1.2")
@@ -1209,20 +1342,17 @@ class DOCXParser:
         # (e.g. a REVISION week with real indicators) keeps its own type: the
         # allocation engine already treats "special period WITH teaching
         # content" as allocatable, so re-typing it would lose the source label.
-        special_rows = [
-            r for r in rows
+        #
+        # The teaching/special split is the cell-evidence one computed above
+        # (``_row_is_teaching``) — recomputing it from the sticky ``week_type``
+        # here would undo Defect D3. ``labelled_rows`` narrows the non-teaching
+        # set to rows that actually DECLARE a period, so an empty continuation
+        # row can never re-type an ordinary teaching week as special.
+        labelled_rows = [
+            r for r in special_rows
             if r.get("week_type", WeekType.INSTRUCTION) != WeekType.INSTRUCTION
         ]
-        teaching_rows = [
-            r for r in rows
-            if r.get("week_type", WeekType.INSTRUCTION) == WeekType.INSTRUCTION
-            and (
-                INDICATOR_CODE_PATTERN.search(r.get("indicators") or "")
-                or (r.get("strand") or "").strip()
-                or (r.get("sub_strand") or "").strip()
-            )
-        ]
-        if special_label and teaching_rows and (special_rows or len(rows) > 1):
+        if special_label and teaching_rows and (labelled_rows or len(rows) > 1):
             week_type = WeekType.MIXED
             # The teaching segment's own strand/sub-strand are the week's
             # curriculum framing — the special row's label cells never are
@@ -1236,8 +1366,8 @@ class DOCXParser:
             # segment is dated by the source teaching row (Defect 5 — no
             # invented Mon-Fri range on either side).
             week_date = t_row.get("date") or week_date
-        elif special_rows:
-            week_type = special_rows[0].get("week_type", WeekType.INSTRUCTION)
+        elif labelled_rows:
+            week_type = labelled_rows[0].get("week_type", WeekType.INSTRUCTION)
         elif special_label:
             # The label leaked into an instruction-classified row with no
             # teaching content of its own — the row IS the special period.

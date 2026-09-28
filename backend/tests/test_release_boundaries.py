@@ -142,7 +142,9 @@ class TestPdfContract:
         assert "500" not in PDF_CONVERTER_REQUIREMENT
 
     @pytest.mark.asyncio
-    async def test_endpoint_503_when_no_converter(self, db):
+    async def test_endpoint_503_when_pdf_rendering_is_impossible(self, db, monkeypatch):
+        """No converter is fine (the structured renderer covers it); no way at
+        all to make a PDF must be the explicit 503 naming the requirement."""
         from tests.conftest import make_user
         from src.routers import generation as gen_router
         u = make_user(db, role="teacher", email="pdf@t.test")
@@ -158,8 +160,14 @@ class TestPdfContract:
         from src.database import LessonPlanDB
         db.add(LessonPlanDB(id=generate_id(), job_id=job.id, owner_id=u.id,
                             scheme_id=scheme.id, week_number=1, lesson_sequence=1,
+                            lesson_date=date(2026, 9, 11),
                             class_level="Basic 9", subject="Science"))
         db.commit()
+
+        def _boom(*args, **kwargs):
+            raise RuntimeError("reportlab build failed")
+
+        monkeypatch.setattr(gen_router, "_render_structured_pdf", _boom)
         with patch.object(PDFExportEngine, "is_available", return_value=False):
             with pytest.raises(HTTPException) as e:
                 await gen_router.export_pdf(job.id, "GES-style", None, u, db)

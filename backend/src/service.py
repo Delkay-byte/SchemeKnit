@@ -351,6 +351,8 @@ class DataService:
             lesson_date=lp.lesson_date,
             lesson_number=lp.lesson_number,
             period=getattr(lp, "period", "") or "",
+            special_period_label=getattr(lp, "special_period_label", "") or "",
+            special_period_type=getattr(lp, "special_period_type", "") or "",
             class_level=lp.class_level.value if isinstance(lp.class_level, ClassLevel) else str(lp.class_level),
             subject=lp.subject.value if isinstance(lp.subject, Subject) else str(lp.subject),
             class_size=lp.class_size,
@@ -384,7 +386,10 @@ class DataService:
             ],
             keywords=lp.keywords,
             homework=getattr(lp, "homework", "") or "",
+            class_assignment=getattr(lp, "class_assignment", "") or "",
+            home_assignment=getattr(lp, "home_assignment", "") or "",
             differentiation=getattr(lp, "differentiation", "") or "",
+            template_id=getattr(lp, "template_id", None),
             status=lp.status.value if isinstance(lp.status, LessonStatus) else str(lp.status),
             ai_generated=lp.ai_generated,
             teacher_edited=lp.teacher_edited,
@@ -441,12 +446,44 @@ class DataService:
             "main_activities", "learner_activities", "teacher_activities",
             "learning_objectives",
         }
+        # Client field-name aliases accepted at the save boundary so every
+        # teacher-owned field lands on its canonical column. A mismatched
+        # alias would silently drop the write (the historical
+        # duration/school persistence misses).
+        _ALIASES = {
+            "duration": "duration_minutes",
+            "school": "school_name",
+        }
+        if any(k in _ALIASES for k in updates):
+            updates = {_ALIASES.get(k, k): v for k, v in updates.items()}
+
+        # Text columns: coerce at the boundary so a list/None client value can
+        # never be double-encoded into the column.
+        text_fields = {
+            "homework", "class_assignment", "home_assignment",
+            "differentiation", "lesson_topic", "previous_knowledge",
+            "introduction", "assessment", "conclusion", "starter_activity",
+        }
+
         for key, value in updates.items():
             if hasattr(lp, key) and key not in ("id", "job_id", "owner_id", "scheme_id", "created_at"):
                 if key == "structured_references":
                     value = normalize_structured_references(value)
                 elif key in text_list_fields:
                     value = normalize_text_items(value)
+                elif key in text_fields:
+                    if value is None:
+                        value = ""
+                    elif not isinstance(value, str):
+                        value = "; ".join(str(v).strip() for v in value) if isinstance(value, (list, tuple)) else str(value)
+                elif key in ("duration_minutes", "class_size", "lesson_number"):
+                    # Numeric columns: a form sends strings; never store text
+                    # in an integer column (SQLite would accept it and the
+                    # export would then fail on int parsing).
+                    try:
+                        value = int(value)
+                    except (TypeError, ValueError):
+                        continue
                 elif key in activity_list_fields and not isinstance(value, list):
                     continue
                 setattr(lp, key, value)

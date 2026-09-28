@@ -24,6 +24,7 @@ indicator→period rule — they retain their existing behaviour.
 from datetime import date
 from typing import List, Optional, Dict, Tuple, Any
 from collections import defaultdict
+import re
 
 from ..models import (
     Week, WeekType, TermConfig, TeachingCalendar,
@@ -44,6 +45,21 @@ def is_special_period_text(text) -> bool:
     from ..parsers.docx_parser import SPECIAL_WEEK_KEYWORDS
     t = (text or "").strip().lower()
     return any(kw in t for kw in SPECIAL_WEEK_KEYWORDS)
+
+
+def is_special_period_label(text) -> bool:
+    """STRICT label test (Defect D2): the whole cell is period vocabulary.
+
+    :func:`is_special_period_text` is deliberately broad (keyword substring),
+    which is right for scanning a week's cells for a period row but WRONG for
+    deciding whether a specific cell's content IS the period: "Examine the
+    nature of God" and "Examples: ironing in bulk" contain ``exam`` yet are
+    curriculum. Every destructive decision — clearing a strand, dropping an
+    indicator, naming a special period — uses this strict form, so real
+    content can never be classified away (or silently dropped) by accident.
+    """
+    from ..parsers.docx_parser import is_special_label_text
+    return is_special_label_text(text)
 
 
 def week_is_non_instructional(week) -> bool:
@@ -99,7 +115,11 @@ def reclassify_special_weeks(weeks):
             getattr(w, "sub_strand", None) or "",
             *(list(getattr(w, "indicators", None) or [])),
         ]
-        label = next((c.strip() for c in candidates if is_special_period_text(c)), "")
+        # Strict label test (Defect D2): only a cell that IS a period label
+        # triggers reclassification. The broad keyword scan would treat
+        # "Examine the nature of God"/"Examples: ..." (contain "exam") as a
+        # period and CLEAR real indicators out of the scheme.
+        label = next((c.strip() for c in candidates if is_special_period_label(c)), "")
         if not label:
             continue
         # Curriculum authority stays with the source: a special-period label is
@@ -108,7 +128,7 @@ def reclassify_special_weeks(weeks):
         # theory") keeps its content: only the LABEL cell is a period name.
         def _is_label(cell: str) -> bool:
             c = (cell or "").strip()
-            return bool(c) and is_special_period_text(c)
+            return bool(c) and is_special_period_label(c)
         w.special_period_label = label
         w.special_period_type = SpecialPeriodType.classify(label).value
         if _is_label(w.strand or ""):
@@ -248,7 +268,7 @@ class AllocationEngine:
                         carry_forward: bool, needs_review: bool) -> AllocatedIndicator:
             return AllocatedIndicator(
                 indicator_code=item["code"],
-                indicator_description=item["text"],
+                indicator_description=self._indicator_description(item["text"]),
                 content_standard_code=item["cs_code"],
                 content_standard_description=item["cs_text"],
                 strand=item["strand"],
@@ -299,7 +319,14 @@ class AllocationEngine:
                         carry_forward=False,
                         carry_forward_from_week=None,
                         needs_review=False,
-                        special_period_label=label or (week.strand or "").strip(),
+                        # Strict test (D2): the fallback names the period only
+                        # when the strand cell IS a label — curriculum prose
+                        # that contains a keyword is never period metadata.
+                        special_period_label=label or (
+                            (week.strand or "").strip()
+                            if is_special_period_label(week.strand)
+                            else ""
+                        ),
                         special_period_type=(
                             getattr(week, "special_period_type", "")
                             or "other_non_instructional"
@@ -343,6 +370,20 @@ class AllocationEngine:
                 }
                 for t in week_indicators
             ]
+
+            # ── Defect D5: the same source cell parsed twice allocates twice ──
+            # A week whose indicator list repeats the SAME (code, text) pair
+            # would emit one allocation per copy: duplicated lessons plus a
+            # false "duplicated indicator" report. First occurrence wins.
+            deduped_items: List[Dict[str, Any]] = []
+            seen_items = set()
+            for item in own_items:
+                key = (item["code"], item["text"])
+                if key in seen_items:
+                    continue
+                seen_items.add(key)
+                deduped_items.append(item)
+            own_items = deduped_items
 
             # ── Conflict detection (§7) ──────────────────────────────
             # A source week with more indicators than its own teaching periods.
@@ -563,16 +604,36 @@ class AllocationEngine:
         ordered = sorted(coverage.allocations, key=lambda a: a.lesson_sequence)
         lesson_plans: List[LessonPlan] = []
         lesson_counter = 0
+
+        def _source_indicator_text(a: AllocatedIndicator) -> str:
+            """The indicator cell as the SOURCE scheme printed it (Defect D5).
+
+            Allocations store the description WITHOUT its curriculum code, but
+            the lesson keeps the source indicator string verbatim — lessons
+            preserve the curriculum's own indicator text (code included) so
+            review, export and provenance quote the scheme exactly. Rebuilt
+            from code + description; an ``indicator_code`` that is not a real
+            code (the extractor's prose fallback) is never re-attached.
+            """
+            code = (a.indicator_code or "").strip()
+            desc = a.indicator_description or ""
+            if not desc:
+                return code
+            if not re.fullmatch(r'[BbKk]?\d+(?:\.\d+){2,4}', code):
+                return desc
+            return f"{code} {desc}"
+
         for idx, alloc in enumerate(ordered):
             # Special-period metadata rows produce NO lesson plan (PART Q/S).
             if getattr(alloc, "is_special_period", False):
                 continue
             lesson_counter += 1
+            source_text = _source_indicator_text(alloc)
             previous_indicator = (
-                ordered[idx - 1].indicator_description if idx > 0 else None
+                _source_indicator_text(ordered[idx - 1]) if idx > 0 else None
             )
             next_indicator = (
-                ordered[idx + 1].indicator_description
+                _source_indicator_text(ordered[idx + 1])
                 if idx < len(ordered) - 1 else None
             )
             # KG-style rows carry a code-only indicator cell, so passing the
@@ -601,7 +662,14 @@ class AllocationEngine:
                 if nxt_row and nxt_row.sub_strand and nxt_row.sub_strand == alloc.sub_strand:
                     next_indicator = nxt_row.sub_strand
             lp = build_lesson(
-                alloc, config, scheme_id,
+                # Defect D5: the builder reads ``indicator_description`` as the
+                # lesson's indicator text; hand it the source string (rebuilt
+                # above) while the allocation row keeps the code-less
+                # description. Behaviour of every lesson is byte-identical to
+                # the source-preserved contract.
+                (alloc.model_copy(update={"indicator_description": source_text})
+                 if source_text != (alloc.indicator_description or "") else alloc),
+                config, scheme_id,
                 previous_indicator=previous_indicator,
                 next_indicator=next_indicator,
             )
@@ -702,6 +770,25 @@ class AllocationEngine:
         if alloc.sub_strand:
             parts.append(alloc.sub_strand)
         return " - ".join(parts) if parts else "Lesson"
+
+    @staticmethod
+    def _indicator_description(text: str) -> str:
+        """The indicator cell WITHOUT its curriculum code (Defect D5).
+
+        The code already lives in ``indicator_code``; keeping it in the
+        description too made every consumer that renders the description show
+        it twice (the provenance panel prints ``indicator — indicator_text``,
+        the lessons list prints ``indicator_codes[0]`` above ``indicators[0]``)
+        and produced bare-code descriptions like "K2.1.1.1.1" for KG rows. A
+        code-only cell has NO description — "" — never the code as its own
+        prose.
+        """
+        if not text:
+            return ""
+        desc = re.sub(r'[BbKk]?\d+(?:\.\d+){2,4}[.:]?', ' ', text).strip()
+        if not re.search(r'[A-Za-z]', desc):
+            return ""
+        return desc
 
     @staticmethod
     def _strip_indicator_code(text: str) -> str:

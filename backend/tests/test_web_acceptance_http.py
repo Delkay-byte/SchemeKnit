@@ -229,10 +229,14 @@ class TestTeacherWorkflowOverHttp:
 
 class TestPdfEndpointBehaviourOverHttp:
     def test_no_converter_is_a_controlled_503(self, http, monkeypatch):
-        """Item 17: PDF generation backend is unavailable on this host, so the
-        endpoint must answer the controlled 503 — never a raw 500 and never a
-        body that is not a PDF."""
+        """Item 17: this host has no DOCX -> PDF converter.
+
+        The endpoint renders the lesson structurally instead, so the normal
+        answer is a real PDF body — never a raw 500 and never a body that is
+        not a PDF. When that render fails too, the answer is the controlled
+        503 with the converter requirement in the detail string."""
         from src.engines.pdf_export import PDFExportEngine
+        from src.routers import generation as gen_router
         monkeypatch.setattr(PDFExportEngine, "is_available", lambda: False)
 
         # A job is needed for the endpoint to reach the converter check.
@@ -252,6 +256,16 @@ class TestPdfEndpointBehaviourOverHttp:
         job_id = http.post(f"/api/generation/{scheme_id}/generate",
                            json=config).json()["job_id"]
 
+        res = http.post(f"/api/generation/{job_id}/export/pdf")
+        assert res.status_code == 200
+        assert res.headers["content-type"].startswith("application/pdf")
+        assert res.content[:4] == b"%PDF"
+
+        # Both renderers down: the environment limitation, not a raw 500.
+        def _boom(*args, **kwargs):
+            raise RuntimeError("reportlab build failed")
+
+        monkeypatch.setattr(gen_router, "_render_structured_pdf", _boom)
         res = http.post(f"/api/generation/{job_id}/export/pdf")
         assert res.status_code == 503
         assert "LibreOffice" in res.json()["detail"]
