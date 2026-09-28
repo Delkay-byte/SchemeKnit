@@ -1027,6 +1027,9 @@ def build_lesson(
         duration_minutes=duration,
         school_name=config.school_name,
         teacher_name=config.teacher_name,
+        # Persisted per lesson so an export re-renders in the SAME template
+        # the teacher approved, even from a later session (template fidelity).
+        template_id=getattr(config, "template_id", None),
         strand=alloc.strand,
         sub_strand=alloc.sub_strand,
         content_standard=alloc.content_standard_description,

@@ -94,6 +94,65 @@ async def _run_pipeline(fn, *args, **kwargs):
     return await loop.run_in_executor(None, partial(fn, *args, **kwargs))
 
 
+def _render_context(db, user_id: str, job, scheme_db, lp_models) -> Dict:
+    """Context every export renderer resolves non-stored header fields from.
+
+    The term the teacher configured and the timetable period are server-side;
+    the school/teacher names come from the lesson rows themselves.
+    """
+    prefs = data_service.get_preferences(db, user_id)
+    snapshot = job.config_snapshot or {}
+    return {
+        "term": scheme_db.term if scheme_db and scheme_db.term else None,
+        "academic_term": snapshot.get("term") if snapshot else None,
+        "period": (prefs.default_period if prefs else "")
+                  or snapshot.get("period", "")
+                  or (lp_models[0].period if lp_models else ""),
+    }
+
+
+def _resolve_export_template_id(job, lp_models, template_id) -> Optional[str]:
+    """Template id an export must render with, following the teacher's choice.
+
+    The query parameter is an explicit selection and always wins. Otherwise the
+    lessons' own stored template is used: a single-lesson export must not
+    silently downgrade the WAPEF form the teacher generated with to the GES
+    default just because no query param was sent (``default_template_for_lessons``
+    only looks at class level, so it could never see the lesson's template).
+
+    Only ids that resolve in the built-in registry are picked up. A custom
+    (teacher-built) template is therefore only ever applied when explicitly
+    requested — an unknown stored id falls through rather than guessing.
+
+    Returns None when nothing resolvable is stored, so the caller keeps its
+    ``template_type`` / class-level default.
+    """
+    if template_id:
+        return template_id
+
+    from ..engines.template_engine import get_template_by_id
+    from ..engines.wapef_template import is_wapef_template
+
+    stored = [t for t in (getattr(lp, "template_id", None) for lp in lp_models) if t]
+    unique = list(dict.fromkeys(stored))
+    if len(unique) == 1 and len(stored) == len(lp_models) and get_template_by_id(unique[0]):
+        return unique[0]
+
+    snapshot = job.config_snapshot or {}
+    chosen = snapshot.get("template_id")
+    if chosen and get_template_by_id(chosen):
+        return chosen
+
+    # Mixed templates: the WAPEF form wins over the GES form so an export is
+    # never rendered in a lower-fidelity layout than the lessons were built in.
+    ordered = ([t for t in unique if is_wapef_template(t) or t.startswith("tpl-wapef")]
+               + [t for t in unique if not (is_wapef_template(t) or t.startswith("tpl-wapef"))])
+    for candidate in ordered:
+        if get_template_by_id(candidate):
+            return candidate
+    return None
+
+
 def resolve_term_window(config: TermConfig, weeks) -> TermConfig:
     """Fill an unset term window from the scheme's own curriculum dates.
 
@@ -853,18 +912,10 @@ async def export_docx(
     scheme_label = re.sub(r'[^A-Za-z0-9]+', '_', scheme_stem).strip('_') or 'lesson_plans'
 
     custom_structure = _custom_structure_for(db, user.id, template_id)
-    # Context the renderer resolves non-stored header fields from: the term the
-    # teacher configured and the timetable period. Both are server-side; the
-    # school/teacher names come from the lesson rows themselves.
-    prefs = data_service.get_preferences(db, user.id)
-    snapshot = job.config_snapshot or {}
-    render_context = {
-        "term": scheme_db.term if scheme_db and scheme_db.term else None,
-        "academic_term": snapshot.get("term") if snapshot else None,
-        "period": (prefs.default_period if prefs else "")
-                  or snapshot.get("period", "")
-                  or (lp_models[0].period if lp_models else ""),
-    }
+    render_context = _render_context(db, user.id, job, scheme_db, lp_models)
+    # What the lessons were generated with, when the teacher picked nothing
+    # here — otherwise a single-lesson export renders in the default layout.
+    resolved_template_id = _resolve_export_template_id(job, lp_models, template_id)
     if custom_structure is not None:
         log_event("custom_template_export", user_id=user.id, job_id=job_id)
         out = await _run_pipeline(
@@ -880,7 +931,8 @@ async def export_docx(
         # approved organizational form) the combined path below is used so the
         # download is always named after the scheme.
         output_dir = Path(f"exports/{user.id}/{job_id}/docx")
-        files = await _run_pipeline(pipeline.export_docx_batch, lp_models, tt, output_dir, template_id=template_id)
+        files = await _run_pipeline(pipeline.export_docx_batch, lp_models, tt, output_dir,
+                                    template_id=resolved_template_id)
         out = files[0]
         download_name = out.name
     else:
@@ -890,7 +942,7 @@ async def export_docx(
             "",
             lp_models, tt,
             Path(f"exports/{user.id}/{job_id}/lesson_plans.docx"),
-            template_id=template_id,
+            template_id=resolved_template_id,
         )
         download_name = f"Lesson_Plans_{scheme_label}.docx"
 
@@ -905,6 +957,83 @@ async def export_docx(
 def _convert_only(pipeline, docx_path: Path, pdf_path: Path) -> Path:
     """Convert an existing DOCX to PDF (no re-rendering) — runs in the executor."""
     return pipeline.pdf_engine._convert_docx_to_pdf(docx_path, pdf_path)
+
+
+def _render_structured_pdf(pipeline, lesson_plans, output_path: Path,
+                           template_id, context) -> Path:
+    """Render the lesson PDF directly with ReportLab — runs in the executor.
+
+    This is the always-available path on hosts with no DOCX -> PDF converter.
+    It is deliberately a function (not an inline lambda) so tests and operators
+    can replace it with a failing implementation to exercise the 503 branch.
+    """
+    return pipeline.export_pdf_structured(
+        lesson_plans, output_path, template_id=template_id, context=context)
+
+
+async def _build_export_pdf(db, user, job, scheme_label, lp_models, tt,
+                            template_id, context) -> Path:
+    """Produce the job's PDF and return the path to serve.
+
+    Two layers, both reported as controlled errors and never as a raw
+    traceback or a body that only claims to be a PDF:
+
+    * a DOCX -> PDF toolchain exists -> build the combined DOCX (the same
+      document the Word download serves) and convert it. Failure here is a
+      conversion failure: 500 `PDF_CONVERSION_FAILED`.
+    * no toolchain (a bare server) -> render the lesson directly with the
+      structured renderer, which needs no external converter. If even that
+      fails the environment really is the problem: 503 with the converter
+      requirement, so the teacher is told exactly what to install.
+    """
+    from ..engines.pdf_export import (
+        PDFExportEngine, PDFConversionError, _is_real_pdf,
+        PDF_CONVERTER_REQUIREMENT, PDF_CONVERSION_FAILED,
+    )
+    user_id, job_id = user.id, job.id
+    resolved = _resolve_export_template_id(job, lp_models, template_id)
+    target = Path(f"exports/{user_id}/{job_id}/pdf/lesson_plans.pdf")
+
+    if PDFExportEngine.is_available():
+        # ONE combined DOCX, converted once. The previous per-lesson batch held
+        # the request open for the whole multi-minute conversion — long enough
+        # for the browser to abort the fetch — and then returned only the first
+        # lesson's PDF.
+        combined_docx = target.with_suffix(".docx")
+        try:
+            await _run_pipeline(
+                pipeline.export_docx_combined, scheme_label, lp_models, tt,
+                combined_docx, template_id=resolved)
+        except Exception as e:
+            logger.error("pdf_source_docx_failed", user_id=user_id, job_id=job_id, detail=str(e))
+            raise HTTPException(status_code=500, detail=PDF_CONVERSION_FAILED)
+
+        # Layer 2 — converter present but produced nothing usable.
+        try:
+            await _run_pipeline(_convert_only, pipeline, combined_docx, target)
+        except PDFConversionError as e:
+            logger.error("pdf_conversion_failed", user_id=user_id, job_id=job_id, detail=str(e))
+            raise HTTPException(status_code=500, detail=PDF_CONVERSION_FAILED)
+
+        if not _is_real_pdf(target):
+            logger.error("pdf_conversion_failed", user_id=user_id, job_id=job_id,
+                         detail="output failed PDF signature check")
+            raise HTTPException(status_code=500, detail=PDF_CONVERSION_FAILED)
+        return target
+
+    log_event("pdf_export_structured", user_id=user_id, job_id=job_id)
+    try:
+        await _run_pipeline(_render_structured_pdf, pipeline, lp_models,
+                            target, resolved, context)
+    except Exception as e:
+        logger.error("pdf_structured_render_failed", user_id=user_id,
+                     job_id=job_id, detail=str(e))
+        raise HTTPException(status_code=503, detail=PDF_CONVERTER_REQUIREMENT)
+    if not _is_real_pdf(target):
+        logger.error("pdf_structured_render_failed", user_id=user_id, job_id=job_id,
+                     detail="output failed PDF signature check")
+        raise HTTPException(status_code=503, detail=PDF_CONVERTER_REQUIREMENT)
+    return target
 
 
 @router.post("/{job_id}/export/pdf")
@@ -923,15 +1052,6 @@ async def export_pdf(
     if not lessons:
         raise HTTPException(status_code=404, detail="No lesson plans found")
 
-    from ..engines.pdf_export import (
-        PDFExportEngine, PDFConversionError, _is_real_pdf,
-        PDF_CONVERTER_REQUIREMENT, PDF_CONVERSION_FAILED,
-    )
-    # Layer 1 — toolchain missing on this server. DOCX/XLSX/ZIP unaffected.
-    if not PDFExportEngine.is_available():
-        log_event("pdf_export_unavailable", user_id=user.id, job_id=job_id)
-        raise HTTPException(status_code=503, detail=PDF_CONVERTER_REQUIREMENT)
-
     lp_models = [_db_to_lesson_model(lp) for lp in lessons]
     tt = TemplateType(template_type) if template_type in [t.value for t in TemplateType] else TemplateType.GES_STYLE
 
@@ -939,36 +1059,9 @@ async def export_pdf(
     scheme_stem = Path(scheme_db.filename).stem if scheme_db and scheme_db.filename else ""
     scheme_label = re.sub(r'[^A-Za-z0-9]+', '_', scheme_stem).strip('_') or 'lesson_plans'
 
-    # Build ONE combined DOCX (the same document the Word download serves) and
-    # convert it once. The previous per-lesson batch held the request open for
-    # the whole multi-minute conversion — long enough for the browser to abort
-    # the fetch — and then returned only the first lesson's PDF.
-    combined_docx = Path(f"exports/{user.id}/{job_id}/pdf/lesson_plans.docx")
-    try:
-        await _run_pipeline(
-            pipeline.export_docx_combined, scheme_label, lp_models, tt,
-            combined_docx, template_id=template_id)
-    except Exception as e:
-        logger.error("pdf_source_docx_failed", user_id=user.id, job_id=job_id, detail=str(e))
-        raise HTTPException(status_code=500, detail=PDF_CONVERSION_FAILED)
-
-    # Layer 2 — converter present but produced nothing usable. Reported as a
-    # controlled 500: never a raw traceback, never a mislabeled .docx body.
-    target = combined_docx.with_suffix(".pdf")
-    try:
-        await _run_pipeline(
-            pipeline.pdf_engine.export_single.__wrapped__ if False else _convert_only,
-            pipeline, combined_docx, target)
-    except PDFConversionError as e:
-        logger.error("pdf_conversion_failed", user_id=user.id, job_id=job_id, detail=str(e))
-        raise HTTPException(status_code=500, detail=PDF_CONVERSION_FAILED)
-
-    # Final guard: never hand the browser a body labelled application/pdf that
-    # isn't actually a PDF (that is what made PDF "downloads" fail silently).
-    if not target.exists() or not _is_real_pdf(target):
-        logger.error("pdf_conversion_failed", user_id=user.id, job_id=job_id,
-                     detail="output failed PDF signature check")
-        raise HTTPException(status_code=500, detail=PDF_CONVERSION_FAILED)
+    target = await _build_export_pdf(
+        db, user, job, scheme_label, lp_models, tt, template_id,
+        _render_context(db, user.id, job, scheme_db, lp_models))
 
     data_service.log_export_event(db, job.id, job.scheme_id, user.id, "pdf")
     return _download_response(target, "application/pdf", f"Lesson_Plans_{scheme_label}.pdf")
@@ -1109,20 +1202,13 @@ async def issue_download_url(
     scheme_label = re.sub(r'[^A-Za-z0-9]+', '_', scheme_stem).strip('_') or 'lesson_plans'
     lp_models = [_db_to_lesson_model(lp) for lp in lessons]
     tt = TemplateType(template_type) if template_type in [t.value for t in TemplateType] else TemplateType.GES_STYLE
+    resolved_template_id = _resolve_export_template_id(job, lp_models, template_id)
 
     if fmt == "docx":
         custom_structure = _custom_structure_for(db, user.id, template_id)
         if custom_structure is not None:
             log_event("custom_template_export", user_id=user.id, job_id=job_id)
-            prefs = data_service.get_preferences(db, user.id)
-            snapshot = job.config_snapshot or {}
-            render_context = {
-                "term": scheme_db.term if scheme_db and scheme_db.term else None,
-                "academic_term": snapshot.get("term") if snapshot else None,
-                "period": (prefs.default_period if prefs else "")
-                          or snapshot.get("period", "")
-                          or (lp_models[0].period if lp_models else ""),
-            }
+            render_context = _render_context(db, user.id, job, scheme_db, lp_models)
             out = await _run_pipeline(
                 pipeline.export_docx_combined_custom, lp_models, custom_structure,
                 Path(f"exports/{user.id}/{job_id}/lesson_plans.docx"),
@@ -1132,7 +1218,7 @@ async def issue_download_url(
             out = await _run_pipeline(
                 pipeline.export_docx_combined, "", lp_models, tt,
                 Path(f"exports/{user.id}/{job_id}/lesson_plans.docx"),
-                template_id=template_id)
+                template_id=resolved_template_id)
         media_type = ("application/vnd.openxmlformats-officedocument"
                       ".wordprocessingml.document")
         filename = f"Lesson_Plans_{scheme_label}.docx"
@@ -1144,7 +1230,7 @@ async def issue_download_url(
         out = await _run_pipeline(
             pipeline.export_zip, lp_models, tt,
             Path(f"exports/{user.id}/{job_id}/lesson_plans.zip"),
-            template_id=template_id, structure=custom_structure,
+            template_id=resolved_template_id, structure=custom_structure,
             context=render_context)
         media_type = "application/zip"
         filename = f"Lesson_Plans_{scheme_label}.zip"
@@ -1156,34 +1242,9 @@ async def issue_download_url(
                       ".spreadsheetml.sheet")
         filename = f"Lesson_Register_{scheme_label}.xlsx"
     else:  # pdf
-        from ..engines.pdf_export import (
-            PDFExportEngine, PDFConversionError, _is_real_pdf,
-            PDF_CONVERTER_REQUIREMENT, PDF_CONVERSION_FAILED,
-        )
-        if not PDFExportEngine.is_available():
-            log_event("pdf_export_unavailable", user_id=user.id, job_id=job_id)
-            raise HTTPException(status_code=503, detail=PDF_CONVERTER_REQUIREMENT)
-        combined_docx = Path(f"exports/{user.id}/{job_id}/pdf/lesson_plans.docx")
-        try:
-            await _run_pipeline(
-                pipeline.export_docx_combined, scheme_label, lp_models, tt,
-                combined_docx, template_id=template_id)
-        except Exception as e:
-            logger.error("pdf_source_docx_failed", user_id=user.id, job_id=job_id,
-                         detail=str(e))
-            raise HTTPException(status_code=500, detail=PDF_CONVERSION_FAILED)
-        target = combined_docx.with_suffix(".pdf")
-        try:
-            await _run_pipeline(_convert_only, pipeline, combined_docx, target)
-        except PDFConversionError as e:
-            logger.error("pdf_conversion_failed", user_id=user.id, job_id=job_id,
-                         detail=str(e))
-            raise HTTPException(status_code=500, detail=PDF_CONVERSION_FAILED)
-        if not target.exists() or not _is_real_pdf(target):
-            logger.error("pdf_conversion_failed", user_id=user.id, job_id=job_id,
-                         detail="output failed PDF signature check")
-            raise HTTPException(status_code=500, detail=PDF_CONVERSION_FAILED)
-        out = target
+        out = await _build_export_pdf(
+            db, user, job, scheme_label, lp_models, tt, template_id,
+            _render_context(db, user.id, job, scheme_db, lp_models))
         media_type = "application/pdf"
         filename = f"Lesson_Plans_{scheme_label}.pdf"
 
@@ -1294,7 +1355,8 @@ async def export_zip(
     if custom_structure is not None:
         log_event("custom_template_export", user_id=user.id, job_id=job_id)
     await _run_pipeline(pipeline.export_zip, lp_models, tt, zip_path,
-                        template_id=template_id, structure=custom_structure,
+                        template_id=_resolve_export_template_id(job, lp_models, template_id),
+                        structure=custom_structure,
                         context=render_context)
 
     scheme_db = scheme_for_ctx
@@ -1544,6 +1606,16 @@ def _serialize_lesson(lp, scheme_db=None) -> dict:
         "structured_references": normalize_structured_references(
             getattr(lp, "structured_references", None)),
         "keywords": normalize_text_items(lp.keywords),
+        # Teacher-owned text/assignment/template fields: serialized on every
+        # read path so a saved value round-trips (persistence matrix).
+        "homework": getattr(lp, "homework", "") or "",
+        "class_assignment": getattr(lp, "class_assignment", "") or "",
+        "home_assignment": getattr(lp, "home_assignment", "") or "",
+        "starter_activity": getattr(lp, "starter_activity", "") or "",
+        "differentiation": getattr(lp, "differentiation", "") or "",
+        "essential_questions": normalize_text_items(
+            getattr(lp, "essential_questions", None)),
+        "template_id": getattr(lp, "template_id", None),
         "status": lp.status,
         "ai_generated": lp.ai_generated,
         "teacher_edited": lp.teacher_edited,
@@ -1637,4 +1709,14 @@ def _db_to_lesson_model(lp) -> LessonPlan:
             if entry is not None
         ],
         keywords=normalize_text_items(lp.keywords),
+        homework=getattr(lp, "homework", "") or "",
+        class_assignment=getattr(lp, "class_assignment", "") or "",
+        home_assignment=getattr(lp, "home_assignment", "") or "",
+        starter_activity=getattr(lp, "starter_activity", "") or "",
+        differentiation=getattr(lp, "differentiation", "") or "",
+        essential_questions=normalize_text_items(
+            getattr(lp, "essential_questions", None)),
+        template_id=getattr(lp, "template_id", None),
+        special_period_label=getattr(lp, "special_period_label", "") or "",
+        special_period_type=getattr(lp, "special_period_type", "") or "",
     )

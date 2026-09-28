@@ -801,6 +801,10 @@ class LessonPlan(BaseModel):
     conclusion: str = ""
     reflection: str = ""
     homework: str = ""
+    #: Assignment the class completes IN LESSON (guides lesson flow).
+    class_assignment: str = ""
+    #: Assignment set to complete AT HOME (after the lesson).
+    home_assignment: str = ""
     #: Structured, per-lesson references (type/title/author/page/notes).
     structured_references: List[ReferenceEntry] = []
     #: Flat string form for existing templates/export paths.

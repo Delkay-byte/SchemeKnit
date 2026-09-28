@@ -424,25 +424,55 @@ class TestDownloadEndpoints:
         assert r.content.startswith(b"PK\x03\x04")
 
     @pytest.mark.asyncio
-    async def test_pdf_without_libreoffice_returns_503_with_clear_message(
+    async def test_pdf_without_libreoffice_still_delivers_a_real_pdf(
         self, db, tmp_path, monkeypatch
     ):
-        """PART 4/22: missing LibreOffice must surface as a clear environment
-        limitation — never as 'Generation problem / Failed to fetch'."""
+        """PART 4/22: missing LibreOffice must never surface as 'Generation
+        problem / Failed to fetch'.
+
+        Hosts with no converter render the lesson structurally instead, so the
+        download still arrives as a real PDF. When that render fails too, the
+        answer is the explicit converter requirement — never a raw 500."""
         from tests.conftest import make_user
         from tests.test_export_download import make_job_with_lessons
         from src.routers import generation as gen_router
         from src.engines.pdf_export import PDFExportEngine, PDF_CONVERTER_REQUIREMENT
         from fastapi import HTTPException
 
+        monkeypatch.chdir(tmp_path)
         monkeypatch.setattr(
             PDFExportEngine, "is_available", classmethod(lambda cls: False))
         u = make_user(db, role="teacher", email="dl-pdf-ru@t.test")
         _scheme, job = make_job_with_lessons(db, u, lessons=1)
 
+        res = await gen_router.issue_download_url(job.id, "pdf", "GES-style", None, u, db)
+        assert res["media_type"] == "application/pdf"
+        assert res["filename"].endswith(".pdf")
+
+        from fastapi.testclient import TestClient
+        from fastapi import FastAPI
+        from src.auth import get_optional_user
+        from src.database import get_db
+        app = FastAPI()
+        app.include_router(gen_router.router, prefix="/api/generation")
+        app.dependency_overrides[get_optional_user] = lambda: None
+        app.dependency_overrides[get_db] = lambda: db
+        with TestClient(app) as client:
+            r = client.get(res["download_url"])
+        assert r.status_code == 200
+        assert r.headers["content-type"].startswith("application/pdf")
+        assert r.content[:4] == b"%PDF"
+
+        # Both renderers down: name the missing converter instead of leaking a
+        # raw 500 at the teacher.
+        def _boom(*args, **kwargs):
+            raise RuntimeError("reportlab build failed")
+
+        monkeypatch.setattr(gen_router, "_render_structured_pdf", _boom)
         with pytest.raises(HTTPException) as excinfo:
             await gen_router.issue_download_url(job.id, "pdf", "GES-style", None, u, db)
         assert excinfo.value.status_code == 503
+        assert excinfo.value.detail == PDF_CONVERTER_REQUIREMENT
         assert "LibreOffice" in (excinfo.value.detail or "")
 
     @pytest.mark.asyncio

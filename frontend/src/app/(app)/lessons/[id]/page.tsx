@@ -81,6 +81,9 @@ interface LessonData {
   core_competencies?: string[]
   structured_references?: { type: string; title: string; author_publisher?: string; page?: string; notes?: string }[]
   references?: string[]
+  homework?: string
+  class_assignment?: string
+  home_assignment?: string
   status: string
   teacher_edited: boolean
   /** "Why this lesson?" — source/alignment record from the curriculum spine. */
@@ -102,6 +105,11 @@ export default function LessonDetailPage() {
   const [introduction, setIntroduction] = useState('')
   const [assessment, setAssessment] = useState('')
   const [conclusion, setConclusion] = useState('')
+  // Assignments (PART 15): class = guided practice during the lesson,
+  // home = after the lesson, homework = legacy single field.
+  const [homework, setHomework] = useState('')
+  const [classAssignment, setClassAssignment] = useState('')
+  const [homeAssignment, setHomeAssignment] = useState('')
   // Per-lesson review fields (Section I)
   const [keywords, setKeywords] = useState<string[]>([])
   const [otherTlrs, setOtherTlrs] = useState<string[]>([])
@@ -117,8 +125,14 @@ export default function LessonDetailPage() {
     'Personal Development and Leadership',
     'Digital Literacy',
   ]
+  // PART 2/28: the curriculum reference option names THIS lesson's subject
+  // ("Science Curriculum") — never a hard-coded "Subject Curriculum" label.
+  const subjectCurriculumLabel =
+    lesson?.subject && lesson.subject !== 'Unknown'
+      ? `${lesson.subject} Curriculum`
+      : 'Subject Curriculum'
   const REFERENCE_TYPES = [
-    'Subject Curriculum',
+    subjectCurriculumLabel,
     "Teacher's Handbook / Teacher's Guide",
     'Textbook',
     'Other',
@@ -154,6 +168,9 @@ export default function LessonDetailPage() {
       setIntroduction(data.introduction || '')
       setAssessment(data.assessment || '')
       setConclusion(data.conclusion || '')
+      setHomework(data.homework || '')
+      setClassAssignment(data.class_assignment || '')
+      setHomeAssignment(data.home_assignment || '')
       setKeywords(data.keywords || [])
       setOtherTlrs(data.other_tlrs || [])
       setMainActivities(normalizeActivities(data.main_activities))
@@ -276,6 +293,9 @@ export default function LessonDetailPage() {
         main_activities: activities,
         assessment,
         conclusion,
+        homework,
+        class_assignment: classAssignment,
+        home_assignment: homeAssignment,
         keywords,
         other_tlrs: otherTlrs,
         core_competencies: coreCompetencies,
@@ -625,6 +645,54 @@ export default function LessonDetailPage() {
               onChange={(e) => setConclusion(e.target.value)}
               rows={3}
             />
+          </section>
+
+          {/* Assignments (PART 15): class work happens in the lesson, home
+              work is set to complete afterwards. Blank stays blank — the
+              generator never invents assignment text. */}
+          <section className="mt-5 border-t border-slate-100 pt-5" aria-label="Assignments">
+            <h3 className="mb-2 text-sm font-semibold text-[#102A43]">Assignments</h3>
+            <div className="space-y-3">
+              <Field
+                label="Class assignment (during the lesson)"
+                htmlFor="lesson-class-assignment"
+                hint="Guided or independent practice learners complete in class"
+              >
+                <TextArea
+                  id="lesson-class-assignment"
+                  aria-label="Class assignment"
+                  value={classAssignment}
+                  onChange={(e) => setClassAssignment(e.target.value)}
+                  rows={2}
+                />
+              </Field>
+              <Field
+                label="Home assignment (after the lesson)"
+                htmlFor="lesson-home-assignment"
+                hint="Work learners take away to complete at home"
+              >
+                <TextArea
+                  id="lesson-home-assignment"
+                  aria-label="Home assignment"
+                  value={homeAssignment}
+                  onChange={(e) => setHomeAssignment(e.target.value)}
+                  rows={2}
+                />
+              </Field>
+              <Field
+                label="Homework (general)"
+                htmlFor="lesson-homework"
+                hint="Optional general homework note for this lesson"
+              >
+                <TextArea
+                  id="lesson-homework"
+                  aria-label="Homework"
+                  value={homework}
+                  onChange={(e) => setHomework(e.target.value)}
+                  rows={2}
+                />
+              </Field>
+            </div>
           </section>
 
           {/* Keywords */}

@@ -31,7 +31,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 from . import split_indicator_text
@@ -172,7 +172,10 @@ def _week_indicators(week) -> List[Dict[str, str]]:
         out.append({
             "code": code,
             "text": text,
-            "description": description or text,
+            # Defect D5: the description never repeats the code. A code-only
+            # cell ("B7.1.1.1.1") has no description at all — the bare code is
+            # reported through ``code``, never echoed as prose.
+            "description": description,
         })
     return out
 
@@ -198,13 +201,19 @@ def week_special_segments(week) -> List[Dict[str, Any]]:
 
 
 def week_teaching_segments(week) -> List[Dict[str, Any]]:
-    """Source-defined teaching segments of one week (Defect 5).
+    """Source-defined teaching segments of one week (Defect 5 / D1).
 
     For a normal instructional week the teaching segment is simply the source
-    week's own date span (start == end for week-ending-date schemes). For a
-    mixed week the teaching content that survives the special period is the
-    segment — its dates are the week's source dates; the source rarely prints
-    an explicit sub-range, and none is invented.
+    week's own date span (start == end for week-ending-date schemes).
+
+    A week's teaching span never overlaps its own special period (D1): the
+    special segment — whose dates come from the label the source printed,
+    never from a calendar guess — is subtracted from the week's span, so
+    teaching begins the day AFTER an opening special period and stops the day
+    BEFORE one that sits later in the week. When the special period covers
+    every day of the week there is no teaching segment at all. Nothing is
+    invented: every boundary is a date the source itself supplies, and a
+    label without dates shifts nothing.
     """
     start = getattr(week, "start_date", None)
     end = getattr(week, "end_date", None)
@@ -212,10 +221,54 @@ def week_teaching_segments(week) -> List[Dict[str, Any]]:
         start = start.date()
     if isinstance(end, datetime):
         end = end.date()
-    return [{
-        "start": _iso(start),
-        "end": _iso(end),
-    }]
+
+    special_spans: List[Tuple[date, date]] = []
+    for seg in week_special_segments(week):
+        seg_start = _as_date(seg.get("start"))
+        seg_end = _as_date(seg.get("end"))
+        if seg_start is None or seg_end is None:
+            continue
+        if seg_end < seg_start:
+            seg_start, seg_end = seg_end, seg_start
+        special_spans.append((seg_start, seg_end))
+
+    if not special_spans or start is None or end is None:
+        # Nothing dated to subtract (or no span to subtract from): the
+        # source's own dates stay exactly as read.
+        return [{"start": _iso(start), "end": _iso(end)}]
+
+    pieces: List[Tuple[date, date]] = [(start, end)]
+    for seg_start, seg_end in special_spans:
+        remaining: List[Tuple[date, date]] = []
+        for lo, hi in pieces:
+            if seg_end < lo or seg_start > hi:
+                remaining.append((lo, hi))
+                continue
+            if lo < seg_start:
+                remaining.append((lo, seg_start - timedelta(days=1)))
+            if hi > seg_end:
+                remaining.append((seg_end + timedelta(days=1), hi))
+        pieces = remaining
+
+    return [
+        {"start": _iso(lo), "end": _iso(hi)}
+        for lo, hi in pieces
+        if lo <= hi
+    ]
+
+
+def _as_date(value) -> Optional[date]:
+    """ISO string / date / datetime → ``date`` (``None`` when undated)."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None
 
 
 _DATE_RANGE_RE = re.compile(
@@ -395,12 +448,15 @@ def lesson_provenance(
     indicator_text = ""
     if indicator_code:
         for raw in indicators:
-            code, _ = split_indicator_text(str(raw))
+            code, description = split_indicator_text(str(raw))
             if code == indicator_code:
-                indicator_text = str(raw)
+                indicator_text = description
                 break
     if not indicator_text and indicators:
-        indicator_text = str(indicators[0])
+        # Fall back to the first indicator's TEXT only: the code is already
+        # reported separately in ``indicator``, and the panel renders them
+        # side by side — repeating it here would show it twice (Defect D5).
+        indicator_text = split_indicator_text(str(indicators[0]))[1]
 
     if ai_active:
         generation = "Curriculum-first + AI enrichment"

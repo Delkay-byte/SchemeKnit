@@ -31,6 +31,9 @@ pandas==2.2.3
 # PDF conversion (optional — requires MS Word or LibreOffice at runtime)
 docx2pdf==0.1.8
 
+# Structured PDF rendering (always available, no external converter)
+reportlab==4.2.5
+
 # File handling
 aiofiles==24.1.0
 aiohttp==3.10.5

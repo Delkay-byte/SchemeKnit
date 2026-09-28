@@ -376,12 +376,17 @@ class TestOneTimeDownloadUrl:
 
     @pytest.mark.asyncio
     async def test_pdf_unavailable_is_a_real_503_on_issue(self, db, tmp_path, monkeypatch):
-        """No converter: the failure is reported up front, never deferred."""
+        """No converter and no working renderer: the failure is reported up
+        front, never deferred to the download navigation."""
         from src.engines.pdf_export import PDFExportEngine
         monkeypatch.chdir(tmp_path)
         u = make_user(db, role="teacher", email="dl-pdf503@t.test")
         _scheme, job = make_job_with_lessons(db, u, lessons=1)
 
+        def _boom(*args, **kwargs):
+            raise RuntimeError("reportlab build failed")
+
+        monkeypatch.setattr(gen_router, "_render_structured_pdf", _boom)
         with patch.object(PDFExportEngine, "is_available", return_value=False):
             with pytest.raises(HTTPException) as e:
                 await gen_router.issue_download_url(job.id, "pdf", "GES-style", None, u, db)

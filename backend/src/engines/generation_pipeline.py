@@ -284,6 +284,28 @@ class GenerationPipeline:
             template = default_template_for_lessons(lesson_plans, template_type)
         return self.pdf_engine.export_batch(lesson_plans, template, output_dir)
 
+    def export_pdf_structured(
+        self,
+        lesson_plans: List[LessonPlan],
+        output_path: Path = Path("exports/lesson_plans.pdf"),
+        template_id: Optional[str] = None,
+        context: Optional[dict] = None,
+    ) -> Path:
+        """Render a template-faithful PDF with no DOCX -> PDF toolchain.
+
+        Hosts without Word or LibreOffice still owe the teacher a real lesson
+        plan, so the structured renderer lays the content out directly with
+        ReportLab instead of extracting text from a DOCX (which flattened every
+        table into prose).
+        """
+        from .structured_pdf import render_structured_pdf
+        template = get_template_by_id(template_id) if template_id else None
+        if template is None:
+            template = default_template_for_lessons(lesson_plans)
+        return render_structured_pdf(
+            lesson_plans, template=template, output_path=output_path,
+            render_context=context)
+
     def export_xlsx(
         self,
         lesson_plans: List[LessonPlan],

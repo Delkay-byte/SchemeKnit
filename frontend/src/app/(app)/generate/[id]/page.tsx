@@ -63,12 +63,6 @@ export default function GeneratePage() {
     'Personal Development and Leadership',
     'Digital Literacy',
   ]
-  const REFERENCE_TYPES = [
-    'Subject Curriculum',
-    'Teacher\'s Handbook / Teacher\'s Guide',
-    'Textbook',
-    'Other',
-  ]
   // Actual AI resolution (mode/provider/available) reported by the backend —
   // so the UI never shows a mode that disagrees with real behaviour.
   const [aiStatus, setAiStatus] = useState<{
@@ -117,6 +111,17 @@ export default function GeneratePage() {
     references: [],
     selected_indicator_codes: [],
   })
+
+  // PART 2/28: the curriculum reference option names THIS scheme's subject
+  // ("Computing Curriculum") — never a hard-coded "Subject Curriculum".
+  const REFERENCE_TYPES = [
+    config.subject && config.subject !== 'Unknown'
+      ? `${config.subject} Curriculum`
+      : 'Subject Curriculum',
+    'Teacher\'s Handbook / Teacher\'s Guide',
+    'Textbook',
+    'Other',
+  ]
 
   useEffect(() => {
     // Restore the teacher's last AI mode choice so it persists across visits.

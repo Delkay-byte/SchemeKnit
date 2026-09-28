@@ -4,7 +4,9 @@ Export/download layer tests.
 Two failure layers are covered separately, because conflating them is what made
 the reported bug hard to diagnose:
 
-  * PDF layer 1 — no converter toolchain on the server (503, explicit message).
+  * PDF layer 1 — no converter toolchain on the server: the API renders the
+    lesson with the structured renderer instead; 503 (explicit message) only
+    when that render fails too.
   * PDF layer 2 — converter present but no usable PDF produced (controlled 500).
   * DOCX — served with the correct MIME type, server-chosen filename, and the
     approved organizational table topology (not the legacy Label|Value grid).
@@ -132,8 +134,7 @@ class TestPdfEngineContract:
         docx = tmp_path / "a.docx"
         docx.write_bytes(b"PK\x03\x04")
         with patch.object(eng, "_try_docx2pdf", side_effect=RuntimeError("no Word")), \
-             patch.object(eng, "_try_libreoffice", side_effect=RuntimeError("no LO")), \
-             patch.object(eng, "_try_pymupdf", side_effect=RuntimeError("no MuPDF")):
+             patch.object(eng, "_try_libreoffice", side_effect=RuntimeError("no LO")):
             with pytest.raises(PDFConversionError):
                 eng._convert_docx_to_pdf(docx, tmp_path / "a.pdf")
         assert not (tmp_path / "a.pdf").exists()
@@ -150,37 +151,36 @@ class TestPdfEngineContract:
             return pdf_path
 
         with patch.object(eng, "_try_docx2pdf", side_effect=bogus), \
-             patch.object(eng, "_try_libreoffice", side_effect=RuntimeError("no LO")), \
-             patch.object(eng, "_try_pymupdf", side_effect=RuntimeError("no MuPDF")):
+             patch.object(eng, "_try_libreoffice", side_effect=RuntimeError("no LO")):
             with pytest.raises(PDFConversionError):
                 eng._convert_docx_to_pdf(docx, pdf)
 
-    def test_pymupdf_fallback_converts_when_word_and_lo_absent(self, tmp_path):
-        """The production path: no Word, no LibreOffice — PyMuPDF still
-        yields a real PDF (%PDF magic), which is what Render relies on."""
-        pymupdf = pytest.importorskip("pymupdf")
-        from docx import Document as DocxDocument
-        docx = tmp_path / "real.docx"
-        d = DocxDocument()
-        d.add_heading("Photos, charts", 0)
-        d.add_paragraph("B9.1.1.1 Show understanding of matter.")
-        d.save(str(docx))
-        pdf = tmp_path / "real.pdf"
-        eng = PDFExportEngine()
-        with patch.object(eng, "_try_docx2pdf", side_effect=RuntimeError("no Word")), \
-             patch.object(eng, "_try_libreoffice", side_effect=RuntimeError("no LO")):
-            out = eng._convert_docx_to_pdf(docx, pdf)
-        assert out == pdf and pdf.exists()
-        assert pdf.read_bytes().startswith(b"%PDF-")
-        # The converted PDF must carry the document content.
-        doc = pymupdf.open(str(pdf))
-        try:
-            text = " ".join(page.get_text() for page in doc)
-        finally:
-            doc.close()
-        assert "B9.1.1.1" in text
+    def test_availability_requires_a_toolchain_not_a_pdf_library(self):
+        """Importing a PDF library is not a DOCX -> PDF converter.
 
-    def test_backend_order_prefers_word_then_libreoffice_then_pymupdf(self, tmp_path):
+        PyMuPDF used to count as "available" and then hand the API a flattened
+        text dump of the DOCX — tables, layout and all fidelity lost. Neither
+        PyMuPDF nor ReportLab can convert a DOCX, so neither may make the
+        toolchain look present; with nothing left, availability is False and the
+        API falls back to its own renderer.
+        """
+        with patch("src.engines.pdf_export._resolve_libreoffice", return_value=None), \
+             patch("src.engines.pdf_export._word_installed", return_value=False):
+            assert PDFExportEngine.is_available() is False
+
+    def test_availability_is_true_when_libreoffice_is_installed(self, tmp_path):
+        fake_soffice = tmp_path / "soffice.exe"
+        fake_soffice.write_bytes(b"")
+        with patch("src.engines.pdf_export._resolve_libreoffice",
+                   return_value=str(fake_soffice)):
+            assert PDFExportEngine.is_available() is True
+
+    def test_backend_order_prefers_word_then_libreoffice(self, tmp_path):
+        """Word first (desktop maturity), LibreOffice second (server fidelity).
+
+        Exactly two backends are attempted: a third pip-only library would only
+        ever produce the flattened text dump this renderer replaced.
+        """
         eng = PDFExportEngine()
         order = []
         pdf = tmp_path / "o.pdf"
@@ -190,17 +190,16 @@ class TestPdfEngineContract:
                 order.append(label)
                 if not ok:
                     raise RuntimeError(f"{label} unavailable")
-                pdf_path.write_bytes(b"%PDF-1.4 fallback")
+                pdf_path.write_bytes(b"%PDF-1.4 converted")
                 return pdf_path
             return fn
 
         docx = tmp_path / "o.docx"
         docx.write_bytes(b"PK\x03\x04")
         with patch.object(eng, "_try_docx2pdf", side_effect=make("word")), \
-             patch.object(eng, "_try_libreoffice", side_effect=make("lo")), \
-             patch.object(eng, "_try_pymupdf", side_effect=make("mupdf", ok=True)):
+             patch.object(eng, "_try_libreoffice", side_effect=make("lo", ok=True)):
             eng._convert_docx_to_pdf(docx, pdf)
-        assert order == ["word", "lo", "mupdf"]
+        assert order == ["word", "lo"]
 
     def test_batch_raises_when_every_conversion_fails(self, tmp_path):
         eng = PDFExportEngine()
@@ -234,14 +233,52 @@ class TestPdfEngineContract:
 
 class TestPdfEndpointLayers:
     @pytest.mark.asyncio
-    async def test_layer1_missing_converter_is_503(self, db):
+    async def test_layer1_missing_converter_renders_a_structured_pdf(self, db):
+        """No converter toolchain on the server is not a server error.
+
+        The API renders the lesson directly with ReportLab, so the teacher
+        still receives a real, template-shaped PDF instead of an environment
+        limitation they cannot act on.
+        """
+        pymupdf = pytest.importorskip("pymupdf")
         u = make_user(db, role="teacher", email="pdf-l1@t.test")
         _scheme, job = make_job_with_lessons(db, u, lessons=1)
+        with patch.object(PDFExportEngine, "is_available", return_value=False):
+            res = await gen_router.export_pdf(job.id, "GES-style", None, u, db)
+
+        assert isinstance(res, FileResponse)
+        assert res.media_type == "application/pdf"
+        served = Path(res.path)
+        assert served.read_bytes().startswith(b"%PDF-")
+
+        # Structured, not a text dump: the lesson's sections are laid out as
+        # tables (the old PyMuPDF fallback re-extracted paragraphs instead).
+        doc = pymupdf.open(str(served))
+        try:
+            tables = [t for page in doc for t in page.find_tables().tables]
+            text = " ".join(page.get_text() for page in doc)
+        finally:
+            doc.close()
+        assert tables, "structured PDF rendered without any table"
+        assert "Diversity of Matter" in text
+
+    @pytest.mark.asyncio
+    async def test_layer1_structured_render_failure_is_503(self, db, monkeypatch):
+        """Only when the structured render fails too is the environment the
+        problem — and then the message must name the missing converter."""
+        u = make_user(db, role="teacher", email="pdf-l1b@t.test")
+        _scheme, job = make_job_with_lessons(db, u, lessons=1)
+
+        def _boom(pipeline, lesson_plans, output_path, template_id, context):
+            raise RuntimeError("reportlab build failed")
+
+        monkeypatch.setattr(gen_router, "_render_structured_pdf", _boom)
         with patch.object(PDFExportEngine, "is_available", return_value=False):
             with pytest.raises(HTTPException) as e:
                 await gen_router.export_pdf(job.id, "GES-style", None, u, db)
         assert e.value.status_code == 503
         assert "LibreOffice" in e.value.detail
+        assert "Traceback" not in e.value.detail
 
     @pytest.mark.asyncio
     async def test_layer2_conversion_failure_is_controlled_500(self, db, monkeypatch):

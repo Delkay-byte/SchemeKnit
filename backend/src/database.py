@@ -276,8 +276,22 @@ class LessonPlanDB(Base):
     structured_references = Column(JSON, default=list)
     keywords = Column(JSON, default=list)
     homework = Column(Text, default="")
+    #: Assignment the class completes IN LESSON (guides lesson flow).
+    class_assignment = Column(Text, default="")
+    #: Assignment set to complete AT HOME (after the lesson).
+    home_assignment = Column(Text, default="")
     differentiation = Column(Text, default="")
     essential_questions = Column(JSON, default=list)
+    #: Template this lesson was generated under. Persisted per lesson so an
+    #: export always re-renders in the same form the teacher approved
+    #: (column added by migration v001; wired into the ORM here).
+    template_id = Column(String, nullable=True)
+    #: Special-period identity carried from the source week (v026 added the
+    #: columns to weeks; lessons derived from a special-period allocation
+    #: need them too or the review UI shows fake curriculum fields after
+    #: save+reload).
+    special_period_label = Column(String, default="")
+    special_period_type = Column(String, default="")
 
     status = Column(String, default="generated")
     ai_generated = Column(Boolean, default=False)
