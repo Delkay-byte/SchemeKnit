@@ -81,7 +81,16 @@ async function api(page, apiPath) {
 async function saveDownload(page, label, action, timeout = 90000) {
   const target = path.join(OUT, `${label}`)
   const hits = []
+  // The POST that issues the one-time URL is the step that can fail before any
+  // bytes move — record it so a missing download event still names its cause.
+  const issues = []
   const onResponse = async (r) => {
+    if (r.url().includes('/download-url')) {
+      let body = ''
+      try { body = (await r.text()).slice(0, 200) } catch { /* unreadable */ }
+      issues.push({ status: r.status(), body })
+      return
+    }
     if (!r.url().includes('/api/generation/downloads/')) return
     const ct = r.headers()['content-type'] || ''
     let head = ''
@@ -108,7 +117,13 @@ async function saveDownload(page, label, action, timeout = 90000) {
       path: target,
     }
   } catch (e) {
-    return { ok: false, error: e.message, mime: hits.length ? hits[hits.length - 1].contentType : '' }
+    const issue = issues[issues.length - 1]
+    return {
+      ok: false,
+      error: e.message,
+      mime: hits.length ? hits[hits.length - 1].contentType : '',
+      detail: issue ? `download-url HTTP ${issue.status} ${issue.body}` : 'no download-url response',
+    }
   } finally {
     page.off('response', onResponse)
   }
@@ -541,9 +556,18 @@ async function runDesktop(browser, state) {
       state.docxOk = true
     }
 
+    // Export the PDF from a FRESH page load. Chrome suppresses a second
+    // automatic download triggered from the same page session, so the PDF
+    // click after the DOCX one never produced a download event even though the
+    // server served the file (verified independently). Reloading clears that
+    // per-page download state without changing what the teacher's click does.
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    await page.waitForSelector('[data-lesson-workspace]', { timeout: 120000 })
+    await page.waitForSelector('[data-lesson-content]', { timeout: 60000 })
     const pdf = await saveDownload(page, 'workspace.pdf', () =>
       page.getByRole('button', { name: /export pdf/i }).first().click(), 240000)
-    record('PDF download reaches disk', pdf.ok, pdf.ok ? `${pdf.suggested} (${pdf.size} bytes)` : pdf.error)
+    record('PDF download reaches disk', pdf.ok,
+      pdf.ok ? `${pdf.suggested} (${pdf.size} bytes)` : `${pdf.error} :: ${pdf.detail}`)
     if (pdf.ok) {
       record('PDF HTTP 200', pdf.http === 200, `HTTP ${pdf.http}`)
       record('PDF has the %PDF signature', pdf.head.startsWith('%PDF-'), JSON.stringify(pdf.head))
