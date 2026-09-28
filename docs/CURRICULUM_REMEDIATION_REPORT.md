@@ -26,43 +26,66 @@ detected`) via `data-subject-count`.
 
 ### Defect 2 — Indicator column exists but weeks say "no indicators"
 
-Three distinct causes were found and separated:
+**Root cause (confirmed against the teacher's own file,
+`BS7-1st-Term-Computing-Scheme.docx`).** The source prints its INDICATOR cells
+as the **code alone**, with no prose:
 
-1. **Stale production extraction.** The deployed rows (scheme
-   `2f2e09db-…`, BS7 RME) were written by the *pre-PART-O* parser: weeks 3–8 and
-   10–13 carry no indicators, week 2's indicators are mangled
-   (`1.1.1.1 B7 B7.1.1.1.2…`), and week 9's `MID-TERM` label is stored **as an
-   indicator**. Re-reading the same source with the current parser yields an
-   indicator for every week that has one. The production data is stale-deploy
-   data, not a current-parser failure.
+```
+WEEK  STRAND                     CONTENT STANDARD  INDICATORS
+1     Introduction to Computing  B7.1.1.1          B7.1.1.1.1
+2     Introduction to Computing  B7.1.1.1          B7.1.1.1.2
+6     Introduction to Computing  B7.1.2.1          B7.1.2.1.1 ⏎ B7.1.2.1.2
+```
 
-2. **Real current-parser loss — special-period labels.** The label scan in
-   `_merge_week_rows` accepted the first cell in the row that contains a period
-   keyword, so the sub-strand cell (bare `MID-TERM`) won over the strand cell
-   that carried the **date range**, and the range was lost. Worse, matching
-   period keywords against *indicator* text could silently drop real
-   curriculum: `"Examine …"` contains `"exam"`, and ordinary descriptions
-   contain `"sba"`.
+`_merge_week_rows` required **both** a code and a non-empty description
+(`if ind_code and ind_desc`), so every code-only cell was silently discarded.
+Only week 6 survived — because its cell held two codes, which made
+`_clean_description` leave the second code as the “description” (so week 6 was
+stored with a wrong description, not two indicators). That is exactly the
+reported symptom: *“several weeks say ‘No indicators were found’; only one week
+successfully captured the indicators; those weeks are marked Needs review.”*
+Weeks 3–8 and 10–13 in the stored production scheme carry 0 indicators for this
+reason, and week 9's `MID-TERM` label had been stored as an indicator.
 
+Three further causes were found and separated:
+
+1. **Code-only indicator cells dropped** (the root cause above).
+2. **Special-period metadata lost on the confirmation path.** A scheme whose
+   class level appears only in its codes pauses for confirmation;
+   `POST /documents/{id}/confirm-subject` re-extracted the document but rebuilt
+   the `WeekDB` rows **without `special_period_label` / `special_period_type`**,
+   so the MID-TERM row's own date range vanished (Defect 5's data loss).
 3. **Conflated review semantics.** `classify_week_review` flagged a week with
    no indicator as `needs_review` even when the *whole source* has no Indicator
    column (the WAPEF Nursery/KG shape), i.e. it could not tell "the source has
-   none" from "the parser missed this week".
+   none" from "the parser missed this week". Matching period keywords against
+   *indicator* text could also drop real curriculum (`"Examine …"` contains
+   `"exam"`, ordinary descriptions contain `"sba"`).
 
 **Fix.**
-- The special-label guards now apply only to a **non-instructional row whose
-  cell contains no indicator code**, so a real indicator is never dropped
-  because of a keyword substring.
+- A **code-only indicator cell is the source data**: it is kept with an empty
+  description (mirroring the content-standard column's long-standing rule), and
+  a cell listing several codes yields one indicator per code. A range tail
+  (`K2.1.1.1.1-3`) still stays a single indicator.
+- Special-label guards apply only to a **non-instructional row whose cell
+  contains no indicator code**, so a real indicator is never dropped because of
+  a keyword substring.
 - The strand cell of a special row is the authoritative label; the
-  noise-normalising pass keeps the source's date range
-  (`AND VACATION` → `VACATION`, `REVISION1` → `REVISION`,
-  `MID-TERM (05-11-2026 to 06-11-2026)` unchanged).
+  noise-normalising pass keeps the source's date range (`AND VACATION` →
+  `VACATION`, `REVISION1` → `REVISION`,
+  `MID-TERM (05-11-2026 to 06-11-2026)` unchanged), and the confirmation path
+  now persists the label + type.
 - `scheme_provides_indicators(weeks)` answers the scheme-wide question. The
   spine and both routers pass the full week list, so:
   * source provides indicators elsewhere + this week empty → **⚠ Needs review**
   * source has no Indicator column at all → **— Not provided in source**
   * special / mixed week → **★ Special period / ◐ Mixed week**
 - The label can no longer surface as an indicator, strand or sub-strand.
+
+**Result on the teacher's own file:** from **1/15** weeks carrying an indicator
+to **13/15** (the two remaining weeks are the REVISION and EXAMINATION
+periods), with every instructional week reading **✓ Parsed** and no
+needs-review rows.
 
 ### Defect 6 — "Action failed — Validation failed" (main blocker)
 
@@ -128,6 +151,22 @@ the single week-ending date.
 - Teacher-facing "Other" is gone: the extraction table and spine use
   Teaching / ★ Special period / ◐ Mixed week / ⚠ Needs review.
 
+### Class level the document never states (the same file's second blocker)
+
+The teacher's scheme names the subject (`SUBJECT: COMPUTING`) but never the
+class — the level lives only in the curriculum codes (`B7.1.1.1.1`), which the
+level detector deliberately ignores to avoid false positives. The confirmation
+card therefore offered only the subject, so the scheme stayed `Unknown` class
+and generation dead-ended at the 409 guard.
+
+**Fix (curriculum authority, no guessing).** The confirmation card now asks the
+teacher for the class level when the document does not state one
+(`#confirm-class-level`, populated from the canonical
+`/api/settings/class-levels` catalogue), and
+`POST /documents/{id}/confirm-subject` accepts and validates an optional
+`class_level`. An unrecognised value is rejected with a 400 — the field is
+never free text and is never inferred.
+
 ### Defect 3 — Needs review opens the actual problem
 
 Needs-review rows are amber-highlighted and carry `data-needs-review`. Clicking
@@ -172,7 +211,7 @@ Backend
 | `backend/src/curriculum/spine.py` | mixed review state, `scheme_provides_indicators`, `special_segments` / `teaching_segments`, `classify_week_review(week, scheme_weeks)` |
 | `backend/src/curriculum/lesson_builder.py` | never emit a null lesson date |
 | `backend/src/engines/allocation_engine.py` | MIXED handling in `week_is_non_instructional`, `reclassify_special_weeks`, `scheme_has_indicators`, week selection |
-| `backend/src/routers/documents.py` | weeks endpoint passes scheme context, returns segments + `source_provides_indicators` |
+| `backend/src/routers/documents.py` | weeks endpoint passes scheme context, returns segments + `source_provides_indicators`; confirm-subject persists special-period metadata and accepts a teacher-confirmed `class_level` |
 | `backend/src/routers/generation.py` | `resolve_term_window()`, scheme-wide review context, review reasons on preview rows |
 | `backend/src/service.py` | unset term dates resolved before the NOT NULL write |
 
@@ -182,7 +221,7 @@ Frontend
 |---|---|
 | `frontend/src/lib/api.ts` | `sanitizeTermConfig()`, typed `source_provides_indicators` |
 | `frontend/src/lib/error-normalizer.ts` | field-specific teacher-facing 422 messages |
-| `frontend/src/app/(app)/upload/page.tsx` | multi-subject only for ≥2 sections; explicit "1 subject detected" |
+| `frontend/src/app/(app)/upload/page.tsx` | multi-subject only for ≥2 sections; explicit "1 subject detected"; teacher confirms the class level a document omits |
 | `frontend/src/app/(app)/review/[id]/page.tsx` | review context banner, mixed-week segments, Parsed/Needs review/Not provided states, review pill in the week list |
 | `frontend/src/app/(app)/generate/[id]/page.tsx` | scheme-derived payload fallback, friendly error copy |
 
@@ -190,18 +229,19 @@ Tests & fixtures
 
 | File | Change |
 |---|---|
-| `backend/tests/test_curriculum_remediation_defects.py` | **new** — 43 tests covering all 15 required backend cases |
+| `backend/tests/test_curriculum_remediation_defects.py` | **new** — 52 tests covering all 15 required backend cases |
 | `backend/tests/test_curriculum_spine_and_provenance.py` | week-date helper fixed (timedelta, weeks > 5) |
-| `backend/tests/fixtures/remediation/build_fixture.py` + `bs7_mixed_midterm_scheme.docx` | **new** — real-structure regression fixture (Defect 9) |
-| `frontend/e2e/curriculum-workspace-acceptance.js` | 21 new browser checks for the remediation defects |
+| `backend/tests/fixtures/remediation/build_fixture.py` + `bs7_mixed_midterm_scheme.docx` + `bs7_code_only_indicators_scheme.docx` | **new** — real-structure regression fixtures (Defect 9) |
+| `frontend/e2e/curriculum-workspace-acceptance.js` | 26 new browser checks for the remediation defects, plus a template selector (`TF_TEMPLATE`) |
 
 ---
 
 ## 3. Regression fixture (Defect 9)
 
-`backend/tests/fixtures/remediation/bs7_mixed_midterm_scheme.docx`, built by
-`build_fixture.py`, reproduces the real BS7 RME structure that exposed the
-defects — **not** a simplified synthetic shape:
+Two fixtures are built by `fixtures/remediation/build_fixture.py` — both
+reproduce real source structures, **not** simplified synthetic shapes:
+
+`bs7_mixed_midterm_scheme.docx` (the prose+code shape of `BS7-1st-Term-RME`):
 
 * one subject section → `1 subject detected`
 * weeks 1,2,4–7,10–12 carry indicators (extraction must succeed)
@@ -211,9 +251,21 @@ defects — **not** a simplified synthetic shape:
   row** → mixed week, midterm never a lesson, teaching content kept
 * week 13 is a pure `REVISION` period
 
+`bs7_code_only_indicators_scheme.docx` (the exact shape of the teacher's
+`BS7-1st-Term-Computing-Scheme.docx` that produced "only one week captured the
+indicators"):
+
+* the INDICATOR column prints **codes only** — no prose anywhere
+* week 6 lists two codes in one cell → two indicators
+* week 9 shares its week cell with a `MID-TERM (05-11-2026 to 06-11-2026)` row
+* weeks 14/15 are `REVISION` / `EXAMINATION`
+* a guard test asserts the cells really are code-only, so the regression cannot
+  pass by accident
+
 Asserted end-to-end: single-subject detection, indicator extraction
-present/absent/multi-line, needs-review classification, mixed-week
-classification, segmented dates, mixed-week allocation, and no indicator
+present/absent/multi-line/code-only, needs-review classification, mixed-week
+classification, segmented dates, mixed-week allocation, confirmation-path
+metadata persistence, teacher-confirmed class level, and no indicator
 fabrication.
 
 ---
@@ -222,20 +274,24 @@ fabrication.
 
 | Gate | Result |
 |---|---|
-| Backend suite | **1591 passed, 12 skipped, 0 failed** (baseline before this pass: 1549 passed, 11 skipped) |
+| Backend suite | **1600 passed, 12 skipped, 0 failed** (baseline before this pass: 1549 passed, 11 skipped) |
 | Frontend typecheck | `npx tsc --noEmit` clean |
 | Frontend build | `NEXT_PUBLIC_BUILD_TARGET=web npx next build` — compiled successfully |
-| Browser acceptance (remediation fixture) | **81/81 checks passed** |
+| Browser acceptance (the teacher's real `BS7-1st-Term-Computing-Scheme.docx`, Approved WAPEF Plan) | **79/79 checks passed** |
+| Browser acceptance (remediation fixtures) | **81/81 checks passed** |
 | Browser acceptance (real `BASIC 7 ENGLISH SCHEME OF LEARNING.docx`) | **75/75 checks passed** |
 
 New browser checks proven against the running stack (built frontend :3100,
 backend :8000):
 
 * single-subject upload never claims multiple subjects; "1 subject detected"
-* weeks whose source has an indicator keep it (11/13 on the fixture)
+* the class level a document omits can be confirmed by the teacher
+* weeks whose source has an indicator keep it — **13/15** on the teacher's real
+  Computing scheme (previously 1/15) and 11/13 on the fixture
 * Needs review click opens the week review context naming what needs attention
 * mixed week labelled "Mixed week", never "Other"
-* midterm segment keeps the SOURCE date range `2026-11-05 → 2026-11-06`
+* midterm segment keeps the SOURCE date range — the report records
+  `Special period: MID-TERM (05-11-2026 to 06-11-2026) · 2026-11-05 → 2026-11-06`
 * teaching segment shown beside the special period; spine exposes
   `special_segments`
 * **Quick Generate → Preview Allocation succeeds (HTTP 200)**
@@ -269,3 +325,7 @@ which drives UPLOAD → subject count → week/indicator extraction → review s
 → mixed week → review interaction → Preview Allocation (both modes) → the real
 lesson workspace. Per the spec, this task is **not** declared complete until
 Preview Allocation succeeds in the deployed environment.
+
+Locally the same command with `TF_TEMPLATE="WAPEF"` and the teacher's real file
+(`C:\Users\SAVIOUR\Downloads\BS7-1st-Term-Computing-Scheme.docx`) passes all 79
+checks against the built frontend and local backend.

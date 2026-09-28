@@ -18,7 +18,7 @@ from ..database import User
 from ..service import data_service
 from ..parsers.pdf_parser import get_document_parser
 from ..database import WeekDB
-from ..models import SchemeOfWork, Subject
+from ..models import SchemeOfWork, Subject, ClassLevel
 from ..logging_config import get_logger, log_event
 
 router = APIRouter()
@@ -381,6 +381,14 @@ async def confirm_subject_section(
     if not requested:
         raise HTTPException(status_code=400, detail="A subject is required")
 
+    # The class level is detected separately from the subject, and some real
+    # schemes print it ONLY in the curriculum codes ("B7.1.1.1.1" for Basic 7)
+    # — which the level detector deliberately ignores to avoid false positives.
+    # The teacher's choice on the confirmation screen is authoritative, so a
+    # readable scheme never dead-ends on an Unknown class (real-use remediation:
+    # the flow must reach the lesson workspace).
+    requested_class = str((body or {}).get("class_level", "") or "").strip()
+
     try:
         subject = Subject(requested)
     except ValueError:
@@ -441,12 +449,27 @@ async def confirm_subject_section(
             content_standards=w.content_standards,
             indicators=w.indicators,
             resources=w.resources,
+            # Special-period metadata MUST survive confirmation: a real scheme's
+            # mid-term row carries the source's own date range here
+            # ("MID-TERM (05-11-2026 to 06-11-2026)"), and dropping it made the
+            # mixed week show only its week-ending date and lose the segment
+            # (real-use remediation, Defect 5). This mirrors the upload path in
+            # ``data_service``.
+            special_period_label=getattr(w, "special_period_label", "") or "",
+            special_period_type=getattr(w, "special_period_type", "") or "",
         ))
 
     scheme.subject = extracted.subject.value if hasattr(extracted.subject, "value") else str(extracted.subject)
     scheme.class_level = (
         extracted.class_level.value if hasattr(extracted.class_level, "value") else str(extracted.class_level)
     )
+    if requested_class:
+        # Teacher-confirmed level (curriculum authority): validated against the
+        # canonical catalogue, never free text.
+        try:
+            scheme.class_level = ClassLevel(requested_class).value
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Unknown class level")
     scheme.detection_status = "confirmed"
     db.commit()
     log_event("subject_confirmed", user_id=user.id, scheme_id=scheme_id,

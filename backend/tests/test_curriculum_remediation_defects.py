@@ -25,6 +25,7 @@ the WAPEF Nursery whole-level scheme) without copying the files themselves.
 """
 
 import asyncio
+import re
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -45,7 +46,7 @@ from src.engines.allocation_engine import (
     scheme_has_indicators,
     week_is_non_instructional,
 )
-from src.database import WeekDB
+from src.database import WeekDB, SchemeDB, generate_id
 
 from tests.conftest import make_user
 from tests.test_curriculum_spine_and_provenance import make_scheme, add_week
@@ -542,10 +543,10 @@ class TestAllocationPreviewAPI:
 
 # ── Defect 9: regression against the real source document structure ─────────
 
-FIXTURE_DOCX = (
-    Path(__file__).resolve().parent
-    / "fixtures" / "remediation" / "bs7_mixed_midterm_scheme.docx"
-)
+FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "remediation"
+FIXTURE_DOCX = FIXTURE_DIR / "bs7_mixed_midterm_scheme.docx"
+#: The teacher's BS7 Computing shape: the INDICATOR column prints the CODE ONLY.
+FIXTURE_CODE_ONLY_DOCX = FIXTURE_DIR / "bs7_code_only_indicators_scheme.docx"
 
 
 class TestRealSchemeFixtureRegression:
@@ -639,6 +640,8 @@ class TestRealSchemeFixtureRegression:
         assert real[0].indicator_code == "B7.3.1.2.2"
 
     def test_no_ai_guessing_for_the_empty_week(self):
+        """Defect 8: nothing invents an indicator for a week the source leaves
+        empty, and no lesson is produced from the gap."""
         """The empty week produces no lesson and no invented indicator.
 
         Allocated against the WHOLE scheme — the real generation path — so the
@@ -650,6 +653,152 @@ class TestRealSchemeFixtureRegression:
         cfg = TermConfig(scheme_of_work_id="fixture")
         coverage = AllocationEngine().allocate(weeks, cal, cfg, False)
         assert [a for a in coverage.allocations if a.week_number == 3] == []
+
+
+class TestCodeOnlyIndicatorScheme:
+    """The teacher's SECOND real shape: a code-only INDICATOR column.
+
+    ``bs7_code_only_indicators_scheme.docx`` mirrors the BS7 Computing scheme
+    that produced the report "only one week captured the indicators": every
+    indicator cell holds a bare code ("B7.1.1.1.1") with no prose. The parser
+    used to require prose after the code, so every such week was stored with
+    ZERO indicators and flagged for review. A code-only cell IS the source
+    data — the same rule the content-standard column already had.
+    """
+
+    @classmethod
+    def setup_class(cls):
+        if not FIXTURE_CODE_ONLY_DOCX.exists():
+            pytest.skip("remediation fixture not built")
+        cls.scheme = asyncio.run(DOCXParser().parse(FIXTURE_CODE_ONLY_DOCX))
+        cls.weeks = {w.week_number: w for w in cls.scheme.weeks}
+
+    def test_code_only_indicator_cells_are_kept(self):
+        for n in (1, 2, 3, 4, 10):
+            inds = [str(i) for i in self.weeks[n].indicators]
+            assert inds, f"week {n} lost its code-only indicator"
+            assert inds[0].startswith("B7.")
+            assert inds[0].count(".") == 4, f"unexpected indicator code {inds[0]!r}"
+
+    def test_two_codes_in_one_cell_are_two_indicators(self):
+        codes = [str(i) for i in self.weeks[6].indicators]
+        assert codes == ["B7.1.2.1.1", "B7.1.2.1.2"]
+
+    def test_code_only_week_is_not_flagged_for_review(self):
+        """The whole point: the teacher's weeks must read as PARSED, not as
+        review failures, once the codes are recovered."""
+        weeks = list(self.scheme.weeks)
+        assert scheme_provides_indicators(weeks) is True
+        for n in (1, 2, 3, 4, 6, 10):
+            assert classify_week_review(self.weeks[n], weeks)[0] == "ok", (
+                f"week {n} should read as parsed"
+            )
+
+    def test_mixed_week_keeps_source_dates_and_teaching_code(self):
+        w9 = self.weeks[9]
+        assert w9.week_type == WeekType.MIXED
+        assert [str(i) for i in w9.indicators] == ["B7.1.3.1.1"]
+        segs = week_special_segments(w9)
+        assert segs[0]["start"] == "2026-11-05"
+        assert segs[0]["end"] == "2026-11-06"
+        assert segs[0]["type"] == "mid_term"
+
+    def test_special_weeks_stay_non_instructional(self):
+        assert self.weeks[14].week_type == WeekType.REVISION
+        assert self.weeks[15].week_type == WeekType.ASSESSMENT
+        assert self.weeks[14].indicators == []
+
+    def test_fixture_indicator_cells_are_really_code_only(self):
+        """Sanity: the fixture really is the code-only shape (no prose anywhere
+        in the INDICATOR column), so the tests above cannot pass by accident.
+        The MID-TERM period row is the one legitimate non-code cell."""
+        from docx import Document
+        table = Document(str(FIXTURE_CODE_ONLY_DOCX)).tables[0]
+        header = [c.text.strip() for c in table.rows[0].cells]
+        col = header.index("INDICATOR(S)")
+        checked = 0
+        for row in table.rows[1:]:
+            cell = row.cells[col].text.strip()
+            if not cell or "MID-TERM" in cell.upper():
+                continue
+            assert re.fullmatch(
+                r"[BbKk]?\d+(\.\d+)+(\s+[BbKk]?\d+(\.\d+)+)*", cell
+            ), f"fixture cell is not code-only: {cell!r}"
+            checked += 1
+        assert checked >= 5, "the code-only shape must actually be present"
+
+
+class TestConfirmationPersistsSourceMetadata:
+    """Defect 5 root cause on the confirmation path.
+
+    The teacher's scheme pauses for confirmation (its class level appears only
+    in the curriculum codes). ``confirm-subject`` re-extracts the document and
+    replaced the stored weeks — but it dropped ``special_period_label`` and
+    ``special_period_type``, so the MID-TERM row's own date range vanished and
+    the mixed week could only show its week-ending date.
+    """
+
+    def _scheme_with_file(self, db, user, path, *, subject="ICT"):
+        scheme = SchemeDB(
+            id=generate_id(), owner_id=user.id,
+            filename=path.name, storage_filename=str(path),
+            subject="Unknown", class_level="Unknown",
+            term="First Term", academic_year="2026/2027",
+            status="uploaded", detection_status="needs_confirmation",
+            detected_subjects=[subject],
+        )
+        db.add(scheme)
+        db.commit()
+        return scheme
+
+    @pytest.mark.asyncio
+    async def test_special_period_metadata_survives_confirmation(self, db):
+        if not FIXTURE_CODE_ONLY_DOCX.exists():
+            pytest.skip("remediation fixture not built")
+        user = make_user(db, email="rem.confirm1@remediation.test")
+        scheme = self._scheme_with_file(db, user, FIXTURE_CODE_ONLY_DOCX)
+        from src.routers import documents
+        result = await documents.confirm_subject_section(
+            scheme.id, {"subject": "ICT", "class_level": "Basic 7"}, user, db)
+        assert result["class_level"] == "Basic 7"
+        w9 = (db.query(WeekDB)
+              .filter(WeekDB.scheme_id == scheme.id, WeekDB.week_number == 9)
+              .first())
+        assert w9 is not None
+        assert "2026" in (w9.special_period_label or ""), (
+            f"special-period label lost its source dates: {w9.special_period_label!r}"
+        )
+        assert w9.special_period_type == "mid_term"
+        # And the spine can therefore expose the source segments.
+        from src.curriculum.spine import week_special_segments
+        segs = week_special_segments(w9)
+        assert segs and segs[0]["start"] == "2026-11-05"
+
+    @pytest.mark.asyncio
+    async def test_teacher_confirmed_class_level_is_applied(self, db):
+        if not FIXTURE_CODE_ONLY_DOCX.exists():
+            pytest.skip("remediation fixture not built")
+        user = make_user(db, email="rem.confirm2@remediation.test")
+        scheme = self._scheme_with_file(db, user, FIXTURE_CODE_ONLY_DOCX)
+        from src.routers import documents
+        await documents.confirm_subject_section(
+            scheme.id, {"subject": "ICT", "class_level": "Basic 7"}, user, db)
+        db.refresh(scheme)
+        assert scheme.class_level == "Basic 7"
+        assert scheme.detection_status == "confirmed"
+
+    @pytest.mark.asyncio
+    async def test_unknown_class_level_is_rejected_not_stored(self, db):
+        if not FIXTURE_CODE_ONLY_DOCX.exists():
+            pytest.skip("remediation fixture not built")
+        user = make_user(db, email="rem.confirm3@remediation.test")
+        scheme = self._scheme_with_file(db, user, FIXTURE_CODE_ONLY_DOCX)
+        from fastapi import HTTPException
+        from src.routers import documents
+        with pytest.raises(HTTPException) as e:
+            await documents.confirm_subject_section(
+                scheme.id, {"subject": "ICT", "class_level": "Basic 99"}, user, db)
+        assert e.value.status_code == 400
 
 
 # ── Defect 8/15: curriculum authority ────────────────────────────────────────

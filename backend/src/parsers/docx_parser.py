@@ -1145,13 +1145,49 @@ class DOCXParser:
                     and not INDICATOR_CODE_PATTERN.search(ind_text)
                 )
                 if not label_only:
-                    ind_code = self._extract_code(ind_text, INDICATOR_CODE_PATTERN)
-                    ind_desc = self._clean_description(ind_text, ind_code)
-                    if ind_code and ind_desc and not any(i.code == ind_code for i in all_indicators):
-                        all_indicators.append(ParsedIndicator(
-                            code=ind_code,
-                            description=ind_desc
-                        ))
+                    # A cell may print SEVERAL distinct indicator codes — the
+                    # source lists them separately ("B7.1.2.1.1\nB7.1.2.1.2")
+                    # and each is its own teachable indicator. A RANGE tail
+                    # ("K2.1.1.1.1-3") is ONE code plus a range marker, so the
+                    # pattern cannot match the tail and the range stays single.
+                    codes = list(dict.fromkeys(
+                        m.group(0).upper()
+                        for m in INDICATOR_CODE_PATTERN.finditer(ind_text)
+                    ))
+                    if codes:
+                        # A CODE-ONLY indicator cell ("B7.1.1.1.1") is the real
+                        # shape of many schemes: the code IS the indicator the
+                        # source provides. It must be kept with an EMPTY
+                        # description — never dropped (which made the teacher's
+                        # own scheme report "No indicators were found" for
+                        # every week but the one cell that held two codes), and
+                        # never echoed back as its own description. This mirrors
+                        # the content-standard column's existing treatment.
+                        if len(codes) > 1:
+                            stripped = ind_text
+                            for c in codes:
+                                stripped = re.sub(
+                                    re.escape(c), "", stripped, flags=re.IGNORECASE
+                                )
+                            desc = re.sub(r"\s+", " ", stripped).strip()
+                        else:
+                            desc = self._clean_description(ind_text, codes[0])
+                        for code in codes:
+                            if not any(i.code == code for i in all_indicators):
+                                all_indicators.append(ParsedIndicator(
+                                    code=code,
+                                    description=desc
+                                ))
+                    else:
+                        # No canonical code in the cell: keep the previous
+                        # behaviour (first token as code, remainder as text).
+                        ind_code = self._extract_code(ind_text, INDICATOR_CODE_PATTERN)
+                        ind_desc = self._clean_description(ind_text, ind_code)
+                        if ind_code and ind_desc and not any(i.code == ind_code for i in all_indicators):
+                            all_indicators.append(ParsedIndicator(
+                                code=ind_code,
+                                description=ind_desc
+                            ))
 
             res = row.get("resources", "")
             if res and res.lower() not in ("", "resources", "resource"):

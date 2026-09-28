@@ -30,6 +30,11 @@ export default function UploadPage() {
   // Multi-subject document confirmation state (§4). When a document contains
   // several subjects the teacher must confirm which section to use.
   const [confirmingSubject, setConfirmingSubject] = useState<string | null>(null)
+  // Defect 2 follow-on: a scheme whose title omits the class level (the codes
+  // carry it — "B7.1.1.1.1") must not dead-end at generation. The teacher's
+  // confirmation is authoritative.
+  const [confirmClass, setConfirmClass] = useState<string>('')
+  const [classLevels, setClassLevels] = useState<string[]>([])
   // Whole-level schemes (the WAPEF KG/Nursery shape) carry no subject headings
   // at all. The teacher must still tell SchemeKnit which subject they teach, so
   // offer the subject catalogue for the detected class level.
@@ -117,6 +122,21 @@ export default function UploadPage() {
   const isMultiSubject =
     result?.detection?.status === 'multiple' && detectedSections.length >= 2
 
+  // The document's own level, when it names one, is authoritative. Only when
+  // detection could not determine it does the teacher's confirmation apply.
+  const detectClassOk = (level?: string) => Boolean(level && level !== 'Unknown')
+  const needsClassConfirmation = needsSubjectConfirmation && !detectClassOk(result?.class_level)
+
+  useEffect(() => {
+    if (!needsClassConfirmation || classLevels.length > 0) return
+    let cancelled = false
+    api.listClassLevels()
+      .then((data) => { if (!cancelled) setClassLevels(data.class_levels || []) })
+      .catch(() => { if (!cancelled) setClassLevels([]) })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needsClassConfirmation])
+
   // A document with weeks but no subject headings (WAPEF KG/Nursery shape):
   // load the subject catalogue for the detected class level so the teacher can
   // declare the subject instead of dead-ending.
@@ -154,7 +174,9 @@ export default function UploadPage() {
     try {
       setConfirmingSubject(subject)
       setError(null)
-      await api.confirmSubjectSection(result.scheme_id, subject)
+      const detected: string = result?.class_level || ''
+      const teacherLevel = detectClassOk(detected) ? undefined : (confirmClass || undefined)
+      await api.confirmSubjectSection(result.scheme_id, subject, teacherLevel)
       router.push(`/review/${result.scheme_id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not confirm that subject')
@@ -305,12 +327,38 @@ export default function UploadPage() {
                       </div>
                     </div>
                   )}
+                  {needsClassConfirmation && (
+                    /* The document names no class level (a real shape: the
+                       level lives only in the curriculum codes). The teacher
+                       confirms it here — curriculum authority, no guessing. */
+                    <div className="col-span-full" data-confirm-class>
+                      <p className="mb-3 text-center text-sm text-muted-foreground">
+                        This document does not state the class level. Choose it
+                        so the lesson plans are filed correctly.
+                      </p>
+                      <div className="mx-auto max-w-xs">
+                        <Field label="Class" htmlFor="confirm-class-level">
+                          <Select
+                            id="confirm-class-level"
+                            value={confirmClass}
+                            disabled={confirmingSubject !== null}
+                            onChange={(e) => setConfirmClass(e.target.value)}
+                          >
+                            <option value="">— Select class —</option>
+                            {classLevels.map((c) => (
+                              <option key={c} value={c}>{c}</option>
+                            ))}
+                          </Select>
+                        </Field>
+                      </div>
+                    </div>
+                  )}
                   {detectedSections.map((s, i) => (
                     <Button
                       key={`${s.subject}-${i}`}
                       variant="outline"
                       className="h-auto flex-col gap-1 whitespace-normal py-3 text-left"
-                      disabled={confirmingSubject !== null}
+                      disabled={confirmingSubject !== null || (needsClassConfirmation && !confirmClass)}
                       onClick={() => handleConfirmSubject(s.subject)}
                     >
                       <span className="font-medium">{s.subject}</span>
