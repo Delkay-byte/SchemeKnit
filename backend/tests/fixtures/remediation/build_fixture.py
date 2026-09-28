@@ -28,6 +28,13 @@ from pathlib import Path
 from docx import Document
 
 OUT = Path(__file__).resolve().parent / "bs7_mixed_midterm_scheme.docx"
+#: The SECOND real shape: a scheme whose INDICATOR column prints the CODE ONLY
+#: ("B7.1.1.1.1") with no prose at all — the teacher's BS7 Computing scheme. A
+#: parser that requires prose after the code silently drops every one of those
+#: weeks, which is exactly what the teacher reported ("only one week captured
+#: the indicators"). Week 6 lists TWO codes in one cell; week 9 shares its week
+#: cell with a MID-TERM row; weeks 14/15 are REVISION / EXAMINATION.
+OUT_CODE_ONLY = Path(__file__).resolve().parent / "bs7_code_only_indicators_scheme.docx"
 
 HEADER = ["WEEK", "WEEK ENDING", "STRAND", "SUB-STRAND", "CONTENT STANDARD",
           "INDICATOR(S)", "RESOURCES"]
@@ -83,20 +90,64 @@ ROWS = [
 ]
 
 
-def main() -> None:
+# week, week-ending, strand, sub-strand, content standard, INDICATOR(S), resources
+CODE_ONLY_ROWS = [
+    ("1", "11-09-2026", "Introduction to Computing",
+     "Components of Computers and Computer Systems", "B7.1.1.1", "B7.1.1.1.1",
+     "Personal Computer, Processor"),
+    ("2", "18-09-2026", "Introduction to Computing",
+     "Components of Computers and Computer Systems", "B7.1.1.1", "B7.1.1.1.2",
+     "Personal Computer, keyboard, mouse"),
+    ("3", "25-09-2026", "Introduction to Computing",
+     "Components of Computers and Computer Systems", "B7.1.1.1", "B7.1.1.1.4",
+     "Pen drive, Hard Disk"),
+    ("4", "02-10-2026", "Introduction to Computing",
+     "Components of Computers and Computer Systems", "B7.1.1.2", "B7.1.1.2.1",
+     "Bootable Flash drive"),
+    # TWO distinct codes printed in one cell: two indicators, not one with the
+    # second code echoed as its description.
+    ("6", "16-10-2026", "Introduction to Computing", "Health and Safety in using ICT tools",
+     "B7.1.2.1", "B7.1.2.1.1\nB7.1.2.1.2", "Smart Phone, Pictures"),
+    # The MID-TERM row and the teaching row share week 9 — the mixed shape, with
+    # a code-only indicator on the teaching row.
+    ("9", "06-11-2026", "MID-TERM (05-11-2026 to 06-11-2026)",
+     "MID-TERM (05-11-2026 to 06-11-2026)",
+     "MID-TERM (05-11-2026 to 06-11-2026)",
+     "MID-TERM (05-11-2026 to 06-11-2026)", ""),
+    ("9", "06-11-2026", "Introduction to Computing", "Health and Safety in using ICT tools",
+     "B7.1.3.1", "B7.1.3.1.1", "Personal Computer, Pictures"),
+    ("10", "13-11-2026", "Productivity Software", "Word Processing", "B7.2.1.1",
+     "B7.2.1.1.1", "Computer, Keyboard"),
+    ("14", "11-12-2026", "REVISION", "REVISION", "", "", "Past questions"),
+    ("15", "18-12-2026", "EXAMINATION", "EXAMINATION", "", "", "Question papers"),
+]
+
+
+def _write(path: Path, title: str, rows) -> None:
     doc = Document()
-    doc.add_paragraph(
-        "FIRST TERM SCHEME OF LEARNING FOR BASIC 7 - RELIGIOUS AND MORAL EDUCATION"
-    )
+    doc.add_paragraph(title)
     table = doc.add_table(rows=1, cols=len(HEADER))
     for i, cell in enumerate(HEADER):
         table.rows[0].cells[i].text = cell
-    for row in ROWS:
+    for row in rows:
         cells = table.add_row().cells
         for i, value in enumerate(row):
             cells[i].text = value
-    doc.save(OUT)
-    print(f"wrote {OUT}")
+    doc.save(path)
+    print(f"wrote {path}")
+
+
+def main() -> None:
+    _write(
+        OUT,
+        "FIRST TERM SCHEME OF LEARNING FOR BASIC 7 - RELIGIOUS AND MORAL EDUCATION",
+        ROWS,
+    )
+    _write(
+        OUT_CODE_ONLY,
+        "FIRST TERM SCHEME OF LEARNING, 2026/2027 ACADEMIC YEAR\nSUBJECT: COMPUTING",
+        CODE_ONLY_ROWS,
+    )
 
 
 if __name__ == "__main__":

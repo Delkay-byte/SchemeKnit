@@ -321,10 +321,16 @@ class ApiService {
     return this.request(`/api/documents/${schemeId}/detection`)
   }
 
-  async confirmSubjectSection(schemeId: string, subject: string): Promise<any> {
+  /**
+   * Confirm the subject section — and, when the document's own title/body never
+   * names it, the class level too. Some real schemes carry the level only in
+   * their curriculum codes ("B7.1.1.1.1"), so the teacher's confirmation is
+   * what keeps the flow moving to the lesson workspace.
+   */
+  async confirmSubjectSection(schemeId: string, subject: string, classLevel?: string): Promise<any> {
     return this.request(`/api/documents/${schemeId}/confirm-subject`, {
       method: 'POST',
-      body: JSON.stringify({ subject }),
+      body: JSON.stringify(classLevel ? { subject, class_level: classLevel } : { subject }),
     })
   }
 

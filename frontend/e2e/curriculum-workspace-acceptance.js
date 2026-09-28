@@ -152,29 +152,57 @@ async function runDesktop(browser, state) {
       await page.getByRole('heading', { name: /upload your scheme of work/i }).waitFor({ timeout: 30000 })
       await page.locator('input[type="file"]').setInputFiles(UPLOAD_FILE)
       await page.getByRole('button', { name: /upload & process/i }).click()
-      // Multi-subject documents pause for a subject confirmation first; a
-      // single-subject scheme reports the detected section directly.
-      try {
-        await page.getByText(/multiple subjects detected/i).waitFor({ timeout: 10000 })
-        await page.getByRole('button', { name: /confirm|continue|review/i }).first().click()
-      } catch { /* single-subject */ }
+      // Either the process pauses on the confirmation card (a multi-subject
+      // document, or a scheme whose class level the title omits) or the success
+      // card reports the extracted curriculum directly.
       const reviewBtn = page.getByRole('button', { name: /review curriculum/i })
-      await reviewBtn.waitFor({ timeout: 120000 })
-      record('upload parses and reports the extracted curriculum',
-        /Curriculum extracted/i.test(await page.locator('body').innerText()))
-      // ── Defect 1: single-subject upload says "1 subject detected" ────────
+      const confirmCard = page.locator('[data-multi-subject]')
+      await Promise.race([
+        reviewBtn.waitFor({ timeout: 120000 }).catch(() => {}),
+        confirmCard.waitFor({ timeout: 120000 }).catch(() => {}),
+      ])
+
+      // ── Defect 1: single-subject upload never says "multiple subjects" ────
       const uploadBody = await page.locator('body').innerText()
-      record('single-subject upload never claims multiple subjects',
-        !/multiple subjects detected/i.test(uploadBody),
-        /multiple subjects detected/i.test(uploadBody) ? 'SHOWED multiple subjects' : 'no false multi-subject message')
-      const subjectCount = page.locator('[data-subject-count]')
-      if (await subjectCount.count()) {
-        record('upload reports the actual subject count',
-          /1 subject detected/i.test(await subjectCount.first().innerText()),
-          (await subjectCount.first().innerText()).trim())
+      const saysMultiple = /multiple subjects detected/i.test(uploadBody)
+      record('single-subject upload never claims multiple subjects', !saysMultiple,
+        saysMultiple ? 'SHOWED multiple subjects' : 'no false multi-subject message')
+
+      if (await confirmCard.count()) {
+        // The document names no class level (a real shape: the level lives only
+        // in the curriculum codes, "B7.1.1.1.1"). The teacher confirms it —
+        // curriculum authority, no guessing.
+        const classSelect = page.locator('#confirm-class-level')
+        if (await classSelect.count()) {
+          const classOptions = await classSelect.locator('option').allInnerTexts()
+          const wanted = process.env.TF_CLASS || 'Basic 7'
+          const match = classOptions.find((o) => o.trim() === wanted)
+            || classOptions.find((o) => new RegExp(wanted, 'i').test(o))
+          if (match) {
+            await classSelect.selectOption({ label: match })
+            await page.waitForTimeout(250)
+            record('teacher can confirm the class level the document omits', true, match.trim())
+          } else {
+            record('teacher can confirm the class level the document omits', false,
+              `no option matching "${wanted}" in: ${classOptions.join(' | ')}`)
+          }
+        }
+        // Confirm the single detected subject section.
+        const subjectBtn = page.locator('[data-multi-subject] button').last()
+        await subjectBtn.click()
+        await page.waitForURL(/\/review\//, { timeout: 90000 })
+      } else {
+        record('upload parses and reports the extracted curriculum',
+          /Curriculum extracted/i.test(uploadBody))
+        const subjectCount = page.locator('[data-subject-count]')
+        if (await subjectCount.count()) {
+          record('upload reports the actual subject count',
+            /1 subject detected/i.test(await subjectCount.first().innerText()),
+            (await subjectCount.first().innerText()).trim())
+        }
+        await reviewBtn.click()
+        await page.waitForURL(/\/review\//, { timeout: 60000 })
       }
-      await reviewBtn.click()
-      await page.waitForURL(/\/review\//, { timeout: 60000 })
       schemeId = page.url().split('/review/')[1].split(/[/?#]/)[0]
       record('upload a real scheme through the UI', true, `scheme=${schemeId}`)
     } else {
@@ -291,6 +319,28 @@ async function runDesktop(browser, state) {
       (await page.getByRole('radio', { name: /quick generate/i }).getAttribute('aria-checked')) === 'true')
     record('Build with me is offered as the secondary path',
       (await page.getByRole('radio', { name: /build with me/i }).count()) > 0)
+
+    // Optional: select a specific export template (e.g. the Approved WAPEF
+    // Plan) — TF_TEMPLATE is matched against the option labels.
+    const wantTemplate = process.env.TF_TEMPLATE
+    if (wantTemplate) {
+      const sel = page.locator('#cfg-template')
+      if (await sel.count()) {
+        const opts = await sel.locator('option').allInnerTexts()
+        const match = opts.find((o) => new RegExp(wantTemplate, 'i').test(o))
+        if (match) {
+          await sel.selectOption({ label: match })
+          await page.waitForTimeout(300)
+          record('selects the requested export template', true, match.trim())
+          state.template = match.trim()
+        } else {
+          record('selects the requested export template', false,
+            `no option matching "${wantTemplate}" in: ${opts.join(' | ')}`)
+        }
+      } else {
+        record('selects the requested export template', false, '#cfg-template not found')
+      }
+    }
 
     // Capture the allocation preview the UI itself requests, so the check is on
     // the real payload the teacher's screen is built from.
