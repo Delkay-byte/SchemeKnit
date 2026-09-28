@@ -10,7 +10,14 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from src.security import sanitize_filename, safe_join, RateLimiter
+from src.security import (
+    sanitize_filename,
+    safe_join,
+    RateLimiter,
+    RateLimitMiddleware,
+    rate_limiter,
+    RATE_LIMITS,
+)
 from src.config import Settings
 
 
@@ -95,6 +102,61 @@ class TestRateLimiter:
         rl = RateLimiter([("/api/generation/", 1, 60)])
         assert rl.is_allowed("9.9.9.9", "/api/generation/abc/export/zip", now=5.0)[0] is True
         assert rl.is_allowed("9.9.9.9", "/api/generation/abc/export/zip", now=6.0)[0] is False
+
+
+class TestDownloadDeliveryRateExempt:
+    """Export reliability: the DOCX/PDF handoff is a plain anchor navigation,
+    so a 429 on the one-time file GET would render raw limiter JSON in place
+    of the file (no banner, no retry). The token-guarded delivery route is
+    exempt from budgets; every other /api/generation/ route stays limited.
+    Regressions seen in production: the journey's polling exhausted the
+    30/60s bucket right before export and the file GET came back 429."""
+
+    @staticmethod
+    def _app():
+        from fastapi import FastAPI
+
+        app = FastAPI()
+        app.add_middleware(RateLimitMiddleware)
+
+        @app.get("/api/generation/downloads/{token}")
+        async def download(token: str):
+            return {"bytes": 1}
+
+        @app.get("/api/generation/preview")
+        async def preview():
+            return {"ok": True}
+
+        return app
+
+    def test_file_delivery_survives_exhausted_budget_others_do_not(self):
+        from fastapi.testclient import TestClient
+
+        rate_limiter.reset()
+        try:
+            client = TestClient(self._app())
+            # TestClient's host is "testclient" — deliberately NOT one of the
+            # localhost-exempt IPs, so budgets apply exactly as in production.
+            budget = max(m for p, m, _w in RATE_LIMITS if p == "/api/generation/")
+            for _ in range(budget + 1):
+                rate_limiter.is_allowed("testclient", "/api/generation/x")
+
+            assert client.get("/api/generation/preview").status_code == 429
+            assert client.get("/api/generation/downloads/sometoken").status_code == 200
+            # The exempt GET must not consume budget: still exhausted after.
+            assert client.get("/api/generation/preview").status_code == 429
+        finally:
+            rate_limiter.reset()
+
+    def test_file_delivery_allows_before_budget_too(self):
+        from fastapi.testclient import TestClient
+
+        rate_limiter.reset()
+        try:
+            client = TestClient(self._app())
+            assert client.get("/api/generation/downloads/sometoken").status_code == 200
+        finally:
+            rate_limiter.reset()
 
 
 class TestConfigFailSafe:
