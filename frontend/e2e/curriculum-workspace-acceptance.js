@@ -174,7 +174,14 @@ async function runDesktop(browser, state) {
         // curriculum authority, no guessing.
         const classSelect = page.locator('#confirm-class-level')
         if (await classSelect.count()) {
-          const classOptions = await classSelect.locator('option').allInnerTexts()
+          // The options are fetched on mount — wait for them rather than
+          // reading the select while it still shows only the placeholder.
+          let classOptions = []
+          for (let i = 0; i < 30; i += 1) {
+            classOptions = await classSelect.locator('option').allInnerTexts()
+            if (classOptions.some((o) => /^Basic 7$/.test(o.trim()))) break
+            await page.waitForTimeout(500)
+          }
           const wanted = process.env.TF_CLASS || 'Basic 7'
           const match = classOptions.find((o) => o.trim() === wanted)
             || classOptions.find((o) => new RegExp(wanted, 'i').test(o))
