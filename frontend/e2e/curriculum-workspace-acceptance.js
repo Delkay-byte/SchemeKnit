@@ -162,6 +162,17 @@ async function runDesktop(browser, state) {
       await reviewBtn.waitFor({ timeout: 120000 })
       record('upload parses and reports the extracted curriculum',
         /Curriculum extracted/i.test(await page.locator('body').innerText()))
+      // ── Defect 1: single-subject upload says "1 subject detected" ────────
+      const uploadBody = await page.locator('body').innerText()
+      record('single-subject upload never claims multiple subjects',
+        !/multiple subjects detected/i.test(uploadBody),
+        /multiple subjects detected/i.test(uploadBody) ? 'SHOWED multiple subjects' : 'no false multi-subject message')
+      const subjectCount = page.locator('[data-subject-count]')
+      if (await subjectCount.count()) {
+        record('upload reports the actual subject count',
+          /1 subject detected/i.test(await subjectCount.first().innerText()),
+          (await subjectCount.first().innerText()).trim())
+      }
       await reviewBtn.click()
       await page.waitForURL(/\/review\//, { timeout: 60000 })
       schemeId = page.url().split('/review/')[1].split(/[/?#]/)[0]
@@ -178,10 +189,14 @@ async function runDesktop(browser, state) {
       spineOk ? `${spine.body.summary.total_weeks} weeks · v${String(spine.body.spine_version).slice(0, 8)}` : `HTTP ${spine.status}`)
     if (spineOk) {
       const weeks = spine.body.weeks
-      const hasStatus = weeks.every((w) => ['ok', 'needs_review', 'special'].includes(w.review_status))
+      const hasStatus = weeks.every((w) =>
+        ['ok', 'needs_review', 'special', 'mixed'].includes(w.review_status))
       record('every week carries a teacher-facing review status', hasStatus,
         weeks.map((w) => `${w.week_number}:${w.review_status}`).join(' '))
       record('spine reports the source document', !!spine.body.source.filename, spine.body.source.filename)
+      record('spine never uses the vague "Other" review state for a mixed week',
+        weeks.every((w) => w.week_type !== 'other' || w.special_period_label),
+        weeks.filter((w) => w.week_type === 'mixed').map((w) => `W${w.week_number}`).join(',') || 'no mixed weeks')
     }
 
     // ── 4. Extraction surface: the teacher sees what was read ──────────────
@@ -197,6 +212,11 @@ async function runDesktop(browser, state) {
       tableText.includes('Needs review') ? 'includes a Needs review row' : 'all parsed')
     record('extraction table exposes no parser diagnostics',
       !/confidence|malformed|fallback path|score 0\./i.test(tableText))
+    // Defect 4: the teacher-facing "Other" state is replaced by meaningful
+    // classification (Teaching / Special period / Mixed week / Needs review).
+    record('extraction table never labels a week "Other"',
+      !/\bOther\b/.test(tableText),
+      tableText.includes('Mixed week') ? 'Mixed week used' : 'no Other label')
 
     // Clicking a row selects that week and populates the week pane.
     const targetRow = rows.nth(Math.min(1, rowCount - 1))
@@ -204,6 +224,65 @@ async function runDesktop(browser, state) {
     await page.waitForTimeout(600)
     const ariaSelected = await targetRow.getAttribute('aria-selected')
     record('clicking an extracted week selects it', ariaSelected === 'true', `aria-selected=${ariaSelected}`)
+
+    // ── Defect 2: indicators the source HAS must be visible ────────────────
+    const weekApi = await api(page, `/api/documents/${schemeId}/weeks`)
+    const apiWeeks = weekApi.body?.weeks || []
+    const weeksWithIndicators = apiWeeks.filter((w) => (w.indicators || []).length > 0)
+    record('weeks whose source has an indicator keep it', weeksWithIndicators.length > 0,
+      `${weeksWithIndicators.length}/${apiWeeks.length} weeks carry indicators`)
+    record('extraction table renders real indicator codes',
+      /[A-Za-z]?\d+\.\d+\.\d+\.\d+/.test(tableText),
+      (tableText.match(/[A-Za-z]?\d+\.\d+\.\d+\.\d+/g) || []).slice(0, 2).join(','))
+
+    // ── Defect 3: Needs review opens the actual problem ────────────────────
+    const needsReviewRow = page.locator('[data-extraction-table] tbody tr[data-needs-review="true"]')
+    const needsReviewCount = await needsReviewRow.count()
+    if (needsReviewCount > 0) {
+      await needsReviewRow.first().click()
+      await page.waitForTimeout(600)
+      const ctx = page.locator('[data-week-review-context]')
+      const ctxVisible = (await ctx.count()) > 0 && (await ctx.first().isVisible())
+      const ctxText = ctxVisible ? await ctx.first().innerText() : ''
+      record('Needs review click opens the week review context', ctxVisible)
+      record('review context names what needs attention',
+        /indicator|strand|sub-strand|content standard/i.test(ctxText),
+        ctxText.replace(/\s+/g, ' ').slice(0, 120))
+      record('review context offers a way forward',
+        /continue|not produce a lesson|nothing is guessed/i.test(await page.locator('body').innerText()))
+    } else {
+      record('Needs review click opens the week review context', true,
+        'no needs-review weeks in this scheme')
+    }
+
+    // ── Defect 4/5: mixed week label + source date segments ───────────────
+    const mixedWeek = apiWeeks.find((w) => w.week_type === 'mixed')
+    if (mixedWeek) {
+      record('mixed week is labelled "Mixed week", never "Other"',
+        /Mixed week/i.test(tableText) && !/\|Other\|/.test(tableText),
+        'extraction table shows Mixed week')
+      await page.locator(`[data-extraction-table] tbody tr[data-week-row="${mixedWeek.week_number}"]`).click()
+      await page.waitForTimeout(600)
+      const segs = page.locator('[data-mixed-week-segments]')
+      const segsVisible = (await segs.count()) > 0 && (await segs.first().isVisible())
+      record('mixed week shows its special period and teaching segments', segsVisible)
+      if (segsVisible) {
+        const segText = await segs.first().innerText()
+        record('midterm segment keeps the SOURCE date range',
+          /\d{4}-\d{2}-\d{2}\s*→\s*\d{4}-\d{2}-\d{2}/.test(segText) && /MID-?TERM|SPECIAL/i.test(segText),
+          segText.replace(/\s+/g, ' ').slice(0, 140))
+        record('teaching segment is shown beside the special period',
+          /Teaching:/i.test(segText))
+      }
+      const spineMixed = await api(page, `/api/curriculum/${schemeId}/spine`)
+      const mixedSpine = (spineMixed.body?.weeks || []).find((w) => w.week_number === mixedWeek.week_number)
+      record('spine exposes source-defined special segments',
+        !!mixedSpine?.special_segments?.length && !!mixedSpine.special_segments[0].start,
+        mixedSpine?.special_segments?.[0]?.start || 'none')
+    } else {
+      record('mixed week is labelled "Mixed week", never "Other"', true,
+        'this scheme has no mixed week')
+    }
 
     // ── 5. Allocation: review + adjust the period, then generate ───────────
     await page.goto(`${WEB}/generate/${schemeId}`, { waitUntil: 'domcontentloaded' })
@@ -237,6 +316,62 @@ async function runDesktop(browser, state) {
     record('allocation rows expose a review state',
       !!preview?.body?.lesson_review?.every((r) => typeof r.needs_review === 'boolean'),
       'needs_review present on every row')
+    // ── Defect 6/7/13: Quick Generate → Preview Allocation succeeds ────────
+    record('Quick Generate → Preview Allocation succeeds', preview?.status === 200,
+      `HTTP ${preview?.status ?? 'no response'}`)
+    let quickPreviewBody = await page.locator('body').innerText()
+    record('no "Validation failed" on the Quick Generate path',
+      !/validation failed/i.test(quickPreviewBody))
+    record('no "Action failed" on the Quick Generate path',
+      !/action failed/i.test(quickPreviewBody))
+
+    // ── Defect 6 root cause: clearing the term dates must NOT break it ─────
+    const termStart = page.locator('#cfg-term-start')
+    const termEnd = page.locator('#cfg-term-end')
+    if (await termStart.count()) {
+      await termStart.fill('')
+      await termEnd.fill('')
+      await page.waitForTimeout(200)
+      let clearedPreview = null
+      const onCleared = async (r) => {
+        if (!r.url().includes('/allocation-preview')) return
+        try { clearedPreview = { status: r.status(), body: await r.json() } } catch { /* not json */ }
+      }
+      page.on('response', onCleared)
+      await page.getByRole('button', { name: /preview allocation/i }).click()
+      await page.waitForTimeout(2500)
+      page.off('response', onCleared)
+      record('emptied term dates do not produce a validation failure',
+        clearedPreview?.status === 200, `HTTP ${clearedPreview?.status ?? 'no response'}`)
+      const clearedBody = await page.locator('body').innerText()
+      record('emptied term dates never surface "Validation failed"',
+        !/validation failed/i.test(clearedBody) && !/action failed/i.test(clearedBody),
+        (clearedBody.match(/[^\n]*validation failed[^\n]*/i) || ['no validation-failed text'])[0].slice(0, 90))
+    }
+
+    // ── Defect 14: Build with me → Preview Allocation succeeds ────────────
+    const buildRadio = page.getByRole('radio', { name: /build with me/i })
+    if (await buildRadio.count()) {
+      await buildRadio.click()
+      await page.waitForTimeout(300)
+      let buildPreview = null
+      const onBuild = async (r) => {
+        if (!r.url().includes('/allocation-preview')) return
+        try { buildPreview = { status: r.status(), body: await r.json() } } catch { /* not json */ }
+      }
+      page.on('response', onBuild)
+      await page.getByRole('button', { name: /preview allocation/i }).click()
+      await page.waitForTimeout(2500)
+      page.off('response', onBuild)
+      record('Build with me → Preview Allocation succeeds', buildPreview?.status === 200,
+        `HTTP ${buildPreview?.status ?? 'no response'}`)
+      const buildBody = await page.locator('body').innerText()
+      record('no "Validation failed" on the Build with me path',
+        !/validation failed/i.test(buildBody))
+      // Back to Quick Generate for the rest of the journey.
+      await page.getByRole('radio', { name: /quick generate/i }).click()
+      await page.waitForTimeout(300)
+    }
     page.off('response', onPreview)
 
     if (periodCount > 0) {

@@ -106,9 +106,23 @@ export function normalizeError(error: unknown): NormalizedError {
   }
 
   if (status === 422) {
+    // A validation failure always names the actual problem in teacher language
+    // when the response carries per-field errors (real-use remediation: the
+    // old copy "Please check your input" never said WHAT to check).
+    const body = extractResponseBody(error)
+    const fields: string[] = Array.isArray(body?.errors)
+      ? body.errors.map((e: any) => String(e?.field || '')).filter(Boolean)
+      : []
+    let message = 'Some lesson details are incomplete, so this step could not run. '
+      + 'Check the term dates and lesson settings, then try again.'
+    if (fields.some(f => f.includes('term_start_date') || f.includes('term_end_date'))) {
+      message = 'The term dates are incomplete. Set the Term Start and Term End dates, then try again.'
+    } else if (fields.some(f => f.includes('class_level') || f.includes('subject'))) {
+      message = 'The subject or class for this scheme is not set. Confirm the scheme details, then try again.'
+    }
     return {
       category: 'validation',
-      message: FRIENDLY_MESSAGES.validation,
+      message,
       technical,
       canRetry: false,
       showBanner: false,

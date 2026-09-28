@@ -335,7 +335,12 @@ class ApiService {
     return this.request(`/api/documents/${schemeId}`)
   }
 
-  async getSchemeWeeks(schemeId: string): Promise<{ weeks: any[] }> {
+  /**
+   * ``source_provides_indicators`` distinguishes "the parser could not read an
+   * indicator this week" from "the source has no Indicator column at all"
+   * (real-use remediation, Defect 2) — the review UI must never conflate them.
+   */
+  async getSchemeWeeks(schemeId: string): Promise<{ weeks: any[]; source_provides_indicators?: boolean }> {
     return this.request(`/api/documents/${schemeId}/weeks`)
   }
 
@@ -397,7 +402,7 @@ class ApiService {
   async getAllocationPreview(schemeId: string, config: any): Promise<any> {
     return this.request(`/api/generation/${schemeId}/allocation-preview`, {
       method: 'POST',
-      body: JSON.stringify(config),
+      body: JSON.stringify(sanitizeTermConfig(config)),
     })
   }
 
@@ -422,7 +427,7 @@ class ApiService {
   async generateLessonPlans(schemeId: string, config: any): Promise<any> {
     return this.request(`/api/generation/${schemeId}/generate`, {
       method: 'POST',
-      body: JSON.stringify(config),
+      body: JSON.stringify(sanitizeTermConfig(config)),
     })
   }
 
@@ -1122,6 +1127,77 @@ class ApiService {
 export interface ApiError extends Error {
   code?: string
   diagnostic?: string
+}
+
+/**
+ * Repair the TermConfig payload at the API boundary (real-use remediation,
+ * "Action failed — Validation failed" root cause).
+ *
+ * The Term Start / Term End date inputs write their value straight into the
+ * config state; clearing an HTML date input yields `''`, and the backend's
+ * Pydantic model rejects an empty date string with a 422 ("Validation failed").
+ * The same class of failure hits class_level / subject when a scheme's
+ * detection left them blank. Both Quick Generate and Build with me share this
+ * one config state, which is why both paths failed identically.
+ *
+ * This repair keeps the teacher's intent instead of dead-ending the flow:
+ * an emptied date is replaced by the scheme's own curriculum span when the
+ * page derived one, and otherwise OMITTED so the backend derives the term
+ * window from the scheme — the page never guesses a date. An emptied
+ * class/subject falls back to the scheme's detected values. The backend
+ * remains the validator of last resort.
+ */
+export function sanitizeTermConfig(
+  config: any,
+  fallback?: { term_start_date?: string; term_end_date?: string; class_level?: string; subject?: string }
+): any {
+  if (!config || typeof config !== 'object') return config
+  const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+  const cfg: any = { ...config }
+
+  // An emptied date input is "not set": restore the scheme's own span when it
+  // is known, else omit the key — the backend fills it from the curriculum.
+  for (const key of ['term_start_date', 'term_end_date'] as const) {
+    const value = cfg[key]
+    if (typeof value === 'string' && DATE_RE.test(value)) continue
+    const fb = fallback?.[key]
+    if (fb && DATE_RE.test(fb)) cfg[key] = fb
+    else delete cfg[key]
+  }
+  // Teaching days must be an array of integers 0-6.
+  if (!Array.isArray(cfg.teaching_days)) cfg.teaching_days = [0, 2, 4]
+  else cfg.teaching_days = cfg.teaching_days.map((d: any) => Number(d)).filter((d: any) => Number.isInteger(d) && d >= 0 && d <= 6)
+
+  // Numeric fields can land as strings from lenient inputs.
+  const asInt = (v: any, dflt: number) => {
+    const n = parseInt(v, 10)
+    return Number.isFinite(n) && n > 0 ? n : dflt
+  }
+  cfg.lessons_per_week = asInt(cfg.lessons_per_week, 3)
+  cfg.lesson_duration_minutes = asInt(cfg.lesson_duration_minutes, 60)
+  cfg.class_size = Number.isFinite(Number(cfg.class_size)) && Number(cfg.class_size) > 0
+    ? Number(cfg.class_size) : 24
+
+  // The backend enum rejects '' — restore the scheme's detected value or drop
+  // the key so the backend default ('Unknown') applies and its own gate can
+  // produce a real teacher-facing message instead of a raw 422.
+  for (const key of ['class_level', 'subject'] as const) {
+    if (typeof cfg[key] !== 'string' || !cfg[key].trim()) {
+      const fb = fallback?.[key]
+      if (fb && fb !== 'Unknown') cfg[key] = fb
+      else delete cfg[key]
+    }
+  }
+
+  // List fields must be arrays of strings.
+  for (const key of ['keywords', 'teaching_learning_resources', 'core_competencies',
+                     'references', 'selected_indicator_codes'] as const) {
+    if (cfg[key] !== undefined && !Array.isArray(cfg[key])) delete cfg[key]
+  }
+  if (Array.isArray(cfg.holidays)) {
+    cfg.holidays = cfg.holidays.filter((h: any) => h && typeof h === 'object' && typeof h.date === 'string' && DATE_RE.test(h.date))
+  }
+  return cfg
 }
 
 /**

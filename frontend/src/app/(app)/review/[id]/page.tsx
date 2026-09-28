@@ -25,9 +25,14 @@ interface WeekData {
   indicators: string[]
   resources: string[]
   special_period_label?: string
+  special_period_type?: string
+  // Source-defined segments (real-use remediation, Defect 5): a special period
+  // and the teaching content of the same week are shown as separate spans.
+  special_segments?: { type: string; label: string; start: string | null; end: string | null }[]
+  teaching_segments?: { start: string | null; end: string | null }[]
   // Teacher-facing extraction review state (from the curriculum spine).
   // Never raw parser diagnostics.
-  review_status?: 'ok' | 'needs_review' | 'special'
+  review_status?: 'ok' | 'needs_review' | 'special' | 'mixed'
   review_reasons?: string[]
 }
 
@@ -61,6 +66,7 @@ const WEEK_TYPE_LABELS: Record<string, string> = {
   revision: 'Revision',
   assessment: 'Assessment',
   sba: 'SBA',
+  mixed: 'Mixed week',
   other: 'Other',
 }
 
@@ -74,6 +80,9 @@ export default function ReviewPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedWeek, setSelectedWeek] = useState<number>(1)
+  // Defect 2: does the SOURCE provide an Indicator column at all? Props that
+  // come from the same endpoint as the weeks (never re-parsed here).
+  const [sourceProvidesIndicators, setSourceProvidesIndicators] = useState<boolean>(true)
   const [validation, setValidation] = useState<any>(null)
   const [approving, setApproving] = useState(false)
   const [confirmingSubject, setConfirmingSubject] = useState<string | null>(null)
@@ -89,6 +98,11 @@ export default function ReviewPage() {
       setScheme(schemeData)
       const weeksData = await api.getSchemeWeeks(schemeId)
       setWeeks(weeksData.weeks || [])
+      // Defect 2: whether the source carries an Indicator column at all — the
+      // difference between "parser could not read it" and "the source has none".
+      if (typeof weeksData.source_provides_indicators === 'boolean') {
+        setSourceProvidesIndicators(weeksData.source_provides_indicators)
+      }
       if (weeksData.weeks && weeksData.weeks.length > 0) {
         setSelectedWeek(weeksData.weeks[0].week_number)
       }
@@ -136,6 +150,7 @@ export default function ReviewPage() {
       revision: 'warning',
       assessment: 'danger',
       sba: 'accent',
+      mixed: 'warning',
       other: 'neutral',
     }
     return tones[type] || tones.other
@@ -149,10 +164,13 @@ export default function ReviewPage() {
     if (week.review_status === 'needs_review') {
       return <StatusPill tone="warning">⚠ Needs review</StatusPill>
     }
+    if (week.review_status === 'mixed' || week.week_type === 'mixed') {
+      return <StatusPill tone="warning">◐ Mixed week</StatusPill>
+    }
     if (week.review_status === 'special' || week.week_type !== 'instruction') {
       return (
         <StatusPill tone={weekTypeTone(week.week_type)}>
-          {week.week_type_label || WEEK_TYPE_LABELS[week.week_type] || week.week_type}
+          ★ {week.week_type_label || WEEK_TYPE_LABELS[week.week_type] || week.week_type}
         </StatusPill>
       )
     }
@@ -343,8 +361,14 @@ export default function ReviewPage() {
                         key={`xt-${week.id}`}
                         onClick={() => setSelectedWeek(week.week_number)}
                         aria-selected={selected}
+                        data-week-row={week.week_number}
+                        data-needs-review={week.review_status === 'needs_review' ? 'true' : undefined}
                         className={`cursor-pointer border-b border-slate-50 transition-colors ${
-                          selected ? 'bg-[#102A43]/5' : 'hover:bg-slate-50'
+                          selected
+                            ? 'bg-[#102A43]/5'
+                            : week.review_status === 'needs_review'
+                              ? 'bg-amber-50/60 hover:bg-amber-50'
+                              : 'hover:bg-slate-50'
                         }`}
                       >
                         <td className="whitespace-nowrap px-4 py-2.5 font-medium text-[#102A43]">
@@ -377,10 +401,17 @@ export default function ReviewPage() {
                                 </span>
                               )}
                             </span>
+                          ) : week.week_type === 'instruction' ? (
+                            // Defect 2: "the parser could not read one" (the
+                            // source DOES have an Indicator column elsewhere)
+                            // and "the source has none" are DIFFERENT facts.
+                            sourceProvidesIndicators ? (
+                              <span className="italic text-amber-700">⚠ Needs review</span>
+                            ) : (
+                              <span className="italic text-muted-foreground">— Not provided in source</span>
+                            )
                           ) : (
-                            <span className="italic text-muted-foreground">
-                              {week.week_type === 'instruction' ? 'No indicator read' : '—'}
-                            </span>
+                            <span className="italic text-muted-foreground">—</span>
                           )}
                         </td>
                         <td className="whitespace-nowrap px-4 py-2.5">{reviewStatusPill(week)}</td>
@@ -431,17 +462,22 @@ export default function ReviewPage() {
                     key={week.id}
                     onClick={() => setSelectedWeek(week.week_number)}
                     aria-current={selectedWeek === week.week_number ? 'true' : undefined}
+                    data-nav-week={week.week_number}
                     className={`w-full rounded-lg px-3 py-2 text-left transition-colors ${
                       selectedWeek === week.week_number
                         ? 'bg-[#102A43] text-white'
-                        : 'hover:bg-slate-50'
+                        : week.review_status === 'needs_review'
+                          ? 'bg-amber-50 hover:bg-amber-100'
+                          : 'hover:bg-slate-50'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-sm font-medium">Week {week.week_number}</span>
-                      <StatusPill tone={weekTypeTone(week.week_type)} className="rounded-full">
-                        {WEEK_TYPE_LABELS[week.week_type] || week.week_type}
-                      </StatusPill>
+                      {/* The week's REVIEW state is what the teacher needs to see
+                          here (Defect 3): an instructional week whose extraction
+                          is uncertain must not be labelled "Instruction" as if
+                          all were well. */}
+                      {reviewStatusPill(week)}
                     </div>
                     <div
                       className={`text-xs ${
@@ -497,6 +533,58 @@ export default function ReviewPage() {
                     </p>
                   </div>
 
+                  {/* Defect 3: clicking a needs-review week opens THIS pane — the
+                      problematic field is named, the reason is stated in plain
+                      language, and the continue action stays available. */}
+                  {currentWeek.review_status === 'needs_review' && (
+                    <Banner tone="warning" title="This week needs your review" className="mt-4" data-week-review-context>
+                      <ul className="list-disc space-y-1 pl-4">
+                        {(currentWeek.review_reasons || []).map((r, i) => (
+                          <li key={i}>{r}</li>
+                        ))}
+                      </ul>
+                      {(!currentWeek.indicators || currentWeek.indicators.length === 0)
+                        && currentWeek.week_type === 'instruction' && (
+                        <p className="mt-2 text-sm">
+                          <span className="font-medium">Indicator — ⚠ Needs review:</span>{' '}
+                          SchemeKnit could not confidently read an indicator for this week.
+                          The week stays exactly as read — nothing is guessed. You can still
+                          continue; this week simply will not produce a lesson until its
+                          indicator is available in the source.
+                        </p>
+                      )}
+                    </Banner>
+                  )}
+
+                  {/* Defect 4/5: a mixed week shows its special period and its
+                      teaching content as separate, source-defined segments. */}
+                  {(currentWeek.week_type === 'mixed'
+                    || (currentWeek.special_segments?.length ?? 0) > 0) && (
+                    <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3" data-mixed-week-segments>
+                      <p className="text-sm font-semibold text-[#102A43]">
+                        ◐ Mixed week — special period and teaching content
+                      </p>
+                      {(currentWeek.special_segments || []).map((seg, i) => (
+                        <p key={`sp-${i}`} className="mt-1 text-sm text-amber-800" data-special-segment>
+                          <span className="font-medium">Special period: {seg.label}</span>
+                          {seg.start && seg.end
+                            ? ` · ${seg.start} → ${seg.end}`
+                            : (seg.start || seg.end
+                                ? ` · ${seg.start || seg.end}`
+                                : '')}
+                          {' '}(not a lesson)
+                        </p>
+                      ))}
+                      {(currentWeek.teaching_segments || []).map((seg, i) => (
+                        <p key={`ts-${i}`} className="mt-1 text-sm text-[#102A43]" data-teaching-segment>
+                          <span className="font-medium">Teaching:</span>{' '}
+                          {seg.start && seg.end ? `${seg.start} → ${seg.end}` : 'dates as in the source'}
+                          {currentWeek.strand ? ` · ${currentWeek.strand}` : ''}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+
                   {currentWeek.strand && (
                     <section className="mt-4" aria-label="Strand">
                       <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
@@ -550,6 +638,19 @@ export default function ReviewPage() {
                           </li>
                         ))}
                       </ul>
+                    </section>
+                  )}
+
+                  {/* Defect 2: "the source provides no indicator" is a DIFFERENT
+                      fact from "the parser could not read one". A special/
+                      mixed week never claims either — it is just not a lesson
+                      week. Data stays exactly as read from the source. */}
+                  {currentWeek.indicators.length === 0 && currentWeek.week_type !== 'instruction' && (
+                    <section className="mt-4 border-t border-slate-100 pt-4" aria-label="Indicators">
+                      <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                        Indicators
+                      </h3>
+                      <p className="mt-2 text-sm italic text-muted-foreground">—</p>
                     </section>
                   )}
 

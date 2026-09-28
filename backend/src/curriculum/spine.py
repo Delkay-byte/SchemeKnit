@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -42,6 +43,7 @@ WEEK_TYPE_LABELS: Dict[str, str] = {
     "assessment": "Assessment",
     "sba": "SBA / Vacation",
     "sba_vacation": "SBA / Vacation",
+    "mixed": "Mixed week",
     "other": "Other",
 }
 
@@ -49,6 +51,7 @@ WEEK_TYPE_LABELS: Dict[str, str] = {
 REVIEW_OK = "ok"
 REVIEW_NEEDS_REVIEW = "needs_review"
 REVIEW_SPECIAL = "special"
+REVIEW_MIXED = "mixed"
 
 
 def _iso(value) -> Optional[str]:
@@ -66,19 +69,34 @@ def _week_type_value(week) -> str:
     return str(raw or "instruction")
 
 
-def classify_week_review(week) -> Tuple[str, List[str]]:
+def classify_week_review(week, scheme_weeks=None) -> Tuple[str, List[str]]:
     """Return ``(review_status, teacher_facing_reasons)`` for one week.
+
+    ``scheme_weeks`` optionally supplies the FULL week list of the source
+    scheme so the "does this source provide indicators at all?" question is
+    answered scheme-wide (Defect 2: "no indicator column in the source" is a
+    different fact from "the parser missed this week's indicator"). Omit it
+    and the check falls back to this week alone.
 
     Rules (deliberately conservative — flag only real uncertainty):
 
     * A non-instructional week (revision / assessment / SBA-vacation / other) is
       ``special``: it is a real curriculum state and carries no lesson fields.
-    * An instructional week with **no extracted indicators** is ``needs_review``.
+    * A ``mixed`` week is ``mixed``: it carries BOTH a special period and real
+      teaching content. The special segment stays excluded from normal lesson
+      allocation while the teaching segment remains allocatable (Defect 4/7).
+    * An instructional week with **no extracted indicators** is ``needs_review``
+      — UNLESS the source genuinely provides no indicator column at all (a
+      whole-scheme check), in which case the honest state is ``ok`` with a
+      "not provided in source" presentation (Defect 2: never conflate "the
+      source has none" with "the parser failed").
     * An instructional week whose strand, sub-strand *and* content standard are
       all missing is ``needs_review`` (the curriculum framing was not read).
     * Anything else is ``ok``.
     """
     week_type = _week_type_value(week)
+    if week_type == "mixed":
+        return REVIEW_MIXED, []
     if week_type != "instruction":
         return REVIEW_SPECIAL, []
 
@@ -88,8 +106,23 @@ def classify_week_review(week) -> Tuple[str, List[str]]:
     standards = [s for s in (getattr(week, "content_standards", None) or []) if str(s).strip()]
 
     reasons: List[str] = []
+    # Defect 2, precisely: the source DOES provide indicators (other weeks
+    # carry them) but this week has none → extraction uncertainty → review.
+    # The source provides NO indicator column anywhere → the honest state is
+    # "not provided in source", never a review failure.
+    # Conservative default: with NO scheme context the source cannot be proven
+    # to provide indicators, so the week stays flagged for review.
     if not indicators:
-        reasons.append("No indicators were found for this week.")
+        # ``scheme_weeks`` supplied → trust the whole-scheme check: review only
+        # when the source DOES provide indicators elsewhere. No context →
+        # conservative default: flag for review (cannot prove the source has
+        # no indicator column).
+        source_provides = (
+            scheme_provides_indicators(scheme_weeks)
+            if scheme_weeks is not None else None
+        )
+        if source_provides is not False:
+            reasons.append("No indicators were found for this week.")
     if not strand and not sub_strand and not standards:
         reasons.append(
             "The strand, sub-strand and content standard were not found for this week."
@@ -97,6 +130,32 @@ def classify_week_review(week) -> Tuple[str, List[str]]:
     if reasons:
         return REVIEW_NEEDS_REVIEW, reasons
     return REVIEW_OK, []
+
+
+def scheme_provides_indicators(scheme_or_weeks) -> bool:
+    """True when the source curriculum carries an indicator column AT ALL.
+
+    Defect 2: "the parser found no indicator this week" and "this source has
+    no indicator column" are different facts. A whole-level scheme (WAPEF
+    Nursery/KG) legitimately has no Indicator column anywhere; its weeks must
+    not be flagged ``needs_review`` for lacking one. Detection is
+    content-based — any non-special week in the scheme carrying any indicator
+    text means the source provides them.
+
+    Accepts a scheme object (anything with ``.weeks``) OR a list of weeks.
+    """
+    weeks = getattr(scheme_or_weeks, "weeks", None)
+    if weeks is None and not isinstance(scheme_or_weeks, (list, tuple)):
+        return False
+    if weeks is None:
+        weeks = scheme_or_weeks
+    for w in (weeks or []):
+        if _week_type_value(w) not in ("instruction", "mixed"):
+            continue
+        for i in (getattr(w, "indicators", None) or []):
+            if str(i or "").strip():
+                return True
+    return False
 
 
 def _week_indicators(week) -> List[Dict[str, str]]:
@@ -118,9 +177,95 @@ def _week_indicators(week) -> List[Dict[str, str]]:
     return out
 
 
-def build_week_spine(week) -> Dict[str, Any]:
-    """Canonical view of one curriculum week."""
-    status, reasons = classify_week_review(week)
+def week_special_segments(week) -> List[Dict[str, Any]]:
+    """Source-defined special-period segments of one week (Defect 5).
+
+    The verbatim source label is preserved as DATA. A label that embeds a date
+    range ("MID-TERM (05-11-2026 to 06-11-2026)") is parsed into start/end
+    dates; a label without dates yields ``start=None, end=None``. No calendar
+    range is ever invented: absent pieces stay absent.
+    """
+    label = (getattr(week, "special_period_label", "") or "").strip()
+    if not label:
+        return []
+    start, end = _parse_label_dates(label)
+    return [{
+        "type": (getattr(week, "special_period_type", "") or "other_non_instructional"),
+        "label": label,
+        "start": _iso(start),
+        "end": _iso(end),
+    }]
+
+
+def week_teaching_segments(week) -> List[Dict[str, Any]]:
+    """Source-defined teaching segments of one week (Defect 5).
+
+    For a normal instructional week the teaching segment is simply the source
+    week's own date span (start == end for week-ending-date schemes). For a
+    mixed week the teaching content that survives the special period is the
+    segment — its dates are the week's source dates; the source rarely prints
+    an explicit sub-range, and none is invented.
+    """
+    start = getattr(week, "start_date", None)
+    end = getattr(week, "end_date", None)
+    if isinstance(start, datetime):
+        start = start.date()
+    if isinstance(end, datetime):
+        end = end.date()
+    return [{
+        "start": _iso(start),
+        "end": _iso(end),
+    }]
+
+
+_DATE_RANGE_RE = re.compile(
+    r"(\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4})\s*(?:to|→|->|–|-)\s*(\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4})",
+    re.IGNORECASE,
+)
+
+
+def _parse_label_dates(label: str) -> Tuple[Optional[date], Optional[date]]:
+    """Pull the (start, end) dates out of a special-period label, day-first.
+
+    "MID-TERM (05-11-2026 to 06-11-2026)" → (date(2026,11,5), date(2026,11,6)).
+    No dates in the label → (None, None). Nothing is invented.
+    """
+    import re as _re
+    m = _DATE_RANGE_RE.search(label or "")
+    if not m:
+        return (None, None)
+
+    def _day_first(token: str) -> Optional[date]:
+        parts = _re.split(r"[-/.]", token.strip())
+        if len(parts) != 3:
+            return None
+        try:
+            d, mo, y = int(parts[0]), int(parts[1]), int(parts[2])
+        except ValueError:
+            return None
+        if y < 100:
+            y += 2000
+        if not (1 <= d <= 31 and 1 <= mo <= 12 and 2020 <= y <= 2035):
+            return None
+        try:
+            return date(y, mo, d)
+        except ValueError:
+            return None
+
+    start = _day_first(m.group(1))
+    end = _day_first(m.group(2))
+    if start and end and end < start:
+        start, end = end, start
+    return (start, end)
+
+
+def build_week_spine(week, scheme_weeks=None) -> Dict[str, Any]:
+    """Canonical view of one curriculum week.
+
+    ``scheme_weeks`` (the full stored week list) gives the review classifier
+    scheme-wide context — see ``classify_week_review``.
+    """
+    status, reasons = classify_week_review(week, scheme_weeks)
     week_type = _week_type_value(week)
     indicators = _week_indicators(week)
     return {
@@ -139,6 +284,10 @@ def build_week_spine(week) -> Dict[str, Any]:
         "resources": list(getattr(week, "resources", None) or []),
         "special_period_label": getattr(week, "special_period_label", "") or "",
         "special_period_type": getattr(week, "special_period_type", "") or "",
+        # Source-defined segments (Defect 5): special periods and teaching
+        # spans are represented explicitly — never an invented Mon–Fri range.
+        "special_segments": week_special_segments(week),
+        "teaching_segments": week_teaching_segments(week),
         # Teacher-facing review state — never raw parser diagnostics.
         "review_status": status,
         "review_reasons": reasons,
@@ -154,10 +303,11 @@ def build_curriculum_spine(scheme_db) -> Dict[str, Any]:
         list(getattr(scheme_db, "weeks", None) or []),
         key=lambda w: (getattr(w, "week_number", 0) or 0),
     )
-    week_rows = [build_week_spine(w) for w in weeks]
+    week_rows = [build_week_spine(w, weeks) for w in weeks]
 
     instructional = [w for w in week_rows if w["week_type"] == "instruction"]
-    special = [w for w in week_rows if w["week_type"] != "instruction"]
+    special = [w for w in week_rows if w["week_type"] not in ("instruction", "mixed")]
+    mixed = [w for w in week_rows if w["week_type"] == "mixed"]
     needs_review = [w for w in week_rows if w["review_status"] == REVIEW_NEEDS_REVIEW]
 
     strands: List[str] = []
@@ -184,6 +334,7 @@ def build_curriculum_spine(scheme_db) -> Dict[str, Any]:
             "total_weeks": len(week_rows),
             "instructional_weeks": len(instructional),
             "special_weeks": len(special),
+            "mixed_weeks": len(mixed),
             "indicator_count": sum(w["indicator_count"] for w in week_rows),
             "needs_review_weeks": len(needs_review),
             "strand_count": len(strands),

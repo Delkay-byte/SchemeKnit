@@ -6,6 +6,7 @@ Production endpoints for lesson plan generation with persistence.
 
 import asyncio
 import json
+from datetime import date
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import FileResponse
 from pathlib import Path
@@ -93,6 +94,28 @@ async def _run_pipeline(fn, *args, **kwargs):
     return await loop.run_in_executor(None, partial(fn, *args, **kwargs))
 
 
+def resolve_term_window(config: TermConfig, weeks) -> TermConfig:
+    """Fill an unset term window from the scheme's own curriculum dates.
+
+    Real-use remediation (Defect 6/7): the teacher clearing the Term Start /
+    Term End inputs used to make the whole allocation payload invalid, so BOTH
+    "Quick Generate" and "Build with me" stopped at "Validation failed" even
+    though the curriculum was perfectly usable. The term window is derived from
+    the scheme's extracted week dates — the source stays authoritative and
+    nothing is invented. A scheme without dates either is the only case that
+    falls back to the server date, exactly as the model default did before.
+    """
+    starts = [w.start_date for w in (weeks or []) if getattr(w, "start_date", None)]
+    ends = [w.end_date for w in (weeks or []) if getattr(w, "end_date", None)]
+    if config.term_start_date is None:
+        config.term_start_date = min(starts) if starts else date.today()
+    if config.term_end_date is None:
+        config.term_end_date = max(ends) if ends else config.term_start_date
+    if config.term_end_date < config.term_start_date:
+        config.term_end_date = config.term_start_date
+    return config
+
+
 @router.post("/{scheme_id}/allocation-preview")
 async def preview_allocation(
     scheme_id: str,
@@ -115,6 +138,7 @@ async def preview_allocation(
     config.teacher_name = _resolve_teacher_name(db, user)
 
     scheme = data_service.scheme_to_model(scheme_db)
+    resolve_term_window(config, scheme.weeks)
 
     calendar = pipeline.calendar_engine.build_calendar(
         config, scheme.weeks, config.holidays
@@ -154,11 +178,21 @@ async def preview_allocation(
     # Spine-derived review state per curriculum week (Patterns 2/6): a week whose
     # extraction was uncertain is shown as "Needs review" on the allocation
     # screen. Nothing is re-parsed and nothing is invented.
-    from ..curriculum.spine import classify_week_review
+    from ..curriculum.spine import classify_week_review, scheme_provides_indicators
+    _scheme_weeks = list(scheme_db.weeks or [])
     week_review = {
-        w.week_number: classify_week_review(w)[0]
-        for w in (scheme_db.weeks or [])
+        w.week_number: classify_week_review(w, _scheme_weeks)[0]
+        for w in _scheme_weeks
     }
+    week_review_reasons = {
+        w.week_number: classify_week_review(w, _scheme_weeks)[1]
+        for w in _scheme_weeks
+    }
+    # Defect 2/7: a scheme whose source has NO indicator column anywhere (the
+    # WAPEF Nursery/KG shape) must not have its weeks flagged as review
+    # failures on the allocation screen — the honest state is "not provided in
+    # source". The indicatorless allocation path already handles these schemes.
+    provides_indicators = scheme_provides_indicators(scheme_db.weeks)
     report["lesson_review"] = [
         {
             "lesson_sequence": a.lesson_sequence,
@@ -186,6 +220,11 @@ async def preview_allocation(
             # periods are a real curriculum state, not a review failure.
             "needs_review": bool(getattr(a, "needs_review", False))
                             and not bool(getattr(a, "is_special_period", False)),
+            # Why the row needs attention (teacher-facing, from the spine).
+            "review_reasons": (
+                week_review_reasons.get(a.week_number, [])
+                if bool(getattr(a, "needs_review", False)) else []
+            ),
             # "Why this lesson?" provenance (Patterns 3/6). Compact, teacher-facing;
             # every value comes from the stored curriculum, nothing is fabricated.
             "source_provenance": {
@@ -201,6 +240,8 @@ async def preview_allocation(
                 "indicator_text": a.indicator_description or "",
                 "carry_forward": bool(getattr(a, "carry_forward", False)),
                 "source_review_status": week_review.get(a.week_number),
+                "source_review_reasons": week_review_reasons.get(a.week_number, []),
+                "source_provides_indicators": provides_indicators,
                 "allocation": f"Week {a.teaching_week or a.week_number} \u00b7 Period "
                               f"{getattr(a, 'period_index', '')}".strip(),
             },
@@ -388,6 +429,7 @@ async def generate_lesson_plans(
     gen_limit = quota_before["limit"] if quota_before["enforced"] else 0
 
     scheme = data_service.scheme_to_model(scheme_db)
+    resolve_term_window(config, scheme.weeks)
 
     # The full curriculum indicator list, in curriculum order (never reordered).
     ae = pipeline.allocation_engine
@@ -402,12 +444,12 @@ async def generate_lesson_plans(
     from ..engines.allocation_engine import scheme_has_indicators
     indicatorless = not scheme_has_indicators(
         [w for w in scheme.weeks
-         if include_special or w.week_type == WeekType.INSTRUCTION])
+         if include_special or w.week_type in (WeekType.INSTRUCTION, WeekType.MIXED)])
 
     available_codes: list = []
     if not indicatorless:
         for w in sorted(scheme.weeks, key=lambda x: x.week_number):
-            if not include_special and w.week_type != WeekType.INSTRUCTION:
+            if not include_special and w.week_type not in (WeekType.INSTRUCTION, WeekType.MIXED):
                 continue
             for text in ae._split_indicators(w.indicators):
                 code = ae._extract_indicator_code(text)

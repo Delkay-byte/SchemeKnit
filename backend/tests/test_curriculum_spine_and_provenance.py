@@ -21,7 +21,7 @@ Covers the curriculum-grounded lesson workspace foundation:
 
 import os
 import sys
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 from fastapi import HTTPException
@@ -57,7 +57,10 @@ def make_scheme(db, owner_id, *, subject="Science", class_level="Basic 9",
 def add_week(db, scheme_id, n, *, week_type="instruction", indicators=None,
              strand="Diversity of Matter", sub_strand="Elements",
              standards=None, resources=None):
-    start = date(2026, 1, 5 + (n - 1) * 7)
+    # WeekENDING dates are week N's Monday + 7*(N-1) days — computed with
+    # timedelta so week numbers above 5 stay valid (a January day-math bug
+    # previously broke helpers using weeks 9/13, the mixed-midterm shape).
+    start = date(2026, 1, 5) + timedelta(days=7 * (n - 1))
     w = WeekDB(
         id=generate_id(), scheme_id=scheme_id, week_number=n,
         week_type=week_type, start_date=start, end_date=start,
