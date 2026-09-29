@@ -712,9 +712,15 @@ class GenerationPipeline:
         elif isinstance(diff, str):
             lp.differentiation = diff
 
-        # Homework
+        # Homework — the AI enriches the deterministic follow-up task. The
+        # canonical home-assignment field and the legacy homework column are
+        # written together so the two can never disagree (PART 15): templates
+        # that read only one of them render the same task.
         if "homework_or_extension" in content:
-            lp.homework = content["homework_or_extension"]
+            home_task = str(content["homework_or_extension"] or "").strip()
+            if home_task:
+                lp.homework = home_task
+                lp.home_assignment = home_task
 
         # Teacher notes
         if "teacher_notes" in content:

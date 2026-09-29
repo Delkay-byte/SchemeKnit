@@ -169,9 +169,16 @@ def is_special_label_text(text) -> bool:
     periods and silently drops them.
     """
     stripped = (text or "").strip()
-    if not stripped or INDICATOR_CODE_PATTERN.search(stripped):
+    if not stripped:
         return False
-    lowered = stripped.lower()
+    # A label may be fused with an indicator code in one cell
+    # ("MID-TERM (05-11-2026 to 06-11-2026) B7.1.1.1"). Strip the code first,
+    # then test the remainder — otherwise the whole cell is treated as an
+    # indicator and the label leaks into the curriculum fields.
+    remainder = INDICATOR_CODE_PATTERN.sub("", stripped).strip()
+    if not remainder:
+        return False
+    lowered = remainder.lower()
     if not any(kw in lowered for kw in SPECIAL_WEEK_KEYWORDS):
         return False
     words = re.findall(r"[a-z]+", lowered)
@@ -1325,12 +1332,18 @@ class DOCXParser:
             res = row.get("resources", "")
             if res and res.lower() not in ("", "resources", "resource"):
                 # CANONICAL RESOURCES (PART 6/7): one cell may hold several
-                # resources ("Charts, Pictures, counters"). Normalize into
+                # resources ("Charts, Pictures, Counters"). Normalize into
                 # individual items here at the source so every downstream
                 # consumer (allocation, lessons, review UI, exports) receives
                 # structured entries — never one serialized string.
+                #
+                # A special-period label must never become a resource: the
+                # label is period metadata, not a teaching material. Filter it
+                # here so "MID-TERM (05-11-2026 to 06-11-2026)" can never
+                # reach a lesson's TLR list.
                 for item in normalize_text_items(res):
-                    all_resources.add(item)
+                    if not is_special_label_text(item):
+                        all_resources.add(item)
 
         # ── Mixed week detection (Defect 4) ──────────────────────────
         # MIXED = the week holds BOTH a non-instructional period row (e.g. the
