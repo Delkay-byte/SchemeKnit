@@ -87,3 +87,14 @@ backend/opencode-be.err
 backend/output/
 frontend/e2e/wapef-acceptance/
 frontend/e2e/kg-acceptance/
+
+# Test-run scratch artifacts (e2e results, diagnostic scripts, logs)
+backend/*.err
+backend/*.out
+frontend/*.err
+frontend/*.out
+frontend/e2e/_*.js
+frontend/e2e/_*.err
+frontend/e2e/_*.out
+frontend/e2e/_diag-out/
+frontend/e2e/*-acceptance/
