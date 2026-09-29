@@ -32,7 +32,9 @@ const TEACHER = {
   email: process.env.TF_TEACHER_EMAIL || 'teacher@acceptance.test',
   password: process.env.TF_TEACHER_PASSWORD || 'TeacherPass123',
 }
-const MARKER = `Acceptance activity ${Date.now()}`
+// PART 21: a realistic activity, never an internal/harness marker (see
+// curriculum-workspace-acceptance.js).
+const MARKER = `Learners sort the device pictures into manual and automatic groups ${Date.now().toString(36)}`
 
 process.on('unhandledRejection', (err) => {
   const msg = String((err && err.message) || err)

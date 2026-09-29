@@ -27,6 +27,9 @@ export default function GeneratePage() {
   const params = useParams()
   const schemeId = resolveRouteId(params.id, 'generate')
 
+  // PART 3: when a scheme never states its class, the teacher must choose one
+  // before generating. "Unknown" is never a generation-ready value.
+  const [classLevels, setClassLevels] = useState<string[]>([])
   const [scheme, setScheme] = useState<SchemeOfWork | null>(null)
   const [templates, setTemplates] = useState<Template[]>([])
   const [profiles, setProfiles] = useState<CurriculumProfile[]>([])
@@ -171,6 +174,14 @@ export default function GeneratePage() {
       setTemplates(templatesData.templates || [])
       setProfiles(profilesData.profiles || [])
 
+      // PART 3: the canonical class catalogue, for the "class needs
+      // confirmation" control. A failure here never blocks the page — the
+      // teacher simply cannot confirm from this screen.
+      api
+        .listClassLevels()
+        .then((d) => setClassLevels(d.class_levels || []))
+        .catch(() => setClassLevels([]))
+
       // School and teacher identity come from the authenticated user, not from
       // typed input (PART 14-15). Seed the config so the generation payload
       // carries the right values; the backend is the source of truth.
@@ -215,6 +226,10 @@ export default function GeneratePage() {
         term: schemeData.term || prev.term,
         // Prefer the scheme's own identity; only keep a previous value when
         // the scheme field is missing — never substitute a default level.
+        // PART 3: a scheme that does not state its class must be confirmed by
+        // the teacher, so the summary shows "Class needs confirmation" and
+        // generation is blocked until they choose. The "Unknown" placeholder is
+        // dropped here — it is a detection artefact, not a class.
         class_level:
           schemeData.class_level && schemeData.class_level !== 'Unknown'
             ? schemeData.class_level
@@ -242,7 +257,10 @@ export default function GeneratePage() {
     return {
       term_start_date: starts[0],
       term_end_date: ends[ends.length - 1],
-      class_level: scheme?.class_level,
+      // PART 3: a teacher-confirmed class WINS over the scheme's own (possibly
+      // "Unknown") value; the scheme value is only the fallback. "Unknown" is
+      // never forwarded as a class.
+      class_level: config.class_level || scheme?.class_level,
       subject: scheme?.subject,
     }
   }
@@ -514,6 +532,14 @@ export default function GeneratePage() {
 
   const filteredTemplates = getTemplatesForScheme()
   const currentProfile = getProfileForScheme()
+  // PART 27: the summary names the REAL selected template (not just "2/week ·
+  // 60 min"), so a teacher can see the WAPEF/GES form they are about to use.
+  const selectedTemplateName =
+    templates.find((t: Template) => t.id === config.template_id)?.name || ''
+  // PART 3: a scheme that never states its class must be confirmed by the
+  // teacher. "Unknown" is never printed as a generation-ready value.
+  const classNeedsConfirmation =
+    !config.class_level || config.class_level === 'Unknown'
   // The WAPEF structured fields belong to the Approved WAPEF Plan only; they
   // appear in the per-lesson review when that template is the chosen form.
   const isWapefSelected = config.template_id === WAPEF_TEMPLATE_ID
@@ -527,6 +553,11 @@ export default function GeneratePage() {
     selectedCodes.length === 0
   ) {
     generateBlockReasons.push('Select at least one indicator to generate.')
+  }
+  // PART 3: generating without a confirmed class is blocked, and the reason
+  // is stated rather than left to a silent disable.
+  if (classNeedsConfirmation) {
+    generateBlockReasons.push('Confirm the class for this scheme before generating.')
   }
   // Quota exhaustion with nothing left to select: state it explicitly.
   // (Indicatorless Nursery-style schemes never enter this branch: the preview
@@ -588,7 +619,19 @@ export default function GeneratePage() {
                 </div>
                 <div>
                   <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Class</dt>
-                  <dd className="text-sm font-semibold text-[#102A43]">{scheme.class_level}</dd>
+                  <dd className="text-sm font-semibold text-[#102A43]">
+                    {/* PART 3/27: "Unknown" is never a generation-ready state.
+                        When the scheme does not state a class the teacher must
+                        choose one before generating, so the summary asks for it
+                        instead of printing a placeholder. */}
+                    {classNeedsConfirmation ? (
+                      <span className="text-amber-700" data-class-needs-confirmation>
+                        Class needs confirmation
+                      </span>
+                    ) : (
+                      config.class_level || scheme.class_level
+                    )}
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Term</dt>
@@ -601,6 +644,22 @@ export default function GeneratePage() {
                 <div>
                   <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Weeks in scheme</dt>
                   <dd className="text-sm font-semibold text-[#102A43]">{scheme.weeks_count}</dd>
+                </div>
+                {/* PART 27: name the real selected template, not only its profile. */}
+                <div>
+                  <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Template</dt>
+                  <dd className="text-sm font-semibold text-[#102A43]" data-selected-template>
+                    {selectedTemplateName || 'Not selected'}
+                  </dd>
+                </div>
+                {/* PART 7: the school this lesson belongs to. */}
+                <div>
+                  <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">School</dt>
+                  <dd className="text-sm font-semibold text-[#102A43]">
+                    {config.school_name || currentUser?.school_name || (
+                      <span className="text-amber-700">Add your school below</span>
+                    )}
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Template profile</dt>
@@ -773,18 +832,71 @@ export default function GeneratePage() {
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-2">
+                    {/* PART 3: a scheme that never states its class needs the
+                        teacher's choice. This is the only place the class can
+                        be set on this screen, and it persists into the
+                        generation payload. */}
+                    <Field
+                      label="Class"
+                      htmlFor="cfg-class-level"
+                      hint={
+                        classNeedsConfirmation
+                          ? 'Your scheme does not state the class — choose it to continue'
+                          : 'Taken from your scheme'
+                      }
+                    >
+                      {classNeedsConfirmation ? (
+                        <select
+                          id="cfg-class-level"
+                          aria-label="Class"
+                          data-class-level-select
+                          className="w-full rounded-lg border border-input bg-white px-3 py-2 text-sm"
+                          value=""
+                          onChange={(e) =>
+                            setConfig((prev) => ({ ...prev, class_level: e.target.value }))
+                          }
+                        >
+                          <option value="">Select the class…</option>
+                          {classLevels.map((c) => (
+                            <option key={c} value={c}>
+                              {c}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <Input
+                          id="cfg-class-level"
+                          type="text"
+                          value={config.class_level}
+                          disabled
+                          className="bg-muted text-muted-foreground"
+                        />
+                      )}
+                    </Field>
                     {/* School and teacher identity are server-derived from the
                         authenticated user's school relationship and profile, so
                         they are shown read-only here (PART 13-15): the teacher
                         never types a school name, and the client value is not
                         trusted. */}
-                    <Field label="School Name" htmlFor="cfg-school-name" hint="Derived from your school membership">
+                    <Field
+                      label="School Name"
+                      htmlFor="cfg-school-name"
+                      hint={
+                        config.school_name || currentUser?.school_name
+                          ? 'From your profile — change it in Settings'
+                          : 'Add the school you teach at in Settings; it then appears on every lesson'
+                      }
+                    >
+                      {/* School identity is server-authoritative: it is resolved
+                          from the authenticated teacher on every generate call,
+                          so this field reports the stored value and never
+                          pretends to accept a value the server would discard. */}
                       <Input
                         id="cfg-school-name"
                         type="text"
-                        value={config.school_name || currentUser?.school_name || '—'}
+                        value={config.school_name || currentUser?.school_name || ''}
                         disabled
-                        placeholder="Derived from your school"
+                        placeholder="Set your school in Settings"
                         className="bg-muted text-muted-foreground"
                       />
                     </Field>
