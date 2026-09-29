@@ -38,7 +38,63 @@ __all__ = [
     "normalize_text",
     "clean_serialized_text",
     "normalize_structured_references",
+    "strip_internal_markers",
+    "looks_internal",
 ]
+
+#: Internal artefacts that must NEVER reach a teacher-visible field or an
+#: export (PART 21): acceptance-harness markers, epoch-millisecond stamps,
+#: fixture/debug labels, and the icon/serialization leak that once printed
+#: "svgSuggest" beside a workspace heading. These are matched as WHOLE tokens so
+#: ordinary lesson prose is never damaged.
+_INTERNAL_MARKER_RE = re.compile(
+    r"\b(?:test|debug|fixture|internal|acceptance)\s*(?:marker|fixture|id|run)?\b"
+    r"[^.!?\n]{0,80}?\b\d{9,13}\b",
+    re.IGNORECASE,
+)
+
+#: A bare 13-digit integer starting with 1 or 2 is an epoch-millisecond
+#: stamp (2001–2100), never prose. Exactly 12 digits is deliberately NOT
+#: matched: that era ended in 2001, and a uuid4's 12-hex-character segment
+#: is all-decimal often enough (~1 in 1300) to misfire on legitimate ids —
+#: which ``strip_internal_markers`` would then delete.
+_EPOCH_STAMP_RE = re.compile(r"\b[12]\d{12}\b")
+
+#: Known icon/serialization leaks that have appeared in the workspace text.
+_ICON_LEAK_RE = re.compile(r"\bsvg(?=[A-Z][a-z])")
+
+
+def looks_internal(text: str) -> bool:
+    """True when ``text`` contains an internal/test artefact (PART 21)."""
+    if not text:
+        return False
+    return bool(
+        _INTERNAL_MARKER_RE.search(text)
+        or _EPOCH_STAMP_RE.search(text)
+        or _ICON_LEAK_RE.search(text)
+    )
+
+
+def strip_internal_markers(text: Any) -> str:
+    """Remove internal/test artefacts from a teacher-visible string.
+
+    Applied at the persistence boundary so a harness marker, a debug label or an
+    epoch stamp can never be saved onto a lesson and then exported. Ordinary
+    prose is untouched: only unambiguous internal shapes are removed, and any
+    leftover separator whitespace is collapsed. Never raises.
+    """
+    if text is None:
+        return ""
+    if not isinstance(text, str):
+        text = str(text)
+    if not text or not looks_internal(text):
+        return text
+    cleaned = _INTERNAL_MARKER_RE.sub(" ", text)
+    cleaned = _EPOCH_STAMP_RE.sub("", cleaned)
+    cleaned = _ICON_LEAK_RE.sub("", cleaned)
+    cleaned = re.sub(r"\s{2,}", " ", cleaned).strip(" \t-–—,;:")
+    return cleaned
+
 
 #: Fragments too weak to stand alone as a resource after a comma split.
 _FRAGILE_TAIL = (
