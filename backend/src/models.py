@@ -747,6 +747,13 @@ class LessonPlan(BaseModel):
     carry_forward: bool = False
     # Timetable slot, e.g. "1st & 2nd". Teacher-configured; never invented.
     period: str = ""
+    #: INTERNAL: the id of the teaching pattern (Layer 3) this lesson was
+    #: built from during batch generation. Diagnostic only — it is NOT a DB
+    #: column (never persisted) and is never shown in the UI; the batch
+    #: variation benchmark and the quality gate read it to verify that
+    #: pattern selection genuinely varied across the batch. Empty for lessons
+    #: generated without a pattern (single-lesson and all pre-pattern paths).
+    pattern_id: str = ""
     #: Special-period metadata (PART O/P/R): verbatim source label plus
     #: normalized type. Non-empty means this "lesson" is a special period —
     #: it carries no curriculum fields and is never AI-generated.

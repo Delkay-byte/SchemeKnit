@@ -647,189 +647,210 @@ SUBJECT_TO_PROFILE = {
 #: way of doing that step.
 _SUBJECT_MOVES: Dict[str, Dict[str, str]] = {
     "ict": {
-        "demonstration": ("Teacher demonstrates on a real device or a labelled "
-                          "diagram, naming each part as it is used; learners "
-                          "observe the steps and the effect of each action."),
+        "demonstration": ("Teacher demonstrates {focus_short} on a real device "
+                          "or a labelled diagram, naming each part as it is "
+                          "used; learners observe the steps and the effect of "
+                          "each action."),
         "observation": ("Learners observe the actual device or an unplugged "
-                        "model and point out the parts and their functions."),
-        "practice": ("Learners take turns operating the device or follow the "
-                     "same steps on paper/board where devices are shared, "
-                     "naming each step aloud as they do it."),
-        "troubleshoot": ("The teacher sets one common device or task failure, "
-                         "learners diagnose the cause in pairs and correct it, "
-                         "then explain what was wrong and why the fix works."),
-        "investigation": ("Learners try the operation on the device or model, "
+                        "model for {focus_short} and point out the parts and "
+                        "their functions."),
+        "practice": ("Learners take turns carrying out {focus_short} on the "
+                     "device, or follow the same steps on paper/board where "
+                     "devices are shared, naming each step aloud as they do "
+                     "it."),
+        "troubleshoot": ("The teacher sets one common failure with "
+                         "{focus_short}; learners diagnose the cause in pairs "
+                         "and correct it, then explain what was wrong and why "
+                         "the fix works."),
+        "investigation": ("Learners try {focus_short} on the device or model, "
                           "record what happens at each step, and note anything "
                           "unexpected in a simple table."),
-        "classification": ("Learners sort devices, pictures or parts into "
-                           "groups by how they work, and justify each group."),
-        "comparison": ("Learners compare two devices or two ways of doing the "
-                       "same operation and state which is faster or more "
+        "classification": ("Learners sort devices, pictures or parts for "
+                           "{focus_short} into groups by how they work, and "
+                           "justify each group."),
+        "comparison": ("Learners compare two devices or two ways of doing "
+                       "{focus_short} and state which is faster or more "
                        "reliable and why."),
-        "synthesis": ("Learners explain the correct procedure to a partner and "
-                      "name one real place outside school where it is used."),
+        "synthesis": ("Learners explain the correct procedure for "
+                      "{focus_short} to a partner and name one real place "
+                      "outside school where it is used."),
     },
     "mathematics": {
-        "demonstration": ("Teacher works through one fully-reasoned example on "
-                          "the board, thinking aloud so learners see the "
-                          "method and the reason for each step."),
-        "practice": ("Learners solve a parallel problem using counters, number "
-                     "cards or place-value materials first, then record the "
-                     "working in their exercise books."),
-        "investigation": ("Learners explore the pattern or relationship with "
-                          "concrete materials, record the results in a table, "
-                          "and state what they notice."),
-        "error_analysis": ("The teacher presents one common wrong answer and "
-                           "the class analyses why it fails, then corrects it "
-                           "together."),
-        "synthesis": ("Learners state the rule or method in one sentence and "
-                      "apply it to a real Ghanaian market or money context."),
+        "demonstration": ("Teacher works through one fully-reasoned example of "
+                          "{focus_short} on the board, thinking aloud so "
+                          "learners see the method and the reason for each "
+                          "step."),
+        "practice": ("Learners solve a parallel problem on {focus_short} using "
+                     "counters, number cards or place-value materials first, "
+                     "then record the working in their exercise books."),
+        "investigation": ("Learners explore the pattern or relationship in "
+                          "{focus_short} with concrete materials, record the "
+                          "results in a table, and state what they notice."),
+        "error_analysis": ("The teacher presents one common wrong answer to "
+                           "{focus_short} and the class analyses why it fails, "
+                           "then corrects it together."),
+        "synthesis": ("Learners state the rule or method for {focus_short} in "
+                      "one sentence and apply it to a real Ghanaian market or "
+                      "money context."),
     },
     "science": {
-        "demonstration": ("Teacher sets up the activity with locally available "
-                          "materials while learners predict what they will "
-                          "observe; safety points are stated explicitly."),
-        "observation": ("Learners observe the object, event or change and "
-                        "record exactly what they see or measure in a simple "
-                        "labelled table."),
+        "demonstration": ("Teacher sets up the activity on {focus_short} with "
+                          "locally available materials while learners predict "
+                          "what they will observe; safety points are stated "
+                          "explicitly."),
+        "observation": ("Learners observe {focus_short} closely and record "
+                        "exactly what they see or measure in a simple labelled "
+                        "table."),
         "investigation": ("In groups, learners carry out the fair test or "
-                          "activity for the indicator, keep one condition "
+                          "activity for {focus_short}, keep one condition "
                           "constant and record every result honestly."),
-        "experiment": ("Learners change one thing, observe and measure the "
-                       "result, and repeat to check their evidence."),
-        "synthesis": ("Groups compare their evidence with the earlier "
-                      "prediction and agree one conclusion the evidence "
+        "experiment": ("Learners change one thing about {focus_short}, observe "
+                       "and measure the result, and repeat to check their "
+                       "evidence."),
+        "synthesis": ("Groups compare their evidence on {focus_short} with the "
+                      "earlier prediction and agree one conclusion the evidence "
                       "actually supports."),
     },
     "english": {
-        "demonstration": ("Teacher reads the model text aloud, highlighting "
-                          "the target language feature so learners both see "
-                          "and hear it in use."),
-        "vocabulary": ("Quick oral activation of the key words for the "
-                       "feature, with learners saying them in sentences."),
-        "practice": ("Learners practise the feature aloud or in pairs, using "
-                     "sentence frames or substitution, while the teacher "
-                     "gives immediate feedback."),
+        "demonstration": ("Teacher reads the model text aloud, highlighting the "
+                          "target language feature for {focus_short} so "
+                          "learners both see and hear it in use."),
+        "vocabulary": ("Quick oral activation of the key words for "
+                       "{focus_short}, with learners saying them in "
+                       "sentences."),
+        "practice": ("Learners practise {focus_short} aloud or in pairs, using "
+                     "sentence frames or substitution, while the teacher gives "
+                     "immediate feedback."),
         "reading": ("Learners read the text and underline the evidence for "
-                    "the feature, pausing to ask and answer questions."),
+                    "{focus_short}, pausing to ask and answer questions."),
         "synthesis": ("Each learner produces a short piece of speaking or "
-                      "writing using the feature; two or three share aloud."),
+                      "writing using {focus_short}; two or three share "
+                      "aloud."),
         "production": ("Learners produce their own sentences or short text "
-                       "using the target feature and peer-check one example."),
+                       "using {focus_short} and peer-check one example."),
     },
     "rme": {
         "demonstration": ("Teacher tells a short story, proverb or real-life "
-                          "example connected to the value, respecting the "
+                          "example connected to {focus_short}, respecting the "
                           "diverse beliefs in the class."),
-        "discussion": ("Learners discuss the choice in the story in groups, "
-                       "giving reasons respectfully and listening to a "
-                       "different view."),
-        "moral_reasoning": ("Learners consider one dilemma and justify what a "
-                            "good choice would be and why, in their own words."),
-        "synthesis": ("Learners name one way they will apply the value this "
-                      "week and share it with a partner."),
-        "comparison": ("Learners compare how the value is practised in "
+        "discussion": ("Learners discuss the choice about {focus_short} in the "
+                       "story in groups, giving reasons respectfully and "
+                       "listening to a different view."),
+        "moral_reasoning": ("Learners consider one dilemma about "
+                            "{focus_short} and justify what a good choice "
+                            "would be and why, in their own words."),
+        "synthesis": ("Learners name one way they will apply {focus_short} "
+                      "this week and share it with a partner."),
+        "comparison": ("Learners compare how {focus_short} is practised in "
                        "different traditions or families respectfully."),
     },
     "social_studies": {
         "demonstration": ("Teacher presents the case, map, chart or local "
-                          "example and learners identify the key people, "
-                          "places and issues involved."),
-        "discussion": ("Learners investigate the case in groups, giving "
-                       "reasons and listening to other views before reporting."),
-        "investigation": ("In groups, learners examine the local example, "
-                          "record the causes and effects, and prepare a short "
-                          "report for the class."),
-        "synthesis": ("Learners apply the discussion to their own community "
-                      "and state one responsibility each person has."),
-        "comparison": ("Learners compare the local situation with another "
-                       "community or time and explain the main difference."),
+                          "example of {focus_short} and learners identify the "
+                          "key people, places and issues involved."),
+        "discussion": ("Learners investigate the case about {focus_short} in "
+                       "groups, giving reasons and listening to other views "
+                       "before reporting."),
+        "investigation": ("In groups, learners examine the local example of "
+                          "{focus_short}, record the causes and effects, and "
+                          "prepare a short report for the class."),
+        "synthesis": ("Learners apply the discussion of {focus_short} to their "
+                      "own community and state one responsibility each person "
+                      "has."),
+        "comparison": ("Learners compare {focus_short} in their community with "
+                       "another community or time and explain the main "
+                       "difference."),
     },
     "career_technology": {
         "demonstration": ("Teacher identifies the materials and demonstrates "
-                          "the process step by step, stating the safety rule "
+                          "{focus_short} step by step, stating the safety rule "
                           "for every tool used."),
-        "practice": ("Learners carry out the practical task in small groups "
-                     "using locally available materials, in the correct order "
-                     "and safely."),
-        "production": ("Learners produce the item following the demonstrated "
-                       "procedure and keep their workspace tidy and safe."),
-        "quality_check": ("Learners inspect their own finished product against "
-                          "the demonstrated steps and the quality criteria, "
-                          "then state one improvement."),
-        "synthesis": ("Learners explain how the skill is used in real work and "
-                      "evaluate the quality of their product honestly."),
+        "practice": ("Learners carry out {focus_short} in small groups using "
+                     "locally available materials, in the correct order and "
+                     "safely."),
+        "production": ("Learners produce the item for {focus_short} following "
+                       "the demonstrated procedure and keep their workspace "
+                       "tidy and safe."),
+        "quality_check": ("Learners inspect their own finished work on "
+                          "{focus_short} against the demonstrated steps and "
+                          "the quality criteria, then state one improvement."),
+        "synthesis": ("Learners explain how {focus_short} is used in real work "
+                      "and evaluate the quality of their product honestly."),
     },
     "creative_arts": {
-        "demonstration": ("Teacher demonstrates the technique with locally "
-                          "available materials, naming each step and the "
-                          "tools used."),
-        "experimentation": ("Learners try the technique with sample materials, "
-                            "exploring what happens before making the final "
-                            "work."),
-        "practice": ("Learners practise the technique on scrap material until "
-                     "they can do it consistently."),
-        "creation": ("Learners create their own work using the technique and "
-                     "locally available materials; the teacher supports "
-                     "individuals."),
-        "critique": ("Learners display or perform their work and give kind, "
-                     "specific feedback against the shared criteria."),
-        "synthesis": ("Learners present their work and name one thing they "
-                      "would improve next time."),
+        "demonstration": ("Teacher demonstrates the technique for "
+                          "{focus_short} with locally available materials, "
+                          "naming each step and the tools used."),
+        "experimentation": ("Learners try the technique for {focus_short} with "
+                            "sample materials, exploring what happens before "
+                            "making the final work."),
+        "practice": ("Learners practise the technique for {focus_short} on "
+                     "scrap material until they can do it consistently."),
+        "creation": ("Learners create their own work on {focus_short} using "
+                     "the technique and locally available materials; the "
+                     "teacher supports individuals."),
+        "critique": ("Learners display or perform their work on {focus_short} "
+                     "and give kind, specific feedback against the shared "
+                     "criteria."),
+        "synthesis": ("Learners present their work on {focus_short} and name "
+                      "one thing they would improve next time."),
     },
     "phe": {
-        "warm_up": ("Teacher leads a short warm-up related to the activity and "
+        "warm_up": ("Teacher leads a short warm-up related to {focus_short} and "
                     "checks that the space is safe for every learner."),
-        "demonstration": ("Teacher demonstrates the movement or technique "
-                          "slowly, emphasising the safe body position and the "
-                          "correct execution."),
-        "practice": ("Learners practise the movement in pairs or small groups "
+        "demonstration": ("Teacher demonstrates the movement or technique for "
+                          "{focus_short} slowly, emphasising the safe body "
+                          "position and the correct execution."),
+        "practice": ("Learners practise {focus_short} in pairs or small groups "
                      "with the teacher giving feedback on technique and "
                      "safety."),
-        "performance": ("Learners perform the movement or routine alone or in "
-                        "a small group, applying the technique in a simple "
-                        "game or sequence."),
-        "observation": ("Learners observe a partner performing and give one "
-                        "specific point of feedback on the technique."),
+        "performance": ("Learners perform {focus_short} alone or in a small "
+                        "group, applying the technique in a simple game or "
+                        "sequence."),
+        "observation": ("Learners observe a partner performing {focus_short} "
+                        "and give one specific point of feedback on the "
+                        "technique."),
         "synthesis": ("Class cools down, reviews the key technique and safety "
-                      "points, and discusses how it helps health and fitness."),
+                      "points for {focus_short}, and discusses how it helps "
+                      "health and fitness."),
     },
     "early_childhood": {
         "demonstration": ("Teacher models the activity with real objects, "
                           "using simple language and repetition, and invites "
-                          "children to join in."),
+                          "children to join in with {focus_short}."),
         "song": ("Teacher leads a song, rhyme or clapping game connected to "
-                 "the activity and the children join in."),
-        "practice": ("Children practise through play, sorting, matching or "
-                     "games in small groups while the teacher supports and "
-                     "observes."),
+                 "{focus_short} and the children join in."),
+        "practice": ("Children practise {focus_short} through play, sorting, "
+                     "matching or games in small groups while the teacher "
+                     "supports and observes."),
         "observation": ("Children look at, touch and talk about the real "
-                        "objects while the teacher names what they do."),
-        "synthesis": ("Children gather, sing or clap about the activity, and "
+                        "objects for {focus_short} while the teacher names "
+                        "what they do."),
+        "synthesis": ("Children gather, sing or clap about {focus_short}, and "
                       "a few show what they did; the teacher praises specific "
                       "efforts."),
     },
     "nursery": {
         "demonstration": ("Teacher models the activity slowly with real "
                           "objects while the children watch, listen and "
-                          "repeat after the teacher."),
+                          "repeat after the teacher for {focus_short}."),
         "song": ("Teacher gathers the children with a familiar song or rhyme "
-                 "linked to the activity."),
-        "practice": ("Children try the activity themselves, one small step at "
+                 "linked to {focus_short}."),
+        "practice": ("Children try {focus_short} themselves, one small step at "
                      "a time, in small groups while the teacher helps each "
                      "child by name."),
-        "play": ("Children play at the activity — sorting, matching, singing "
+        "play": ("Children play at {focus_short} — sorting, matching, singing "
                  "or colouring — while the teacher watches and encourages."),
-        "synthesis": ("Children return to the circle, sing or clap about the "
-                      "activity, a few children show what they did, and the "
-                      "teacher praises each child."),
+        "synthesis": ("Children return to the circle, sing or clap about "
+                      "{focus_short}, a few children show what they did, and "
+                      "the teacher praises each child."),
     },
     "generic": {
-        "demonstration": ("Teacher introduces the concept clearly with "
+        "demonstration": ("Teacher introduces {focus_short} clearly with "
                           "examples and the board."),
-        "practice": ("Learners practise with the teacher's support in pairs "
-                     "or small groups."),
-        "synthesis": ("Learners apply the learning on their own while the "
+        "practice": ("Learners practise {focus_short} with the teacher's "
+                     "support in pairs or small groups."),
+        "synthesis": ("Learners apply {focus_short} on their own while the "
                       "teacher gives feedback."),
     },
 }

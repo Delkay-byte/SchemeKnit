@@ -131,7 +131,7 @@ def normalized_reflection(text: str) -> str:
 
 
 def normalized_resource_sequence(resources: Sequence[Any]) -> str:
-    return " | ".join(sorted(_norm_text(r) for r in (resources or [])))
+    return " | ".join(sorted({_norm_text(r) for r in (resources or []) if _norm_text(r)}))
 
 
 def assignment_type(text: str) -> str:
@@ -329,6 +329,20 @@ class BatchHistory:
 
     # ── Recording ───────────────────────────────────────────────────────
 
+    _recent_selections: str = field(default="", repr=False, compare=False)
+
+    def note_selection(self, pattern_id: str) -> None:
+        """Record a selection the SELECTOR made (before the lesson exists).
+
+        Pattern selection needs to know what the previous lessons chose; the
+        fingerprint only exists after the lesson is built. ``note_selection``
+        feeds the recently-used pattern ids without waiting for the builder,
+        and :meth:`record` later adds the full fingerprint.
+        """
+        if pattern_id:
+            self._recent_selections = (
+                self._recent_selections + " " + pattern_id).strip()
+
     def record(self, fingerprint: LessonFingerprint) -> None:
         if fingerprint and not fingerprint.is_empty:
             self.fingerprints.append(fingerprint)
@@ -344,8 +358,17 @@ class BatchHistory:
     # ── Queries for Layer 3 selection ────────────────────────────────────
 
     def recent_pattern_ids(self, window: int = 6) -> Tuple[str, ...]:
-        """Pattern ids of the most recent lessons (oldest→newest)."""
-        out = [fp.pattern_id for fp in self.fingerprints if fp.pattern_id]
+        """Pattern ids of the most recent lessons (oldest→newest).
+
+        Combines completed fingerprints with selections that have not yet been
+        fingerprinted (the current lesson is mid-flight), keeping the most
+        recent ``window`` entries.
+        """
+        out: List[str] = [fp.pattern_id for fp in self.fingerprints
+                          if fp.pattern_id]
+        for pid in self._recent_selections.split():
+            if pid and pid not in out:
+                out.append(pid)
         return tuple(out[-window:])
 
     def recent_starter_modes(self, window: int = 4) -> Tuple[str, ...]:
@@ -440,22 +463,42 @@ class BatchHistory:
         for shape, idxs in by_shape.items():
             if len(idxs) < 2:
                 continue
-            # Rule 6: the same pattern is legitimate when the indicators are
-            # genuinely the same kind of work. Flag only when the INDICATORS
-            # differ (unrelated lessons) or the streak is long.
-            indicators = {fps[i].indicator for i in idxs if fps[i].indicator}
-            justified = len(indicators) <= 1 and len(idxs) <= 3
-            if not justified:
+            # Rule 6 / rule 1: reusing a PATTERN is legitimate when the
+            # indicators genuinely call for the same teaching method — but the
+            # RENDERED phase sequence must still differ (each lesson renders
+            # through its own indicator focus). A repeat is a defect only when
+            # the phases are actually identical, or one teaching shape is
+            # dominating the batch (a stuck engine), or a long unbroken run of
+            # the same shape.
+            mains = {fps[i].main_sequence for i in idxs if fps[i].main_sequence}
+            # Fewer distinct main texts than lessons ⇒ some pair is a clone.
+            cloned = len(mains) < len(idxs)
+            dominant = len(idxs) > max(3, n // 2 - 1)
+            streak = self._shape_streak(shape) > 3
+            if cloned or dominant or streak:
                 report["duplicated_phase_sequences"].append({
                     "indices": idxs,
                     "count": len(idxs),
                     "pattern": shape[0],
-                    "indicators_match": len(indicators) <= 1,
+                    "cloned": cloned,
+                    "dominant": dominant,
+                    "streak": streak,
                 })
 
         # Filler density across the whole batch.
         report["filler_density"] = self.filler_density()
         return report
+
+    def _shape_streak(self, shape: Tuple[str, ...]) -> int:
+        """Longest unbroken run of one teaching shape in the batch."""
+        best = run = 0
+        for fp in self.fingerprints:
+            if fp.pattern_id and fp.structural_signature() == shape:
+                run += 1
+                best = max(best, run)
+            else:
+                run = 0
+        return best
 
     def filler_density(self) -> Dict[str, int]:
         """Count of generic filler phrases across the recorded lessons."""

@@ -1029,12 +1029,30 @@ def _render_pattern_step(step, fmt: Dict[str, str], profile, act_key):
     if not isinstance(step, PatternStep):
         return None
 
-    # Subject moves first (Layer 2): the subject's own way of doing the step.
+    weight = _STEP_ROLE_WEIGHTS.get(step.role, 0.25)
+
+    # 1. INDICATOR-FOLLOWING steps: the indicator's OWN activity bank is the
+    #    canonical classroom structure for this curriculum work — a
+    #    Mathematics problem_solving indicator keeps its worked example +
+    #    practice, an investigation keeps prediction → investigate → explain.
+    #    The pattern sequences AROUND the core practice; it never rewrites it.
+    if step.use_indicator_activity and act_key:
+        bank = _PHASE_BANK.get(act_key) or []
+        if bank:
+            idx = 0 if step.role == "input" else (
+                1 if step.role == "guided" else min(len(bank) - 1, 2))
+            tmpl = bank[min(idx, len(bank) - 1)][1]
+            desc = _safe_format(tmpl, **fmt)
+            if desc.strip():
+                return (step.name, desc, weight)
+
+    # 2. Subject moves (Layer 2): the subject's own way of doing the step's
+    #    activity, so one pattern reads differently across subjects.
     move = subject_move(profile.key, step.activity_key)
     if move is None:
         move = subject_move(profile.key, step.role)
     if move is None and act_key and act_key != step.activity_key:
-        move = subject_move(profile.key, act_key) or subject_move("generic", step.role)
+        move = subject_move(profile.key, act_key)
     if move is None:
         move = subject_move("generic", step.role) or subject_move(
             "generic", step.activity_key)
@@ -1042,7 +1060,7 @@ def _render_pattern_step(step, fmt: Dict[str, str], profile, act_key):
     if move:
         desc = _safe_format(move, **fmt)
     else:
-        # Fall back to the shared activity bank for this activity key.
+        # 3. Shared activity bank for the step's own activity key.
         bank = _PHASE_BANK.get(step.activity_key) or _PHASE_BANK.get(
             act_key or "") or []
         if bank:
@@ -1058,7 +1076,6 @@ def _render_pattern_step(step, fmt: Dict[str, str], profile, act_key):
         desc = _safe_format(
             "Carry out {focus_short} following the demonstrated steps.", **fmt)
 
-    weight = _STEP_ROLE_WEIGHTS.get(step.role, 0.25)
     return (step.name, desc, weight)
 
 
@@ -1918,6 +1935,10 @@ def build_lesson(
         scheme_of_work_id=scheme_id,
         term_config_id=config.id,
         week_number=alloc.week_number,
+        # INTERNAL diagnostic only (never persisted, never shown): the teaching
+        # pattern this lesson was sequenced from, so the batch benchmark can
+        # verify selection genuinely varied. Empty when no pattern was used.
+        pattern_id=(pattern.id if pattern is not None else ""),
         week_ending=alloc.week_ending,
         week_ending_derived=bool(getattr(alloc, "week_ending_derived", False)),
         teaching_week=alloc.teaching_week or alloc.week_number,
