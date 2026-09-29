@@ -196,6 +196,7 @@ export default function LessonDetailPage() {
 
   const handleRegenerate = async (
     section: 'introduction' | 'assessment' | 'conclusion' | 'main_activities',
+    rewriteMode: 'suggest_another_version' | 'make_more_practical' = 'suggest_another_version',
   ) => {
     if (!lesson) return
     try {
@@ -215,7 +216,7 @@ export default function LessonDetailPage() {
         const saved = window.localStorage.getItem('schemeknit.ai_mode')
         if (saved && saved !== 'OFF') mode = saved
       } catch { /* storage unavailable */ }
-      const res = await api.regenerateSection(lesson.id, section, mode, '', requestId)
+      const res = await api.regenerateSection(lesson.id, section, mode, '', requestId, rewriteMode)
       if (section === 'main_activities') {
         // PART F/G: render the backend-normalized structured activities, then
         // let the teacher review — saving is an explicit, separate action.
@@ -350,14 +351,21 @@ export default function LessonDetailPage() {
 
   const objectives = lesson.learning_objectives || []
 
-  const suggestButton = (section: 'introduction' | 'assessment' | 'conclusion') => (
+  const suggestButton = (
+    section: 'introduction' | 'assessment' | 'conclusion',
+    practical = false,
+  ) => (
     <Button
       size="sm"
       variant="outline"
       disabled={regenBusy !== null}
-      onClick={() => handleRegenerate(section)}
+      onClick={() => handleRegenerate(section, practical ? 'make_more_practical' : 'suggest_another_version')}
     >
-      {regenBusy === section ? 'Generating...' : `Suggest ${section}`}
+      {regenBusy === section
+        ? 'Generating...'
+        : practical
+          ? 'Make this more practical'
+          : 'Suggest another version'}
     </Button>
   )
 
@@ -443,6 +451,16 @@ export default function LessonDetailPage() {
 
         {/* The lesson document — phased hierarchy, editable in place. */}
         <SurfaceCard data-lesson-plan className="px-5 py-5 sm:px-6">
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center rounded-full bg-[#04769B]/10 px-2.5 py-0.5 text-xs font-semibold text-[#04769B]">
+              Generated lesson
+            </span>
+            {!lesson.provenance?.ai_provider && (
+              <span className="text-xs text-muted-foreground">
+                Built from your scheme and curriculum evidence.
+              </span>
+            )}
+          </div>
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
               <h2 className="text-base font-semibold text-[#102A43]">Lesson plan</h2>
@@ -501,7 +519,10 @@ export default function LessonDetailPage() {
           <section className="mt-5 border-t border-slate-100 pt-5" aria-label="Phase 1 Starter">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-sm font-semibold text-[#102A43]">Phase 1 · Starter</h3>
-              {suggestButton('introduction')}
+              <div className="flex items-center gap-1.5">
+                {suggestButton('introduction', true)}
+                {suggestButton('introduction')}
+              </div>
             </div>
             <TextArea
               id="lesson-introduction"
@@ -519,15 +540,26 @@ export default function LessonDetailPage() {
           >
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-sm font-semibold text-[#102A43]">Phase 2 · Main Learning</h3>
-              <Button
-                size="sm"
-                variant="outline"
-                type="button"
-                disabled={regenBusy !== null}
-                onClick={() => handleRegenerate('main_activities')}
-              >
-                {regenBusy === 'main_activities' ? 'Generating...' : 'Suggest Main Learning'}
-              </Button>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  type="button"
+                  disabled={regenBusy !== null}
+                  onClick={() => handleRegenerate('main_activities', 'make_more_practical')}
+                >
+                  {regenBusy === 'main_activities' ? 'Generating...' : 'Make this more practical'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  type="button"
+                  disabled={regenBusy !== null}
+                  onClick={() => handleRegenerate('main_activities')}
+                >
+                  {regenBusy === 'main_activities' ? 'Generating...' : 'Suggest another version'}
+                </Button>
+              </div>
             </div>
 
             {mainActivities.length === 0 && (
@@ -621,7 +653,10 @@ export default function LessonDetailPage() {
           <section className="mt-5 border-t border-slate-100 pt-5" aria-label="Assessment">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-sm font-semibold text-[#102A43]">Assessment</h3>
-              {suggestButton('assessment')}
+              <div className="flex items-center gap-1.5">
+                {suggestButton('assessment', true)}
+                {suggestButton('assessment')}
+              </div>
             </div>
             <TextArea
               id="lesson-assessment"
@@ -636,7 +671,10 @@ export default function LessonDetailPage() {
           <section className="mt-5 border-t border-slate-100 pt-5" aria-label="Phase 3 Plenary">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-sm font-semibold text-[#102A43]">Phase 3 · Plenary</h3>
-              {suggestButton('conclusion')}
+              <div className="flex items-center gap-1.5">
+                {suggestButton('conclusion', true)}
+                {suggestButton('conclusion')}
+              </div>
             </div>
             <TextArea
               id="lesson-conclusion"

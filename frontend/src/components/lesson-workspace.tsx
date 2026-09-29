@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { CheckCircle, Loader2, Plus, RefreshCw, Save, Sparkles, Trash2 } from 'lucide-react'
+import { CheckCircle, Loader2, Plus, RefreshCw, Save, Sparkles, Trash2, Wrench } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { SurfaceCard } from '@/components/ui/surface-card'
@@ -315,11 +315,16 @@ export function LessonWorkspace({
 
   // Build with me (Pattern 7): a per-section AI suggestion that NEVER blanks
   // existing content on failure (teacher-safe copy via aiFailure).
+  //
+  // AI is OFF by default and only ever runs here — one section at a time, on
+  // the teacher's explicit request. The two affordances map to the backend's
+  // rewrite modes; internal pattern names/scores/corpus ids never surface.
   const suggest = async (
     section: 'introduction' | 'main_activities' | 'assessment' | 'conclusion',
+    rewriteMode: 'suggest_another_version' | 'make_more_practical' = 'suggest_another_version',
   ) => {
     if (!active || !draft) return
-    setSuggesting(section)
+    setSuggesting(`${section}·${rewriteMode}`)
     setAiNotice(null)
     try {
       let mode = 'BASIC'
@@ -328,7 +333,7 @@ export function LessonWorkspace({
         if (savedMode && savedMode !== 'OFF') mode = savedMode
       } catch { /* storage unavailable */ }
       const requestId = `${active.id}:${section}:${Date.now()}`
-      const res = await api.regenerateSection(active.id, section, mode, '', requestId)
+      const res = await api.regenerateSection(active.id, section, mode, '', requestId, rewriteMode)
       if (section === 'main_activities') {
         const next = normalizeActivities(res.new_activities)
         if (next.length === 0) {
@@ -508,6 +513,20 @@ export function LessonWorkspace({
       ) : (
         <SurfaceCard data-lesson-content className="px-5 py-5 sm:px-6">
           {/* SECTION 2 — THE LESSON (shown immediately). */}
+          {/* Product-cop: the teacher is told this is a generated lesson, built
+              from their own scheme plus the curriculum evidence layer. AI is
+              never mentioned as the author and no internal pattern name, score
+              or corpus id is ever shown. */}
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center rounded-full bg-[#04769B]/10 px-2.5 py-0.5 text-xs font-semibold text-[#04769B]">
+              Generated lesson
+            </span>
+            {!active.provenance?.ai_provider && (
+              <span className="text-xs text-muted-foreground">
+                Built from your scheme and curriculum evidence.
+              </span>
+            )}
+          </div>
           <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Lesson topic
           </label>
@@ -542,8 +561,10 @@ export function LessonWorkspace({
           {stepVisible('starter') && (
             <WorkspaceSection
               title="Phase 1 · Starter"
+              sectionKey="introduction"
+              busyKey={suggesting}
               onSuggest={() => suggest('introduction')}
-              suggesting={suggesting === 'introduction'}
+              onSuggestPractical={() => suggest('introduction', 'make_more_practical')}
             >
               <TextArea
                 value={draft.introduction}
@@ -557,8 +578,10 @@ export function LessonWorkspace({
           {stepVisible('main') && (
             <WorkspaceSection
               title="Phase 2 · Main Learning"
+              sectionKey="main_activities"
+              busyKey={suggesting}
               onSuggest={() => suggest('main_activities')}
-              suggesting={suggesting === 'main_activities'}
+              onSuggestPractical={() => suggest('main_activities', 'make_more_practical')}
             >
               {draft.mainActivities.length > 0 ? (
                 <div className="space-y-2">
@@ -613,8 +636,10 @@ export function LessonWorkspace({
           {stepVisible('assessment') && (
             <WorkspaceSection
               title="Assessment"
+              sectionKey="assessment"
+              busyKey={suggesting}
               onSuggest={() => suggest('assessment')}
-              suggesting={suggesting === 'assessment'}
+              onSuggestPractical={() => suggest('assessment', 'make_more_practical')}
             >
               <TextArea
                 value={draft.assessment}
@@ -628,8 +653,10 @@ export function LessonWorkspace({
           {stepVisible('reflection') && (
             <WorkspaceSection
               title="Phase 3 · Reflection"
+              sectionKey="conclusion"
+              busyKey={suggesting}
               onSuggest={() => suggest('conclusion')}
-              suggesting={suggesting === 'conclusion'}
+              onSuggestPractical={() => suggest('conclusion', 'make_more_practical')}
             >
               <TextArea
                 value={draft.conclusion}
@@ -991,33 +1018,59 @@ function ContextItem({ label, value }: { label: string; value: string }) {
 
 function WorkspaceSection({
   title,
+  sectionKey,
+  busyKey,
   onSuggest,
-  suggesting,
+  onSuggestPractical,
   children,
 }: {
   title: string
+  /** Internal key used to match the spinning affordance. */
+  sectionKey?: string
+  /** `${section}·${rewriteMode}` for the suggestion currently in flight. */
+  busyKey?: string | null
   onSuggest?: () => void
-  suggesting?: boolean
+  onSuggestPractical?: () => void
   children: React.ReactNode
 }) {
+  const suggestSpinning = busyKey === `${sectionKey}·suggest_another_version`
+  const practicalSpinning = busyKey === `${sectionKey}·make_more_practical`
+  const anySpinning = Boolean(sectionKey && busyKey && busyKey.startsWith(`${sectionKey}·`))
   return (
     <section className="mt-5 border-t border-slate-100 pt-4">
-      <div className="mb-2 flex items-center justify-between gap-2">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">{title}</h3>
         {onSuggest && (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 px-2 text-xs"
-            onClick={onSuggest}
-            disabled={suggesting}
-          >
-            {suggesting ? (
-              <><Loader2 className="mr-1 h-3 w-3 animate-spin" aria-hidden="true" /> Suggesting…</>
-            ) : (
-              <><Sparkles className="mr-1 h-3 w-3" aria-hidden="true" /> Suggest</>
+          <div className="flex items-center gap-1.5">
+            {onSuggestPractical && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs"
+                onClick={onSuggestPractical}
+                disabled={anySpinning}
+              >
+                {practicalSpinning ? (
+                  <><Loader2 className="mr-1 h-3 w-3 animate-spin" aria-hidden="true" /> Reworking…</>
+                ) : (
+                  <><Wrench className="mr-1 h-3 w-3" aria-hidden="true" /> Make this more practical</>
+                )}
+              </Button>
             )}
-          </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-xs"
+              onClick={onSuggest}
+              disabled={anySpinning}
+            >
+              {suggestSpinning ? (
+                <><Loader2 className="mr-1 h-3 w-3 animate-spin" aria-hidden="true" /> Suggesting…</>
+              ) : (
+                <><Sparkles className="mr-1 h-3 w-3" aria-hidden="true" /> Suggest another version</>
+              )}
+            </Button>
+          </div>
         )}
       </div>
       {children}
