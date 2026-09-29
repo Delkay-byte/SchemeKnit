@@ -47,6 +47,50 @@ def is_special_period_text(text) -> bool:
     return any(kw in t for kw in SPECIAL_WEEK_KEYWORDS)
 
 
+_SPECIAL_DATE_RE = re.compile(
+    r"(\d{1,2}[-/\.]\d{1,2}[-/\.]\d{2,4})"
+)
+
+
+def special_period_date_range(label: str) -> Optional[Tuple[date, date]]:
+    """Extract the (start, end) date range a special-period label declares.
+
+    A mixed week prints its period as ``"MID-TERM (05-11-2026 to 06-11-2026)"``.
+    Teaching begins AFTER that period ends, so the allocation must know the
+    range to keep those days out of the teaching dates. Returns None when the
+    label carries no dates (e.g. a bare ``"REVISION"``) — nothing is excluded.
+    """
+    if not label:
+        return None
+    dates = []
+    for token in _SPECIAL_DATE_RE.findall(label):
+        parsed = _parse_dayfirst_date(token)
+        if parsed:
+            dates.append(parsed)
+    if len(dates) < 2:
+        return None
+    return min(dates), max(dates)
+
+
+def _parse_dayfirst_date(token: str) -> Optional[date]:
+    """Parse a day-first numeric date (DD-MM-YYYY). Returns None if invalid."""
+    parts = re.split(r"[-/\.]", token)
+    if len(parts) != 3:
+        return None
+    try:
+        d, m, y = (int(p) for p in parts)
+    except ValueError:
+        return None
+    if y < 100:
+        y += 2000
+    if not (1 <= d <= 31 and 1 <= m <= 12 and 2020 <= y <= 2030):
+        return None
+    try:
+        return date(y, m, d)
+    except ValueError:
+        return None
+
+
 def is_special_period_label(text) -> bool:
     """STRICT label test (Defect D2): the whole cell is period vocabulary.
 
@@ -346,6 +390,19 @@ class AllocationEngine:
                 d.date for d in calendar.days
                 if d.is_teaching_day and d.week_number == week.week_number
             )
+
+            # A MIXED week holds a special period AND teaching. Teaching begins
+            # AFTER the period ends, so the period's own days are removed from
+            # the teaching dates — the period end date is never the teaching
+            # start. A label with no dates (bare "REVISION") excludes nothing.
+            period_range = special_period_date_range(
+                getattr(week, "special_period_label", "") or ""
+            )
+            if period_range:
+                p_start, p_end = period_range
+                available_dates = [
+                    d for d in available_dates if not (p_start <= d <= p_end)
+                ]
 
             # Real schemes store multiple indicators concatenated in one string.
             week_indicators = self._split_indicators(week.indicators)

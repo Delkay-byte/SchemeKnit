@@ -195,6 +195,9 @@ async def preview_allocation(
 
     config.school_name = _resolve_school_name(db, user)
     config.teacher_name = _resolve_teacher_name(db, user)
+    # PART 3: record a teacher-confirmed class at PREVIEW time too, so the
+    # preview the teacher approves is generated from the same class.
+    _persist_confirmed_class(db, user, scheme_db, config)
 
     scheme = data_service.scheme_to_model(scheme_db)
     resolve_term_window(config, scheme.weeks)
@@ -252,9 +255,32 @@ async def preview_allocation(
     # failures on the allocation screen — the honest state is "not provided in
     # source". The indicatorless allocation path already handles these schemes.
     provides_indicators = scheme_provides_indicators(scheme_db.weeks)
+    # The review row's ``lesson_sequence`` is the number the BUILT lesson will
+    # carry — the ordinal among the real lessons — not the allocation index.
+    # The allocation engine numbers allocations from 0 while the built lessons
+    # are numbered from 1, so keying the teacher's pre-generation drafts by the
+    # raw allocation index applied every row's WAPEF/keyword/reference choices
+    # to the WRONG lesson (row 2's selections landed on lesson 1) and dropped
+    # the first row's entirely. Special-period rows are not lessons and keep -1.
+    _ordered_allocations = sorted(coverage.allocations,
+                                 key=lambda x: x.lesson_sequence)
+    _lesson_number: Dict[int, int] = {}
+    _lesson_counter = 0
+    for _a in _ordered_allocations:
+        if getattr(_a, "is_special_period", False):
+            _lesson_number[id(_a)] = -1
+        else:
+            _lesson_counter += 1
+            _lesson_number[id(_a)] = _lesson_counter
+
+    def _draft_for(alloc) -> dict:
+        """The teacher's saved pre-generation draft for THIS lesson."""
+        draft = drafts.get(str(_lesson_number[id(alloc)]))
+        return draft if isinstance(draft, dict) else {}
+
     report["lesson_review"] = [
         {
-            "lesson_sequence": a.lesson_sequence,
+            "lesson_sequence": _lesson_number[id(a)],
             "indicator_code": a.indicator_code,
             "indicator_description": a.indicator_description,
             "content_standard_code": a.content_standard_code,
@@ -273,7 +299,7 @@ async def preview_allocation(
             "special_period_type": getattr(a, "special_period_type", ""),
             # Teacher-editable timetable slot for THIS lesson (Pattern 1).
             # Starts from any saved draft, else blank — never invented.
-            "period": (drafts.get(str(a.lesson_sequence)) or {}).get("period", ""),
+            "period": _draft_for(a).get("period", ""),
             # Allocation review state: the engine flags an allocation whose
             # placement could not be confirmed (e.g. no teaching date). Special
             # periods are a real curriculum state, not a review failure.
@@ -306,15 +332,15 @@ async def preview_allocation(
             },
             # Draft fields normalize at the API boundary too: a serialized
             # string draft must never reach the UI as split characters.
-            "keywords": normalize_text_items((drafts.get(str(a.lesson_sequence)) or {}).get("keywords")),
-            "other_tlrs": normalize_text_items((drafts.get(str(a.lesson_sequence)) or {}).get("other_tlrs")),
-            "core_competencies": normalize_text_items((drafts.get(str(a.lesson_sequence)) or {}).get("core_competencies")),
-            "structured_references": normalize_structured_references((drafts.get(str(a.lesson_sequence)) or {}).get("structured_references")),
-            "wapef_deep_hope": (drafts.get(str(a.lesson_sequence)) or {}).get("wapef_deep_hope", ""),
-            "wapef_storyline": (drafts.get(str(a.lesson_sequence)) or {}).get("wapef_storyline", ""),
-            "wapef_through_lines": normalize_text_items((drafts.get(str(a.lesson_sequence)) or {}).get("wapef_through_lines")),
-            "wapef_gods_story": (drafts.get(str(a.lesson_sequence)) or {}).get("wapef_gods_story", ""),
-            "remarks": (drafts.get(str(a.lesson_sequence)) or {}).get("remarks", ""),
+            "keywords": normalize_text_items(_draft_for(a).get("keywords")),
+            "other_tlrs": normalize_text_items(_draft_for(a).get("other_tlrs")),
+            "core_competencies": normalize_text_items(_draft_for(a).get("core_competencies")),
+            "structured_references": normalize_structured_references(_draft_for(a).get("structured_references")),
+            "wapef_deep_hope": _draft_for(a).get("wapef_deep_hope", ""),
+            "wapef_storyline": _draft_for(a).get("wapef_storyline", ""),
+            "wapef_through_lines": normalize_text_items(_draft_for(a).get("wapef_through_lines")),
+            "wapef_gods_story": _draft_for(a).get("wapef_gods_story", ""),
+            "remarks": _draft_for(a).get("remarks", ""),
         }
         # Special-period rows stay in the list so the review UI can show the
         # period banner; normal lessons keep their curriculum order.
@@ -449,15 +475,34 @@ async def generate_lesson_plans(
                 "detected structure or upload a clearer copy."
             ),
         )
-    if (scheme_db.subject in ("Unknown", "", None)
-            or scheme_db.class_level in ("Unknown", "", None)):
+    # PART 3: a teacher-confirmed value satisfies a detection gap. When the
+    # scheme never stated the class, the ONLY acceptable source is the value the
+    # teacher explicitly chose on this request (validated against the canonical
+    # class-level catalogue). A client-supplied value can never OVERRIDE a class
+    # the scheme actually states, and "Unknown" is never accepted as a class.
+    _UNDETERMINED = ("Unknown", "", None)
+    if scheme_db.subject in _UNDETERMINED:
         raise HTTPException(
             status_code=409,
             detail=(
-                "The subject or class could not be determined from this scheme "
-                "and needs confirmation before lesson plans can be generated."
+                "The subject could not be determined from this scheme and needs "
+                "confirmation before lesson plans can be generated."
             ),
         )
+    if scheme_db.class_level in _UNDETERMINED:
+        _confirmed = (getattr(config, "class_level", "") or "").strip()
+        if not _confirmed or _confirmed == "Unknown" or not _is_known_class_level(_confirmed):
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "The class could not be determined from this scheme. "
+                    "Select the class this scheme is for, then try again."
+                ),
+            )
+        scheme_db.class_level = _confirmed
+        log_event("class_level_confirmed", user_id=user.id, scheme_id=scheme_id,
+                  class_level=_confirmed)
+        db.commit()
 
     # Server-authoritative identity (PART 14/15/32). School and teacher names are
     # derived from the authenticated user's real school relationship and profile —
@@ -1412,19 +1457,60 @@ async def get_lessons_for_scheme(
     }
 
 
+def _persist_confirmed_class(db: Session, user: User, scheme_db, config) -> None:
+    """Store a teacher-confirmed class on a scheme that never stated one.
+
+    PART 3: the document is allowed not to name its class, but the lesson must
+    never carry "Unknown". A class the SCHEME states is never overwritten; only a
+    genuine detection gap is filled from the teacher's explicit, catalogue-valid
+    choice, and it is persisted so the preview, the generation and every export
+    agree on one class.
+    """
+    if scheme_db.class_level not in ("Unknown", "", None):
+        return
+    confirmed = (getattr(config, "class_level", "") or "").strip()
+    if not confirmed or confirmed == "Unknown" or not _is_known_class_level(confirmed):
+        return
+    scheme_db.class_level = confirmed
+    db.commit()
+    log_event("class_level_confirmed", user_id=user.id,
+              scheme_id=scheme_db.id, class_level=confirmed)
+
+
+def _is_known_class_level(value: str) -> bool:
+    """True when ``value`` is a class level from the canonical catalogue.
+
+    The teacher-confirmed class is validated against the SAME enum the
+    ``/api/settings/class-levels`` endpoint serves, so the confirm control and
+    this check can never disagree. Free text is rejected.
+    """
+    try:
+        from ..models import ClassLevel
+    except Exception:
+        return False
+    return any(c.value == value for c in ClassLevel)
+
+
 def _resolve_school_name(db: Session, user: User) -> Optional[str]:
-    """The authenticated user's real school name.
+    """The authenticated user's real school / institution name.
 
     Identity is server-authoritative (PART 15): the teacher's school membership
     is looked up from the authenticated user, never accepted from the client.
-    A teacher with no school relationship gets None, which renders blank rather
-    than a generic placeholder.
+
+    A teacher with no school relationship is an INDEPENDENT teacher (PART 7).
+    They state the institution they teach at once, on their own profile, and
+    that value is used here — so every lesson carries the school on its header
+    without retyping it, and without a lesson ever accepting a client-supplied
+    school. Blank when neither source states one: a lesson with no school
+    renders an empty header cell rather than a fake placeholder.
     """
     from ..database import SchoolDB
-    if not getattr(user, "school_id", None):
-        return None
-    school = db.query(SchoolDB).filter(SchoolDB.id == user.school_id).first()
-    return school.name if school else None
+    if getattr(user, "school_id", None):
+        school = db.query(SchoolDB).filter(SchoolDB.id == user.school_id).first()
+        if school and school.name:
+            return school.name
+    own = (getattr(user, "school_name", "") or "").strip()
+    return own or None
 
 
 def _resolve_teacher_name(db: Session, user: User) -> Optional[str]:
@@ -1453,7 +1539,13 @@ def _apply_lesson_review_draft(lp, drafts: dict) -> None:
     """
     if not drafts:
         return
-    draft = drafts.get(str(getattr(lp, "lesson_sequence", "")))
+    seq = getattr(lp, "lesson_sequence", None)
+    draft = drafts.get(str(seq)) if seq is not None else None
+    # NOTE: no "sequence - 1" fallback. The review rows are numbered the same
+    # way the lessons are, and the generate page re-saves its rows immediately
+    # before generating, so a missing key means this lesson really has no
+    # draft. Falling back to the previous number would put one lesson's
+    # teacher additions onto its neighbour — the off-by-one being fixed here.
     if not draft:
         codes = list(getattr(lp, "indicator_codes", None) or [])
         draft = drafts.get(codes[0]) if codes else None

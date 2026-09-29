@@ -367,7 +367,11 @@ def _resource_lines(lp) -> List[str]:
     teacher = normalize_text_items(getattr(lp, "other_tlrs", None))
     display = normalize_text_items(
         getattr(lp, "teaching_learning_resources", None))
-    pool = source or display or []
+    # LESSON VALUE WINS (PART 13/26): the teacher-editable lesson list is
+    # authoritative when the teacher has edited it; the source record remains
+    # the fallback and is never mutated. Keeps the PDF's Resources cell
+    # identical to the DOCX renderers, which already read this field.
+    pool = display or source or []
     extra = [r for r in teacher if r.lower() not in {p.lower() for p in pool}]
     return pool + extra
 

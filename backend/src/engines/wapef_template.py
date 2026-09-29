@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .official_ges_template import (
+    _code_and_text,
     _fill_paragraph,
     _iter_paragraphs,
     _sectpr,
@@ -79,10 +80,10 @@ WAPEF_TOKEN_FIELDS: Dict[str, Optional[str]] = {
     "PERFORMANCE_INDICATOR": "performance_indicator",
     "CORE_COMPETENCIES": "core_competencies",
     "KEY_WORDS": "keywords",
-    "THROUGH_LINE": "wapef.through_lines",
-    "GODS_STORY": "wapef.gods_story",
-    "DEEP_HOPE": "wapef.deep_hope",
-    "STORYLINE": "wapef.storyline",
+    "THROUGH_LINE": "wapef_through_lines",
+    "GODS_STORY": "wapef_gods_story",
+    "DEEP_HOPE": "wapef_deep_hope",
+    "STORYLINE": "wapef_storyline",
     "PHASE_1_STARTER": "phase_1_activities",
     "PHASE_1_RESOURCES": "phase_1_resources",
     "PHASE_2_MAIN": "phase_2_activities",
@@ -192,14 +193,6 @@ def format_wapef_date(value) -> str:
         return ""
 
 
-def _code_and_text(code, text) -> str:
-    code = _text(code).strip()
-    text = _text(text).strip()
-    if code and text:
-        return f"{code} {text}"
-    return code or text
-
-
 def _activities_lines(lesson, *names: str) -> List[str]:
     """Description lines from one or more activity/objective list fields."""
     lines: List[str] = []
@@ -210,6 +203,35 @@ def _activities_lines(lesson, *names: str) -> List[str]:
     return lines
 
 
+def _prose_lines(lesson, *names: str) -> List[str]:
+    """PROSE fields read verbatim — punctuation and all.
+
+    ``_text_items`` is the resource/competency-list normalizer: it splits a
+    serialized list on commas and semicolons. That is right for
+    "Counters, sticks, flash cards" and destructive for a sentence — the
+    teacher's Class Assignment
+
+        "In pairs, learners classify a set of device pictures ...; the teacher
+         checks the reasons given."
+
+    came back as comma-less fragments joined into one run-on line in both the
+    DOCX and the PDF. A sentence is not a list, so prose fields (starter,
+    conclusion, class/home assignment, homework) are read whole.
+    """
+    out: List[str] = []
+    for name in names:
+        value = _get(lesson, name)
+        if isinstance(value, (list, tuple)):
+            text = "\n".join(str(v).strip() for v in value if str(v).strip())
+        else:
+            text = str(value or "").strip()
+        for line in text.splitlines():
+            line = line.strip()
+            if line and line not in out:
+                out.append(line)
+    return out
+
+
 def _phase_block(lesson, phase_index: int) -> str:
     """Learner-activity block for one WAPEF delivery phase.
 
@@ -218,7 +240,7 @@ def _phase_block(lesson, phase_index: int) -> str:
     main -> main/learner activities, plenary -> assessment/conclusion.
     """
     if phase_index == 1:
-        lines = _activities_lines(lesson, "introduction", "starter_activity")
+        lines = _prose_lines(lesson, "introduction", "starter_activity")
     elif phase_index == 2:
         lines = _activities_lines(lesson, "learner_activities", "main_activities")
         # main_activities items render "description (N min)" — keep description only
@@ -228,8 +250,20 @@ def _phase_block(lesson, phase_index: int) -> str:
             if desc and desc not in cleaned:
                 cleaned.append(desc)
         lines = cleaned
+        # PART 15: the approved form has no dedicated assignment row, so the
+        # IN-LESSON assignment is placed in the MAIN phase it belongs to. It is
+        # labelled so a reader can tell the task from the activities.
+        class_task = " ".join(_prose_lines(lesson, "class_assignment")).strip()
+        if class_task and class_task not in "\n".join(lines):
+            lines = lines + [f"Class Assignment: {class_task}"]
     else:
-        lines = _activities_lines(lesson, "conclusion")
+        lines = _prose_lines(lesson, "conclusion")
+        # PART 15: the follow-up task sits in the PLENARY / REFLECTION phase,
+        # the form's own place for setting work after the lesson.
+        home_task = " ".join(
+            _prose_lines(lesson, "home_assignment", "homework")).strip()
+        if home_task and home_task not in "\n".join(lines):
+            lines = lines + [f"Home Assignment: {home_task}"]
     return _bullet_block([l for l in lines if l])
 
 
@@ -248,7 +282,12 @@ def _phase_resources(lesson, phase_index: int, ctx: Dict[str, Any]) -> str:
     source = _text_items(_get(lesson, "source_tlrs"))
     teacher = _text_items(_get(lesson, "other_tlrs"))
     display = _text_items(_get(lesson, "teaching_learning_resources"))
-    pool = source or display or []
+    # LESSON VALUE WINS (PART 13/26): ``teaching_learning_resources`` is the
+    # teacher-editable lesson list — a corrected spelling ("Touchscreen")
+    # replaces the source's own ("Touchscreenn") in the export while
+    # ``source_tlrs`` keeps the scheme's verbatim record untouched. The source
+    # list is the fallback for lessons the teacher has not edited.
+    pool = display or source or []
     extra = [r for r in teacher if r.lower() not in {p.lower() for p in pool}]
     items = pool + extra
     if not items:
@@ -307,17 +346,18 @@ def _resolve(token: str, lesson, ctx: Dict[str, Any]) -> str:
         return ", ".join(_text_items(_get(lesson, "core_competencies")))
     if field == "keywords":
         return ", ".join(_text_items(_get(lesson, "keywords")))
-    if field == "wapef.through_lines":
-        # Teacher-selected structured values, verbatim, approved order — the
-        # canonical order is enforced at render time regardless of the order
-        # selections were stored in.
+    # The four WAPEF selections. ``field`` is the canonical lesson attribute
+    # name (``WAPEF_TOKEN_FIELDS`` maps token -> lesson field), so these read
+    # the exact stored value: teacher selection wins, verbatim, approved order
+    # for the multi-select Through lines — never rewritten, never invented.
+    if field == "wapef_through_lines":
         lines = _text_items(_get(lesson, "wapef_through_lines"))
         return format_through_lines(normalize_through_lines(lines))
-    if field == "wapef.gods_story":
+    if field == "wapef_gods_story":
         return _text(_get(lesson, "wapef_gods_story"))
-    if field == "wapef.deep_hope":
+    if field == "wapef_deep_hope":
         return _text(_get(lesson, "wapef_deep_hope"))
-    if field == "wapef.storyline":
+    if field == "wapef_storyline":
         return _text(_get(lesson, "wapef_storyline"))
     if field == "phase_1_activities":
         return _phase_block(lesson, 1)
