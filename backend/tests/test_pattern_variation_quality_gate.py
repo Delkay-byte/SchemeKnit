@@ -104,11 +104,12 @@ def test_check1_phases_must_reference_the_indicator_focus():
 
 def test_check2_objective_must_point_at_the_indicator():
     """Rule: the objective references the indicator's own focus — a generic
-    'Learners can work together' objective FAILS the gate."""
+    'Learners can work together' objective is flagged for review (warning:
+    a legitimately aligned objective may use a synonym)."""
     lesson = _lesson(learning_objectives=[
         {"description": "Learners can work together in groups."}])
-    failures = _failures(lesson)
-    assert any(i.check_name == "objective_indicator_alignment" for i in failures)
+    names = [i.check_name for i in _warnings(lesson)]
+    assert "objective_indicator_alignment" in names
 
 
 def test_check3_bare_filler_phase_fails():

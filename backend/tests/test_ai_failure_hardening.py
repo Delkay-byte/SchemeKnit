@@ -390,7 +390,7 @@ class TestDeterministicFallbackExplicit:
                 "learning_objectives": ["Learners can do something"],
                 "starter": {"activity": "Review", "duration_minutes": 5},
                 "main_learning": {
-                    "phase1": {"name": "EXPLANATION", "activity": "Teach", "duration_minutes": 15},
+                    "phase1": {"name": "EXPLANATION", "activity": "Teacher explains the concept with concrete examples", "duration_minutes": 15},
                 },
                 "learner_activities": [
                     {"phase": "PRACTICE", "description": "Practice", "duration_minutes": 15}

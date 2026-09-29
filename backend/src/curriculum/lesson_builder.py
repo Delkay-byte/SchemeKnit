@@ -195,9 +195,10 @@ _PHASE_BANK: Dict[str, List[Tuple[str, str]]] = {
          "happen, and why?'). Record two or three predictions on the board "
          "without judging them yet."),
         ("Investigation",
-         "In groups, learners carry out the activity for {focus_short} using "
-         "{resource}. They record what they observe or measure in a simple "
-         "table."),
+         "In groups, learners investigate {focus_short} using {resource}: they "
+         "decide what to change, what to keep the same and what to measure, "
+         "then carry out the steps and record what they observe or measure in "
+         "a simple table."),
         ("Explanation",
          "Groups explain how their evidence supports or contradicts the earlier "
          "prediction about {focus_short}. Correct misconceptions and link the "

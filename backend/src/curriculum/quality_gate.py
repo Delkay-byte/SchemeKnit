@@ -73,9 +73,12 @@ class BatchQualityReport:
 
 _GENERIC_FILLER = (
     "learners practise the concept",
+    "learners practise input devices",
     "complete the task",
     "do the activity",
     "work with your partner",
+    "practise the skill",
+    "carry out the activity",
 )
 
 #: Activity-type → resource-support signal. A lesson whose main activity type
@@ -158,9 +161,10 @@ def _check_objective_indicator_alignment(lesson: Dict[str, Any]) -> List[Quality
     if not any(w in obj_text for w in focus_words):
         return [QualityIssue(
             check_name="objective_indicator_alignment",
-            status=QualityStatus.FAIL,
-            message="Learning objective does not reference the lesson's indicator focus.",
-            severity="error", category="objectives",
+            status=QualityStatus.WARN,
+            message="Learning objective does not reference the lesson's "
+                    "indicator focus (may be a synonym — verify).",
+            severity="warning", category="objectives",
         )]
     return [QualityIssue(
         check_name="objective_indicator_alignment", status=QualityStatus.PASS,
@@ -173,21 +177,20 @@ def _check_phase_action_specificity(lesson: Dict[str, Any]) -> List[QualityIssue
     """(3) Phases describe concrete teacher/learner actions — never a bare
     heading, never 'Learners practise input devices' style filler.
 
-    A main phase that carries neither a teacher action nor enough room for a
-    learner action cannot be taught from, so it is a FAIL. Merely terse phases
-    are a warning.
+    A phase is only a hard FAIL when it carries no usable content at all
+    (a bare heading such as 'Teacher adds.' or an explicit filler phrase).
+    A concrete but terse phase ('Learners sort samples into categories') is
+    legitimate, so terseness stays a warning.
     """
     descs = _lesson_main_descriptions(lesson)
     if not descs:
         return []
     filler = [d for d in descs if any(p in d.lower() for p in _GENERIC_FILLER)]
-    # A phase with no teacher role AND under 45 characters names neither the
-    # teaching move nor a usable learner task.
-    unteachable = [d for d in descs
-                   if len(d.strip()) < 45 and "teacher" not in d.lower()]
-    if filler or unteachable:
-        first = (filler or unteachable)[0]
-        kind = "generic filler" if filler else "no teachable detail"
+    # A bare heading carries fewer than three real words — not a task.
+    bare = [d for d in descs if len(_content_words(d)) < 3]
+    if filler or bare:
+        first = (filler or bare)[0]
+        kind = "generic filler" if filler else "a bare heading, not a task"
         return [QualityIssue(
             check_name="phase_action_specificity", status=QualityStatus.FAIL,
             message=f"Main phase is not teachable as written ({kind}): "
@@ -206,6 +209,18 @@ def _check_phase_action_specificity(lesson: Dict[str, Any]) -> List[QualityIssue
         message="Main phases describe concrete teacher and learner actions.",
         category="activities",
     )]
+
+
+_SPECIFICITY_STOPWORDS = frozenset({
+    "the", "and", "for", "with", "into", "onto", "their", "them", "then",
+    "will", "can", "may", "not", "out", "off", "but", "are", "was", "its",
+})
+
+
+def _content_words(text: str) -> List[str]:
+    """Real words (>=3 chars) excluding glue words — a heading detector."""
+    return [w for w in re.findall(r"[a-z]{3,}", (text or "").lower())
+            if w not in _SPECIFICITY_STOPWORDS]
 
 
 def _check_subject_specific_pedagogy(lesson: Dict[str, Any]) -> List[QualityIssue]:

@@ -13,7 +13,9 @@ from datetime import datetime
 from ..database import get_db, User, LessonPlanDB, AIEnrichmentCacheDB, generate_id
 from ..auth import get_current_user
 from ..models import AIMode, ContentSource, SectionRegenerationRequest
-from ..engines.ai_provider import get_provider, resolve_provider_mode, NAMED_PROVIDERS
+from ..engines.ai_provider import (
+    get_provider, resolve_provider_mode, NAMED_PROVIDERS, AIProvider,
+)
 from ..entitlements import require_ai_entitlement, consume_ai_generation
 from ..logging_config import get_logger, log_event
 
@@ -39,9 +41,24 @@ REGENERATABLE_SECTIONS = [
     "learner_activities", "teacher_activities", "assessment",
     "differentiation", "remediation", "extension",
     "conclusion", "reflection", "homework",
+    "class_assignment", "home_assignment",
     "essential_questions", "learning_objectives",
     "teaching_learning_resources", "previous_knowledge",
 ]
+
+#: The two AI affordances a teacher sees (never an internal pattern name).
+#: AI is OFF by default and only ever runs for one section at a time.
+REWRITE_MODES = {
+    "suggest_another_version": (
+        "Suggest ANOTHER VERSION of this section only: a different but "
+        "equally valid way to deliver the SAME curriculum objective."
+    ),
+    "make_more_practical": (
+        "Make this section MORE PRACTICAL: concrete, hands-on, using local "
+        "Ghanaian materials a teacher can actually put on the table."
+    ),
+}
+DEFAULT_REWRITE_MODE = "suggest_another_version"
 
 #: Provider output schema keys for each regeneratable lesson section (PART W).
 #: The V2 provider contract returns ``starter``/``main_learning``/``plenary``
@@ -63,6 +80,9 @@ SECTION_TO_PROVIDER_KEYS = {
     "conclusion": ("plenary", "conclusion"),
     "reflection": ("plenary", "reflection", "conclusion"),
     "homework": ("homework_or_extension", "homework", "assessment"),
+    "class_assignment": ("class_assignment", "assessment"),
+    "home_assignment": ("home_assignment", "homework_or_extension", "homework",
+                        "assessment"),
     "essential_questions": ("essential_questions", "learning_objectives"),
     "learning_objectives": ("learning_objectives",),
     "teaching_learning_resources": ("teaching_learning_resources", "resources"),
@@ -102,6 +122,9 @@ class SectionRegenerateRequest(BaseModel):
     section: str
     ai_mode: str = "BASIC"
     additional_context: str = ""
+    #: Which affordance the teacher clicked. AI is OFF by default and only
+    #: runs per-section on one of the two named rewrite actions.
+    rewrite_mode: str = DEFAULT_REWRITE_MODE
     #: Client-generated id for THIS user action. Used to make the lifetime
     #: AI-generation consumption idempotent across duplicate submissions.
     request_id: str = ""
@@ -177,7 +200,9 @@ async def regenerate_section(
         )
 
     try:
-        prompt = _build_section_prompt(lp, req.section, previous_content, req.additional_context)
+        prompt = _build_section_prompt(
+            lp, req.section, previous_content, req.additional_context,
+            req.rewrite_mode)
         gen_kwargs = dict(
             indicator=lp.indicators[0] if lp.indicators else "",
             strand=lp.strand or "",
@@ -187,7 +212,14 @@ async def regenerate_section(
         if provider.get_name() == "ollama":
             # Section-targeted prompt: smaller, faster, section-relevant output.
             gen_kwargs["section"] = req.section
-        result = provider.generate_lesson_content(**gen_kwargs)
+
+        # The section prompt reaches the provider through the method the
+        # provider actually implements. Real providers implement
+        # ``generate_structured`` and receive the per-section prompt VERBATIM
+        # (a rewrite of one section, not a whole-lesson regeneration). Mocks
+        # and providers without that override fall back to the legacy
+        # whole-lesson call, whose payload is then mined for the section.
+        result = _section_generation(provider, prompt, gen_kwargs)
 
         # ``main_activities`` is a STRUCTURED section: the provider's
         # ``main_learning`` object must be normalized to
@@ -205,7 +237,7 @@ async def regenerate_section(
         # and a transient failure should be retried, not reported.
         if (not new_content or len(new_content.strip()) < MIN_SECTION_CHARS) and provider.get_name() == "ollama":
             logger.warning("ai_empty_retry", section=req.section)
-            result = provider.generate_lesson_content(**gen_kwargs)
+            result = _section_generation(provider, prompt, gen_kwargs)
             if req.section == "main_activities":
                 new_activities = _normalize_main_activities(result)
                 new_content = "\n".join(a["description"] for a in new_activities)
@@ -295,6 +327,23 @@ async def regenerate_section(
 async def list_regeneratable_sections():
     """List sections that can be regenerated."""
     return {"sections": REGENERATABLE_SECTIONS}
+
+
+def _section_generation(provider, prompt: str, gen_kwargs: dict) -> dict:
+    """Send the per-section rewrite prompt through the provider's channel.
+
+    Every real provider (Gemini / Groq / OpenAI / Ollama / …) OVERRIDES
+    :meth:`AIProvider.generate_structured`; those receive the curated section
+    prompt verbatim — a rewrite of ONE section, never a whole-lesson
+    regeneration whose unrelated fields then leak into the section. Providers
+    that only implement the legacy whole-lesson call get that instead; the
+    caller mines the returned lesson for the requested section.
+    """
+    impl = getattr(type(provider), "generate_structured", None)
+    base = getattr(AIProvider, "generate_structured", None)
+    if impl is not None and base is not None and impl is not base:
+        return provider.generate_structured(prompt)
+    return provider.generate_lesson_content(**gen_kwargs)
 
 
 def _as_text_list(raw) -> list:
@@ -485,23 +534,161 @@ def _normalize_main_activities(result) -> List[dict]:
     return items
 
 
-def _build_section_prompt(lp, section: str, current_content: str, additional_context: str) -> str:
-    return f"""You are a Ghanaian educator. Regenerate the '{section}' section of this lesson plan.
+def _evidence_brief(lp) -> str:
+    """Layer-1 curriculum evidence for the AI prompt, with provenance.
 
-Subject: {lp.subject}
-Class: {lp.class_level}
-Topic: {lp.strand} / {lp.sub_strand}
-Content Standard: {lp.content_standard}
+    The AI is a REWRITE tool: it may never invent curriculum content, so it
+    is handed the retrieved NaCCA exemplar row (if any). ``""`` when the
+    corpus has no record for this indicator — an empty retrieval is valid and
+    the prompt simply says so.
+    """
+    from ..curriculum.evidence import (
+        EvidenceRequest, evidence_for_lesson, get_evidence_provider,
+    )
 
-Current content:
+    try:
+        provider = get_evidence_provider()
+    except Exception:
+        return ""
+    codes = lp.indicator_codes or []
+    request = EvidenceRequest(
+        subject=(lp.subject or "").strip(),
+        level=(lp.class_level or "").strip(),
+        indicator_code=(codes[0] if codes else "").strip(),
+        content_standard_code=(lp.content_standard_code or "").strip(),
+        terms=_signal_words(" ".join(lp.indicators or [])),
+        source_week=lp.week_number or None,
+    )
+    ev = evidence_for_lesson(request, provider=provider)
+    if ev is None:
+        return ("No structured curriculum exemplar is on file for this "
+                "indicator — do not invent one.")
+    src = (ev.provenance.source_name or ev.provenance.source_type) if ev.provenance else ""
+    header = f"NaCCA exemplar ({src}):" if src else "NaCCA exemplar:"
+    bits = []
+    if ev.learning_focus:
+        bits.append(f"Learning focus: {ev.learning_focus}.")
+    if ev.exemplar_activity_patterns:
+        bits.append("Exemplar activities: " + "; ".join(
+            ev.exemplar_activity_patterns[:3]) + ".")
+    if ev.assessment_patterns:
+        bits.append("Exemplar assessment: " + ev.assessment_patterns[0] + ".")
+    if not bits:
+        return header + " record found; no exemplar detail fields."
+    return header + " " + " ".join(bits)
+
+
+def _signal_words(text: str) -> List[str]:
+    """Content words of the indicator text (for evidence keyword retrieval)."""
+    import re as _re
+    stop = {"the", "and", "for", "with", "use", "able", "learners", "learner"}
+    words = [w for w in _re.findall(r"[a-z]{4,}", (text or "").lower())
+             if w not in stop]
+    return sorted(set(words))[:8]
+
+
+def _resource_brief(lp) -> str:
+    """Every resource line attached to the lesson (scheme + teacher-added)."""
+    rows: List[str] = []
+    for column in ("teaching_learning_resources", "source_tlrs", "other_tlrs"):
+        rows.extend(_as_text_list(getattr(lp, column, None)))
+    rows = [r for r in rows if r]
+    if not rows:
+        return "None listed."
+    return "; ".join(dict.fromkeys(rows))
+
+
+def _objective_brief(lp) -> str:
+    return " ".join(_as_text_list(lp.learning_objectives)).strip()
+
+
+def _current_approach(lp) -> str:
+    """The pedagogical shape of the lesson as rendered (the pattern's visible
+    result). The internal pattern id is never persisted or shown, so the AI
+    receives the *structure* — it must respect it, not fight it."""
+    descs = _as_text_list(lp.main_activities)
+    if not descs:
+        return ""
+    first = descs[0].lower()
+    if "worked example" in first or "teacher works through" in first:
+        return "worked example followed by guided then independent practice"
+    if "investigate" in first or "observe" in first:
+        return "guided observation and investigation"
+    if "discuss" in first:
+        return "structured discussion"
+    return "teacher modelling followed by learner practice"
+
+
+def _json_contract(section: str) -> str:
+    if section == "main_activities":
+        return (
+            'Return JSON: {"main_learning": {"phase1": {"activity": "...", '
+            '"duration_minutes": 15}, "phase2": {...}, "phase3": {...}}} '
+            "with three to five sequenced phases.")
+    return f'Return JSON: {{"{section}": "the rewritten section text"}}'
+
+
+def _build_section_prompt(
+    lp,
+    section: str,
+    current_content: str,
+    additional_context: str,
+    rewrite_mode: str = DEFAULT_REWRITE_MODE,
+) -> str:
+    """Build the per-section AI rewrite prompt.
+
+    Contract (Layer wiring): the AI receives the ORIGINAL section, the
+    indicator + objective, the curriculum evidence, the subject, the
+    resources, the current pedagogical approach, the teacher's instruction,
+    and the WAPEF/duration/context it must NOT change. It rewrites ONE
+    section's delivery wording — never the curriculum meaning.
+    """
+    indicators = lp.indicators or []
+    indicator_line = "; ".join(
+        f"{code} {text}".strip() for code, text in
+        zip(lp.indicator_codes or [], indicators)) or " ".join(indicators) or "(none)"
+    mode_instruction = REWRITE_MODES.get(rewrite_mode, REWRITE_MODES[DEFAULT_REWRITE_MODE])
+
+    preserve = [
+        "Keep the SAME curriculum indicator code and objective meaning — never "
+        "renumber, retitle or drift from it.",
+        f"Keep the SAME subject ({lp.subject}), class ({lp.class_level}) and "
+        f"duration ({getattr(lp, 'duration_minutes', 60)} minutes).",
+        "Keep the SAME resources listed for this lesson and the same WAPEF "
+        "selections (deep hope / storyline) if the school uses them.",
+        "Rewrite ONLY the delivery wording of this ONE section.",
+    ]
+    wapef = (lp.wapef_deep_hope or "").strip()
+    if wapef:
+        preserve.append(f"WAPEF deep hope to honour: {wapef}")
+
+    return f"""You are a Ghanaian educator rewriting ONE section of a real lesson plan.
+
+{mode_instruction}
+
+SUBJECT: {lp.subject}
+CLASS: {lp.class_level}
+STRAND / SUB-STRAND: {lp.strand} / {lp.sub_strand}
+INDICATOR: {indicator_line}
+OBJECTIVE: {_objective_brief(lp) or current_content[:120]}
+RESOURCES: {_resource_brief(lp)}
+TEACHING APPROACH: {_current_approach(lp)}
+
+CURRICULUM EVIDENCE:
+{_evidence_brief(lp)}
+
+ORIGINAL '{section}' SECTION (rewrite THIS):
 {current_content or '(empty)'}
 
-{f'Additional context: {additional_context}' if additional_context else ''}
+{f'TEACHER INSTRUCTION: {additional_context}' if additional_context else ''}
 
-Return ONLY the regenerated content for the '{section}' section.
-Use local Ghanaian examples and materials.
-No ICT/projector/smartboard references.
-Appropriate for {lp.class_level} students.
+You MUST:
+{chr(10).join('- ' + p for p in preserve)}
+- Use concrete local Ghanaian examples and materials.
+- No ICT, projector or smartboard references.
+- Sound like a teacher's plan, not a textbook.
+
+{_json_contract(section)}
 """
 
 
