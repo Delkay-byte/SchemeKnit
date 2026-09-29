@@ -61,6 +61,36 @@ function log(ok, label, detail) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
+/**
+ * Wait until React is hydrated AND STABLE: fill() before hydration is
+ * silently wiped when the app swaps in the hydrated tree (a cold Render
+ * deploy hydrates seconds after domcontentloaded; localhost is instant).
+ * A one-shot probe is not enough — hydration can replace the DOM after the
+ * probe sticks — so the value must SURVIVE a settle window.
+ */
+async function waitHydrated(page, probe = '#signup-name', timeout = 30000) {
+  const start = Date.now()
+  const probeValue = `hydration-probe-${Date.now().toString(36)}`
+  while (Date.now() - start < timeout) {
+    const filled = await page.evaluate(({ sel, value }) => {
+      const el = document.querySelector(sel)
+      if (!el) return false
+      const setter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype, 'value')?.set
+      setter?.call(el, value)
+      el.dispatchEvent(new Event('input', { bubbles: true }))
+      return true
+    }, { sel: probe, value: probeValue }).catch(() => false)
+    if (filled) {
+      await sleep(1500)
+      const kept = await page.evaluate(({ sel, value }) =>
+        document.querySelector(sel)?.value === value, { sel: probe, value: probeValue }).catch(() => false)
+      if (kept) return
+    }
+    await sleep(300)
+  }
+}
+
 async function shot(page, name) {
   await page.screenshot({ path: path.join(OUT, name), fullPage: false }).catch(() => {})
 }
@@ -80,6 +110,7 @@ async function apiGet(page, p) {
 
 async function signup(page) {
   await page.goto(`${WEB}/signup`, { waitUntil: 'domcontentloaded', timeout: 60000 })
+  await waitHydrated(page, '#signup-name')
   await page.locator('#signup-name').fill('Persistence Teacher')
   await page.locator('#signup-email').fill(EMAIL)
   await page.locator('#signup-password').fill(PASSWORD)
@@ -93,6 +124,7 @@ async function setSchoolInSettings(page) {
   await page.goto(`${WEB}/settings`, { waitUntil: 'domcontentloaded', timeout: 60000 })
   const input = page.locator('#profile-school')
   await input.waitFor({ timeout: 30000 })
+  await waitHydrated(page, '#profile-school')
   await input.fill(SCHOOL)
   await page.getByRole('button', { name: /save profile/i }).click()
   await page.waitForTimeout(1500)
@@ -102,6 +134,7 @@ async function setSchoolInSettings(page) {
 
 async function uploadScheme(page) {
   await page.goto(`${WEB}/upload`, { waitUntil: 'domcontentloaded', timeout: 60000 })
+  await waitHydrated(page, 'input[type="file"]')
   await page.locator('input[type="file"]').setInputFiles(SCHEME)
   await page.getByRole('button', { name: /upload & process/i }).click()
   const success = page.locator('[data-upload-success]')
@@ -176,6 +209,10 @@ async function wapefOptions(page) {
 /** Set all four WAPEF fields on the first lesson row, with 2+ Through lines. */
 async function setWapefOnRow(page, opts, picks) {
   const deepHope = page.locator('select[id^="wapef-deep-hope-"]').first()
+  // Record WHICH rows production numbered — the draft↔lesson alignment marker.
+  const rowIds = await page.locator('select[id^="wapef-deep-hope-"]')
+    .evaluateAll((els) => els.map((e) => e.id)).catch(() => [])
+  console.log(`[diag] preview WAPEF row ids: ${rowIds.join(', ') || 'NONE'}`)
   await deepHope.selectOption({ label: picks.deepHope })
   await page.locator('select[id^="wapef-storyline-"]').first().selectOption({ label: picks.storyline })
   await page.locator('select[id^="wapef-gods-story-"]').first().selectOption({ label: picks.godsStory })
@@ -311,7 +348,10 @@ async function readWorkspace(page) {
       through.push((await buttons.nth(i).innerText()).trim())
     }
   }
+  const deepSel = ws.locator('select[aria-label="Deep Hope"]')
+  const deepCount = await deepSel.count()
   return {
+    _diag: { deepSelects: deepCount },
     lessonTopic: await read('Lesson topic'),
     starter: await read('Phase 1 starter'),
     main: await read('Main learning activity 1'),
@@ -323,7 +363,8 @@ async function readWorkspace(page) {
     resource: await read('Lesson resource 1'),
     referenceTitle: await read('Reference 1 title'),
     referenceType: await selectLabel('Reference 1 type'),
-    deepHope: await selectLabel('Deep Hope'),
+    deepHope: deepCount ? await deepSel.first().inputValue().catch(() => null)
+      : await selectLabel('Deep Hope'),
     storyline: await selectLabel('Storyline'),
     godsStory: await selectLabel("God's Story"),
     throughLines: through,
@@ -458,7 +499,29 @@ print("\\n".join(written))
 
     // ── 4. Generate → workspace says WAPEF ────────────────────────────────
     await generate(page)
-    const afterGenerate = await readWorkspace(page)
+    // A cold deploy serves the workspace shell before the lesson fetch
+    // resolves; wait until the teacher's pre-generation selections are ON the
+    // page (or the fields prove absent) instead of racing the fetch.
+    let afterGenerate = await readWorkspace(page)
+    for (let i = 0; i < 20 && (afterGenerate.deepHope !== picks.deepHope
+        || afterGenerate.throughLines.length < 2); i += 1) {
+      await sleep(1500)
+      afterGenerate = await readWorkspace(page)
+    }
+    console.log(`[diag] post-generate workspace: ${JSON.stringify(afterGenerate._diag)},
+      deepHope=${JSON.stringify((afterGenerate.deepHope || '').slice(0, 30))},
+      through=${JSON.stringify(afterGenerate.throughLines)}`)
+    // When does the JOB endpoint carry the selections? (read-after-write lag)
+    const jobMatch = page.url().match(/generate\/([a-f0-9-]+)/i)
+    if (jobMatch) {
+      for (let i = 0; i < 12; i += 1) {
+        const jobLessons = await apiGet(page, `/api/generation/${jobMatch[1]}/lessons`)
+        const jl = (jobLessons.body?.lesson_plans || [])[0] || {}
+        console.log(`[diag] t+${i * 2}s job-API deep=${jl.wapef_deep_hope ? 'SET' : 'EMPTY'} tmpl=${jl.template_id || 'none'}`)
+        if (jl.wapef_deep_hope) break
+        await sleep(2000)
+      }
+    }
     log(afterGenerate.wapefSectionVisible,
       'workspace shows the WAPEF fields section (template identity is WAPEF)')
     log(Boolean(afterGenerate.throughLines.length),
@@ -535,7 +598,13 @@ print("\\n".join(written))
     await page.locator('[data-lesson-workspace]').waitFor({ timeout: 120000 })
     await page.waitForTimeout(1500)
 
-    const afterReload = await readWorkspace(page)
+    // Same cold-fetch race as after generation: the saved topic is the signal
+    // that the lesson data has actually arrived.
+    let afterReload = await readWorkspace(page)
+    for (let i = 0; i < 20 && afterReload.lessonTopic !== edits.topic; i += 1) {
+      await sleep(1500)
+      afterReload = await readWorkspace(page)
+    }
     const checks = [
       ['lesson topic', afterReload.lessonTopic, edits.topic],
       ['Phase 1 starter', afterReload.starter, edits.starter],
