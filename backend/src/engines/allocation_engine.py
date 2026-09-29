@@ -651,16 +651,32 @@ class AllocationEngine:
           - knows its week_number (source curriculum week)
           - knows its lesson_number = period_index within the week
           - derives objectives, activities, assessment from that indicator
+
+        Lesson Pattern + Variation (Layers 3/4): a batch-level history is
+        built once for the whole scheme/subject/class/term. Each lesson is
+        then assigned the best-fitting TEACHING PATTERN through the curriculum
+        evidence + subject pedagogy, with a bounded novelty penalty from the
+        patterns already used in the batch. Curriculum fit always dominates:
+        a pattern is never chosen merely to look different. The selected
+        pattern supplies the teaching SHAPE; the indicator remains the
+        substance, and indicator-specific content (assessment, assignments,
+        resources, keywords) is untouched.
         """
         # Generation Engine V3: the deterministic subject-aware lesson builder
         # composes ONE coherent three-phase lesson per indicator. The old
         # helpers below remain for API compatibility but are no longer the
         # generation path.
         from ..curriculum.lesson_builder import build_lesson
+        from ..curriculum.batch_context import build_batch_history
 
         ordered = sorted(coverage.allocations, key=lambda a: a.lesson_sequence)
         lesson_plans: List[LessonPlan] = []
         lesson_counter = 0
+
+        # Layer 4: one batch history for the whole generation run. Provenance
+        # is scheme/subject/class/term-scoped so history never leaks across
+        # schemes, and the first lesson of a batch starts with an empty slate.
+        batch_history = build_batch_history(config, scheme_id)
 
         def _source_indicator_text(a: AllocatedIndicator) -> str:
             """The indicator cell as the SOURCE scheme printed it (Defect D5).
@@ -718,6 +734,24 @@ class AllocationEngine:
                 nxt_row = ordered[idx + 1] if idx + 1 < len(ordered) else None
                 if nxt_row and nxt_row.sub_strand and nxt_row.sub_strand == alloc.sub_strand:
                     next_indicator = nxt_row.sub_strand
+            # ── Layer 3/4: select this lesson's teaching pattern ──────────
+            # Deterministic and evidence-driven: curriculum fit (indicator
+            # activity + subject pedagogy + corpus evidence) is scored, and a
+            # BOUNDED novelty penalty from patterns already used lets equally
+            # fitting patterns vary. The indicator, objective, assessment and
+            # assignments are never changed by the pattern.
+            from ..curriculum.batch_context import select_pattern_for_alloc
+            try:
+                lesson_pattern = select_pattern_for_alloc(
+                    alloc, config, batch_history,
+                    previous_indicator=previous_indicator,
+                )
+                if lesson_pattern is not None:
+                    selection_verb = getattr(lesson_pattern, "id", "")
+                    batch_history.note_selection(selection_verb)
+            except Exception:
+                # Pattern selection must never break a deterministic batch.
+                lesson_pattern = None
             lp = build_lesson(
                 # Defect D5: the builder reads ``indicator_description`` as the
                 # lesson's indicator text; hand it the source string (rebuilt
@@ -729,6 +763,8 @@ class AllocationEngine:
                 config, scheme_id,
                 previous_indicator=previous_indicator,
                 next_indicator=next_indicator,
+                pattern=lesson_pattern,
+                batch_history=batch_history,
             )
             # Curriculum order and period label are assigned here so the
             # builder stays position-independent (and deterministic).

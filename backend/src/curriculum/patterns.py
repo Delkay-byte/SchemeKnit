@@ -591,8 +591,13 @@ def score_pattern(pattern: LessonPattern, ctx: SelectionContext) -> float:
         score += 0.8
 
     # 3. Evidence (corpus / teacher) alignment — the official record's verbs.
+    # ADVISORY by design: a corpus record is keyed by CODE, and schools
+    # legitimately renumber indicators (the scheme's own prose is the
+    # authority for what the lesson teaches — see the builder's source-
+    # authority rule). Evidence verbs therefore contribute a bounded advisory
+    # signal; the indicator's OWN activity type and verbs always lead.
     if ctx.evidence_verbs:
-        score += 0.6 * _verb_overlap(ctx.evidence_verbs, pattern.suitable_verbs)
+        score += 0.4 * _verb_overlap(ctx.evidence_verbs, pattern.suitable_verbs)
 
     # 4. Indicator-verb match.
     if ctx.indicator_text:
@@ -604,7 +609,9 @@ def score_pattern(pattern: LessonPattern, ctx: SelectionContext) -> float:
         words = set(re.findall(r"[a-z]+", ctx.objective_text.lower()))
         score += 0.25 * _verb_overlap(words, pattern.suitable_verbs)
 
-    # 6. Evidence activity-pattern alignment (corpus hints).
+    # 6. Evidence activity-pattern alignment (corpus hints). Advisory only:
+    # bounded so a corpus record (keyed by code) cannot override the
+    # indicator's own activity type.
     if ctx.evidence_activity_patterns:
         blob = " ".join(ctx.evidence_activity_patterns).lower()
         hits = set()
@@ -612,7 +619,7 @@ def score_pattern(pattern: LessonPattern, ctx: SelectionContext) -> float:
             if marker in blob:
                 hits.update(ids)
         if pattern.id in hits:
-            score += 0.35
+            score += 0.2
 
     # 7. Bounded practicality penalties.
     score -= _resource_weight(pattern, ctx)
@@ -712,6 +719,18 @@ def select_pattern(
 
     canon = set(canonical_pattern_ids(ctx))
     scores: Dict[str, float] = {p.id: score_pattern(p, ctx) for p in pool}
+
+    # The subject's canonical (activity+subject home) pattern wins a TIE
+    # against a non-canonical one: a demonstration lesson stays a
+    # demonstration lesson even when another pattern scores equally. This is
+    # the "curriculum alignment outweighs novelty" rule applied at the fit
+    # level — canonical patterns are this subject's pedagogical home.
+    best_canon_fit = max((scores[pid] for pid in canon if pid in scores),
+                         default=None)
+    if best_canon_fit is not None:
+        for pid in list(scores):
+            if pid not in canon and abs(scores[pid] - best_canon_fit) < 0.15:
+                scores[pid] = best_canon_fit - 0.15
 
     adjusted = dict(scores)
     for pid, penalty in (novelty_penalty or {}).items():
