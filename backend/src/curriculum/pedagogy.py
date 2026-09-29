@@ -129,8 +129,9 @@ _SCIENCE = SubjectPedagogy(
                   "available materials. Learners observe carefully and record what "
                   "they see or measure.", 0.40),
         MainPhase("Observation and evidence collection",
-                  "In groups, learners carry out the activity for {skill}, record "
-                  "results in a simple table, and note anything unexpected.", 0.35),
+                  "In groups, learners set up and run the practical for {skill} "
+                  "with the materials, record results in a simple table, and "
+                  "note anything unexpected.", 0.35),
         MainPhase("Explanation",
                   "Groups explain their results against the earlier predictions. "
                   "The teacher corrects misconceptions and links findings to {skill}.", 0.25),
