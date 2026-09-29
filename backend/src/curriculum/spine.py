@@ -497,4 +497,42 @@ def lesson_provenance(
         "source_week_type": source_week_type,
         "source_review_status": source_review_status,
         "source_review_reasons": source_review_reasons,
+        # Official-curriculum grounding, recomputed from the lesson's own subject
+        # and indicator code — no stored copy, so it can never go stale. Absent
+        # (None) when no official record exists for this indicator, which is the
+        # honest answer: the deterministic planner then rests on the teacher's
+        # scheme and the bounded subject pedagogy.
+        "exemplar": _exemplar_provenance(lp),
     }
+
+
+def _exemplar_provenance(lp) -> Optional[Dict[str, Any]]:
+    """Official NaCCA exemplar evidence behind this lesson, or None."""
+    codes = list(getattr(lp, "indicator_codes", None) or [])
+    code = codes[0] if codes else ""
+    subject = getattr(lp, "subject", "") or ""
+    try:
+        from .exemplars import CORPUS_VERSION, lookup_indicator
+    except Exception:  # pragma: no cover - corpus is optional infrastructure
+        return None
+    looked_up = [
+        code,
+        getattr(lp, "content_standard_code", "") or "",
+    ]
+    for candidate in looked_up:
+        if not candidate:
+            continue
+        record = lookup_indicator(candidate, str(subject))
+        if record is None:
+            continue
+        return {
+            "grounding": "Official NaCCA curriculum (derived)",
+            "learning_focus": record.learning_focus,
+            "action_verbs": list(record.curriculum_action_verbs or []),
+            "source_title": record.source_title,
+            "source_url": record.source_url,
+            "source_version": record.source_version,
+            "corpus_version": CORPUS_VERSION,
+            "provenance": record.provenance,
+        }
+    return None

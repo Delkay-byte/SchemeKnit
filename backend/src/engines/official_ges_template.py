@@ -244,12 +244,19 @@ def _join(items: List[str], separator: str = ", ") -> str:
 def _code_and_text(code, text) -> str:
     code = _text(code).strip()
     text = _text(text).strip()
-    if code and text:
-        return f"{code} {text}"
-    return code or text
+    if not code or not text:
+        return code or text
+    # The stored text often already begins with the code (a content standard
+    # with no description is stored as its own code). Prepending it again
+    # prints "B7.1.1.1 B7.1.1.1" — the code must appear exactly once.
+    if text == code or _CODE_PREFIX_RE.match(text):
+        return text
+    return f"{code} {text}"
 
 
-_CODE_PREFIX_RE = re.compile(r'^\s*[Bb]?\d+(?:\.\d+){2,4}[.:]?\s*')
+#: The curriculum package owns the canonical definition — including the
+#: "B7/JHS1 1.1.1.1" shape English/RME/Social Studies schemes print.
+from ..curriculum import CODE_PREFIX_RE as _CODE_PREFIX_RE  # noqa: E402
 
 
 def _code_and_text_list(codes: List[str], texts: List[str]) -> List[str]:
@@ -345,12 +352,29 @@ def _resolve(field: Optional[str], lesson, ctx: Dict[str, Any]) -> str:
                  + _text_items(_get(lesson, "learner_activities")))
         return _bullet_block(steps)
     if field == "assessment":
-        return _text(_get(lesson, "assessment"))
+        # PART 15: the official form has no dedicated assignment row, so the
+        # IN-LESSON assignment is placed with the assessment it evidences. The
+        # home follow-up is already carried by the plenary (homework) below.
+        parts = [_text(_get(lesson, "assessment"))]
+        class_task = " ".join(_text_items(_get(lesson, "class_assignment"))).strip()
+        if class_task and class_task not in (parts[0] or ""):
+            parts.append(f"Class Assignment: {class_task}")
+        return "\n".join(p for p in parts if p)
     if field == "conclusion":
         close = (_text_items(_get(lesson, "conclusion"))
                  + _text_items(_get(lesson, "reflection"))
+                 + _text_items(_get(lesson, "home_assignment"))
                  + _text_items(_get(lesson, "homework")))
-        return _bullet_block(close)
+        # ``home_assignment`` and ``homework`` mirror each other on new lessons;
+        # de-duplicate so the same task is never printed twice.
+        seen = set()
+        deduped = []
+        for line in close:
+            key = line.strip().lower()
+            if line and key not in seen:
+                seen.add(key)
+                deduped.append(line)
+        return _bullet_block(deduped)
     return ""
 
 
