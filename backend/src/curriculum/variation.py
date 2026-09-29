@@ -223,24 +223,34 @@ def fingerprint_lesson(
     generator (they are internal and never surface in the UI). When they are
     absent the fingerprint is derived purely from the lesson text, so
     repetition can still be detected on lessons saved by older runs.
+
+    Accepts a ``LessonPlan`` object OR a plain dict (the batch-level gate
+    reviews lessons as dicts).
     """
-    main = getattr(lesson, "main_activities", None) or []
-    starter_mode = starter_mode or _infer_starter_mode(getattr(lesson, "starter_activity", ""))
-    plenary_mode = plenary_mode or _infer_plenary_mode(getattr(lesson, "conclusion", ""))
+    main = _lesson_field(lesson, "main_activities", [])
+    starter_mode = starter_mode or _infer_starter_mode(_lesson_field(lesson, "starter_activity", ""))
+    plenary_mode = plenary_mode or _infer_plenary_mode(_lesson_field(lesson, "conclusion", ""))
     return LessonFingerprint(
         pattern_id=pattern_id,
         starter_mode=starter_mode,
         plenary_mode=plenary_mode,
-        starter=normalized_starter(getattr(lesson, "starter_activity", "")),
+        starter=normalized_starter(_lesson_field(lesson, "starter_activity", "")),
         main_sequence=normalized_main_sequence(main),
-        reflection=normalized_reflection(getattr(lesson, "conclusion", "")),
+        reflection=normalized_reflection(_lesson_field(lesson, "conclusion", "")),
         resource_sequence=normalized_resource_sequence(
-            getattr(lesson, "teaching_learning_resources", []) or []
+            _lesson_field(lesson, "teaching_learning_resources", []) or []
         ),
-        class_assignment_type=assignment_type(getattr(lesson, "class_assignment", "")),
-        home_assignment_type=assignment_type(getattr(lesson, "home_assignment", "")),
-        indicator=_norm_text(" ".join(getattr(lesson, "indicators", []) or [])),
+        class_assignment_type=assignment_type(_lesson_field(lesson, "class_assignment", "")),
+        home_assignment_type=assignment_type(_lesson_field(lesson, "home_assignment", "")),
+        indicator=_norm_text(" ".join(_lesson_field(lesson, "indicators", []) or [])),
     )
+
+
+def _lesson_field(lesson: Any, name: str, default: Any) -> Any:
+    """Read a field from a LessonPlan object or a plain dict."""
+    if isinstance(lesson, dict):
+        return lesson.get(name, default)
+    return getattr(lesson, name, default)
 
 
 _STARTER_MODE_MARKERS: List[Tuple[str, Tuple[str, ...]]] = [
