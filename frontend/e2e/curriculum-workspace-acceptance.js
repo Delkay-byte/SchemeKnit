@@ -51,7 +51,11 @@ const UPLOAD_FILE = process.env.TF_UPLOAD_FILE
   ? path.resolve(process.env.TF_UPLOAD_FILE)
   : path.resolve(__dirname, '../../temp/accept-single-science.docx')
 const OUT = path.join(__dirname, 'curriculum-workspace-acceptance')
-const MARKER = `Acceptance main learning ${Date.now()}`
+// PART 21: the journey types content a teacher could actually write. An
+// internal/harness marker or an epoch stamp must never enter lesson content or
+// an export, so this is a real classroom instruction with a short per-run
+// suffix (base-36, never a 12-13 digit timestamp).
+const MARKER = `Learners compare manual and automatic devices using classroom examples ${Date.now().toString(36)}`
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 

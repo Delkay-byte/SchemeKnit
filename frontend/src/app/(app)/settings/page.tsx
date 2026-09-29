@@ -26,6 +26,10 @@ export default function SettingsPage() {
   const [newHoliday, setNewHoliday] = useState({ name: '', date: '', is_recurring: false })
   const [profile, setProfile] = useState<{ email?: string; full_name?: string; school_name?: string } | null>(null)
   const [profileName, setProfileName] = useState('')
+  // PART 7: an independent teacher's own institution. `isSchoolManaged` means
+  // the account belongs to a real school, whose name is authoritative.
+  const [profileSchool, setProfileSchool] = useState('')
+  const [isSchoolManaged, setIsSchoolManaged] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   // Server-authoritative plan + usage. Never derived from client storage.
@@ -54,6 +58,9 @@ export default function SettingsPage() {
       if (profileData) {
         setProfile(profileData)
         setProfileName(profileData.full_name || '')
+        setProfileSchool(profileData.school_name || '')
+        // A school-attached account's name is owned by the school record.
+        setIsSchoolManaged(Boolean((profileData as { school_id?: string }).school_id))
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load settings')
@@ -66,7 +73,15 @@ export default function SettingsPage() {
     try {
       setSavingProfile(true)
       setError(null)
-      const updated = await api.updateProfile({ full_name: profileName.trim() })
+      // PART 7: an independent teacher (no school membership) states the
+      // institution they teach at ONCE here; generation reuses it, so it never
+      // has to be retyped per lesson. A school-attached teacher's membership is
+      // authoritative, so nothing is sent for them.
+      const payload: { full_name: string; school_name?: string } = {
+        full_name: profileName.trim(),
+      }
+      if (!isSchoolManaged) payload.school_name = profileSchool.trim()
+      const updated = await api.updateProfile(payload)
       setProfile(updated)
       setSuccess('Profile updated successfully')
       setTimeout(() => setSuccess(null), 3000)
@@ -245,14 +260,20 @@ export default function SettingsPage() {
                 <Field
                   label="School"
                   htmlFor="profile-school"
-                  hint="Derived from your school membership and cannot be changed here"
+                  hint={
+                    isSchoolManaged
+                      ? 'Derived from your school membership and cannot be changed here'
+                      : 'Type the school or institution you teach at — it appears on every lesson you generate'
+                  }
                 >
                   <Input
                     id="profile-school"
                     type="text"
-                    value={profile?.school_name || '—'}
-                    disabled
-                    className="bg-muted text-muted-foreground"
+                    value={isSchoolManaged ? profile?.school_name || '—' : profileSchool}
+                    disabled={isSchoolManaged}
+                    onChange={(e) => setProfileSchool(e.target.value)}
+                    placeholder="e.g. Aburi Presby Primary School"
+                    className={isSchoolManaged ? 'bg-muted text-muted-foreground' : ''}
                   />
                 </Field>
                 <Button onClick={handleSaveProfile} disabled={savingProfile || !profileName.trim()}>

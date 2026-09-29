@@ -67,6 +67,7 @@ interface LessonData {
   keywords?: string[]
   source_tlrs?: string[]
   other_tlrs?: string[]
+  teaching_learning_resources?: string[]
   core_competencies?: string[]
   structured_references?: { type: string; title: string; page?: string }[]
   references?: string[]
@@ -74,18 +75,61 @@ interface LessonData {
   wapef_storyline?: string
   wapef_through_lines?: string[]
   wapef_gods_story?: string
+  homework?: string
+  class_assignment?: string
+  home_assignment?: string
+  school_name?: string | null
+  template_id?: string | null
   status?: string
   teacher_edited?: boolean
   ai_generated?: boolean
   provenance?: LessonProvenance
 }
 
+/** The Approved WAPEF Plan carries four teacher-selected structured fields. */
+const WAPEF_TEMPLATE_ID = 'tpl-wapef-approved-plan'
+
+const NACCA_COMPETENCIES = [
+  'Critical Thinking and Problem Solving',
+  'Creativity and Innovation',
+  'Communication and Collaboration',
+  'Cultural Identity and Global Citizenship',
+  'Personal Development and Leadership',
+  'Digital Literacy',
+]
+
+interface ReferenceDraft {
+  type: string
+  title: string
+  page?: string
+}
+
+/**
+ * Everything the teacher owns on this lesson (PART 5/36 persistence matrix).
+ * Source fields (source_tlrs, the indicator, the content standard) are NOT in
+ * the draft: they stay the scheme's authoritative record and are read-only.
+ */
 interface Draft {
   topic: string
   introduction: string
   assessment: string
   conclusion: string
   mainActivities: MainActivity[]
+  //: Class work completed IN the lesson (PART 15).
+  classAssignment: string
+  //: Follow-up completed AT HOME. Seeded from home_assignment, falling back to
+  //: the legacy homework field so an AI-enriched home task is never hidden.
+  homeAssignment: string
+  //: Lesson-specific vocabulary (PART 14) — editable, never re-forced.
+  keywords: string[]
+  //: The LESSON's resource list (PART 13/26). Editing it corrects the lesson
+  //: without ever mutating the scheme's own source_tlrs record.
+  lessonResources: string[]
+  references: ReferenceDraft[]
+  wapefDeepHope: string
+  wapefStoryline: string
+  wapefThroughLines: string[]
+  wapefGodsStory: string
 }
 
 function draftFrom(l: LessonData): Draft {
@@ -95,6 +139,21 @@ function draftFrom(l: LessonData): Draft {
     assessment: l.assessment || '',
     conclusion: l.conclusion || '',
     mainActivities: normalizeActivities(l.main_activities),
+    classAssignment: l.class_assignment || '',
+    homeAssignment: l.home_assignment || l.homework || '',
+    keywords: Array.isArray(l.keywords) ? l.keywords : [],
+    // The lesson value: teacher-corrected list when present, otherwise the
+    // generated union of source + teacher resources.
+    lessonResources: Array.isArray(l.teaching_learning_resources)
+      ? l.teaching_learning_resources
+      : [...(l.source_tlrs || []), ...(l.other_tlrs || [])],
+    references: (l.structured_references || []).map((r) => ({
+      type: r.type || 'Other', title: r.title || '', page: r.page || '',
+    })),
+    wapefDeepHope: l.wapef_deep_hope || '',
+    wapefStoryline: l.wapef_storyline || '',
+    wapefThroughLines: Array.isArray(l.wapef_through_lines) ? l.wapef_through_lines : [],
+    wapefGodsStory: l.wapef_gods_story || '',
   }
 }
 
@@ -145,6 +204,15 @@ export function LessonWorkspace({
   const [suggesting, setSuggesting] = useState<string | null>(null)
   const [aiNotice, setAiNotice] = useState<string | null>(null)
   const [guidedStep, setGuidedStep] = useState<GuidedStep>('objectives')
+  // Approved WAPEF option lists. Loaded once; a failure only means the WAPEF
+  // selects are unavailable, never that the workspace breaks (the four fields
+  // still show their stored values as read-only text).
+  const [wapefOptions, setWapefOptions] = useState<{
+    deep_hopes: string[]
+    storylines: string[]
+    through_lines: string[]
+    gods_story: string[]
+  } | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -168,6 +236,12 @@ export function LessonWorkspace({
 
   useEffect(() => { load() }, [load])
 
+  useEffect(() => {
+    api.getWapefOptions()
+      .then(setWapefOptions)
+      .catch(() => setWapefOptions(null))
+  }, [])
+
   const active = lessons.find((l) => l.id === activeId) || null
 
   const selectLesson = (l: LessonData) => {
@@ -190,11 +264,33 @@ export function LessonWorkspace({
     setSaving(true)
     setError(null)
     try {
+      // PART 5/36: EVERY teacher-owned field is sent in one payload so a save
+      // is complete. The server is authoritative and echoes the stored lesson
+      // back, which then replaces local state — the UI can never drift from the
+      // database after a save.
       const updated = await api.updateLesson(active.id, {
         lesson_topic: draft.topic,
         introduction: draft.introduction,
         assessment: draft.assessment,
         conclusion: draft.conclusion,
+        class_assignment: draft.classAssignment,
+        home_assignment: draft.homeAssignment,
+        // Keep the legacy single field in step so templates that declare only a
+        // Homework row still render the home follow-up.
+        homework: draft.homeAssignment,
+        keywords: draft.keywords.map((k) => k.trim()).filter(Boolean),
+        // The lesson's resource list (PART 13/26): correcting a source spelling
+        // changes the lesson only — source_tlrs is untouched server-side.
+        teaching_learning_resources: draft.lessonResources
+          .map((r) => r.trim())
+          .filter(Boolean),
+        structured_references: draft.references
+          .filter((r) => (r.title || '').trim())
+          .map((r) => ({ type: r.type || 'Other', title: r.title.trim(), page: r.page || '' })),
+        wapef_deep_hope: draft.wapefDeepHope,
+        wapef_storyline: draft.wapefStoryline,
+        wapef_through_lines: draft.wapefThroughLines,
+        wapef_gods_story: draft.wapefGodsStory,
         main_activities: draft.mainActivities.map((a) => ({
           phase: a.phase || 'main_learning',
           description: a.description,
@@ -202,7 +298,11 @@ export function LessonWorkspace({
           resources: a.resources || [],
         })),
       })
-      setLessons((ls) => ls.map((l) => (l.id === active.id ? { ...l, ...updated } : l)))
+      const merged = { ...active, ...updated } as LessonData
+      setLessons((ls) => ls.map((l) => (l.id === active.id ? merged : l)))
+      // Re-seed from the SERVER's echo, so what the teacher sees after Save is
+      // exactly what the database holds (never a local-only value).
+      setDraft(draftFrom(merged))
       setSaved(true)
       setDirty(false)
       setTimeout(() => setSaved(false), 3000)
@@ -293,7 +393,21 @@ export function LessonWorkspace({
 
   const isSpecial = Boolean(active.special_period_label || active.special_period_type)
   const objectives = active.learning_objectives || []
-  const resources = [...(active.source_tlrs || []), ...(active.other_tlrs || [])]
+  // PART 6/22: the four WAPEF fields are first-class only for the Approved
+  // WAPEF Plan. Any other template intentionally hides them.
+  const isWapefTemplate = active.template_id === WAPEF_TEMPLATE_ID
+  // PART 2/28: the curriculum reference names THIS lesson's subject
+  // ("Computing Curriculum") — never a hard-coded "Subject Curriculum".
+  const subjectCurriculumLabel =
+    active.subject && active.subject !== 'Unknown'
+      ? `${active.subject} Curriculum`
+      : 'Subject Curriculum'
+  const REFERENCE_TYPES = [
+    subjectCurriculumLabel,
+    "Teacher's Handbook / Teacher's Guide",
+    'Textbook',
+    'Other',
+  ]
 
   // Guided mode shows one section at a time (accept / suggest / skip).
   const stepVisible = (step: GuidedStep) => !guided || guidedStep === step
@@ -333,7 +447,20 @@ export function LessonWorkspace({
         {/* SECTION 1 — CONTEXT */}
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
           <ContextItem label="Subject" value={active.subject} />
-          <ContextItem label="Class" value={active.class_level} />
+          {/* PART 3: "Unknown" is never shown as a generation-ready class. */}
+          <ContextItem
+            label="Class"
+            value={
+              active.class_level && active.class_level !== 'Unknown'
+                ? active.class_level
+                : 'Needs confirmation'
+            }
+          />
+          {/* PART 7: the school this lesson belongs to, server-derived. */}
+          <ContextItem
+            label="School"
+            value={active.school_name || 'Not set in Settings'}
+          />
           <ContextItem label="Week" value={String(active.teaching_week || active.week_number)} />
           {teachingDayLabel(active) && (
             <ContextItem label="Teaching day" value={teachingDayLabel(active)} />
@@ -513,34 +640,208 @@ export function LessonWorkspace({
             </WorkspaceSection>
           )}
 
-          {/* Read-only curriculum context (not AI, not editable here). */}
-          <WorkspaceSection title="Resources">
-            {resources.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {resources.map((r, i) => (
-                  <span key={i} className="rounded bg-[#102A43]/8 px-2 py-1 text-sm text-[#102A43]">
-                    {r}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm italic text-muted-foreground">No resources recorded.</p>
-            )}
+          {/* ASSESSMENT FOLLOW-UP (PART 15): class work and home work are
+              two distinct, teacher-editable tasks inside the lesson structure —
+              not a huge configuration form. */}
+          <WorkspaceSection title="Class Assignment">
+            <TextArea
+              value={draft.classAssignment}
+              onChange={(e) => updateDraft({ classAssignment: e.target.value })}
+              rows={3}
+              aria-label="Class assignment"
+              placeholder="What the class completes during the lesson"
+            />
           </WorkspaceSection>
 
-          {(active.structured_references?.length || 0) > 0 && (
-            <WorkspaceSection title="References">
-              <ul className="list-disc space-y-1 pl-5 text-sm text-[#102A43]">
-                {active.structured_references!.map((r, i) => (
-                  <li key={i}>
-                    {r.title}
-                    {r.page ? ` — p.${r.page}` : ''}
-                    {r.type ? ` (${r.type})` : ''}
-                  </li>
-                ))}
-              </ul>
-            </WorkspaceSection>
-          )}
+          <WorkspaceSection title="Home Assignment">
+            <TextArea
+              value={draft.homeAssignment}
+              onChange={(e) => updateDraft({ homeAssignment: e.target.value })}
+              rows={3}
+              aria-label="Home assignment"
+              placeholder="What learners complete at home after the lesson"
+            />
+          </WorkspaceSection>
+
+          {/* RESOURCES — SOURCE vs LESSON (PART 13/26). The scheme's own list is
+              shown verbatim and read-only; the lesson list is editable so a
+              source spelling error can be corrected without rewriting the
+              uploaded scheme. */}
+          <WorkspaceSection title="Resources">
+            {(active.source_tlrs?.length || 0) > 0 && (
+              <div className="mb-3">
+                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  From your scheme (source — read only)
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {active.source_tlrs!.map((r, i) => (
+                    <span
+                      key={i}
+                      className="rounded bg-[#102A43]/8 px-2 py-1 text-xs text-[#102A43]"
+                    >
+                      {r}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              This lesson&apos;s resources
+            </p>
+            {draft.lessonResources.map((r, i) => (
+              <div key={i} className="mb-1 flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={r}
+                  aria-label={`Lesson resource ${i + 1}`}
+                  onChange={(e) =>
+                    updateDraft({
+                      lessonResources: draft.lessonResources.map((x, j) =>
+                        j === i ? e.target.value : x),
+                    })
+                  }
+                  className="flex-1 rounded-lg border border-input bg-white px-2.5 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#04A9CE]/45"
+                />
+                <button
+                  type="button"
+                  aria-label={`Remove lesson resource ${i + 1}`}
+                  onClick={() =>
+                    updateDraft({
+                      lessonResources: draft.lessonResources.filter((_, j) => j !== i),
+                    })
+                  }
+                  className="text-slate-400 hover:text-red-600"
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
+            ))}
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-1"
+              onClick={() =>
+                updateDraft({ lessonResources: [...draft.lessonResources, ''] })
+              }
+            >
+              <Plus className="mr-1 h-3 w-3" aria-hidden="true" /> Add resource
+            </Button>
+          </WorkspaceSection>
+
+          {/* KEYWORDS — lesson-specific vocabulary, editable (PART 14). */}
+          <WorkspaceSection title="Keywords">
+            {draft.keywords.map((k, i) => (
+              <div key={i} className="mb-1 flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={k}
+                  aria-label={`Keyword ${i + 1}`}
+                  onChange={(e) =>
+                    updateDraft({
+                      keywords: draft.keywords.map((x, j) =>
+                        j === i ? e.target.value : x),
+                    })
+                  }
+                  className="flex-1 rounded-lg border border-input bg-white px-2.5 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#04A9CE]/45"
+                />
+                <button
+                  type="button"
+                  aria-label={`Remove keyword ${i + 1}`}
+                  onClick={() =>
+                    updateDraft({ keywords: draft.keywords.filter((_, j) => j !== i) })
+                  }
+                  className="text-slate-400 hover:text-red-600"
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
+            ))}
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-1"
+              onClick={() => updateDraft({ keywords: [...draft.keywords, ''] })}
+            >
+              <Plus className="mr-1 h-3 w-3" aria-hidden="true" /> Add keyword
+            </Button>
+          </WorkspaceSection>
+
+          {/* REFERENCES — teacher-editable; the curriculum option names THIS
+              lesson's subject (PART 2/28). */}
+          <WorkspaceSection title="References">
+            {draft.references.map((ref, i) => (
+              <div key={i} className="mb-1 flex items-center gap-1.5">
+                <select
+                  value={ref.type || 'Other'}
+                  aria-label={`Reference ${i + 1} type`}
+                  onChange={(e) =>
+                    updateDraft({
+                      references: draft.references.map((x, j) =>
+                        j === i ? { ...x, type: e.target.value } : x),
+                    })
+                  }
+                  className="w-40 rounded-lg border border-input bg-white px-2 py-1.5 text-xs"
+                >
+                  {REFERENCE_TYPES.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  value={ref.title || ''}
+                  aria-label={`Reference ${i + 1} title`}
+                  placeholder="Title"
+                  onChange={(e) =>
+                    updateDraft({
+                      references: draft.references.map((x, j) =>
+                        j === i ? { ...x, title: e.target.value } : x),
+                    })
+                  }
+                  className="flex-1 rounded-lg border border-input bg-white px-2.5 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#04A9CE]/45"
+                />
+                <input
+                  type="text"
+                  value={ref.page || ''}
+                  aria-label={`Reference ${i + 1} page`}
+                  placeholder="Page"
+                  onChange={(e) =>
+                    updateDraft({
+                      references: draft.references.map((x, j) =>
+                        j === i ? { ...x, page: e.target.value } : x),
+                    })
+                  }
+                  className="w-20 rounded-lg border border-input bg-white px-2 py-1.5 text-sm"
+                />
+                <button
+                  type="button"
+                  aria-label={`Remove reference ${i + 1}`}
+                  onClick={() =>
+                    updateDraft({
+                      references: draft.references.filter((_, j) => j !== i),
+                    })
+                  }
+                  className="text-slate-400 hover:text-red-600"
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
+            ))}
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-1"
+              onClick={() =>
+                updateDraft({
+                  references: [
+                    ...draft.references,
+                    { type: subjectCurriculumLabel, title: '', page: '' },
+                  ],
+                })
+              }
+            >
+              <Plus className="mr-1 h-3 w-3" aria-hidden="true" /> Add reference
+            </Button>
+          </WorkspaceSection>
 
           {(active.core_competencies?.length || 0) > 0 && (
             <WorkspaceSection title="Core Competencies">
@@ -554,19 +855,98 @@ export function LessonWorkspace({
             </WorkspaceSection>
           )}
 
-          {(active.keywords?.length || 0) > 0 && (
-            <WorkspaceSection title="Keywords">
-              <p className="text-sm text-[#102A43]">{active.keywords!.join(', ')}</p>
-            </WorkspaceSection>
-          )}
-
-          {(active.wapef_deep_hope || active.wapef_storyline || active.wapef_gods_story) && (
-            <WorkspaceSection title="WAPEF">
-              <dl className="space-y-1 text-sm text-[#102A43]">
-                {active.wapef_deep_hope && <div><dt className="inline font-medium">Deep Hope: </dt><dd className="inline">{active.wapef_deep_hope}</dd></div>}
-                {active.wapef_storyline && <div><dt className="inline font-medium">Storyline: </dt><dd className="inline">{active.wapef_storyline}</dd></div>}
-                {active.wapef_gods_story && <div><dt className="inline font-medium">God&apos;s Story: </dt><dd className="inline">{active.wapef_gods_story}</dd></div>}
-              </dl>
+          {/* WAPEF four fields (PART 6/22): first-class when the WAPEF plan is
+              the selected template — editable here and persisted verbatim.
+              They disappear only when a non-WAPEF template is in use. */}
+          {isWapefTemplate && (
+            <WorkspaceSection title="WAPEF fields">
+              <p className="mb-2 text-xs text-muted-foreground">
+                Teacher-selected values. The AI never chooses or rewrites these;
+                the export prints exactly what is saved here.
+              </p>
+              {wapefOptions ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="text-xs font-semibold text-[#102A43]">
+                    Deep Hope
+                    <select
+                      value={draft.wapefDeepHope}
+                      aria-label="Deep Hope"
+                      onChange={(e) => updateDraft({ wapefDeepHope: e.target.value })}
+                      className="mt-1 w-full rounded-lg border border-input bg-white px-2.5 py-1.5 text-sm"
+                    >
+                      <option value="">— Select —</option>
+                      {wapefOptions.deep_hopes.map((o) => (
+                        <option key={o} value={o}>{o}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="text-xs font-semibold text-[#102A43]">
+                    Storyline
+                    <select
+                      value={draft.wapefStoryline}
+                      aria-label="Storyline"
+                      onChange={(e) => updateDraft({ wapefStoryline: e.target.value })}
+                      className="mt-1 w-full rounded-lg border border-input bg-white px-2.5 py-1.5 text-sm"
+                    >
+                      <option value="">— Select —</option>
+                      {wapefOptions.storylines.map((o) => (
+                        <option key={o} value={o}>{o}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="text-xs font-semibold text-[#102A43]">
+                    God&apos;s Story
+                    <select
+                      value={draft.wapefGodsStory}
+                      aria-label="God's Story"
+                      onChange={(e) => updateDraft({ wapefGodsStory: e.target.value })}
+                      className="mt-1 w-full rounded-lg border border-input bg-white px-2.5 py-1.5 text-sm"
+                    >
+                      <option value="">— Select —</option>
+                      {wapefOptions.gods_story.map((o) => (
+                        <option key={o} value={o}>{o}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              ) : null}
+              <p className="mt-3 mb-1 text-xs font-semibold text-[#102A43]">
+                Through lines (select all that apply)
+              </p>
+              {wapefOptions ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {wapefOptions.through_lines.map((o) => {
+                    const selected = draft.wapefThroughLines.includes(o)
+                    return (
+                      <button
+                        key={o}
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() =>
+                          updateDraft({
+                            wapefThroughLines: selected
+                              ? draft.wapefThroughLines.filter((t) => t !== o)
+                              : [...draft.wapefThroughLines, o],
+                          })
+                        }
+                        className={`rounded border px-2 py-0.5 text-xs ${
+                          selected
+                            ? 'border-[#102A43] bg-[#102A43] text-white'
+                            : 'bg-background text-muted-foreground'
+                        }`}
+                      >
+                        {o}
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-[#102A43]">
+                  {draft.wapefThroughLines.length
+                    ? draft.wapefThroughLines.join(', ')
+                    : 'No Through lines selected.'}
+                </p>
+              )}
             </WorkspaceSection>
           )}
 
@@ -633,9 +1013,9 @@ function WorkspaceSection({
             disabled={suggesting}
           >
             {suggesting ? (
-              <><Loader2 className="mr-1 h-3 w-3 animate-spin" /> Suggesting…</>
+              <><Loader2 className="mr-1 h-3 w-3 animate-spin" aria-hidden="true" /> Suggesting…</>
             ) : (
-              <><Sparkles className="mr-1 h-3 w-3" /> Suggest</>
+              <><Sparkles className="mr-1 h-3 w-3" aria-hidden="true" /> Suggest</>
             )}
           </Button>
         )}
