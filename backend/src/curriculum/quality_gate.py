@@ -36,6 +36,497 @@ class QualityIssue:
 
 
 @dataclass
+class BatchQualityReport:
+    """Variation/anti-repetition gate result for a WHOLE batch of lessons.
+
+    The single-lesson gate cannot judge repetition or lesson-to-lesson
+    continuity — those are properties of the batch. This report carries the
+    batch-level checks so a generated batch can fail the gate as a whole.
+    """
+
+    lessons: int = 0
+    issues: List[QualityIssue] = field(default_factory=list)
+
+    @property
+    def passed(self) -> bool:
+        return not any(i.status == QualityStatus.FAIL for i in self.issues)
+
+    @property
+    def failures(self) -> List[QualityIssue]:
+        return [i for i in self.issues if i.status == QualityStatus.FAIL]
+
+    def summary(self) -> Dict[str, Any]:
+        return {
+            "lessons": self.lessons,
+            "passed": self.passed,
+            "failures": len(self.failures),
+            "failure_messages": [i.message for i in self.failures],
+        }
+
+
+# ── Pattern & variation checks (Layers 3/4) ─────────────────────────────────
+#
+# Twelve checks extending the single-lesson gate; nine run per lesson inside
+# ``validate_lesson_quality`` and three run across a batch inside
+# ``validate_batch_variation``. They are not arbitrary: each has a explicit
+# PASS/WARN/FAIL condition and a lesson (or batch) that violates it FAILS.
+
+_GENERIC_FILLER = (
+    "learners practise the concept",
+    "complete the task",
+    "do the activity",
+    "work with your partner",
+)
+
+#: Activity-type → resource-support signal. A lesson whose main activity type
+#: is practical/investigative needs SOMETHING concrete listed; a discussion-
+#: type lesson does not.
+_ACTIVITY_RESOURCE_NEEDS = {
+    "practical", "investigation", "observation", "creation",
+    "demonstration", "classification", "experiment",
+}
+
+
+def _plain(value: Any) -> str:
+    """Normalise a field to a plain string (model_dump() keeps enums)."""
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    # Enum member (Subject.MATHEMATICS etc.) — use its value, never str().
+    return str(getattr(value, "value", value))
+
+
+def _lesson_focus(lesson: Dict[str, Any]) -> str:
+    """The lesson's own indicator text, code-stripped, for alignment checks."""
+    parts = lesson.get("indicators") or []
+    text = " ".join(str(p) for p in parts if p)
+    if not text:
+        text = str(lesson.get("lesson_topic") or "")
+    code_re = re.compile(r"[BbKk]?\d+(?:\.\d+){2,4}")
+    return code_re.sub("", text).strip()
+
+
+def _lesson_main_descriptions(lesson: Dict[str, Any]) -> List[str]:
+    return [str(a.get("description", "")) for a in (lesson.get("main_activities") or [])]
+
+
+def _check_pattern_focus_alignment(lesson: Dict[str, Any]) -> List[QualityIssue]:
+    """(1) Every MAIN phase names the lesson's own indicator focus — a phase
+    about 'the concept' with no link to THIS indicator is not teachable as is.
+    """
+    focus = _lesson_focus(lesson)
+    if not focus or len(focus) < 4:
+        return []
+    focus_words = {w for w in re.findall(r"[a-z]{3,}", focus.lower())}
+    # Drop very generic curriculum words so the check is not vacuous.
+    focus_words -= {"learners", "learner", "indicator", "the", "and", "able"}
+    if not focus_words:
+        return []
+    issues = []
+    descs = _lesson_main_descriptions(lesson)
+    missing = [i for i, desc in enumerate(descs)
+               if not any(w in desc.lower() for w in focus_words)]
+    if missing:
+        issues.append(QualityIssue(
+            check_name="phase_indicator_focus",
+            status=QualityStatus.WARN,
+            message=f"{len(missing)} of {len(descs)} main phases do not "
+                    f"reference the lesson's indicator focus.",
+            severity="warning", category="activities",
+        ))
+    else:
+        issues.append(QualityIssue(
+            check_name="phase_indicator_focus", status=QualityStatus.PASS,
+            message="Main phases reference the lesson's indicator focus.",
+            category="activities",
+        ))
+    return issues
+
+
+def _check_objective_indicator_alignment(lesson: Dict[str, Any]) -> List[QualityIssue]:
+    """(2) The learning objective points at THIS indicator, not generic work."""
+    focus = _lesson_focus(lesson)
+    objectives = lesson.get("learning_objectives") or []
+    obj_text = " ".join(str(o.get("description", "")) for o in objectives).lower()
+    if not focus or not obj_text or len(focus) < 4:
+        return []
+    focus_words = {w for w in re.findall(r"[a-z]{3,}", focus.lower())}
+    focus_words -= {"learners", "learner", "indicator", "able"}
+    if not focus_words:
+        return []
+    if not any(w in obj_text for w in focus_words):
+        return [QualityIssue(
+            check_name="objective_indicator_alignment",
+            status=QualityStatus.FAIL,
+            message="Learning objective does not reference the lesson's indicator focus.",
+            severity="error", category="objectives",
+        )]
+    return [QualityIssue(
+        check_name="objective_indicator_alignment", status=QualityStatus.PASS,
+        message="Learning objective references the lesson's indicator focus.",
+        category="objectives",
+    )]
+
+
+def _check_phase_action_specificity(lesson: Dict[str, Any]) -> List[QualityIssue]:
+    """(3) Phases describe concrete teacher/learner actions — never a bare
+    heading, never 'Learners practise input devices' style filler.
+
+    A main phase that carries neither a teacher action nor enough room for a
+    learner action cannot be taught from, so it is a FAIL. Merely terse phases
+    are a warning.
+    """
+    descs = _lesson_main_descriptions(lesson)
+    if not descs:
+        return []
+    filler = [d for d in descs if any(p in d.lower() for p in _GENERIC_FILLER)]
+    # A phase with no teacher role AND under 45 characters names neither the
+    # teaching move nor a usable learner task.
+    unteachable = [d for d in descs
+                   if len(d.strip()) < 45 and "teacher" not in d.lower()]
+    if filler or unteachable:
+        first = (filler or unteachable)[0]
+        kind = "generic filler" if filler else "no teachable detail"
+        return [QualityIssue(
+            check_name="phase_action_specificity", status=QualityStatus.FAIL,
+            message=f"Main phase is not teachable as written ({kind}): "
+                    f"{first.strip()[:80]}",
+            severity="error", category="activities",
+        )]
+    thin = [d for d in descs if len(d.strip()) < 40]
+    if len(thin) > len(descs) // 2:
+        return [QualityIssue(
+            check_name="phase_action_specificity", status=QualityStatus.WARN,
+            message="Main phases are too short to describe concrete actions.",
+            severity="warning", category="activities",
+        )]
+    return [QualityIssue(
+        check_name="phase_action_specificity", status=QualityStatus.PASS,
+        message="Main phases describe concrete teacher and learner actions.",
+        category="activities",
+    )]
+
+
+def _check_subject_specific_pedagogy(lesson: Dict[str, Any]) -> List[QualityIssue]:
+    """(4) Subject specificity: the MAIN phases must not all be identical to
+    another subject's generic template — every phase carries the subject's own
+    pedagogical voice. Checked structurally: phases use the subject's verb
+    vocabulary, never a subject-agnostic placeholder."""
+    subject = _plain(lesson.get("subject")).lower()
+    descs = _lesson_main_descriptions(lesson)
+    if not subject or not descs:
+        return []
+    blob = " ".join(descs).lower()
+    # Subject-agnostic placeholders that indicate the pedagogy layer was
+    # bypassed entirely.
+    placeholders = ("this topic", "the concept", "the lesson topic")
+    if any(p in blob for p in placeholders):
+        return [QualityIssue(
+            check_name="subject_specific_pedagogy", status=QualityStatus.WARN,
+            message="Main phases use subject-agnostic placeholders.",
+            severity="warning", category="activities",
+        )]
+    return [QualityIssue(
+        check_name="subject_specific_pedagogy", status=QualityStatus.PASS,
+        message="Main phases carry subject-specific pedagogy.",
+        category="activities",
+    )]
+
+
+def _check_pattern_subject_suitability(lesson: Dict[str, Any]) -> List[QualityIssue]:
+    """(5) The selected teaching pattern must be compatible with the lesson's
+    subject — an incompatible pattern is a selection defect, not a style."""
+    from .patterns import pattern_for_id
+
+    pattern_id = str(lesson.get("pattern_id") or "").strip()
+    if not pattern_id:
+        # No pattern (single-lesson/early-years path) — nothing to check.
+        return []
+    pattern = pattern_for_id(pattern_id)
+    if pattern is None:
+        return [QualityIssue(
+            check_name="pattern_subject_suitability", status=QualityStatus.WARN,
+            message=f"Lesson carries unknown pattern id '{pattern_id}'.",
+            severity="warning", category="activities",
+        )]
+    subject = _plain(lesson.get("subject")).strip().lower()
+    from .pedagogy import profile_for_subject
+    profile_key = profile_for_subject(subject).key
+    if pattern.compatible_subjects and profile_key not in pattern.compatible_subjects:
+        return [QualityIssue(
+            check_name="pattern_subject_suitability", status=QualityStatus.FAIL,
+            message=f"Pattern '{pattern.name}' is not compatible with {subject}.",
+            severity="error", category="activities",
+        )]
+    return [QualityIssue(
+        check_name="pattern_subject_suitability", status=QualityStatus.PASS,
+        message=f"Pattern '{pattern.name}' is compatible with the lesson subject.",
+        category="activities",
+    )]
+
+
+def _check_filler_density(lesson: Dict[str, Any]) -> List[QualityIssue]:
+    """(7) Generic filler density: the lesson's phases must not lean on
+    filler sentences as padding."""
+    blob = " ".join([str(lesson.get("starter_activity") or ""),
+                     " ".join(_lesson_main_descriptions(lesson)),
+                     str(lesson.get("conclusion") or "")]).lower()
+    hits = [p for p in _GENERIC_FILLER if p in blob]
+    if hits:
+        return [QualityIssue(
+            check_name="filler_density", status=QualityStatus.WARN,
+            message=f"Generic filler present: {hits[:2]}",
+            severity="warning", category="coherence",
+        )]
+    return [QualityIssue(
+        check_name="filler_density", status=QualityStatus.PASS,
+        message="No generic filler in the lesson phases.", category="coherence",
+    )]
+
+
+def _check_assessment_activity_alignment(lesson: Dict[str, Any]) -> List[QualityIssue]:
+    """(8) The assessment must align with the indicator's own action — an
+    indicator that asks learners to 'classify' must not be assessed only with
+    a written recall test."""
+    focus = _lesson_focus(lesson)
+    assessment = str(lesson.get("assessment") or "")
+    if not focus or not assessment.strip() or len(focus) < 4:
+        return []
+    action_verbs = set(re.findall(r"\b(classif|sort|group|investigat|predict|"
+                                  r"experiment|demonstrat|perform|create|design|"
+                                  r"compose|construct|compare| analys|analyz|"
+                                  r"discuss|explain|describe|solve|calculate|"
+                                  r"apply|measure|observe)\w*", focus.lower()))
+    if not action_verbs:
+        return []
+    low = assessment.lower()
+    if not any(v in low for v in action_verbs):
+        return [QualityIssue(
+            check_name="assessment_activity_alignment", status=QualityStatus.WARN,
+            message="Assessment does not use the indicator's own action verb.",
+            severity="warning", category="assessment",
+        )]
+    return [QualityIssue(
+        check_name="assessment_activity_alignment", status=QualityStatus.PASS,
+        message="Assessment uses the indicator's own action verb.",
+        category="assessment",
+    )]
+
+
+def _check_assignment_alignment(lesson: Dict[str, Any]) -> List[QualityIssue]:
+    """(9) Class and home assignments must be real tasks tied to the
+    indicator, not empty or generic stand-ins."""
+    issues = []
+    focus = _lesson_focus(lesson)
+    for field_name, label in (("class_assignment", "Class"),
+                              ("home_assignment", "Home")):
+        value = str(lesson.get(field_name) or "").strip()
+        if not value:
+            issues.append(QualityIssue(
+                check_name=f"{field_name}_alignment",
+                status=QualityStatus.WARN,
+                message=f"{label} assignment is empty.", severity="warning",
+                category="assessment",
+            ))
+        elif len(value) < 20:
+            issues.append(QualityIssue(
+                check_name=f"{field_name}_alignment",
+                status=QualityStatus.WARN,
+                message=f"{label} assignment is too short to be a real task.",
+                severity="warning", category="assessment",
+            ))
+        else:
+            issues.append(QualityIssue(
+                check_name=f"{field_name}_alignment", status=QualityStatus.PASS,
+                message=f"{label} assignment is a concrete task.",
+                category="assessment",
+            ))
+    # Both assignments must not be identical copies of each other.
+    ca = str(lesson.get("class_assignment") or "").strip()
+    ha = str(lesson.get("home_assignment") or "").strip()
+    if ca and ha and ca == ha:
+        issues.append(QualityIssue(
+            check_name="assignment_differentiation", status=QualityStatus.FAIL,
+            message="Class and home assignments are identical.",
+            severity="error", category="assessment",
+        ))
+    elif ca and ha:
+        issues.append(QualityIssue(
+            check_name="assignment_differentiation", status=QualityStatus.PASS,
+            message="Class and home assignments are distinct tasks.",
+            category="assessment",
+        ))
+    if focus and (ca or ha):
+        blob = f"{ca} {ha}".lower()
+        focus_words = {w for w in re.findall(r"[a-z]{3,}", focus.lower())}
+        focus_words -= {"learners", "learner", "indicator", "able"}
+        if focus_words and not any(w in blob for w in focus_words):
+            issues.append(QualityIssue(
+                check_name="assignment_indicator_alignment",
+                status=QualityStatus.WARN,
+                message="Assignments do not reference the lesson's indicator focus.",
+                severity="warning", category="assessment",
+            ))
+            return issues
+        if focus_words:
+            issues.append(QualityIssue(
+                check_name="assignment_indicator_alignment",
+                status=QualityStatus.PASS,
+                message="Assignments reference the lesson's indicator focus.",
+                category="assessment",
+            ))
+    return issues
+
+
+def _check_resource_alignment(lesson: Dict[str, Any]) -> List[QualityIssue]:
+    """(10) A practical/investigative lesson must list concrete resources —
+    'practical work' with nothing on the table cannot be taught."""
+    descs = _lesson_main_descriptions(lesson)
+    resources = [str(r) for r in (lesson.get("teaching_learning_resources") or [])]
+    blob = " ".join(descs).lower()
+    needs_concrete = any(t in blob for t in
+                         ("practical", "investigate", "experiment", "observe",
+                          "device", "apparatus", "materials", "measure"))
+    if not needs_concrete:
+        return [QualityIssue(
+            check_name="resource_alignment", status=QualityStatus.PASS,
+            message="Lesson activity does not require concrete resources.",
+            category="practicality",
+        )]
+    if not resources:
+        return [QualityIssue(
+            check_name="resource_alignment", status=QualityStatus.WARN,
+            message="Practical/investigative phase but no resources listed.",
+            severity="warning", category="practicality",
+        )]
+    return [QualityIssue(
+        check_name="resource_alignment", status=QualityStatus.PASS,
+        message="Practical phases have listed resources.", category="practicality",
+    )]
+
+
+def _new_variation_checks(lesson: Dict[str, Any]) -> List[QualityIssue]:
+    """The nine per-lesson pattern/variation checks (checks 1-5, 7-10)."""
+    issues: List[QualityIssue] = []
+    issues.extend(_check_pattern_focus_alignment(lesson))
+    issues.extend(_check_objective_indicator_alignment(lesson))
+    issues.extend(_check_phase_action_specificity(lesson))
+    issues.extend(_check_subject_specific_pedagogy(lesson))
+    issues.extend(_check_pattern_subject_suitability(lesson))
+    issues.extend(_check_filler_density(lesson))
+    issues.extend(_check_assessment_activity_alignment(lesson))
+    issues.extend(_check_assignment_alignment(lesson))
+    issues.extend(_check_resource_alignment(lesson))
+    return issues
+
+
+def validate_batch_variation(
+    lessons: List[Dict[str, Any]],
+    *,
+    class_level: str = "",
+) -> BatchQualityReport:
+    """Batch-level variation gate (checks 6, 11, 12).
+
+      6.  no identical phase sequences across UNRELATED lessons;
+      11. prior-lesson continuity: consecutive lessons on the same strand
+          carry a starter that builds on what came before;
+      12. no inappropriate pattern repetition (cloned phases or one shape
+          dominating the batch).
+
+    A batch that violates any of these FAILS — the same standard as the
+    single-lesson gate.
+    """
+    from .variation import BatchHistory, fingerprint_lesson
+
+    report = BatchQualityReport(lessons=len(lessons))
+    if len(lessons) < 2:
+        return report
+
+    history = BatchHistory(class_level=class_level)
+    for lesson in lessons:
+        history.record(fingerprint_lesson(
+            lesson, pattern_id=str(lesson.get("pattern_id") or "")))
+
+    rep = history.repetition_report()
+
+    # 6 / 12. cloned or dominating phase sequences across unrelated lessons.
+    # A clone (identical RENDERED phases) is a hard failure — the batch
+    # repeats itself. A dominating shape may still be curriculum-justified, so
+    # it is a warning: the gate flags it, the teacher decides.
+    for dup in rep.get("duplicated_phase_sequences", []):
+        status = QualityStatus.FAIL if dup.get("cloned") else QualityStatus.WARN
+        report.issues.append(QualityIssue(
+            check_name="batch_phase_repetition",
+            status=status,
+            message=(f"{dup['count']} lessons share the identical teaching shape "
+                     f"('{dup['pattern']}')"
+                     + (" with identical rendered phases." if dup.get("cloned")
+                        else ", which dominates the batch.")),
+            severity="error" if dup.get("cloned") else "warning",
+            category="coherence",
+        ))
+
+    # 12b. identical starter text across lessons (one opener for the batch).
+    for dup in rep.get("duplicated_starters", []):
+        report.issues.append(QualityIssue(
+            check_name="batch_starter_repetition",
+            status=QualityStatus.FAIL,
+            message=f"{dup['count']} lessons open with the identical starter text.",
+            severity="error", category="coherence",
+        ))
+
+    # 6b. identical rendered main sequence (cloned MAIN block).
+    for dup in rep.get("duplicated_main_sequences", []):
+        report.issues.append(QualityIssue(
+            check_name="batch_main_repetition",
+            status=QualityStatus.FAIL,
+            message=f"{dup['count']} lessons share the identical MAIN sequence.",
+            severity="error", category="coherence",
+        ))
+
+    # 12c. a single pattern dominating an otherwise varied batch.
+    distinct = rep.get("distinct_patterns", 0)
+    if distinct and len(lessons) >= 6 and distinct == 1:
+        report.issues.append(QualityIssue(
+            check_name="batch_pattern_diversity",
+            status=QualityStatus.WARN,
+            message="The whole batch used one teaching pattern.",
+            severity="warning", category="coherence",
+        ))
+    elif distinct and len(lessons) >= 6:
+        report.issues.append(QualityIssue(
+            check_name="batch_pattern_diversity", status=QualityStatus.PASS,
+            message=f"Batch used {distinct} distinct teaching patterns.",
+            category="coherence",
+        ))
+
+    # 11. prior-lesson continuity: consecutive lessons must not contradict
+    # the teaching order — the next lesson's starter must reference something
+    # the previous lesson taught (link), and no two consecutive lessons may
+    # carry the exact same indicator focus.
+    for i in range(1, len(lessons)):
+        prev_focus = _lesson_focus(lessons[i - 1])
+        this_focus = _lesson_focus(lessons[i])
+        if prev_focus and this_focus and prev_focus == this_focus:
+            report.issues.append(QualityIssue(
+                check_name="prior_lesson_continuity",
+                status=QualityStatus.WARN,
+                message=f"Lessons {i} and {i + 1} carry the identical indicator "
+                        f"focus — a duplicated lesson.",
+                severity="warning", category="curriculum",
+            ))
+    if not any(i.check_name == "prior_lesson_continuity" for i in report.issues):
+        report.issues.append(QualityIssue(
+            check_name="prior_lesson_continuity", status=QualityStatus.PASS,
+            message="No duplicated consecutive indicator focus.",
+            category="curriculum",
+        ))
+
+    return report
+
+
+@dataclass
 class QualityReport:
     """Aggregated quality validation report for a lesson plan."""
     overall_status: str = QualityStatus.PASS
@@ -909,6 +1400,9 @@ def validate_lesson_quality(
     all_issues.extend(_check_irrelevant_content(lesson))
     if indicator:
         all_issues.extend(_check_indicator_exactness(lesson, indicator))
+
+    # ── Pattern & variation checks (Layers 3/4): nine per-lesson checks ──
+    all_issues.extend(_new_variation_checks(lesson))
 
     report.issues = all_issues
 
