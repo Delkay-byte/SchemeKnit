@@ -47,7 +47,9 @@ from ..models import (
 from .pedagogy import profile_for_subject, SubjectPedagogy
 from ..ai_resource_text import normalize_text_items
 
-_CODE_RE = re.compile(r"^\s*[BbKk]?\d+(?:\.\d+){2,4}[.:]?\s*")
+#: The canonical code patterns live in the curriculum package so the builder,
+#: the allocation engine and every template renderer agree on what a code is.
+from . import CODE_PREFIX_RE as _CODE_RE  # noqa: E402
 
 #: Legacy learner-facing prefixes stripped before re-phrasing.
 _LEARNER_PREFIXES = (
@@ -68,6 +70,41 @@ _STOPWORDS = {
     "knowledge", "skill", "skills", "lesson", "learners", "learner",
     "students", "pupils", "including", "such", "e.g", "eg", "i.e", "ie",
     "correctly", "accurately", "own", "words", "different", "various",
+    # Relations/pronouns that carried no vocabulary value into a keyword list.
+    "between", "within", "through", "across", "among", "about", "also",
+    "both", "each", "other", "others", "more", "most", "same", "involving",
+    "involve", "involves", "him", "her", "his", "he", "she", "we", "our",
+    "us", "you", "your", "they", "i", "ways", "way",
+}
+
+#: Bloom action verbs (PART 14). They say what learners DO, not what the
+#: lesson is ABOUT, so they are not vocabulary: repeating "distinguish",
+#: "compare", "discuss" in every keyword list was the reported defect.
+_BLOOM_ACTION_WORDS = {
+    "identify", "recognise", "recognize", "summarise", "summarize",
+    "interpret", "classify", "compare", "contrast", "paraphrase",
+    "illustrate", "exemplify", "clarify", "demonstrate", "solve",
+    "calculate", "perform", "execute", "implement", "construct", "build",
+    "draw", "record", "measure", "complete", "practice", "practise",
+    "analyse", "analyze", "examine", "investigate", "differentiate",
+    "distinguish", "categorise", "categorize", "organise", "organize",
+    "determine", "evaluate", "assess", "judge", "justify", "critique",
+    "review", "argue", "defend", "recommend", "decide", "select",
+    "choose", "rate", "design", "produce", "plan", "compose",
+    "formulate", "generate", "develop", "compute", "find", "prepare",
+    "sort", "group", "state", "name", "label", "match", "list",
+    "describe", "explain", "discuss", "define", "read", "write",
+    "observe", "apply", "show", "give", "take", "make", "create",
+    # Arithmetic operations: the lesson's own noun ("addition", "fractions")
+    # is the vocabulary, not the command.
+    "add", "subtract", "multiply", "divide", "sum", "simplify", "convert",
+}
+
+#: Multi-word generic activity phrases the interpreter supplies as action
+#: context — useful for selecting a phase, never useful as lesson vocabulary.
+_KEYWORD_NOISE = {
+    "share views", "sharing ideas", "talk about", "talk", "debate",
+    "ideas", "things", "stuff", "activity", "activities",
 }
 
 # ── Indicator-activity phase banks ─────────────────────────────────────────
@@ -76,6 +113,59 @@ _STOPWORDS = {
 # {topic}, {bloom}, {evidence}, {class_level}.
 # The bank is keyed by the indicator's activity type so a problem-solving
 # lesson and an investigation lesson do not share one skeleton.
+
+#: How THIS subject puts the activity into practice (PART 17). The shared
+#: activity banks select the structure from the indicator's verb; this sentence
+#: is appended to the MAIN block's consolidating phase so the same verb is
+#: taught the way the subject actually does it — a discussion in RME and a
+#: discussion in Mathematics no longer share one identical skeleton. One
+#: bounded sentence per subject, never a subject-sized prompt.
+_SUBJECT_PRACTICE_CLAUSE: Dict[str, str] = {
+    "mathematics": (
+        "Insist on the full working, not only the answer, and link the numbers "
+        "to a real Ghanaian context learners can picture."
+    ),
+    "science": (
+        "Base every answer on what was actually observed or measured, and keep "
+        "the recording in a simple labelled table."
+    ),
+    "english": (
+        "Require the target language features and support every point with "
+        "evidence from the text or the learner's own experience."
+    ),
+    "social_studies": (
+        "Connect the idea to people, places and decisions in the learners' own "
+        "community."
+    ),
+    "creative_arts": (
+        "Work with the correct technique and locally available materials, and "
+        "judge the work against a simple shared criteria list."
+    ),
+    "ict": (
+        "Handle the real device or a labelled diagram of it, and name each part "
+        "with its correct term while using it."
+    ),
+    "rme": (
+        "Give reasons respectfully, listen to a different view, and connect the "
+        "idea to how learners should live and relate to others."
+    ),
+    "phe": (
+        "Keep the body position safe and controlled, and let every learner take "
+        "an active turn rather than watch."
+    ),
+    "career_technology": (
+        "Follow the correct procedure in order, observe the safety rules for the "
+        "tools, and inspect the finished product against them."
+    ),
+    "early_childhood": (
+        "Keep the activity playful and concrete: movement, song or real objects, "
+        "with the teacher observing what each child can do."
+    ),
+    "nursery": (
+        "Keep the activity playful and concrete, and assess by watching what "
+        "each child does with the real objects."
+    ),
+}
 
 _PHASE_BANK: Dict[str, List[Tuple[str, str]]] = {
     "problem_solving": [
@@ -224,6 +314,155 @@ _PHASE_BANK: Dict[str, List[Tuple[str, str]]] = {
         ("Independent application",
          "Learners perform the task for {focus_short} on their own and check "
          "their work against the demonstrated steps."),
+    ],
+}
+
+#: Learner-activity templates keyed by activity type — what LEARNERS do in
+#: each phase. Parallel to ``_PHASE_BANK`` (which describes the teacher's
+#: action) so the learner column is equally specific: a classification lesson
+#: has learners sorting and justifying, an investigation has learners
+#: recording evidence. This replaces the generic "Watch and listen carefully"
+#: / "Complete the task" fallbacks with concrete, indicator-tied actions.
+_LEARNER_PHASE_BANK: Dict[str, List[Tuple[str, str]]] = {
+    "problem_solving": [
+        ("Worked example",
+         "Follow the worked example for {focus_short} on the board, noting each "
+         "step and the reason for it."),
+        ("Guided practice",
+         "In mixed-ability pairs, solve a parallel problem on {focus_short}, "
+         "explaining each step to your partner."),
+        ("Independent practice",
+         "Solve two problems on {focus_short} alone, then check your method "
+         "against the board."),
+    ],
+    "investigation": [
+        ("Prediction",
+         "Record your prediction about {focus_short} and the reason for it "
+         "before starting."),
+        ("Investigation",
+         "Carry out the activity for {focus_short} in your group using "
+         "{resource}, recording what you observe or measure."),
+        ("Explanation",
+         "Explain how your group's evidence supports or contradicts your "
+         "prediction about {focus_short}."),
+    ],
+    "practical": [
+        ("Demonstration",
+         "Watch the demonstration of {focus_short} and note the order of steps "
+         "and the safety points."),
+        ("Guided practical",
+         "Carry out the practical task for {focus_short} in your group using "
+         "{resource}, following the demonstrated steps."),
+        ("Application",
+         "Complete one task on {focus_short} and inspect your own product "
+         "against the steps."),
+    ],
+    "classification": [
+        ("Presentation of examples",
+         "Examine the two contrasting examples for {focus_short} and identify "
+         "what is the same and what is different."),
+        ("Classification activity",
+         "Sort or group the given items by the rule for {focus_short}, "
+         "explaining the basis of each group."),
+        ("Accuracy check",
+         "Review the class groups, challenge one borderline item and agree "
+         "the correct classification for {focus_short}."),
+    ],
+    "observation": [
+        ("Directed observation",
+         "Observe {focus_short} closely, focusing on the features the teacher "
+         "points out."),
+        ("Recording",
+         "Record your observations of {focus_short} in a simple table or "
+         "labelled diagram using the correct terms."),
+        ("Discussion of findings",
+         "Compare your observations with other groups and identify the key "
+         "pattern about {focus_short}."),
+    ],
+    "reading": [
+        ("Vocabulary and preview",
+         "Learn the key words for {focus_short} and preview the text, "
+         "predicting its content from the title."),
+        ("Guided reading",
+         "Read the text for {focus_short} together, underlining evidence "
+         "relevant to the indicator."),
+        ("Comprehension task",
+         "Answer comprehension questions on {focus_short}, giving evidence "
+         "from the text."),
+    ],
+    "writing": [
+        ("Model text",
+         "Study the model showing how {focus_short} is done and note the "
+         "features to reproduce."),
+        ("Guided writing",
+         "Plan and draft your own piece for {focus_short} using the model as "
+         "a scaffold."),
+        ("Independent writing",
+         "Complete and improve your piece on {focus_short} against a short "
+         "checklist."),
+    ],
+    "discussion": [
+        ("Stimulus",
+         "Examine the scenario or question about {focus_short} and identify "
+         "the key issue involved."),
+        ("Structured discussion",
+         "Take part in the group discussion on {focus_short}, giving reasons "
+         "and responding to other views."),
+        ("Application",
+         "Apply the discussion to a local situation and answer 'what would we "
+         "do here?' about {focus_short}."),
+    ],
+    "comparison": [
+        ("First item",
+         "Examine the first item for {focus_short} and note its features."),
+        ("Second item",
+         "Examine the second item and note how it differs for {focus_short}."),
+        ("Comparison task",
+         "Complete a comparison chart for {focus_short}, stating the "
+         "similarities and differences clearly."),
+    ],
+    "creation": [
+        ("Inspiration",
+         "Examine the sample connected to {focus_short} and notice how it was "
+         "made or performed."),
+        ("Creation",
+         "Create your own work applying {focus_short}, using {resource}."),
+        ("Critique and revision",
+         "Display or perform your work, give kind specific feedback on "
+         "{focus_short}, then revise."),
+    ],
+    "analysis": [
+        ("Present data/source",
+         "Examine the data or source linked to {focus_short} and check you "
+         "understand what it shows."),
+        ("Analysis",
+         "Break down the information for {focus_short}, identifying patterns, "
+         "causes or relationships."),
+        ("Findings",
+         "Report your group's findings about {focus_short} and agree the key "
+         "conclusion."),
+    ],
+    "reflection": [
+        ("Experience review",
+         "Recall the experience or learning linked to {focus_short} and "
+         "identify what stood out."),
+        ("Reflection task",
+         "Reflect on {focus_short} in writing, justifying what you would keep "
+         "or change."),
+        ("Sharing",
+         "Share your reflections about {focus_short} and identify the main "
+         "lesson."),
+    ],
+    "demonstration": [
+        ("Teacher demonstration",
+         "Watch the demonstration of {focus_short} and note each step and the "
+         "reason for it."),
+        ("Guided imitation",
+         "Repeat or reproduce the demonstration for {focus_short} with the "
+         "teacher's prompts, using {resource}."),
+        ("Independent application",
+         "Perform the task for {focus_short} on your own and check your work "
+         "against the demonstrated steps."),
     ],
 }
 
@@ -403,6 +642,136 @@ _PLENARY_BANK: Dict[str, str] = {
     ),
 }
 
+#: CLASS ASSIGNMENT templates keyed by activity type (PART 15): the task the
+#: class completes IN the lesson, aligned to the indicator's own action — a
+#: classification indicator gets a sorting task, an investigation gets an
+#: evidence-recording task. Never a generic written question for every lesson.
+_CLASS_ASSIGNMENT_BANK: Dict[str, str] = {
+    "problem_solving": (
+        "In pairs, learners work through two problems on {focus_short} in their "
+        "exercise books. The teacher moves round, checks each pair's method and "
+        "asks one pair to explain their reasoning to the class."
+    ),
+    "investigation": (
+        "Groups carry out the investigation into {focus_short} and record what "
+        "they observe in a table. The teacher checks that each group records "
+        "what they actually saw, not what they expected."
+    ),
+    "practical": (
+        "In groups, learners carry out the practical task for {focus_short}, "
+        "following the demonstrated steps. The teacher observes technique and "
+        "safety and gives short corrective feedback as they work."
+    ),
+    "classification": (
+        "Pairs sort or group the given items by the rule for {focus_short} and "
+        "write one reason for each group. The teacher checks a sample and asks "
+        "two pairs to justify a borderline item."
+    ),
+    "observation": (
+        "Learners observe {focus_short} and record their findings in a simple "
+        "labelled table, using the correct terms. The teacher checks the "
+        "accuracy of the recorded terms."
+    ),
+    "reading": (
+        "Learners read the passage on {focus_short} and answer the "
+        "comprehension questions, giving evidence from the text. The teacher "
+        "checks the answers of three learners and corrects one common error."
+    ),
+    "writing": (
+        "Learners draft their own piece on {focus_short} using the model as a "
+        "scaffold. The teacher circulates, corrects one shared error and asks "
+        "two learners to read their opening sentence aloud."
+    ),
+    "discussion": (
+        "Groups discuss the question on {focus_short} and prepare two reasons "
+        "for their position. Each group presents for one minute and the "
+        "teacher records the strongest points on the board."
+    ),
+    "comparison": (
+        "Learners complete a comparison chart for {focus_short}, listing the "
+        "similarities and differences. The teacher checks three charts against "
+        "the class model."
+    ),
+    "creation": (
+        "Learners create their own work applying {focus_short}, using locally "
+        "available materials. The teacher observes technique and gives short "
+        "feedback while they work."
+    ),
+    "analysis": (
+        "Learners analyse the data or source for {focus_short} and write the "
+        "pattern they find with one piece of supporting evidence. The teacher "
+        "checks the reasoning, not just the answer."
+    ),
+    "reflection": (
+        "Learners write a short reflection on {focus_short}, stating what they "
+        "would keep and what they would change. The teacher reviews a sample "
+        "and gives feedback."
+    ),
+    "demonstration": (
+        "In groups, learners demonstrate the task for {focus_short} while the "
+        "teacher observes and records which learners have met the indicator."
+    ),
+}
+
+#: HOME ASSIGNMENT templates keyed by activity type (PART 15): a genuine
+#: follow-up the learner can complete away from school, reusing the lesson's
+#: own focus. A practical lesson is never forced into a written homework
+#: question, and an investigation gets an observation task instead.
+_HOME_ASSIGNMENT_BANK: Dict[str, str] = {
+    "problem_solving": (
+        "Write and solve three short problems of the same type as today's work "
+        "on {focus_short}. Show each step clearly."
+    ),
+    "investigation": (
+        "Find one more example of {focus_short} at home or in your community "
+        "and write what you observed and what it shows."
+    ),
+    "practical": (
+        "Practise the steps for {focus_short} at home where it is safe to do "
+        "so, and write down the steps you followed."
+    ),
+    "classification": (
+        "Collect or draw five items you can group and write the rule you used "
+        "to group them for {focus_short}."
+    ),
+    "observation": (
+        "Observe something related to {focus_short} at home and record three "
+        "things you notice in your exercise book."
+    ),
+    "reading": (
+        "Read the text on {focus_short} again and write three sentences about "
+        "the main idea."
+    ),
+    "writing": (
+        "Write a short paragraph on {focus_short}, using at least three of "
+        "today's key words."
+    ),
+    "discussion": (
+        "Ask one adult at home about {focus_short} and write two points you "
+        "learned from the conversation."
+    ),
+    "comparison": (
+        "Draw a table comparing two things related to {focus_short} and list "
+        "one similarity and one difference."
+    ),
+    "creation": (
+        "Finish or improve the work you started today on {focus_short} and "
+        "bring it to the next lesson."
+    ),
+    "analysis": (
+        "Find one more example of {focus_short} at home and write what it "
+        "shows."
+    ),
+    "reflection": (
+        "Write three sentences about what you learned in {focus_short} and how "
+        "you will use it at home."
+    ),
+    "demonstration": (
+        "Practise the steps for {focus_short} at home and be ready to show one "
+        "step in the next lesson."
+    ),
+}
+
 #: Core competencies genuinely implied by this kind of activity. They may
 #: legitimately overlap across lessons, but a practical lesson never blindly
 #: inherits the same static set as a reading lesson.
@@ -466,7 +835,7 @@ def strip_indicator_code(text: str) -> str:
     return _CODE_RE.sub("", text).strip() or text.strip()
 
 
-_ANY_CODE_RE = re.compile(r"[BbKk]?\d+(?:\.\d+)+")
+from . import ANY_CODE_RE as _ANY_CODE_RE  # noqa: E402
 
 
 def is_code_only_indicator(text: str) -> bool:
@@ -667,6 +1036,15 @@ def _compose_main_phases(
         for mp in profile.main_phases
     ]
 
+    # PART 17: make the indicator's activity skeleton subject-specific. The
+    # consolidating phase carries this subject's own practice sentence so the
+    # same verb is never taught with an identical template in every subject.
+    clause = _SUBJECT_PRACTICE_CLAUSE.get(profile.key, "")
+    if clause and bank:
+        name, desc, weight = bank[-1]
+        if clause not in desc:
+            bank[-1] = (name, f"{desc} {clause}", weight)
+
     if not position_index or not bank or len(bank) < 2:
         # Established single-lesson behaviour: the indicator's own activity
         # phases when genuinely expressed, else the subject profile's phases.
@@ -677,6 +1055,113 @@ def _compose_main_phases(
         return bank or profile_phases
     shift = ((position_index + 1) // 2) % len(source)
     return source[shift:] + source[:shift]
+
+
+#: Words that begin a focus and must NOT be lower-cased into mid-sentence.
+_PROPER_NOUN_STARTS = {
+    "windows", "start", "nacca", "ghana", "english", "mathematics",
+    "computing", "microsoft", "god's", "africa", "technolog",
+}
+
+
+def _objective_focus(focus: str) -> str:
+    """A curriculum focus, phrased to follow an objective verb naturally.
+
+    "Fourth-generation computers and the microchip" becomes lower-case so it
+    reads mid-sentence; a proper noun (Windows, NaCCA) keeps its capital.
+    """
+    text = (focus or "").strip()
+    if not text:
+        return text
+    first = text.split(" ", 1)[0].rstrip(":").lower()
+    if first in _PROPER_NOUN_STARTS:
+        return text
+    return text[:1].lower() + text[1:]
+
+
+def skill_from_source(alloc: AllocatedIndicator) -> bool:
+    """True when the teacher's scheme states usable indicator PROSE.
+
+    A code-only cell ("B7.1.1.1.2") is not teachable text, so the scheme is not
+    the source of the lesson's focus in that case — the official curriculum
+    corpus is. A scheme that does state prose always wins over the corpus.
+    """
+    text = (getattr(alloc, "indicator_description", "") or "").strip()
+    return bool(text) and not _is_code_only(text)
+
+
+def _exemplar_for(alloc: AllocatedIndicator, subject_name: str):
+    """Official NaCCA exemplar evidence for this lesson, or None.
+
+    Resolved by INDICATOR code only. The content-standard code is deliberately
+    not used as a fallback: "B7.1.1.1" is the first content standard of Strand
+    1 in every subject, and a record describes its own indicator's exemplars —
+    attaching it to some other indicator of the same standard would attribute
+    one indicator's curriculum evidence to another lesson (PART 33).
+
+    A subject mismatch also returns None: another subject's curriculum
+    evidence is never substituted.
+    """
+    try:
+        from .exemplars import lookup_indicator
+    except Exception:  # pragma: no cover - corpus is optional infrastructure
+        return None
+    code = getattr(alloc, "indicator_code", "") or ""
+    if not code:
+        return None
+    return lookup_indicator(code, subject_name)
+
+
+#: Verbs that can be written as a measurable "Learners can <verb> ..."
+#: objective. The corpus stores the verbs the official exemplars actually use;
+#: some of them ("discover", "practise", "show") describe the activity rather
+#: than an assessable outcome, so the planner prefers the first measurable verb
+#: the same exemplar supports.
+_MEASURABLE_OBJECTIVE_VERBS = {
+    "identify", "describe", "demonstrate", "compare", "classify",
+    "explain", "apply", "investigate", "distinguish", "examine",
+    "categorise", "categorize", "discuss", "design", "state", "list",
+    "model", "represent", "determine", "analyse", "analyze", "evaluate",
+    "outline", "use", "create", "perform", "measure", "calculate",
+    "interpret", "justify", "name", "recite", "write", "read",
+    "pronounce", "match", "arrange", "sort", "construct", "draw",
+}
+
+
+def _objective_verb(exemplar) -> str:
+    """The exemplar's most measurable action verb (falling back to its first)."""
+    verbs = [str(v).strip().lower() for v in (exemplar.curriculum_action_verbs or [])
+             if str(v).strip()]
+    for verb in verbs:
+        if verb in _MEASURABLE_OBJECTIVE_VERBS:
+            return verb
+    return verbs[0] if verbs else "explain"
+
+
+def _exemplar_phases(exemplar, fmt: Dict[str, str]) -> List[Tuple[str, str, float]]:
+    """MAIN phases from the official exemplar's own derived activity patterns.
+
+    Patterns are ordered by the corpus: ``[0]`` is the opening (used as the
+    starter), ``[1]`` the teacher-led teaching step and ``[2]`` the learners'
+    guided task. A record with fewer patterns falls back to the pedagogy bank
+    for the missing positions — the lesson is never left with one phase.
+    """
+    patterns = [p.strip() for p in (exemplar.exemplar_activity_patterns or [])
+                if (p or "").strip()]
+    names = [
+        "Teaching and demonstration",
+        "Guided learner task",
+        "Application and assessment",
+    ]
+    weights = [0.40, 0.35, 0.25]
+    phases: List[Tuple[str, str, float]] = []
+    for i, pattern in enumerate(patterns[1:4]):
+        phases.append((
+            names[i] if i < len(names) else f"Step {i + 2}",
+            _safe_format(pattern, **fmt),
+            weights[i] if i < len(weights) else 0.25,
+        ))
+    return phases
 
 
 def build_lesson(
@@ -740,6 +1225,27 @@ def build_lesson(
     # quality gate's exactness check and the teacher's own review).
     if not focus_short or len(focus_short.split()) < 4:
         focus_short = skill or focus_short
+
+    # ── Official NaCCA exemplar evidence (PHASE 1-4) ─────────────────────
+    # The teacher's scheme remains the authority for SEQUENCE and for any
+    # indicator prose it states. The corpus supplies the PEDAGOGICAL EVIDENCE
+    # for this indicator (derived, never a verbatim copy, and only ever present
+    # when the official source was actually read for it). When the scheme prints
+    # codes only — the real Computing-scheme shape — the corpus is what stops
+    # every indicator in the sub-strand sharing one generic focus.
+    exemplar = _exemplar_for(alloc, subject_name)
+    if exemplar is not None and skill_from_source(alloc):
+        # The scheme states this indicator's own wording, and that wording is
+        # the authority for what the lesson teaches. A corpus record is keyed
+        # by the same CODE but describes the OFFICIAL indicator of that code;
+        # schools renumber, so "B7.1.1.1.1 Add whole numbers up to 1000" must
+        # never receive the official B7.1.1.1.1 place-value-and-billions
+        # activities. With the source's own prose the corpus steps aside
+        # entirely and the subject pedagogy composes the lesson.
+        exemplar = None
+    if exemplar and not skill:
+        skill = exemplar.learning_focus
+        focus_short = exemplar.learning_focus
     # Nursery-style rows (and KG code-only rows) carry no indicator prose: the
     # source row itself (strand + sub-strand) is the authoritative curriculum
     # focus. The sub-strand names what the lesson actually teaches; the strand
@@ -748,6 +1254,10 @@ def build_lesson(
         skill = alloc.sub_strand
         focus_short = alloc.sub_strand
     topic = _derive_topic(alloc)
+    if exemplar and not skill_from_source(alloc):
+        # Code-only source: the corpus focus is more useful than the shared
+        # sub-strand as the lesson topic.
+        topic = exemplar.learning_focus
     duration = int(config.lesson_duration_minutes or 60)
 
     prev_short = _first_clause(previous_indicator or "") if previous_indicator else ""
@@ -787,27 +1297,42 @@ def build_lesson(
     )
 
     # ── STARTER — prepares learners for THIS indicator's activity ───────
-    starter_line = _STARTER_BANK.get(act_key) or profile.starter_template
-    starter = _safe_format(starter_line, **fmt)
-    if position_index and (prev_short or focus_short):
-        # A class-teacher week (Basic 1-3): the day's starter names the teaching
-        # day it continues from, so two days on the same curriculum focus open
-        # differently instead of repeating one sentence.
-        link = prev_short or focus_short
-        label = previous_day_label or "the previous lesson"
-        starter = f"Continue from {label} on '{link}'. " + starter
-    elif prev_short:
-        starter = f"Build on the previous lesson ('{prev_short}'). " + starter
-    if misconceptions and "Monitor for general" not in misconceptions:
-        starter += f" Watch for: {misconceptions}"
+    exemplar_starter = ""
+    if exemplar and (exemplar.exemplar_activity_patterns or []):
+        exemplar_starter = (exemplar.exemplar_activity_patterns[0] or "").strip()
+    if exemplar_starter:
+        # The official exemplar's own derived opening activity: concrete
+        # teacher action, learner action and object, replacing the generic
+        # prior-knowledge formula.
+        starter = _safe_format(exemplar_starter, **fmt)
+        if prev_short:
+            starter = f"Build on the previous lesson ('{prev_short}'). " + starter
+    else:
+        starter_line = _STARTER_BANK.get(act_key) or profile.starter_template
+        starter = _safe_format(starter_line, **fmt)
+        if position_index and (prev_short or focus_short):
+            # A class-teacher week (Basic 1-3): the day's starter names the
+            # teaching day it continues from, so two days on the same curriculum
+            # focus open differently instead of repeating one sentence.
+            link = prev_short or focus_short
+            label = previous_day_label or "the previous lesson"
+            starter = f"Continue from {label} on '{link}'. " + starter
+        elif prev_short:
+            starter = f"Build on the previous lesson ('{prev_short}'). " + starter
+        if misconceptions and "Monitor for general" not in misconceptions:
+            starter += f" Watch for: {misconceptions}"
     # ``introduction`` is the lesson-level framing (how this lesson connects to
     # the last one and where it sits in the topic); ``starter_activity`` is the
     # concrete opening activity. Keeping them distinct stops the same sentence
     # being emitted twice into the exported plan.
     if prev_short:
         intro = f"This lesson builds on '{prev_short}' and moves the class on to {skill}."
-    else:
+    elif topic and topic.strip() and topic.strip().lower() != (skill or "").strip().lower():
         intro = f"This lesson focuses on {skill} within {topic}."
+    else:
+        # The topic IS the focus (a code-only scheme filled from the official
+        # exemplar corpus): "within {topic}" would repeat the same words twice.
+        intro = f"This lesson focuses on {skill}."
     if position_index:
         # Same curriculum focus on a later teaching day: the framing states the
         # continuation explicitly (never a cloned opening sentence).
@@ -819,22 +1344,55 @@ def build_lesson(
     # ── MAIN — phases follow the indicator's activity type ──────────────
     starter_min = max(5, round(duration * 0.15))
     plenary_min = max(5, round(duration * 0.20))
-    phase_specs = _compose_main_phases(profile, fmt, act_key,
-                                       position_index=position_index)
+    # An official exemplar record supplies the MAIN block from its own derived
+    # activity patterns; otherwise the indicator's activity bank / subject
+    # profile composes it (unchanged behaviour for subjects without a record).
+    exemplar_phases = _exemplar_phases(exemplar, fmt) if exemplar else []
+    if len(exemplar_phases) >= 2:
+        # The approved plan's MAIN block spans at least three phases. The
+        # exemplar's own derived patterns fill it first — they are specific to
+        # THIS indicator — and the subject's activity bank supplies any
+        # remaining positions so the subject's own teaching language (worked
+        # example, prediction, investigation, model and production) is not
+        # lost when a record covers an indicator only briefly.
+        for extra in _compose_main_phases(profile, fmt, act_key,
+                                          position_index=position_index):
+            if len(exemplar_phases) >= 3:
+                break
+            if extra[1].strip() not in {p[1].strip() for p in exemplar_phases}:
+                exemplar_phases.append(extra)
+        phase_specs = exemplar_phases
+    else:
+        phase_specs = _compose_main_phases(profile, fmt, act_key,
+                                           position_index=position_index)
     main_total = max(duration - starter_min - plenary_min, len(phase_specs))
     phase_minutes = _distribute(main_total, [p[2] for p in phase_specs])
+
+    # Learner activities come from the SAME activity-type bank as the teacher's,
+    # so the learner column is equally specific to the indicator — never the
+    # generic "Watch and listen carefully" / "Complete the task" fallbacks.
+    learner_bank = _LEARNER_PHASE_BANK.get(act_key) or []
 
     main_activities: List[TeachingActivity] = []
     learner_activities: List[TeachingActivity] = []
     teacher_activities: List[TeachingActivity] = []
-    for (phase_name, desc, _), minutes in zip(phase_specs, phase_minutes):
+    for idx, ((phase_name, desc, _), minutes) in enumerate(
+        zip(phase_specs, phase_minutes)
+    ):
         main_activities.append(TeachingActivity(
             phase=phase_name.upper(), description=desc,
             duration_minutes=minutes, resources=[],
         ))
+        # Prefer the learner bank's own phase at the same position; fall back
+        # to a learner reframing of the teacher phase name only when the bank
+        # has no entry for this activity type.
+        if idx < len(learner_bank):
+            learner_desc = _safe_format(learner_bank[idx][1], **fmt)
+        else:
+            learner_desc = _learner_task(phase_name, focus_short)
         learner_activities.append(TeachingActivity(
             phase="LEARNER",
-            description=_learner_task(phase_name, focus_short),
+            description=learner_desc,
             duration_minutes=minutes, resources=[],
         ))
         teacher_activities.append(TeachingActivity(
@@ -844,11 +1402,18 @@ def build_lesson(
         ))
 
     # ── ASSESSMENT — measures THIS indicator's evidence ─────────────────
-    assessment_tmpl = _ASSESSMENT_BANK.get(act_key) or profile.assessment_template
-    assessment = _safe_format(assessment_tmpl, **fmt)
+    if exemplar and exemplar.assessment_patterns:
+        # Assessment comes from the official exemplar's own derived evidence
+        # check: what the teacher looks and listens for in THIS indicator.
+        assessment = " ".join(
+            p.strip() for p in exemplar.assessment_patterns if (p or "").strip()
+        )
+    else:
+        assessment_tmpl = _ASSESSMENT_BANK.get(act_key) or profile.assessment_template
+        assessment = _safe_format(assessment_tmpl, **fmt)
     if assessment_mode and assessment_mode.lower() not in assessment.lower():
         assessment += f" Assessment mode: {assessment_mode}"
-    if not alloc.indicator_description:
+    if not exemplar and not alloc.indicator_description:
         # Indicatorless rows (Nursery week-units): the observation target is
         # the row's own focus, so evaluation stays lesson-specific instead of
         # one generic formula for every week — without inventing any test or
@@ -871,6 +1436,26 @@ def build_lesson(
         f"Extension: {_safe_format(profile.extension_template, **fmt)}",
         f"Grouping: {profile.grouping}",
     ])
+
+    # ── Assignments (PART 15) — class work and follow-up home work ──────
+    # Both follow the indicator's OWN activity type: a classification lesson
+    # sets a sorting task, an investigation sets an observation follow-up.
+    # The teacher edits both in the workspace; the legacy single ``homework``
+    # column mirrors the home assignment so templates that declare only a
+    # Homework row still render the follow-up. Never a written homework
+    # question forced onto every indicator.
+    if exemplar and exemplar.class_assignment_pattern.strip():
+        class_assignment = _safe_format(exemplar.class_assignment_pattern, **fmt)
+    else:
+        class_assignment = _safe_format(
+            _CLASS_ASSIGNMENT_BANK.get(act_key)
+            or _CLASS_ASSIGNMENT_BANK["demonstration"], **fmt)
+    if exemplar and exemplar.home_assignment_pattern.strip():
+        home_assignment = _safe_format(exemplar.home_assignment_pattern, **fmt)
+    else:
+        home_assignment = _safe_format(
+            _HOME_ASSIGNMENT_BANK.get(act_key)
+            or _HOME_ASSIGNMENT_BANK["demonstration"], **fmt)
 
     # ── Resources — THIS lesson's scheme TLRs first, then activity extras ──
     # SOURCE TLRs: from the scheme for this subject + source week + indicator.
@@ -902,6 +1487,13 @@ def build_lesson(
             r = (r or "").strip()
             if r and r.lower() not in [x.lower() for x in resources]:
                 resources.append(r)
+    # Official curriculum material patterns for THIS indicator (e.g. "picture
+    # cards showing keyboard, mouse, touchscreen, barcode reader, scanner").
+    if exemplar:
+        for r in (exemplar.suitable_resource_patterns or []):
+            r = (r or "").strip()
+            if r and r.lower() not in [x.lower() for x in resources]:
+                resources.append(r)
 
     # ── Keywords / vocabulary — PER-LESSON, curriculum-derived (PART G) ──
     # Priority: exact lesson indicator / learning focus first, then sub-strand,
@@ -912,20 +1504,40 @@ def build_lesson(
     # teacher's edits always win once saved.
     keywords: List[str] = []
     kw_sources: List[str] = []
-    # 1. Exact lesson indicator / learning focus.
+    # 1. Scheme resources are the PRIMARY keyword seed (PART 14): the teacher's
+    #    own scheme names the concrete materials for THIS lesson ("light pen",
+    #    "touchscreen", "mouse", "keyboard", "personal computer"), which are far
+    #    more lesson-specific than the shared sub-strand. Normalized and deduped.
+    for r in normalize_text_items(list(getattr(alloc, "source_resources", []) or [])):
+        r = (r or "").strip()
+        if r and r.lower() not in [x.lower() for x in keywords]:
+            keywords.append(r)
+    # 2. Official exemplar focus terms for THIS indicator (concrete curriculum
+    #    vocabulary such as "microchip" or "barcode reader") before the
+    #    generic sub-strand can contribute anything.
+    if exemplar:
+        kw_sources.extend(exemplar.focus_terms or [])
+    # 3. Exact lesson indicator / learning focus.
     kw_sources.extend(_content_terms(alloc.indicator_description, limit=5))
-    # 2. Sub-strand (the lesson's own curriculum focus when no indicator prose).
-    kw_sources.extend(_content_terms(alloc.sub_strand or "", limit=3))
-    # 3. Content standard.
+    # 3. Sub-strand (the lesson's own curriculum focus when no indicator prose).
+    #    Limited to 2 so the shared sub-strand cannot dominate the list.
+    kw_sources.extend(_content_terms(alloc.sub_strand or "", limit=2))
+    # 4. Content standard.
     kw_sources.extend(_content_terms(alloc.content_standard_description or "", limit=2))
-    # 4. Lesson-specific activity context from the interpreter.
+    # 5. Lesson-specific activity context from the interpreter.
     if act_key and interp is not None:
         kw_sources.extend(getattr(interp, "activity_keywords", []) or [])
     # Teacher-supplied PER-LESSON terms always survive (never a batch seed).
     kw_sources.extend((getattr(config, "keywords", []) or []))
     for k in kw_sources:
         k = (k or "").strip()
-        if k and k.lower() not in [x.lower() for x in keywords]:
+        kl = k.lower()
+        if not k or len(kl) < 3 or kl in _KEYWORD_NOISE:
+            continue
+        # A single generic Bloom verb is not lesson vocabulary.
+        if " " not in kl and kl in _BLOOM_ACTION_WORDS:
+            continue
+        if kl not in [x.lower() for x in keywords]:
             keywords.append(k)
 
     # ── Core competencies — PER-LESSON, activity-derived (PART H) ───────
@@ -935,7 +1547,12 @@ def build_lesson(
     # lesson review object; the generator never re-forces a removed value.
     competencies: List[str] = []
     comp_sources = list(getattr(config, "core_competencies", []) or [])
-    comp_sources.extend(_COMPETENCIES_BY_ACTIVITY.get(act_key or "demonstration", []))
+    if exemplar and exemplar.core_competencies:
+        # The competencies the official curriculum attaches to THIS indicator
+        # (PART 1) rather than the activity-type default.
+        comp_sources.extend(exemplar.core_competencies)
+    else:
+        comp_sources.extend(_COMPETENCIES_BY_ACTIVITY.get(act_key or "demonstration", []))
     for c in comp_sources:
         c = (c or "").strip()
         if c and c.lower() not in [x.lower() for x in competencies]:
@@ -989,6 +1606,18 @@ def build_lesson(
         ),
         indicator_code=alloc.indicator_code or None,
     )]
+
+    # PHASE 6: when the scheme prints codes only, the objective comes from the
+    # official exemplar's OWN action verb and focus — measurable, lesson
+    # specific, and aligned with the assessment and assignments above. A scheme
+    # that states its own indicator prose is never overridden (source
+    # authority).
+    if exemplar and not skill_from_source(alloc) and objectives:
+        verb0 = _objective_verb(exemplar)
+        objectives[0] = LearningObjective(
+            description=f"Learners can {verb0} {_objective_focus(exemplar.learning_focus)}",
+            indicator_code=alloc.indicator_code or None,
+        )
 
     previous_knowledge = (
         f"Previous lesson: {prev_short}" if prev_short
@@ -1053,6 +1682,9 @@ def build_lesson(
         learner_activities=learner_activities,
         teacher_activities=teacher_activities,
         assessment=assessment,
+        class_assignment=class_assignment,
+        home_assignment=home_assignment,
+        homework=home_assignment,
         differentiation=differentiation,
         conclusion=conclusion,
         structured_references=structured_refs,

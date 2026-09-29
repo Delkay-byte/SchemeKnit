@@ -256,8 +256,37 @@ class CurriculumDocument:
 
 # ── Indicator Code Utilities ──────────────────────────────────────────────
 
+# ── The one canonical definition of a curriculum code ─────────────────────
+#
+# The real published schemes print the SAME code in several shapes, verbatim
+# from the teacher's upload:
+#
+#   B7.1.1.1.1          Computing, Mathematics, Physical Education and Health
+#   B7/JHS1.1.1.1.1     English Language
+#   B7/JHS1 1.1.1.1     Religious and Moral Education, Social Studies,
+#                       Creative Arts and Design   (space instead of a dot)
+#   K2.1.1.1.1-3        KG code ranges
+#
+# Every consumer must recognise ALL of them. When only the dotted shape is
+# recognised, a scheme that prints "B7/JHS1 1.1.1.1" is treated as indicator
+# PROSE: the raw code leaks into the lesson as "Learners can B7/JHS1 1.1.1.1"
+# and the template prints the code twice ("B7.1.1.1 B7/JHS1 1.1.1.1 ...").
+_CODE_ALTERNATION = "|".join((
+    r"[BbKk]?\d+/JHS\d+\s?\.?\d+(?:\.\d+)+",  # B7/JHS1 1.1.1.1 | B7/JHS1.1.1.1.1
+    r"[BbKk]\d+\.\d+(?:\.\d+)+",            # B7.1.1.1.1
+    r"[BbKk]\d+\s\d+(?:\.\d+)+",            # B7 1.1.1.1  (source spacing)
+    r"\d+(?:\.\d+){2,}",                      # 1.1.1.1     (no level letter)
+))
+_CODE_TAIL = r"(?:-\d+)?[.:]?"
+
+#: A code at the START of an indicator/content-standard cell.
+CODE_PREFIX_RE = re.compile(rf"^\s*(?:{_CODE_ALTERNATION}){_CODE_TAIL}\s*")
+
+#: A code ANYWHERE in a cell — used to decide whether a cell holds only codes.
+ANY_CODE_RE = re.compile(rf"(?:{_CODE_ALTERNATION}){_CODE_TAIL}")
+
 # Matches indicator codes like B9.1.1.1.2, B7.4.3.1.2, 9.1.1.1, B8.2.1.1.1
-INDICATOR_CODE_RE = re.compile(r'[Bb]?\d+\.\d+\.\d+\.\d+(?:\.\d+)?')
+INDICATOR_CODE_RE = re.compile(rf'[BbKk]?\d+(?:/JHS\d+)?[.\s]\d+(?:\.\d)+')
 
 
 def split_indicator_text(text: str) -> tuple[str, str]:
