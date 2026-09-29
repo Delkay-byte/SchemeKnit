@@ -21,7 +21,11 @@ from .models import (
     AIMode, ValidationIssue, EducationalLevel, TemplateType,
     CLASS_LEVEL_TO_EDUCATIONAL_LEVEL,
 )
-from .ai_resource_text import normalize_text_items, normalize_structured_references
+from .ai_resource_text import (
+    normalize_text_items,
+    normalize_structured_references,
+    strip_internal_markers,
+)
 
 
 WORKFLOW_STAGES = ["upload", "review", "configure", "generate", "export"]
@@ -471,11 +475,16 @@ class DataService:
                     value = normalize_structured_references(value)
                 elif key in text_list_fields:
                     value = normalize_text_items(value)
+                    # PART 21: an internal/harness marker can never persist
+                    # through a list-typed field either.
+                    value = [strip_internal_markers(v) for v in value]
+                    value = [v for v in value if v]
                 elif key in text_fields:
                     if value is None:
                         value = ""
                     elif not isinstance(value, str):
                         value = "; ".join(str(v).strip() for v in value) if isinstance(value, (list, tuple)) else str(value)
+                    value = strip_internal_markers(value)
                 elif key in ("duration_minutes", "class_size", "lesson_number"):
                     # Numeric columns: a form sends strings; never store text
                     # in an integer column (SQLite would accept it and the
@@ -484,8 +493,31 @@ class DataService:
                         value = int(value)
                     except (TypeError, ValueError):
                         continue
-                elif key in activity_list_fields and not isinstance(value, list):
-                    continue
+                elif key in activity_list_fields:
+                    if not isinstance(value, list):
+                        continue
+                    # PART 21: activity/objective prose is teacher-visible and
+                    # exported, so internal artefacts are removed here too — a
+                    # placeholder marker can never become a lesson activity.
+                    cleaned_items = []
+                    for item in value:
+                        if isinstance(item, dict):
+                            item = dict(item)
+                            if isinstance(item.get("description"), str):
+                                item["description"] = strip_internal_markers(
+                                    item["description"])
+                            if isinstance(item.get("resources"), list):
+                                item["resources"] = [
+                                    strip_internal_markers(str(r))
+                                    for r in item["resources"]
+                                ]
+                                item["resources"] = [
+                                    r for r in item["resources"] if r
+                                ]
+                        elif isinstance(item, str):
+                            item = strip_internal_markers(item)
+                        cleaned_items.append(item)
+                    value = cleaned_items
                 setattr(lp, key, value)
 
         # WAPEF teacher-selected fields are normalized through the approved

@@ -75,10 +75,32 @@ class TestServerDerivedIdentity:
         assert gen_router._resolve_school_name(db, u) == "Awasive M/A JHS"
 
     def test_school_name_is_none_without_a_school_membership(self, db):
+        # An independent teacher who has NOT stated an institution gets None —
+        # never a generic/demo school — so the header renders blank rather
+        # than inventing one.
         u = make_user(db, role="teacher", email="nomad@t.test")
-        # None — never a generic/demo school — so the header renders blank
-        # rather than inventing an institution.
+        u.school_name = ""
+        db.commit()
         assert gen_router._resolve_school_name(db, u) is None
+
+    def test_school_name_comes_from_an_independent_teachers_own_profile(self, db):
+        # PART 7: a teacher with no school membership is independent. They state
+        # the institution they teach at once on their profile and every lesson
+        # reuses it — no retyping, and never a client-supplied value.
+        u = make_user(db, role="teacher", email="indep@t.test")
+        u.school_name = "Aburi Presby Primary School"
+        db.commit()
+        assert gen_router._resolve_school_name(db, u) == "Aburi Presby Primary School"
+
+    def test_school_membership_wins_over_a_stale_profile_value(self, db):
+        # A real school relationship is authoritative: a leftover profile value
+        # must never override the school the account actually belongs to.
+        school = make_school(db, name="Awasive M/A JHS")
+        u = make_user(db, role="teacher", school_id=school.id,
+                      email="t@awasive.edu.gh")
+        u.school_name = "Stale Text"
+        db.commit()
+        assert gen_router._resolve_school_name(db, u) == "Awasive M/A JHS"
 
     def test_teacher_name_comes_from_the_profile(self, db):
         u = make_user(db, role="teacher", email="s@t.test")

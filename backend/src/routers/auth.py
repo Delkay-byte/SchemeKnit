@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 import hashlib
 import secrets
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from sqlalchemy.orm import Session
@@ -121,6 +121,18 @@ class CreateTeacherRequest(BaseModel):
     password: str
     full_name: str
     school_name: str = ""
+
+
+class ProfileUpdateRequest(BaseModel):
+    """The teacher's own profile edits (PART 7).
+
+    The client PUTs a JSON body; the field must be declared here or the write
+    is silently discarded (a JSON body is NOT bound to bare function
+    parameters — that is how the school silently failed to persist).
+    """
+
+    full_name: Optional[str] = None
+    school_name: Optional[str] = None
 
 
 def user_response(user: User):
@@ -593,15 +605,39 @@ async def get_profile(user: User = Depends(get_current_user)):
 
 @router.put("/me")
 async def update_profile(
-    full_name: str = None,
-    school_name: str = None,
+    payload: Optional[ProfileUpdateRequest] = Body(None),
+    full_name: Optional[str] = None,
+    school_name: Optional[str] = None,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    """Update the teacher's profile.
+
+    Accepts the JSON body the app sends (``{"full_name": ..., "school_name":
+    ...}``) and the query-parameter form for compatibility. A missing field
+    leaves the stored value alone; an explicit null/empty is honoured.
+    """
+    if payload is not None:
+        if payload.full_name is not None:
+            full_name = payload.full_name
+        if payload.school_name is not None:
+            school_name = payload.school_name
     if full_name is not None:
         user.full_name = full_name
     if school_name is not None:
-        user.school_name = school_name
+        # PART 7 permission model: a teacher attached to a real school has a
+        # server-authoritative school name and may not overwrite it with a
+        # free-text value. An INDEPENDENT teacher (no membership) declares the
+        # institution they teach at once, here, on their own profile.
+        if getattr(user, "school_id", None):
+            school = db.query(SchoolDB).filter(SchoolDB.id == user.school_id).first()
+            if school and school.name:
+                user.school_name = school.name
+            else:
+                user.school_name = ""
+        else:
+            cleaned = (school_name or "").strip()
+            user.school_name = cleaned[:200]
     db.commit()
     return user_response(user)
 
