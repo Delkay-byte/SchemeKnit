@@ -461,7 +461,7 @@ class ApiService {
     return this.request(`/api/generation/lessons/${lessonId}`)
   }
 
-  async regenerateSection(lessonId: string, section: string, aiMode = 'ollama', context = '', requestId = ''): Promise<{
+  async regenerateSection(lessonId: string, section: string, aiMode = 'ollama', context = '', requestId = '', rewriteMode = 'suggest_another_version'): Promise<{
     section: string
     previous_content: string
     new_content: string
@@ -483,6 +483,9 @@ class ApiService {
         // Idempotency key: a duplicate submission for the same successful
         // generation must not consume a second AI allowance.
         request_id: requestId || undefined,
+        // Which affordance the teacher clicked. AI is off by default; this is
+        // the only thing that ever triggers a per-section AI rewrite.
+        rewrite_mode: rewriteMode,
       }),
     })
   }
