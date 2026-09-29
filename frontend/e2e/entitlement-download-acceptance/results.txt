@@ -1,0 +1,29 @@
+base=https://schemeknit-frontend.onrender.com api=https://schemeknit-api.onrender.com
+PASS Teacher login — https://schemeknit-frontend.onrender.com/dashboard/
+PASS Teacher plan is readable (server-authoritative) — FREE · active
+PASS Teacher is FREE before admin activation — FREE
+PASS Lesson generated / generation available — existing
+PASS Lesson review page renders Phase 2 Main Learning — e3111064-f9de-423c-bdfb-a89e334ea5db
+PASS Generated plan shows real curriculum sections — markers=[Strand,Indicator,Assessment] deep=true
+PASS Review page is not an empty skeleton
+PASS Export panel survives a page refresh — Download DOCX present after reload
+PASS DOCX request authenticated (Bearer on download-url POST) — HTTP 200
+PASS DOCX HTTP 200 — HTTP 200
+PASS DOCX final file request succeeded — HTTP 200 application/vnd.openxmlformats-officedocument.wordprocessingml.document
+PASS DOCX browser saved a file — Lesson_Plans_BASIC_9_SCIENCE_SCHEME_OF_LEARNING.docx (38914 bytes)
+PASS DOCX bytes valid (PK zip signature) — head="PK\u0003\u0004\u0014"
+PASS DOCX filename has .docx — Lesson_Plans_BASIC_9_SCIENCE_SCHEME_OF_LEARNING.docx
+PASS PDF browser saved a file — Lesson_Plans_BASIC_9_SCIENCE_SCHEME_OF_LEARNING.pdf (58686 bytes)
+PASS PDF final file request succeeded — HTTP 200 application/pdf
+PASS PDF bytes valid (%PDF signature) — head="%PDF-"
+PASS PDF filename has .pdf — Lesson_Plans_BASIC_9_SCIENCE_SCHEME_OF_LEARNING.pdf
+PASS No "Failed to fetch" surfaced
+PASS No generic "Action failed" surfaced
+PASS DOCX downloads in a newly authenticated tab — Lesson_Plans_BASIC_9_SCIENCE_SCHEME_OF_LEARNING.docx (38914 bytes)
+PASS Teacher self-upgrade is blocked (403) — HTTP 403
+PASS Teacher self-revoke is blocked (403) — HTTP 403
+PASS Admin login — https://schemeknit-frontend.onrender.com/platform-admin/
+PASS Admin sees the teacher
+PASS Admin activated PRO
+PASS Teacher entitlement now PRO after refresh — PRO · active
+PASS Revoking PRO returns teacher to FREE — FREE · revoked

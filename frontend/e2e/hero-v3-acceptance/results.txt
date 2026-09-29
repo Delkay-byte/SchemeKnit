@@ -1,0 +1,155 @@
+Hero V3/V4 acceptance — 2026-09-26T22:56:56.802Z
+BASE=http://localhost:3999
+PASS=151 FAIL=0
+
+PASS  landing: mesh canvas present — count=1
+PASS  landing: data-mesh present — mesh=1
+PASS  landing: mesh painted
+PASS  landing: cursor deformation changes pixels — before=78861 during=74312
+PASS  landing: light logo capsule — {"ok":true,"bg":"rgb(244, 247, 250)","w":44}
+PASS  landing: no horizontal overflow — 1440/1440
+PASS  seam: hero.bottom ≈ next.top (≤1px) — gap=0.00px
+PASS  seam: no white overlap onto hero — overlap=0.00px
+PASS  seam: canvas top inside hero — canvasTop=1.0 heroTop=1.0
+PASS  seam: canvas bottom inside hero — canvasBottom=829.0 heroBottom=829.0
+PASS  teacher-login: title — Welcome back, teacher.
+PASS  teacher-login: no landing mesh — mesh=0
+PASS  teacher-login: grid signal canvas — count=1
+PASS  teacher-login: 3–4 signals — count=4
+PASS  teacher-login: signal moves over time (3 samples) — 262,449 700,769 1135,268 829,500 → 258,420 740,769 1135,279 829,472 → 220,420 784,769 1135,245 829,491
+PASS  teacher-login: distinct bg — rgb(7, 24, 38) expected rgb(7, 24, 38)
+PASS  teacher-login: light logo capsule
+PASS  teacher-login: no overflow — 1440/1440
+PASS  school-admin-login: title — School Administration Sign In
+PASS  school-admin-login: no landing mesh — mesh=0
+PASS  school-admin-login: grid signal canvas — count=1
+PASS  school-admin-login: 3–4 signals — count=4
+PASS  school-admin-login: signal moves over time (3 samples) — 240,477 839,714 1175,234 816,528 → 288,473 864,700 1152,216 816,568 → 288,426 862,666 1161,186 851,570
+PASS  school-admin-login: distinct bg — rgb(11, 31, 58) expected rgb(11, 31, 58)
+PASS  school-admin-login: light logo capsule
+PASS  school-admin-login: no overflow — 1440/1440
+PASS  platform-admin-login: title — Platform Administration Sign In
+PASS  platform-admin-login: no landing mesh — mesh=0
+PASS  platform-admin-login: grid signal canvas — count=1
+PASS  platform-admin-login: 3–4 signals — count=4
+PASS  platform-admin-login: signal moves over time (3 samples) — 277,465 775,591 1163,200 754,478 → 277,427 775,636 1163,164 720,484 → 274,478 749,644 1163,161 720,531
+PASS  platform-admin-login: distinct bg — rgb(5, 14, 24) expected rgb(5, 14, 24)
+PASS  platform-admin-login: light logo capsule
+PASS  platform-admin-login: no overflow — 1440/1440
+PASS  signup: title — Create your SchemeKnit account
+PASS  signup: no landing mesh — mesh=0
+PASS  signup: grid signal canvas — count=1
+PASS  signup: 3–4 signals — count=4
+PASS  signup: signal moves over time (3 samples) — 279,512 790,798 1115,256 751,547 → 279,535 784,826 1115,222 743,580 → 246,547 746,826 1115,263 743,559
+PASS  signup: distinct bg — rgb(10, 31, 53) expected rgb(10, 31, 53)
+PASS  signup: light logo capsule
+PASS  signup: no overflow — 1440/1440
+PASS  activate-school: title — Activate your school
+PASS  activate-school: no landing mesh — mesh=0
+PASS  activate-school: grid signal canvas — count=1
+PASS  activate-school: 3–4 signals — count=4
+PASS  activate-school: signal moves over time (3 samples) — 257,530 771,745 1131,337 823,551 → 257,573 804,759 1095,347 774,553 → 273,604 800,759 1080,317 771,597
+PASS  activate-school: distinct bg — rgb(10, 34, 64) expected rgb(10, 34, 64)
+PASS  activate-school: light logo capsule
+PASS  activate-school: no overflow — 1440/1440
+PASS  activate-teacher: title — Activate your license
+PASS  activate-teacher: no landing mesh — mesh=0
+PASS  activate-teacher: grid signal canvas — count=1
+PASS  activate-teacher: 3–4 signals — count=4
+PASS  activate-teacher: signal moves over time (3 samples) — 240,551 816,750 1152,322 816,569 → 240,592 848,762 1116,330 769,570 → 258,618 840,762 1104,299 768,613
+PASS  activate-teacher: distinct bg — rgb(14, 28, 46) expected rgb(14, 28, 46)
+PASS  activate-teacher: light logo capsule
+PASS  activate-teacher: no overflow — 1440/1440
+PASS  reset-password: title — Reset your password
+PASS  reset-password: no landing mesh — mesh=0
+PASS  reset-password: grid signal canvas — count=1
+PASS  reset-password: 3–4 signals — count=4
+PASS  reset-password: signal moves over time (3 samples) — 232,524 736,673 1180,276 864,475 → 203,524 699,673 1221,276 844,450 → 246,524 695,704 1241,254 861,425
+PASS  reset-password: distinct bg — rgb(10, 22, 40) expected rgb(10, 22, 40)
+PASS  reset-password: light logo capsule
+PASS  reset-password: no overflow — 1440/1440
+PASS  setup: redirects to sign-in when already bootstrapped — Welcome back, teacher.
+PASS  setup: no landing mesh — mesh=0
+PASS  setup: grid signal canvas — count=1
+PASS  setup: 3–4 signals — count=4
+PASS  setup: signal moves over time (3 samples) — 262,445 698,769 1135,272 829,504 → 255,420 742,769 1135,275 829,469 → 219,420 785,768 1138,245 829,496
+PASS  setup: sign-in bg after redirect — rgb(7, 24, 38) expected rgb(7, 24, 38)
+PASS  setup: light logo capsule
+PASS  setup: no overflow — 1440/1440
+PASS  auth matrix: distinct backgrounds — unique=7
+PASS  reduced-motion: static mesh still painted
+PASS  reduced-motion: mesh static (no animation loop) — 83631 vs 83631
+PASS  reduced-motion: login grid signal present — count=1
+PASS  reduced-motion: login signal static — 221,529 706,750 1015,264 750,529 vs 221,529 706,750 1015,264 750,529
+PASS  reduced-motion: touch does not deform mesh — 83631 vs 83631
+PASS  landing @390: no overflow — 390/390
+PASS  landing @390: headline visible
+PASS  seam @390: hero/next meet ≤1px — gap=0.00
+PASS  seam @390: no overlap — overlap=0.00
+PASS  landing @430: no overflow — 430/430
+PASS  landing @430: headline visible
+PASS  seam @430: hero/next meet ≤1px — gap=0.00
+PASS  seam @430: no overlap — overlap=0.00
+PASS  landing @768: no overflow — 768/768
+PASS  landing @768: headline visible
+PASS  seam @768: hero/next meet ≤1px — gap=0.00
+PASS  seam @768: no overlap — overlap=0.00
+PASS  landing @1024: no overflow — 1024/1024
+PASS  landing @1024: headline visible
+PASS  seam @1024: hero/next meet ≤1px — gap=0.00
+PASS  seam @1024: no overlap — overlap=0.00
+PASS  landing @1280: no overflow — 1280/1280
+PASS  landing @1280: headline visible
+PASS  seam @1280: hero/next meet ≤1px — gap=0.00
+PASS  seam @1280: no overlap — overlap=0.00
+PASS  landing @1440: no overflow — 1440/1440
+PASS  landing @1440: headline visible
+PASS  seam @1440: hero/next meet ≤1px — gap=0.00
+PASS  seam @1440: no overlap — overlap=0.00
+PASS  teacher-login @390: no overflow — 390/390
+PASS  teacher-login @390: no landing mesh — mesh=0
+PASS  teacher-login @390: grid signal — count=1
+PASS  teacher-login @390: 3–4 signals — count=3
+PASS  school-admin-login @390: no overflow — 390/390
+PASS  school-admin-login @390: no landing mesh — mesh=0
+PASS  school-admin-login @390: grid signal — count=1
+PASS  school-admin-login @390: 3–4 signals — count=3
+PASS  platform-admin-login @390: no overflow — 390/390
+PASS  platform-admin-login @390: no landing mesh — mesh=0
+PASS  platform-admin-login @390: grid signal — count=1
+PASS  platform-admin-login @390: 3–4 signals — count=3
+PASS  signup @390: no overflow — 390/390
+PASS  signup @390: no landing mesh — mesh=0
+PASS  signup @390: grid signal — count=1
+PASS  signup @390: 3–4 signals — count=3
+PASS  activate-school @390: no overflow — 390/390
+PASS  activate-school @390: no landing mesh — mesh=0
+PASS  activate-school @390: grid signal — count=1
+PASS  activate-school @390: 3–4 signals — count=3
+PASS  activate-teacher @390: no overflow — 390/390
+PASS  activate-teacher @390: no landing mesh — mesh=0
+PASS  activate-teacher @390: grid signal — count=1
+PASS  activate-teacher @390: 3–4 signals — count=3
+PASS  reset-password @390: no overflow — 390/390
+PASS  reset-password @390: no landing mesh — mesh=0
+PASS  reset-password @390: grid signal — count=1
+PASS  reset-password @390: 3–4 signals — count=3
+PASS  setup @390: no overflow — 390/390
+PASS  setup @390: no landing mesh — mesh=0
+PASS  setup @390: grid signal — count=1
+PASS  setup @390: 3–4 signals — count=3
+PASS  touch: mesh canvas present — count=1
+PASS  touch: mesh painted at rest
+PASS  touch: pointer down changes pixels — rest=87287 hold=76890
+PASS  touch: moving touch changes pixel signature — hold=76890 drag=78206
+PASS  touch: release allows settling (signature changes) — drag=78206 settle=79279
+PASS  touch: no horizontal overflow — 390/390
+PASS  touch: page can vertically scroll — 0 → 500
+PASS  touch seam: hero/next meet ≤1px — gap=0.00
+PASS  touch seam: no overlap — overlap=0.00
+PASS  touch seam: canvas inside hero — canvasBottom=1436.0 heroBottom=1436.3
+PASS  landing: no public platform-admin CTA — []
+PASS  direct platform admin route works — Platform Administration Sign In
+PASS  platform admin: no landing mesh — mesh=0
+PASS  platform admin: grid signal present — count=1
+PASS  footer: light logo capsule — {"ok":true,"bg":"rgb(244, 247, 250)"}

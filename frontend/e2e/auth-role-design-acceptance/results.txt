@@ -1,0 +1,135 @@
+Auth role design V2 acceptance — 2026-09-26T22:57:37.260Z
+BASE=http://localhost:3999
+PASS=131 FAIL=0
+
+PASS  teacher-login: title — SchemeKnit — Lesson Plan Generator / h1=Welcome back, teacher.
+PASS  teacher-login: distinct bg — rgb(7, 24, 38) expected rgb(7, 24, 38)
+PASS  teacher-login: no landing mesh — mesh=0
+PASS  teacher-login: grid signal present — ["teacher"]
+PASS  teacher-login: 3–4 signals — count=4
+PASS  teacher-login: signal moves over time (3 samples) — 189:41:94605 → 189:47:94605 → 189:44:94605
+PASS  teacher-login: light logo capsule — bg=rgb(244, 247, 250)
+PASS  teacher-login: no overflow — 1440/1440
+PASS  teacher-login: form visible — forms=1 inputs=2
+PASS  teacher-login: CTA visible
+PASS  school-admin-login: title — SchemeKnit — Lesson Plan Generator / h1=School Administration Sign In
+PASS  school-admin-login: distinct bg — rgb(11, 31, 58) expected rgb(11, 31, 58)
+PASS  school-admin-login: no landing mesh — mesh=0
+PASS  school-admin-login: grid signal present — ["school"]
+PASS  school-admin-login: 3–4 signals — count=4
+PASS  school-admin-login: signal moves over time (3 samples) — 199:39:85170 → 144:119:85170 → 139:95:84755
+PASS  school-admin-login: light logo capsule — bg=rgb(244, 247, 250)
+PASS  school-admin-login: no overflow — 1440/1440
+PASS  school-admin-login: form visible — forms=1 inputs=2
+PASS  school-admin-login: CTA visible
+PASS  platform-admin-login: title — Platform Admin Login | SchemeKnit / h1=Platform Administration Sign In
+PASS  platform-admin-login: distinct bg — rgb(5, 14, 24) expected rgb(5, 14, 24)
+PASS  platform-admin-login: no landing mesh — mesh=0
+PASS  platform-admin-login: grid signal present — ["platform"]
+PASS  platform-admin-login: 3–4 signals — count=4
+PASS  platform-admin-login: signal moves over time (3 samples) — 194:34:94605 → 194:29:94605 → 120:87:94605
+PASS  platform-admin-login: light logo capsule — bg=rgb(244, 247, 250)
+PASS  platform-admin-login: no overflow — 1440/1440
+PASS  platform-admin-login: form visible — forms=1 inputs=2
+PASS  platform-admin-login: CTA visible
+PASS  signup: title — SchemeKnit — Lesson Plan Generator / h1=Create your SchemeKnit account
+PASS  signup: distinct bg — rgb(10, 31, 53) expected rgb(10, 31, 53)
+PASS  signup: no landing mesh — mesh=0
+PASS  signup: grid signal present — ["register"]
+PASS  signup: 3–4 signals — count=4
+PASS  signup: signal moves over time (3 samples) — 186:45:94605 → 186:39:94605 → 185:39:94605
+PASS  signup: light logo capsule — bg=rgb(244, 247, 250)
+PASS  signup: no overflow — 1440/1440
+PASS  signup: form visible — forms=1 inputs=4
+PASS  signup: CTA visible
+PASS  activate-school: title — SchemeKnit — Lesson Plan Generator / h1=Activate your school
+PASS  activate-school: distinct bg — rgb(10, 34, 64) expected rgb(10, 34, 64)
+PASS  activate-school: no landing mesh — mesh=0
+PASS  activate-school: grid signal present — ["school_activate"]
+PASS  activate-school: 3–4 signals — count=4
+PASS  activate-school: signal moves over time (3 samples) — 43:83:79560 → 43:91:79560 → 129:92:90932
+PASS  activate-school: light logo capsule — bg=rgb(244, 247, 250)
+PASS  activate-school: no overflow — 1440/1440
+PASS  activate-school: form visible — forms=1 inputs=1
+PASS  activate-school: CTA visible
+PASS  activate-teacher: title — SchemeKnit — Lesson Plan Generator / h1=Activate your license
+PASS  activate-teacher: distinct bg — rgb(14, 28, 46) expected rgb(14, 28, 46)
+PASS  activate-teacher: no landing mesh — mesh=0
+PASS  activate-teacher: grid signal present — ["teacher_license"]
+PASS  activate-teacher: 3–4 signals — count=4
+PASS  activate-teacher: signal moves over time (3 samples) — 192:48:94605 → 191:55:94605 → 143:127:93075
+PASS  activate-teacher: light logo capsule — bg=rgb(244, 247, 250)
+PASS  activate-teacher: no overflow — 1440/1440
+PASS  activate-teacher: form visible — forms=1 inputs=1
+PASS  activate-teacher: CTA visible
+PASS  reset-password: title — SchemeKnit — Lesson Plan Generator / h1=Reset your password
+PASS  reset-password: distinct bg — rgb(10, 22, 40) expected rgb(10, 22, 40)
+PASS  reset-password: no landing mesh — mesh=0
+PASS  reset-password: grid signal present — ["password_reset"]
+PASS  reset-password: 3–4 signals — count=4
+PASS  reset-password: signal moves over time (3 samples) — 191:46:97155 → 200:46:97155 → 141:71:97155
+PASS  reset-password: light logo capsule — bg=rgb(244, 247, 250)
+PASS  reset-password: no overflow — 1440/1440
+PASS  reset-password: form visible — forms=1 inputs=3
+PASS  reset-password: CTA visible
+PASS  setup: redirects to sign-in when already bootstrapped — http://localhost:3999/login/
+PASS  setup: sign-in bg after redirect — rgb(7, 24, 38) expected rgb(7, 24, 38)
+PASS  setup: no landing mesh — mesh=0
+PASS  setup: grid signal present — ["teacher"]
+PASS  setup: 3–4 signals — count=4
+PASS  setup: signal moves over time (3 samples) — 189:41:94605 → 189:47:94605 → 189:44:94605
+PASS  setup: light logo capsule — bg=rgb(244, 247, 250)
+PASS  setup: no overflow — 1440/1440
+PASS  setup: form visible — forms=1 inputs=2
+PASS  setup: CTA visible
+PASS  auth matrix: distinct backgrounds — unique=7 of 7
+PASS  teacher login ≠ signup bg — rgb(7, 24, 38) vs rgb(10, 31, 53)
+PASS  school activation ≠ teacher license bg — rgb(10, 34, 64) vs rgb(14, 28, 46)
+PASS  platform setup state renders distinct — login=rgb(5, 14, 24) setup=rgb(5, 14, 24) h1=Setup already complete
+PASS  password reset unique context — rgb(10, 22, 40)
+PASS  keyboard focus works — INPUT
+PASS  error state visible on invalid submit
+PASS  teacher-login @390: no overflow — 390/390
+PASS  teacher-login @390: logo present — rgb(244, 247, 250)
+PASS  teacher-login @390: grid signal — ["teacher"]
+PASS  teacher-login @390: no landing mesh — mesh=0
+PASS  teacher-login @390: 3–4 signals — count=3
+PASS  school-admin-login @390: no overflow — 390/390
+PASS  school-admin-login @390: logo present — rgb(244, 247, 250)
+PASS  school-admin-login @390: grid signal — ["school"]
+PASS  school-admin-login @390: no landing mesh — mesh=0
+PASS  school-admin-login @390: 3–4 signals — count=3
+PASS  platform-admin-login @390: no overflow — 390/390
+PASS  platform-admin-login @390: logo present — rgb(244, 247, 250)
+PASS  platform-admin-login @390: grid signal — ["platform"]
+PASS  platform-admin-login @390: no landing mesh — mesh=0
+PASS  platform-admin-login @390: 3–4 signals — count=3
+PASS  signup @390: no overflow — 390/390
+PASS  signup @390: logo present — rgb(244, 247, 250)
+PASS  signup @390: grid signal — ["register"]
+PASS  signup @390: no landing mesh — mesh=0
+PASS  signup @390: 3–4 signals — count=3
+PASS  activate-school @390: no overflow — 390/390
+PASS  activate-school @390: logo present — rgb(244, 247, 250)
+PASS  activate-school @390: grid signal — ["school_activate"]
+PASS  activate-school @390: no landing mesh — mesh=0
+PASS  activate-school @390: 3–4 signals — count=3
+PASS  activate-teacher @390: no overflow — 390/390
+PASS  activate-teacher @390: logo present — rgb(244, 247, 250)
+PASS  activate-teacher @390: grid signal — ["teacher_license"]
+PASS  activate-teacher @390: no landing mesh — mesh=0
+PASS  activate-teacher @390: 3–4 signals — count=3
+PASS  reset-password @390: no overflow — 390/390
+PASS  reset-password @390: logo present — rgb(244, 247, 250)
+PASS  reset-password @390: grid signal — ["password_reset"]
+PASS  reset-password @390: no landing mesh — mesh=0
+PASS  reset-password @390: 3–4 signals — count=3
+PASS  setup @390: no overflow — 390/390
+PASS  setup @390: logo present — rgb(244, 247, 250)
+PASS  setup @390: grid signal — ["teacher"]
+PASS  setup @390: no landing mesh — mesh=0
+PASS  setup @390: 3–4 signals — count=3
+PASS  landing: mesh present — mesh=1 canvas=1
+PASS  reduced-motion: grid signal present — ["teacher"]
+PASS  reduced-motion: signal static — 169:44:94605 vs 169:44:94605
+PASS  landing: no public platform-admin CTA — []

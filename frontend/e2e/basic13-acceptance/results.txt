@@ -1,0 +1,55 @@
+PASS  teacher logged in
+PASS  header nav shows "Weekly Plan"
+PASS  list page renders "Weekly Class Plans"
+PASS  list page shows table or empty state
+PASS  no horizontal overflow @ 1440px: weekly plans list — 1440/1440
+PASS  Basic 1 routes to the class-teacher model
+PASS  Basic 4 shows the subject-teacher boundary banner — Not a class-teacher plan
+PASS  Basic 4 model text = subject-teacher (weekly plan not available)
+PASS  preview disabled for Basic 4
+PASS  back to Basic 1 -> class-teacher model again
+PASS  both schemes open their teaching-day panels
+PASS  class mismatch is badged (Basic 7 scheme under Basic 1)
+PASS  Wednesday deselected for subject A
+PASS  WAPEF Deep Hope selected — Learners will recognize and appreciate t
+PASS  shared-entry toggle ON for subject A
+PASS  shared entry renders one grouped day label — MONDAY & TUESDAY & THURSDAY & FRIDAY
+PASS  shared entry = 1 day row for subject A
+PASS  subject B keeps 5 individual day rows
+PASS  per-day mode: subject A = 4 day rows (no Wednesday)
+PASS  subject A preview has no Wednesday row
+PASS  subject B unaffected: still 5 day rows
+PASS  preview validates clean — Ready to save: 2 subject section(s), 9 day row(s).
+PASS  no horizontal overflow @ 1440px: builder preview — 1440/1440
+PASS  review header shows Basic 1 · Week 1 (request class)
+PASS  review shows both subject sections
+PASS  subject A review = 4 day cards
+PASS  subject B review = 5 day cards
+PASS  subject A review has no Wednesday card
+PASS  subject B review keeps Wednesday card
+PASS  WAPEF fields visible on review
+PASS  no horizontal overflow @ 1440px: review page — 1440/1440
+PASS  save enables when a day starter changes
+PASS  edit saved (toast "Changes saved")
+PASS  isolation: Tuesday starter of subject A unchanged
+PASS  isolation: Monday starter of subject B unchanged
+PASS  edited starter persists after reload
+PASS  DOCX downloads — Weekly_Plan.docx
+PASS  DOCX carries the edited Monday starter
+PASS  DOCX carries the untouched Tuesday starter
+PASS  DOCX carries subject B Monday starter (cross-subject)
+PASS  DOCX carries the WAPEF Deep Hope selection
+PASS  DOCX keeps DAYS + PHASE 1/2/3 structure
+PASS  DOCX holds both subject sections
+PASS  DOCX has no leftover template tokens
+PASS  PDF export: no download event (LibreOffice missing here)
+PASS  PDF export fails with an explanatory banner — PDF conversion is unavailable in this environment (LibreOffice missing).
+PASS  list now shows the saved week as a row — 6 row(s)
+PASS  list row shows class + subjects — Basic 1	Week 1	First Term	Science, Science	2026-09-26	 | Open
+PASS  no horizontal overflow @ 1024px: list — 1024/1024
+PASS  no horizontal overflow @ 1024px: review @ 1024 — 1024/1024
+PASS  no horizontal overflow @ 1024px: builder @ 1024 — 1024/1024
+PASS  no horizontal overflow @ 390px: list — 390/390
+PASS  no horizontal overflow @ 390px: review @ 390 — 390/390
+PASS  no horizontal overflow @ 390px: builder @ 390 — 390/390
+PASS  zero uncaught page errors

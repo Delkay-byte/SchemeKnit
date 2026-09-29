@@ -1,0 +1,76 @@
+App chrome (Batch 2) acceptance — 2026-09-26T22:14:02.816Z
+BASE=http://localhost:3003
+PASS=72 FAIL=0
+
+PASS  static: <Header /> renders exactly 3x (one per application area) — count=3
+PASS  static: no page embeds <Header /> inline — count=0
+PASS  static: ServiceStatusBanner is not a fixed z-50 overlay — position classes checked
+PASS  static: school-admin authorization guard intact (login/role redirects) — all four redirects present
+PASS  static: PageHeader component renders data-page-header + h1 — ok
+PASS  static: .app-blueprint is static CSS (no animation → reduced-motion safe) — ok
+PASS  teacher/dashboard: exactly one application header — count=1
+PASS  teacher/dashboard: header background = #071826 — bg=rgb(7, 24, 38)
+PASS  teacher/dashboard: header is sticky — position=sticky top=0px
+PASS  teacher/dashboard: header z-index = 40 (below dialogs at z-50) — z=40
+PASS  teacher/lessons: exactly one aria-current nav link — href=/lessons/
+PASS  teacher/lessons: aria-current on Lesson Plans — /lessons/
+PASS  teacher/lessons: active indicator = brand cyan #04A9CE — color=rgb(4, 169, 206)
+PASS  PageHeader present with h1 on /dashboard/ — headers=1 h1=1
+PASS  /dashboard/: no landing mesh / auth grid signal in app page — count=0
+PASS  no horizontal overflow @1440 /dashboard/ — 1440/1440
+PASS  PageHeader present with h1 on /upload/ — headers=1 h1=1
+PASS  /upload/: no landing mesh / auth grid signal in app page — count=0
+PASS  no horizontal overflow @1440 /upload/ — 1440/1440
+PASS  PageHeader present with h1 on /lessons/ — headers=1 h1=1
+PASS  /lessons/: no landing mesh / auth grid signal in app page — count=0
+PASS  no horizontal overflow @1440 /lessons/ — 1440/1440
+PASS  PageHeader present with h1 on /templates/ — headers=1 h1=1
+PASS  /templates/: no landing mesh / auth grid signal in app page — count=0
+PASS  no horizontal overflow @1440 /templates/ — 1440/1440
+PASS  PageHeader present with h1 on /payments/ — headers=1 h1=1
+PASS  /payments/: no landing mesh / auth grid signal in app page — count=0
+PASS  no horizontal overflow @1440 /payments/ — 1440/1440
+PASS  teacher: workspace blueprint = static linear grid (not the landing mesh) — linear-gradient(90deg, rgba(16, 42, 67, 0.04) 1px, rgba(0, 0
+PASS  teacher: blueprint has no animation — animation=none
+PASS  banner: status banner renders on server-down event — visible
+PASS  banner: not a fixed overlay (in normal document flow) — position=relative
+PASS  banner: z-index below header (never covers navigation) — z=auto
+PASS  banner: does not overlap the sticky header (stacked, not covering) — banner.bottom=53 header.top=53
+PASS  reduced-motion: blueprint static and present — matches=true animation=none
+PASS  no horizontal overflow @1024 /dashboard/ — 1024/1024
+PASS  no horizontal overflow @1024 /lessons/ — 1024/1024
+PASS  teacher/dashboard @390: exactly one application header — count=1
+PASS  teacher/dashboard @390: header background = #071826 — bg=rgb(7, 24, 38)
+PASS  teacher/dashboard @390: header is sticky — position=sticky top=0px
+PASS  teacher/dashboard @390: header z-index = 40 (below dialogs at z-50) — z=40
+PASS  mobile: hamburger menu button present (collapsed) — label=Open menu expanded=false
+PASS  mobile: desktop nav hidden at 390 — hidden=true
+PASS  mobile: menu opens with nav links + aria-expanded=true — links=6 expanded=true
+PASS  mobile: active link marked aria-current inside menu — count=1
+PASS  mobile: Escape closes the menu — open=false
+PASS  no horizontal overflow @390 /review/56d2240d-9880-4520-ba25-b4cfbf0437e0/ — 390/390
+PASS  no horizontal overflow @390 /dashboard/ — 390/390
+PASS  no horizontal overflow @390 /lessons/ — 390/390
+PASS  no horizontal overflow @390 /settings/ — 390/390
+PASS  school-admin: exactly one application header — count=1
+PASS  school-admin: header background = #071826 — bg=rgb(7, 24, 38)
+PASS  school-admin: header is sticky — position=sticky top=0px
+PASS  school-admin: header z-index = 40 (below dialogs at z-50) — z=40
+PASS  school-admin: no landing mesh / auth grid signal in app page — count=0
+PASS  school-admin: sub-nav uses shared Tabs (4 tabs) — count=4
+PASS  school-admin: tabs keep existing route links — /school-admin/,/school-admin/teachers/,/school-admin/settings/,/school-admin/license/
+PASS  school-admin: active section marked on dashboard — /school-admin/
+PASS  school-admin: tab click navigates (route behavior preserved) — http://localhost:3003/school-admin/teachers/
+PASS  school-admin/teachers: PageHeader present — count=1
+PASS  school-admin/teachers: no horizontal overflow @1440 — 1440/1440
+PASS  platform-admin: exactly one application header — count=1
+PASS  platform-admin: header background = #071826 — bg=rgb(7, 24, 38)
+PASS  platform-admin: header is sticky — position=sticky top=0px
+PASS  platform-admin: header z-index = 40 (below dialogs at z-50) — z=40
+PASS  platform-admin: no landing mesh / auth grid signal in app page — count=0
+PASS  platform-admin: tab row uses shared Tabs (10 tabs incl. teachers) — count=10
+PASS  platform-admin: tab click activates section (behavior preserved) — active=schools
+PASS  platform-admin: PageHeader present — count=1
+PASS  platform-admin: no horizontal overflow @1440 — 1440/1440
+PASS  platform-admin: no horizontal overflow @390 — 390/390
+PASS  zero page errors across all journeys — none
