@@ -1,0 +1,82 @@
+web=https://schemeknit-frontend.onrender.com api=https://schemeknit-api.onrender.com scheme=8321453e-5582-4c41-b7de-b9e3495d035c
+PASS login through the UI — https://schemeknit-frontend.onrender.com/dashboard/
+PASS single-subject upload never claims multiple subjects — no false multi-subject message
+PASS upload parses and reports the extracted curriculum
+PASS upload reports the actual subject count — 1 subject detected
+PASS upload a real scheme through the UI — scheme=8321453e-5582-4c41-b7de-b9e3495d035c
+PASS curriculum spine is readable — 13 weeks · v6388ac15
+PASS every week carries a teacher-facing review status — 1:ok 2:ok 3:needs_review 4:ok 5:ok 6:ok 7:ok 8:ok 9:mixed 10:ok 11:ok 12:ok 13:special
+PASS spine reports the source document — bs7_mixed_midterm_scheme.docx
+PASS spine never uses the vague "Other" review state for a mixed week — W9
+PASS extraction table is shown after processing
+PASS extraction table lists the extracted weeks — 13 rows
+PASS extraction status uses teacher-facing wording — includes a Needs review row
+PASS extraction table exposes no parser diagnostics
+PASS extraction table never labels a week "Other" — Mixed week used
+PASS clicking an extracted week selects it — aria-selected=true
+PASS weeks whose source has an indicator keep it — 11/13 weeks carry indicators
+PASS extraction table renders real indicator codes — B7.1.1.1,B7.1.1.2
+PASS Needs review click opens the week review context
+PASS review context names what needs attention — This week needs your review No indicators were found for this week. Indicator — ⚠ Needs review: SchemeKnit could not con
+PASS review context offers a way forward
+PASS mixed week is labelled "Mixed week", never "Other" — extraction table shows Mixed week
+PASS mixed week shows its special period and teaching segments
+PASS midterm segment keeps the SOURCE date range — ◐ Mixed week — special period and teaching content Special period: MID-TERM (05-11-2026 to 06-11-2026) · 2026-11-05 → 2026-11-06 (not a less
+PASS teaching segment is shown beside the special period
+PASS spine exposes source-defined special segments — 2026-11-05
+PASS generation mode defaults to Quick Generate
+PASS Build with me is offered as the secondary path
+PASS allocation shows an editable teaching period per lesson — 11 editable slots
+PASS allocation rows carry source provenance — week 1 · B7.1.1.1.1
+PASS allocation rows expose a review state — needs_review present on every row
+PASS Quick Generate → Preview Allocation succeeds — HTTP 200
+PASS no "Validation failed" on the Quick Generate path
+PASS no "Action failed" on the Quick Generate path
+PASS emptied term dates do not produce a validation failure — HTTP 200
+PASS emptied term dates never surface "Validation failed" — no validation-failed text
+PASS Build with me → Preview Allocation succeeds — HTTP 200
+PASS no "Validation failed" on the Build with me path
+PASS teacher can adjust the allocation period — set Monday · Period 1
+PASS generation completes and opens the workspace — HTTP 200
+PASS workspace shows the real lesson, not an empty editor — 362 chars
+PASS workspace renders Lesson topic
+PASS workspace renders Objectives
+PASS workspace renders Phase 1 · Starter
+PASS workspace renders Phase 2 · Main Learning
+PASS workspace renders Assessment
+PASS workspace renders Phase 3 · Reflection
+PASS workspace lesson topic has real content — God - Nature of God
+PASS Source & alignment panel is present
+PASS Source & alignment names the scheme — Source & alignment Indicator B7.1.1.1.1 SCHEME bs7_mixed_midterm_scheme.docx CURRICULUM SOURCE Teacher scheme SOURCE WEEK Week 1 STRAND God 
+PASS Source & alignment names the source week
+PASS Source & alignment names the indicator — B7.1.1.1,B7.1.1.1
+PASS Source & alignment states the generation path
+PASS generated lessons are retrievable — count=5
+PASS lesson provenance API answers "why this lesson?" — week 1 · B7.1.1.1.1 · Curriculum-first (deterministic)
+PASS lesson provenance never fabricates a missing source
+PASS Main Learning is editable in the workspace
+PASS unsaved edits are signalled
+PASS edited Main Learning persists after save + reload — "Acceptance main learning 1790601505974"
+PASS DOCX download reaches disk — Lesson_Plans_bs7_mixed_midterm_scheme.docx (41072 bytes)
+PASS DOCX HTTP 200 — HTTP 200
+PASS DOCX is a real zip package (PK signature) — "PK\u0003\u0004\u0014"
+PASS DOCX MIME is an OOXML document — application/vnd.openxmlformats-officedocument.wordprocessingml.document
+PASS DOCX filename ends in .docx — Lesson_Plans_bs7_mixed_midterm_scheme.docx
+PASS DOCX opens as an OOXML package
+PASS PDF download reaches disk — Lesson_Plans_bs7_mixed_midterm_scheme.pdf (67751 bytes)
+PASS PDF HTTP 200 — HTTP 200
+PASS PDF has the %PDF signature — "%PDF-"
+PASS PDF MIME is application/pdf — application/pdf
+PASS PDF filename ends in .pdf — Lesson_Plans_bs7_mixed_midterm_scheme.pdf
+PASS PDF opens (header + xref + EOF)
+PASS no "Failed to fetch" surfaced
+PASS no generic "Action failed" surfaced
+PASS no uncaught page exceptions (desktop)
+PASS mobile: login works
+PASS mobile: no horizontal page overflow on extraction — overflow=0px
+PASS mobile: generated lesson is visible in the workspace
+PASS mobile: Save is reachable
+PASS mobile: Export DOCX is reachable
+PASS mobile: no horizontal page overflow in the workspace — overflow=0px
+PASS mobile: Source & alignment collapses by default
+PASS no uncaught page exceptions (mobile)

@@ -1,0 +1,70 @@
+PASS  fresh teacher account created — persist.teacher.1790691278118@schemeknit.test
+PASS  school stored on the teacher profile (PART 7) — Achimota Basic School
+PASS  real Computing scheme uploaded and extracted through the UI — scheme=6215008f-aa9a-47dc-adb4-32d74ed13576
+PASS  Approved WAPEF Plan selected in the Template dropdown — Approved WAPEF Plan
+PASS  more than one Through line selected before generation — God worshiper, Image reflector
+PASS  workspace shows the WAPEF fields section (template identity is WAPEF)
+FAIL  the workspace reflects the Through lines chosen before generation
+FAIL  Deep Hope set before generation survives into the workspace
+PASS  the source resource list is shown read-only beside the lesson list
+PASS  Save succeeds and reports the edits are stored
+PASS  no "Action failed" / internal server error on Save
+PASS  saved lesson is found through the API — topic=Input devices: manual and automatic
+PASS  API returns the edited topic
+PASS  API returns the saved Deep Hope verbatim — Learners will recognize and appreciate the beauty, order, and purpose of design in the physical world around them.
+PASS  API returns the saved Storyline verbatim — Shaping our world.
+PASS  API returns the saved God's Story verbatim — Creation
+PASS  API returns BOTH saved Through lines — God worshiper | Image reflector
+PASS  API returns the corrected lesson resource — Touchscreen (corrected spelling), Processor, a real microchip or a clear picture of one, diagram of a processor, chart comparing computer generations
+PASS  API returns the Class Assignment
+PASS  API returns the Home Assignment
+PASS  API returns the school on the lesson — Achimota Basic School
+PASS  the lesson keeps the WAPEF template identity — tpl-wapef-approved-plan
+PASS  lesson topic survives leave → return → reload
+PASS  Phase 1 starter survives leave → return → reload
+PASS  Main Learning survives leave → return → reload
+PASS  Assessment survives leave → return → reload
+PASS  Phase 3 reflection survives leave → return → reload
+PASS  Class Assignment survives leave → return → reload
+PASS  Home Assignment survives leave → return → reload
+PASS  keyword survives leave → return → reload
+PASS  lesson resource survives leave → return → reload
+PASS  reference title survives leave → return → reload
+PASS  reference type survives leave → return → reload
+PASS  Deep Hope survives leave → return → reload
+PASS  Storyline survives leave → return → reload
+PASS  God's Story survives leave → return → reload
+PASS  both Through lines survive leave → return → reload — God worshiper | Image reflector
+PASS  the scheme's own source resource record is unchanged (PART 13) — Personal Computer, Processor
+PASS  every stored field is identical before and after the navigation round-trip
+PASS  Through lines are identical before and after the round-trip
+PASS  the lesson page shows the saved topic — Input devices: manual and automatic
+PASS  the lesson page shows the saved Phase 1 starter
+PASS  DOCX export downloads a real package — 84402 bytes
+PASS  DOCX carries the saved topic
+PASS  DOCX carries the saved Deep Hope verbatim
+PASS  DOCX carries the saved Storyline verbatim
+PASS  DOCX carries the saved God's Story verbatim
+PASS  DOCX carries the saved Through line — God worshiper
+PASS  DOCX carries the Class Assignment verbatim
+PASS  DOCX carries the Home Assignment verbatim
+PASS  DOCX carries the corrected lesson resource
+PASS  DOCX keeps the assignment sentence punctuation (not a comma-less list)
+PASS  DOCX contains the template's real tables — 20 tables
+PASS  DOCX contains no internal or debug text
+PASS  PDF export downloads a real PDF — 21078 bytes
+PASS  PDF has at least one page — 10 pages
+PASS  PDF carries the saved topic
+PASS  PDF carries the saved Deep Hope verbatim
+PASS  PDF carries the saved Storyline verbatim
+PASS  PDF carries the saved God's Story verbatim
+PASS  PDF carries the saved Through line
+PASS  PDF carries the Class Assignment verbatim
+PASS  PDF carries the Home Assignment verbatim
+PASS  PDF carries the corrected lesson resource
+PASS  PDF keeps the assignment sentence punctuation (not a comma-less list)
+PASS  PDF contains no internal or debug text
+PASS  PDF draws real table rules/borders (not a text dump) — 233 vector drawings
+PASS  PDF pages rendered to images for visual inspection — pdf-page1.png, pdf-page2.png, pdf-page3.png, pdf-page4.png, pdf-page5.png, pdf-page6.png, pdf-page7.png, pdf-page8.png, pdf-page9.png, pdf-page10.png
+FAIL  no HTTP errors during the journey — 404 https://schemeknit-api.onrender.com/api/generation/6215008f-aa9a-47dc-adb4-32d74ed13576/lessons | 404 https://schemeknit-api.onrender.com/api/generation/6215008f-aa9a-47dc-adb4-32d74ed13576/lessons | 404 https://schemeknit-api.onrender.com/api/generation/6215008f-aa9a-47dc-adb4-32d74ed13576/lessons
+PASS  no uncaught page exceptions

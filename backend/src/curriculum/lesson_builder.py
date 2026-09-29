@@ -47,6 +47,14 @@ from ..models import (
 from .pedagogy import profile_for_subject, SubjectPedagogy
 from ..ai_resource_text import normalize_text_items
 
+#: Layer 3/4 integration — imported lazily inside ``build_lesson`` to avoid an
+#: import cycle (patterns imports nothing from the builder; the typing-only
+#: names below are for signatures and annotations).
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:  # pragma: no cover
+    from .patterns import LessonPattern
+    from .variation import BatchHistory
+
 #: The canonical code patterns live in the curriculum package so the builder,
 #: the allocation engine and every template renderer agree on what a code is.
 from . import CODE_PREFIX_RE as _CODE_RE  # noqa: E402
@@ -828,6 +836,232 @@ _ESSENTIAL_BANK: Dict[str, str] = {
 }
 
 
+# ── Pattern rendering (Layer 3 integration) ────────────────────────────────
+#
+# The lesson pattern supplies the teaching SEQUENCE; these banks supply the
+# concrete classroom wording for each pattern moment. The starter modulates
+# HOW the lesson opens and the plenary HOW it closes, so a batch of lessons
+# on different indicators does not all open and end with the same sentence
+# skeleton. All templates are rendered with the existing ``fmt`` placeholders
+# so the indicator remains visibly the subject of every sentence.
+
+#: STARTER MODES (Layer 3/4): the pattern's opening moment. Each names a
+#: concrete teacher action and learner action, never "discuss the previous
+#: lesson". Selected from the pattern's ``starter_mode``.
+STARTER_MODE_TEMPLATES: Dict[str, str] = {
+    "retrieval": (
+        "Quick recall: ask three learners to state what they remember about "
+        "{focus_short} from the last lesson. Write one keyword on the board "
+        "and have the class read it together."
+    ),
+    "object_observation": (
+        "Show a real object or a picture connected to {focus_short} and ask "
+        "learners to say three things they notice about it before any "
+        "explanation."
+    ),
+    "quick_scenario": (
+        "Tell a one-minute local scenario about {focus_short} (a market, home "
+        "or community situation) and ask: 'what would you do here, and why?'"
+    ),
+    "diagnostic_question": (
+        "Pose one diagnostic question about {focus_short} and ask for hands; "
+        "note who answers confidently and who hesitates — this frames the "
+        "support needed today."
+    ),
+    "demonstration_teaser": (
+        "Perform the first step of {focus_short} without explaining it and "
+        "ask learners to predict what you will do next and why."
+    ),
+    "prior_knowledge_challenge": (
+        "Write one statement about {focus_short} on the board that is ALMOST "
+        "right, and challenge the class to find what is wrong with it."
+    ),
+    "misconception_probe": (
+        "Present the common mistake around {focus_short} as if it were a "
+        "learner's answer, and ask the class whether they agree and why."
+    ),
+    "short_game": (
+        "Play a quick two-minute game around {focus_short} — thumbs up/down "
+        "or a call-and-response — so every learner answers at least once."
+    ),
+    "prediction": (
+        "Ask learners to predict what will happen with {focus_short}: record "
+        "two or three predictions on the board without judging them yet."
+    ),
+    "oral_classification": (
+        "Say aloud four items linked to {focus_short} and ask learners to "
+        "tell you which two belong together and why."
+    ),
+    "real_life_connection": (
+        "Ask learners to name where they have seen {focus_short} at home or "
+        "in their community; collect two examples on the board."
+    ),
+    "vocabulary_activation": (
+        "Build a quick word wall for {focus_short}: learners say the key "
+        "words they already know, and the teacher adds the two they will need "
+        "today."
+    ),
+    "contrast_pairs": (
+        "Show two contrasting examples linked to {focus_short} and ask "
+        "learners to name one way they are the same and one way they differ."
+    ),
+    "warm_up_game": (
+        "Lead a lively warm-up game or action song connected to {focus_short}, "
+        "then settle the class and state today's focus."
+    ),
+}
+
+#: PLENARY MODES (Layer 3/4): the pattern's closing moment. Each must produce
+#: EVIDENCE that learners understood the objective, never a bare 'review'.
+PLENARY_MODE_TEMPLATES: Dict[str, str] = {
+    "exit_question": (
+        "Exit question: every learner answers one question on {focus_short} "
+        "in their book or orally before leaving; use the answers to plan "
+        "re-teaching."
+    ),
+    "learner_explanation": (
+        "Ask two learners to explain {focus_short} to the class in their own "
+        "words, and ask one other learner whether they agree."
+    ),
+    "quick_classification": (
+        "Give three examples and one non-example of {focus_short} and ask the "
+        "class to identify the one that does not belong and why."
+    ),
+    "one_minute_summary": (
+        "One-minute summary: each learner writes one sentence about "
+        "{focus_short}; two read theirs aloud and the class agrees the best "
+        "statement."
+    ),
+    "teach_a_peer": (
+        "Each learner teaches {focus_short} to a partner in one minute; the "
+        "teacher listens in and names one strong explanation."
+    ),
+    "application_scenario": (
+        "Give one real-life scenario about {focus_short} and ask learners to "
+        "say what they would do and why; two or three answer."
+    ),
+    "misconception_correction": (
+        "Return to any prediction or misconception about {focus_short} from "
+        "the starter and correct it together, naming what the evidence "
+        "showed."
+    ),
+    "oral_recap": (
+        "Oral recap: the teacher asks, learners answer in chorus for the key "
+        "facts, then one learner summarises {focus_short} in a sentence."
+    ),
+    "demonstration": (
+        "Ask two learners to demonstrate {focus_short} while the class checks "
+        "each step; correct one common error together."
+    ),
+    "reflection_question": (
+        "Reflection question: learners write one thing they can now do with "
+        "{focus_short} and one question they still have."
+    ),
+    "retrieval_challenge": (
+        "Quick retrieval challenge: three rapid questions on {focus_short} "
+        "covering the starter, the main practice and one extension; keep a "
+        "tally of confident answers."
+    ),
+    "explain_rule": (
+        "Ask learners to state the rule or method for {focus_short} in one "
+        "sentence, then give one new example that fits it."
+    ),
+    "justify_choice": (
+        "Ask learners to justify one choice they made about {focus_short} "
+        "today and to name one difference it made."
+    ),
+    "report_findings": (
+        "Two groups report their findings on {focus_short}; the class agrees "
+        "the strongest evidence and one open question."
+    ),
+    "conclusion_check": (
+        "Ask the class to answer the question that opened the lesson about "
+        "{focus_short}, and to explain how their evidence supports the answer."
+    ),
+    "group_presentation_recap": (
+        "Each group presents its analysis of {focus_short} in one minute; the "
+        "teacher records the strongest reason and one disagreement."
+    ),
+    "application_commitment": (
+        "Each learner names one way they will apply {focus_short} this week "
+        "in their home or community; two or three share with the class."
+    ),
+    "share_and_critique": (
+        "Three learners display or perform their work on {focus_short}; the "
+        "class gives one kind, specific point of feedback each."
+    ),
+    "cool_down_reflection": (
+        "Cool down with gentle movement, then ask learners to name the most "
+        "important technique or safety point about {focus_short} they "
+        "practised today."
+    ),
+    "misconception_correction": (
+        "Return to any prediction or misconception about {focus_short} from "
+        "the starter and correct it together, naming what the evidence "
+        "showed."
+    ),
+}
+
+#: Weight of each pattern-step ROLE inside the MAIN block (fractions of the
+# main period). Kept close to the established profile weighting so a pattern's
+# rhythm still respects the standard lesson shape.
+_STEP_ROLE_WEIGHTS: Dict[str, float] = {
+    "input": 0.30,
+    "guided": 0.40,
+    "independent": 0.20,
+    "synthesis": 0.30,
+}
+
+
+def _render_pattern_step(step, fmt: Dict[str, str], profile, act_key):
+    """Render ONE pattern step as (name, description, weight).
+
+    The step's activity bank supplies the shared classroom skeleton; when the
+    subject's own pedagogy (Layer 2) has a MOVE for the step's role or
+    activity key, the step is rendered through that move instead — so one
+    pattern reads differently in Computing, Mathematics and RME. Fallbacks
+    keep the step fully specified: a pattern step is never rendered as a bare
+    heading.
+    """
+    from .pedagogy import subject_move
+    from .patterns import PatternStep
+
+    if not isinstance(step, PatternStep):
+        return None
+
+    # Subject moves first (Layer 2): the subject's own way of doing the step.
+    move = subject_move(profile.key, step.activity_key)
+    if move is None:
+        move = subject_move(profile.key, step.role)
+    if move is None and act_key and act_key != step.activity_key:
+        move = subject_move(profile.key, act_key) or subject_move("generic", step.role)
+    if move is None:
+        move = subject_move("generic", step.role) or subject_move(
+            "generic", step.activity_key)
+
+    if move:
+        desc = _safe_format(move, **fmt)
+    else:
+        # Fall back to the shared activity bank for this activity key.
+        bank = _PHASE_BANK.get(step.activity_key) or _PHASE_BANK.get(
+            act_key or "") or []
+        if bank:
+            idx = 0 if step.role == "input" else (
+                1 if step.role == "guided" else min(len(bank) - 1, 2))
+            tmpl = bank[min(idx, len(bank) - 1)][1]
+            desc = _safe_format(tmpl, **fmt)
+        else:
+            desc = _safe_format(
+                "Carry out {focus_short} following the demonstrated steps.", **fmt)
+
+    if not desc.strip():
+        desc = _safe_format(
+            "Carry out {focus_short} following the demonstrated steps.", **fmt)
+
+    weight = _STEP_ROLE_WEIGHTS.get(step.role, 0.25)
+    return (step.name, desc, weight)
+
+
 def strip_indicator_code(text: str) -> str:
     """Remove a leading curriculum code (e.g. B7.4.3.1.2) from indicator text."""
     if not text:
@@ -1173,6 +1407,8 @@ def build_lesson(
     position_index: int = 0,
     day_label: str = "",
     previous_day_label: str = "",
+    pattern: Optional["LessonPattern"] = None,
+    batch_history: Optional["BatchHistory"] = None,
 ) -> LessonPlan:
     """Compose one deterministic, subject-aware, indicator-specific lesson plan.
 
@@ -1185,6 +1421,18 @@ def build_lesson(
     cloned. The parameters default to the single-lesson behaviour, so every
     existing caller (Basic 4-JHS, KG, Nursery, subject-teacher WAPEF) is
     unchanged.
+
+    ``pattern`` (Layer 3) optionally supplies the teaching SEQUENCE: the MAIN
+    phases are then composed from the pattern's step roles rendered through
+    the subject's own pedagogy moves, the starter from the pattern's starter
+    mode and the plenary from its plenary mode. It defaults to ``None`` — the
+    established output is byte-for-byte preserved — and the allocation engine
+    passes a selected pattern during batch generation only. The pattern
+    supplies the SHAPE of the lesson; the indicator remains the substance.
+
+    ``batch_history`` (Layer 4) records the generated lesson's fingerprint for
+    anti-repetition. It never changes this lesson's text; it only lets the
+    NEXT selection vary. It is optional and never required for a valid lesson.
     """
     subject_name = (
         config.subject.value if isinstance(config.subject, Subject) else str(config.subject)
@@ -1300,7 +1548,19 @@ def build_lesson(
     exemplar_starter = ""
     if exemplar and (exemplar.exemplar_activity_patterns or []):
         exemplar_starter = (exemplar.exemplar_activity_patterns[0] or "").strip()
-    if exemplar_starter:
+    if pattern is not None and pattern.starter_mode in STARTER_MODE_TEMPLATES:
+        # Layer 3: the selected pattern opens the lesson with its own concrete
+        # teacher + learner action. The indicator stays the subject of every
+        # sentence via {focus_short}; the mode only changes HOW it opens, so a
+        # batch does not share one opening skeleton.
+        starter = _safe_format(STARTER_MODE_TEMPLATES[pattern.starter_mode], **fmt)
+        if prev_short:
+            starter = f"Build on the previous lesson ('{prev_short}'). " + starter
+        if position_index and (prev_short or focus_short):
+            link = prev_short or focus_short
+            label = previous_day_label or "the previous lesson"
+            starter = f"Continue from {label} on '{link}'. " + starter
+    elif exemplar_starter:
         # The official exemplar's own derived opening activity: concrete
         # teacher action, learner action and object, replacing the generic
         # prior-knowledge formula.
@@ -1348,7 +1608,25 @@ def build_lesson(
     # activity patterns; otherwise the indicator's activity bank / subject
     # profile composes it (unchanged behaviour for subjects without a record).
     exemplar_phases = _exemplar_phases(exemplar, fmt) if exemplar else []
-    if len(exemplar_phases) >= 2:
+    # Layer 3: when a teaching pattern was selected, its step sequence composes
+    # the MAIN block — rendered through the subject's own pedagogy moves so the
+    # same pattern reads differently per subject. Indicator-specific content
+    # (verbs, resources, competencies, assessment) is NOT touched; the pattern
+    # only supplies the teaching shape.
+    if pattern is not None:
+        pattern_specs: List[Tuple[str, str, float]] = []
+        for step in pattern.steps:
+            rendered = _render_pattern_step(step, fmt, profile, act_key)
+            if rendered and rendered[1].strip():
+                pattern_specs.append(rendered)
+        if len(pattern_specs) >= 2:
+            # A pattern with fewer than two renderable steps falls back to the
+            # established composition rather than producing a thin MAIN block.
+            phase_specs = pattern_specs
+        else:
+            phase_specs = _compose_main_phases(profile, fmt, act_key,
+                                               position_index=position_index)
+    elif len(exemplar_phases) >= 2:
         # The approved plan's MAIN block spans at least three phases. The
         # exemplar's own derived patterns fill it first — they are specific to
         # THIS indicator — and the subject's activity bank supplies any
@@ -1424,11 +1702,19 @@ def build_lesson(
         )
 
     # ── PLENARY — consolidates THIS indicator ───────────────────────────
-    conclusion = _safe_format(
-        _PLENARY_BANK.get(act_key) or profile.plenary_template, **fmt
-    )
-    if next_short:
-        conclusion += f" Preview the next lesson ('{next_short}')."
+    if pattern is not None and pattern.plenary_mode in PLENARY_MODE_TEMPLATES:
+        # Layer 3: the pattern's closing moment — always a consolidation that
+        # produces evidence of understanding, never a bare "review the lesson".
+        conclusion = _safe_format(
+            PLENARY_MODE_TEMPLATES[pattern.plenary_mode], **fmt)
+        if next_short:
+            conclusion += f" Preview the next lesson ('{next_short}')."
+    else:
+        conclusion = _safe_format(
+            _PLENARY_BANK.get(act_key) or profile.plenary_template, **fmt
+        )
+        if next_short:
+            conclusion += f" Preview the next lesson ('{next_short}')."
 
     # ── Differentiation — tied to the actual task ───────────────────────
     differentiation = "\n".join([
@@ -1628,7 +1914,7 @@ def build_lesson(
         _ESSENTIAL_BANK.get(act_key) or profile.essential_question, **fmt
     )
 
-    return LessonPlan(
+    lp = LessonPlan(
         scheme_of_work_id=scheme_id,
         term_config_id=config.id,
         week_number=alloc.week_number,
@@ -1692,6 +1978,24 @@ def build_lesson(
         status=LessonStatus.GENERATED,
         ai_generated=False,
     )
+
+    # ── Layer 4: record this lesson's fingerprint for anti-repetition ────
+    # The history is optional and NEVER changes this lesson's text; it only
+    # lets the NEXT lesson's pattern selection vary. Recording happens after
+    # the lesson is fully composed so every field is final.
+    if batch_history is not None and pattern is not None:
+        try:
+            from .variation import fingerprint_lesson
+            batch_history.record(fingerprint_lesson(
+                lp, pattern_id=pattern.id,
+                starter_mode=pattern.starter_mode,
+                plenary_mode=pattern.plenary_mode,
+            ))
+        except Exception:
+            # History recording must never break a deterministic generation.
+            pass
+
+    return lp
 
 
 def _learner_task(phase_name: str, skill: str) -> str:

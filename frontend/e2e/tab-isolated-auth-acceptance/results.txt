@@ -1,0 +1,47 @@
+Tab-isolated auth acceptance — 2026-09-26T22:27:00.245Z
+BASE=http://localhost:3003 API=http://localhost:8000
+PASS=43 FAIL=0
+
+PASS  A: teacher logged in — accept.teacher@schemeknit.test path=/dashboard/
+PASS  A: no legacy localStorage auth keys — ls=null
+PASS  B: fresh tab on protected URL is unauthenticated — path=/login/
+PASS  B: no legacy localStorage auth keys — ls=null
+PASS  A: still teacher after B logs in — accept-teacher-0001
+PASS  B: school admin logged in — accept-sa-0001 path=/school-admin/
+PASS  A and B hold DISTINCT bearer tokens — len=251/244
+PASS  A: /api/auth/me resolves teacher — status=200 id=accept-teacher-0001
+PASS  B: /api/auth/me resolves school admin — status=200 id=accept-sa-0001
+PASS  A: reload keeps teacher identity — id=accept-teacher-0001
+PASS  B: reload keeps school-admin identity — id=accept-sa-0001
+PASS  A: logout clears THIS tab only — path=/login/
+PASS  B: still authenticated right after A logs out — status=200 id=accept-sa-0001
+PASS  B: token intact after A logout — path=/school-admin/
+PASS  A: re-login restores teacher — id=accept-teacher-0001
+PASS  B: unaffected by A re-login — id=accept-sa-0001
+PASS  C: new tab on landing starts unauthenticated — path=/
+PASS  C: pasted protected URL stays unauthenticated (no inheritance) — path=/login/
+PASS  C: /api/auth/me resolves platform admin — status=200 id=accept-pa-0001 path=/platform-admin/
+PASS  A: still teacher with 3 tabs open — id=accept-teacher-0001
+PASS  B: still school admin with 3 tabs open — id=accept-sa-0001
+PASS  API: A token resolves teacher — 200 accept.teacher@schemeknit.test
+PASS  API: B token resolves school admin — 200 accept.sa@schemeknit.test
+PASS  API: C token resolves platform admin — 200 accept.pa@schemeknit.test
+PASS  role: teacher forbidden from platform-admin API — status=403
+PASS  role: school admin forbidden from platform-admin API — status=403
+PASS  role: platform admin allowed on platform-admin API — status=200
+PASS  role: teacher forbidden from user list — status=403
+PASS  role: school admin allowed on user list — status=200
+PASS  invalid A session: A alone logged out — path=/login/ token=false
+PASS  invalid A session: B unaffected — status=200
+PASS  invalid A session: C unaffected — status=200
+PASS  captured API requests from all tabs — total=61
+PASS  authenticated API requests carry Authorization: Bearer — bearer=29/61
+PASS  NO request carries a Cookie header (no shared session cookie) — cookie-reqs=0
+PASS  each tab authenticated with its OWN bearer token — {"A":4,"B":1,"C":1}
+PASS  A: final legacy localStorage check clean — ls=null
+PASS  A: still authenticated in its own tab — path=/dashboard/
+PASS  B: final legacy localStorage check clean — ls=null
+PASS  B: still authenticated in its own tab — path=/school-admin/
+PASS  C: final legacy localStorage check clean — ls=null
+PASS  C: still authenticated in its own tab — path=/platform-admin/
+PASS  no uncaught page errors in any tab

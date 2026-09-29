@@ -1,0 +1,130 @@
+PASS  [Numeracy] fresh teacher created — nursery.numeracy.1790462793942@schemeknit.test
+PASS  [Numeracy] multi-subject confirmation shown (Nursery has 4 sections)
+PASS  [Numeracy] review shows detected level "Nursery 1"
+PASS  [Numeracy] review never shows KG
+PASS  [Numeracy] review shows the confirmed subject
+PASS  [Numeracy] no fabricated curriculum codes on review
+PASS  [Numeracy] week-2 detail shows its own strand "Number"
+PASS  [Numeracy] week-2 detail shows its own week-2 sub-strand
+PASS  [Numeracy] week-2 detail preserves source resources
+PASS  [Numeracy] no "Listening and Speaking" leakage from Language and Literacy
+PASS  [Numeracy] no "Marking simple rules" leakage from Creative Arts and Design
+PASS  [Numeracy] no "Describing yourself" leakage from Our World Our People
+PASS  no horizontal overflow @ 1440px: Numeracy review — 1440/1440
+PASS  [Numeracy] WAPEF teacher selections set — 11 row(s)
+PASS  [Numeracy] no EXAMINATION/VACATION lesson rows
+PASS  no horizontal overflow @ 1440px: Numeracy post-generate — 1440/1440
+PASS  [Numeracy] WAPEF selections survive reload
+PASS  [Numeracy] DOCX downloads — Lesson_Plans_WAPEF_SCHEME_OF_LEARNING_FOR_NURSERY.docx
+PASS  [Numeracy] DOCX carries level "Nursery 1"
+PASS  [Numeracy] DOCX carries its subject
+PASS  [Numeracy] DOCX carries its strand
+PASS  [Numeracy] DOCX carries its week-2 sub-strand
+PASS  [Numeracy] DOCX preserves source resources
+PASS  [Numeracy] DOCX carries Deep Hope verbatim
+PASS  [Numeracy] DOCX keeps three phases
+PASS  [Numeracy] DOCX keeps evaluation + remarks
+PASS  [Numeracy] DOCX has no fabricated curriculum codes
+PASS  [Numeracy] DOCX has no sample-content leakage
+PASS  [Numeracy] DOCX has no leftover template tokens
+PASS  [Numeracy] DOCX has no duplicated activity lines within a lesson
+PASS  [Numeracy] PDF export downloads with a real PDF signature — 343809 bytes
+PASS  [Language and Literacy] fresh teacher created — nursery.languageandliteracy.1790462793942@schemeknit.test
+PASS  [Language and Literacy] multi-subject confirmation shown (Nursery has 4 sections)
+PASS  [Language and Literacy] review shows detected level "Nursery 1"
+PASS  [Language and Literacy] review never shows KG
+PASS  [Language and Literacy] review shows the confirmed subject
+PASS  [Language and Literacy] no fabricated curriculum codes on review
+PASS  [Language and Literacy] week-2 detail shows its own strand "Oral Skills"
+PASS  [Language and Literacy] week-2 detail shows its own week-2 sub-strand
+PASS  [Language and Literacy] week-2 detail preserves source resources
+PASS  [Language and Literacy] no "Grouping of objects" leakage from Numeracy
+PASS  [Language and Literacy] no "Marking simple rules" leakage from Creative Arts and Design
+PASS  [Language and Literacy] no "Describing yourself" leakage from Our World Our People
+PASS  no horizontal overflow @ 1440px: Language and Literacy review — 1440/1440
+PASS  [Language and Literacy] WAPEF teacher selections set — 11 row(s)
+PASS  [Language and Literacy] no EXAMINATION/VACATION lesson rows
+PASS  no horizontal overflow @ 1440px: Language and Literacy post-generate — 1440/1440
+PASS  [Language and Literacy] WAPEF selections survive reload
+PASS  [Language and Literacy] DOCX downloads — Lesson_Plans_WAPEF_SCHEME_OF_LEARNING_FOR_NURSERY.docx
+PASS  [Language and Literacy] DOCX carries level "Nursery 1"
+PASS  [Language and Literacy] DOCX carries its subject
+PASS  [Language and Literacy] DOCX carries its strand
+PASS  [Language and Literacy] DOCX carries its week-2 sub-strand
+PASS  [Language and Literacy] DOCX preserves source resources
+PASS  [Language and Literacy] DOCX carries Deep Hope verbatim
+PASS  [Language and Literacy] DOCX keeps three phases
+PASS  [Language and Literacy] DOCX keeps evaluation + remarks
+PASS  [Language and Literacy] DOCX has no fabricated curriculum codes
+PASS  [Language and Literacy] DOCX has no sample-content leakage
+PASS  [Language and Literacy] DOCX has no leftover template tokens
+PASS  [Language and Literacy] DOCX has no duplicated activity lines within a lesson
+PASS  [Language and Literacy] PDF export downloads with a real PDF signature — 346545 bytes
+PASS  [Creative Arts and Design] fresh teacher created — nursery.creativeartsanddesign.1790462793942@schemeknit.test
+PASS  [Creative Arts and Design] multi-subject confirmation shown (Nursery has 4 sections)
+PASS  [Creative Arts and Design] review shows detected level "Nursery 1"
+PASS  [Creative Arts and Design] review never shows KG
+PASS  [Creative Arts and Design] review shows the confirmed subject
+PASS  [Creative Arts and Design] no fabricated curriculum codes on review
+PASS  [Creative Arts and Design] week-2 detail shows its own strand "Responsibilities"
+PASS  [Creative Arts and Design] week-2 detail shows its own week-2 sub-strand
+PASS  [Creative Arts and Design] week-2 detail preserves source resources
+PASS  [Creative Arts and Design] no "Grouping of objects" leakage from Numeracy
+PASS  [Creative Arts and Design] no "Listening and Speaking" leakage from Language and Literacy
+PASS  [Creative Arts and Design] no "Describing yourself" leakage from Our World Our People
+PASS  no horizontal overflow @ 1440px: Creative Arts and Design review — 1440/1440
+PASS  [Creative Arts and Design] WAPEF teacher selections set — 11 row(s)
+PASS  [Creative Arts and Design] no EXAMINATION/VACATION lesson rows
+PASS  no horizontal overflow @ 1440px: Creative Arts and Design post-generate — 1440/1440
+PASS  [Creative Arts and Design] WAPEF selections survive reload
+PASS  [Creative Arts and Design] DOCX downloads — Lesson_Plans_WAPEF_SCHEME_OF_LEARNING_FOR_NURSERY.docx
+PASS  [Creative Arts and Design] DOCX carries level "Nursery 1"
+PASS  [Creative Arts and Design] DOCX carries its subject
+PASS  [Creative Arts and Design] DOCX carries its strand
+PASS  [Creative Arts and Design] DOCX carries its week-2 sub-strand
+PASS  [Creative Arts and Design] DOCX preserves source resources
+PASS  [Creative Arts and Design] DOCX carries Deep Hope verbatim
+PASS  [Creative Arts and Design] DOCX keeps three phases
+PASS  [Creative Arts and Design] DOCX keeps evaluation + remarks
+PASS  [Creative Arts and Design] DOCX has no fabricated curriculum codes
+PASS  [Creative Arts and Design] DOCX has no sample-content leakage
+PASS  [Creative Arts and Design] DOCX has no leftover template tokens
+PASS  [Creative Arts and Design] DOCX has no duplicated activity lines within a lesson
+PASS  [Creative Arts and Design] PDF export downloads with a real PDF signature — 344395 bytes
+PASS  [Our World Our People] fresh teacher created — nursery.ourworldourpeople.1790462793942@schemeknit.test
+PASS  [Our World Our People] multi-subject confirmation shown (Nursery has 4 sections)
+PASS  [Our World Our People] review shows detected level "Nursery 1"
+PASS  [Our World Our People] review never shows KG
+PASS  [Our World Our People] review shows the confirmed subject
+PASS  [Our World Our People] no fabricated curriculum codes on review
+PASS  [Our World Our People] week-2 detail shows its own strand "Myself"
+PASS  [Our World Our People] week-2 detail shows its own week-2 sub-strand
+PASS  [Our World Our People] week-2 detail preserves source resources
+PASS  [Our World Our People] no "Grouping of objects" leakage from Numeracy
+PASS  [Our World Our People] no "Listening and Speaking" leakage from Language and Literacy
+PASS  [Our World Our People] no "Marking simple rules" leakage from Creative Arts and Design
+PASS  no horizontal overflow @ 1440px: Our World Our People review — 1440/1440
+PASS  [Our World Our People] WAPEF teacher selections set — 11 row(s)
+PASS  [Our World Our People] no EXAMINATION/VACATION lesson rows
+PASS  no horizontal overflow @ 1440px: Our World Our People post-generate — 1440/1440
+PASS  [Our World Our People] WAPEF selections survive reload
+PASS  [Our World Our People] DOCX downloads — Lesson_Plans_WAPEF_SCHEME_OF_LEARNING_FOR_NURSERY.docx
+PASS  [Our World Our People] DOCX carries level "Nursery 1"
+PASS  [Our World Our People] DOCX carries its subject
+PASS  [Our World Our People] DOCX carries its strand
+PASS  [Our World Our People] DOCX carries its week-2 sub-strand
+PASS  [Our World Our People] DOCX preserves source resources
+PASS  [Our World Our People] DOCX carries Deep Hope verbatim
+PASS  [Our World Our People] DOCX keeps three phases
+PASS  [Our World Our People] DOCX keeps evaluation + remarks
+PASS  [Our World Our People] DOCX has no fabricated curriculum codes
+PASS  [Our World Our People] DOCX has no sample-content leakage
+PASS  [Our World Our People] DOCX has no leftover template tokens
+PASS  [Our World Our People] DOCX has no duplicated activity lines within a lesson
+PASS  [Our World Our People] PDF export downloads with a real PDF signature — 343702 bytes
+PASS  isolation: Numeracy "Cut out shapes" absent from Creative Arts DOCX
+PASS  isolation: Creative Arts sub-strand absent from Numeracy DOCX
+PASS  isolation: Numeracy and Creative Arts DOCX differ
+PASS  no horizontal overflow @ 1024px: landing @ 1024 — 1024/1024
+PASS  no horizontal overflow @ 390px: landing @ 390 — 390/390
+PASS  zero uncaught page errors

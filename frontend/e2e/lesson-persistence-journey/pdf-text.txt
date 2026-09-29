@@ -1,0 +1,454 @@
+LESSON PLAN
+Lesson Metadata
+Week
+1
+Week Ending
+11-09-2026
+School
+Achimota Basic School
+Teacher
+Persistence Teacher
+Teaching Week
+2
+Lesson Date
+14/09/2026
+Duration (minutes)
+60
+Lesson Topic
+Input devices: manual and automatic
+Curriculum Alignment
+Strand
+Introduction to Computing
+Sub Strand
+Components of Computers and Computer Systems
+Content Standard
+B7.1.1.1
+Learning Indicator
+B7.1.1.1.1
+Performance Indicator
+Learners can discuss fourth-generation computers and the microchip
+Core Competencies
+Critical Thinking and Problem Solving, Communication and Collaboration, Digital Literacy
+Key Words
+manual and automatic input devices, Processor, fourth-generation computers, microchip,
+microprocessor, computer generations, components, computers
+WAPEF Special Fields
+Through line
+God worshiper and Image reflector
+God's Story
+Creation
+Deep Hope
+Learners will recognize and appreciate the beauty, order, and purpose of design in the
+physical world around them.
+Storyline
+Shaping our world.
+
+Lesson Delivery
+Phase 1 Starter
+- Display pictures of a keyboard, mouse, touchscreen and barcode reader. Ask learners
+which they have used at home and record their answers in two columns: devices a person
+works and devices that work on their own.
+- Hold up a microchip (or a clear picture of one) next to a picture of an early room-sized
+computer. Ask learners which is newer and why, write their reasons on the board, then tell
+them both are computers.
+Phase 2 Main
+- Watch and listen carefully
+- then describe each step of Fourth-generation computers and the microchip in your own
+words
+- Work with your partner/group to carry out the task for Fourth-generation computers and
+the microchip and record what you find
+- Give each pair a labelled diagram of a keyboard and ask them to point to the home row
+- the function keys and the number pad
+- then explain which of the devices sends data to the computer automatically
+- Give pairs a labelled diagram of a processor. Learners trace the path from the microchip
+to the parts it controls and write one sentence on why the microchip changed computers
+- Demonstrate the concept or steps for Fourth-generation computers and the microchip.
+Use the board or an unplugged model if there are not enough devices for everyone
+- Class Assignment: In pairs, learners classify a set of device pictures as manual or
+automatic and write one advantage and one disadvantage of each group; the teacher
+checks the reasons given.
+Phase 2 Resources
+- Touchscreen (corrected spelling)
+- Processor
+- a real microchip or a clear picture of one
+- diagram of a processor
+- chart comparing computer generations
+Phase 3 Plenary
+- Learners state one manual and one automatic input device they used today and explain in
+one sentence why a hospital or a supermarket would choose the automatic one.
+- Home Assignment: List three input devices used in your home or community. For each
+one write whether it is manual or automatic, what it is used for and one care you must take
+when using it.
+Evaluation
+Give each pair four device cards and ask them to sort them as manual or automatic, giving
+one reason per card; ask two pairs to justify a borderline device and listen for the words
+manual and automatic used correctly.
+Assignments
+Class Assignment
+In pairs, learners classify a set of device pictures as manual or automatic and write one
+advantage and one disadvantage of each group; the teacher checks the reasons given.
+Home Assignment
+List three input devices used in your home or community. For each one write whether it is
+manual or automatic, what it is used for and one care you must take when using it.
+Homework
+List three input devices used in your home or community. For each one write whether it is
+manual or automatic, what it is used for and one care you must take when using it.
+References
+Type
+Title
+Author / Publisher
+Page
+ICT Curriculum
+Computing Curriculum, Basic 7, pages
+12-14
+
+LESSON PLAN
+Lesson Metadata
+Week
+2
+Week Ending
+18-09-2026
+School
+Achimota Basic School
+Teacher
+Persistence Teacher
+Teaching Week
+2
+Lesson Date
+16/09/2026
+Duration (minutes)
+60
+Lesson Topic
+Input devices: manual and automatic
+Curriculum Alignment
+Strand
+Introduction to Computing
+Sub Strand
+Components of Computers and Computer Systems
+Content Standard
+B7.1.1.1
+Learning Indicator
+B7.1.1.1.2
+Performance Indicator
+Learners can demonstrate input devices: manual and automatic
+Core Competencies
+Critical Thinking and Problem Solving, Communication and Collaboration, Digital Literacy
+Key Words
+mouse, Personal Computer, keyboard, input devices, touchscreen, barcode reader,
+scanner, manual input, automatic input, components, computers
+
+WAPEF Special Fields
+Lesson Delivery
+Phase 1 Starter
+- This lesson builds on 'Components of Computers and Computer Systems' and moves the
+class on to Input devices: manual and automatic.
+- Build on the previous lesson ('Components of Computers and Computer Systems'). Show
+pictures of a keyboard, mouse, touchscreen, barcode reader and scanner. Ask learners
+which of these they have used and record their answers on the board.
+Phase 2 Main
+- Watch and listen carefully
+- then describe each step of Input devices: manual and automatic in your own words
+- Work with your partner/group to carry out the task for Input devices: manual and
+automatic and record what you find
+- Demonstrate one device from each group in front of the class: type on the keyboard
+(manual) and scan a barcode (automatic). Learners watch and then say which needed a
+person and which worked on its own
+- Give each pair the device pictures. Learners sort them into manual and automatic groups
+- then list one advantage and one disadvantage of each group and say where each device
+is used
+- Demonstrate the concept or steps for Input devices: manual and automatic. Use the board
+or an unplugged model if there are not enough devices for everyone
+- Class Assignment: Pairs sort the device pictures into manual and automatic groups, write
+one reason for each group, and state where each device is used. The teacher checks a
+sample and asks two pairs to justify a borderline device.
+Phase 2 Resources
+- mouse
+- Personal Computer
+- keyboard
+- picture cards showing keyboard
+- touchscreen
+- barcode reader
+- scanner
+- a real keyboard and a real barcode reader or scanner
+- sorting chart labelled MANUAL / AUTOMATIC
+Phase 3 Plenary
+- Review the steps for Input devices: manual and automatic, discuss the common problem
+met and how it was solved, and link to everyday technology. Preview the next lesson
+('Components of Computers and Computer Systems').
+- Home Assignment: Find and list three input devices used in your home or community. For
+each one, say whether it is manual or automatic and what it is used for.
+Evaluation
+Give each pair four device cards and ask them to sort the cards as manual or automatic,
+giving one reason per card. Ask two pairs to explain a borderline device and listen for the
+words 'manual' and 'automatic' used correctly. Assessment mode: Oral questions and
+observation of participation.
+Assignments
+Class Assignment
+Pairs sort the device pictures into manual and automatic groups, write one reason for each
+group, and state where each device is used. The teacher checks a sample and asks two
+pairs to justify a borderline device.
+Home Assignment
+Find and list three input devices used in your home or community. For each one, say
+whether it is manual or automatic and what it is used for.
+Homework
+Find and list three input devices used in your home or community. For each one, say
+whether it is manual or automatic and what it is used for.
+
+LESSON PLAN
+Lesson Metadata
+Week
+3
+Week Ending
+25-09-2026
+School
+Achimota Basic School
+Teacher
+Persistence Teacher
+Teaching Week
+3
+Lesson Date
+21/09/2026
+Duration (minutes)
+60
+Lesson Topic
+Hard drives and optical storage media
+Curriculum Alignment
+Strand
+Introduction to Computing
+Sub Strand
+Components of Computers and Computer Systems
+Content Standard
+B7.1.1.1
+Learning Indicator
+B7.1.1.1.4
+Performance Indicator
+Learners can identify hard drives and optical storage media
+Core Competencies
+Critical Thinking and Problem Solving, Communication and Collaboration, Digital Literacy
+Key Words
+Pen drive, Hard Disk, hard drive, portable hard drive, optical disc, CD-ROM, DVD-ROM,
+storage capacity, write speed, disk caching, components, computers
+
+WAPEF Special Fields
+Lesson Delivery
+Phase 1 Starter
+- This lesson builds on 'Components of Computers and Computer Systems' and moves the
+class on to Hard drives and optical storage media.
+- Build on the previous lesson ('Components of Computers and Computer Systems').
+Display a portable hard drive and two optical discs (one CD, one DVD). Ask learners where
+they save school work and why, and note their answers on the board.
+Phase 2 Main
+- Watch and listen carefully
+- then describe each step of Hard drives and optical storage media in your own words
+- Work with your partner/group to carry out the task for Hard drives and optical storage
+media and record what you find
+- Name and point to each storage item: magnetic hard drive
+- portable hard drive
+- CD-ROM
+- DVD-ROM. Learners repeat each name and say which one holds the most data and why
+- In groups
+- learners read the printed capacities and write speeds from the disc labels into a table
+- then compare the items and state one strength and one weakness of each
+- Demonstrate the concept or steps for Hard drives and optical storage media. Use the
+board or an unplugged model if there are not enough devices for everyone
+- Class Assignment: Groups build a comparison table of the hard drive, portable hard drive,
+CD-ROM and DVD-ROM using the printed capacities and write speeds, then state one
+strength and one weakness of each. The teacher checks each table has the correct units.
+Phase 2 Resources
+- Pen drive
+- Hard Disk
+- a portable hard drive or picture of one
+- CD-ROM and DVD-ROM discs (or pictures)
+- chart of storage capacities and read/write speeds
+Phase 3 Plenary
+- Review the steps for Hard drives and optical storage media, discuss the common problem
+met and how it was solved, and link to everyday technology. Preview the next lesson
+('Components of Computers and Computer Systems').
+- Home Assignment: Find one storage device at home or school. Write the capacity printed
+on it, whether it is magnetic or optical, and one advantage of that type of storage.
+Evaluation
+Ask each group to name the storage item with the largest capacity on the table and give the
+evidence from the label. Check that learners can say why an optical disc is read-only while
+a hard drive can be written many times. Assessment mode: Oral questions and observation
+of participation.
+Assignments
+Class Assignment
+Groups build a comparison table of the hard drive, portable hard drive, CD-ROM and
+DVD-ROM using the printed capacities and write speeds, then state one strength and one
+weakness of each. The teacher checks each table has the correct units.
+Home Assignment
+Find one storage device at home or school. Write the capacity printed on it, whether it is
+magnetic or optical, and one advantage of that type of storage.
+Homework
+Find one storage device at home or school. Write the capacity printed on it, whether it is
+magnetic or optical, and one advantage of that type of storage.
+
+LESSON PLAN
+Lesson Metadata
+Week
+4
+Week Ending
+02-10-2026
+School
+Achimota Basic School
+Teacher
+Persistence Teacher
+Teaching Week
+10
+Lesson Date
+02/10/2026
+Duration (minutes)
+60
+Lesson Topic
+Windows desktop: Start screen, tiles and taskbar
+Curriculum Alignment
+Strand
+Introduction to Computing
+Sub Strand
+Components of Computers and Computer Systems
+Content Standard
+B7.1.1.2
+Learning Indicator
+B7.1.1.2.1
+Performance Indicator
+Learners can demonstrate Windows desktop: Start screen
+tiles and taskbar
+Core Competencies
+Digital Literacy, Communication and Collaboration
+Key Words
+Bootable Flash drive, Windows desktop, Start screen, tiles, taskbar, preview thumbnail,
+window, components, computers
+
+WAPEF Special Fields
+Lesson Delivery
+Phase 1 Starter
+- This lesson builds on 'Components of Computers and Computer Systems' and moves the
+class on to Windows desktop: Start screen, tiles and taskbar.
+- Build on the previous lesson ('Components of Computers and Computer Systems'). Ask
+learners what they see when a Windows computer finishes starting. Record the parts they
+name on the board and add any missing ones.
+Phase 2 Main
+- Watch and listen carefully
+- then describe each step of Windows desktop: Start screen
+- tiles and taskbar in your own words
+- Work with your partner/group to carry out the task for Windows desktop: Start screen
+- tiles and taskbar and record what you find
+- At the computer (or using a screenshot on the board) point out the Start screen
+- the tiles
+- the taskbar buttons and a preview thumbnail. Learners name each part as the teacher
+points to it
+- In pairs at a computer or with the screenshot
+- learners open two windows and use the taskbar to preview one another
+- then write down the four features they used and what each one does
+- Demonstrate the concept or steps for Windows desktop: Start screen
+- tiles and taskbar. Use the board or an unplugged model if there are not enough devices
+for everyone
+- Class Assignment: Pairs use the computer (or the labelled screenshot) to open two
+windows, preview one from the taskbar, and record the four desktop features with what
+each one does. The teacher observes and asks each pair to demonstrate one feature.
+Phase 2 Resources
+- Bootable Flash drive
+- a computer with Windows
+- or a labelled screenshot of the desktop
+- chart naming the Start screen
+- tiles
+- taskbar and preview thumbnails
+Phase 3 Plenary
+- Review the steps for Windows desktop: Start screen, tiles and taskbar, discuss the
+common problem met and how it was solved, and link to everyday technology. Preview the
+next lesson ('Health and Safety in using ICT tools').
+- Home Assignment: Draw the Windows desktop from memory and label the Start screen,
+tiles and the taskbar. Write one sentence on what a preview thumbnail shows.
+Evaluation
+Point to a screen part and ask a learner to name it and say what it does; require all four
+feature names across the class. Ask a pair to demonstrate previewing a window from the
+taskbar. Assessment mode: Oral questions and observation of participation.
+Assignments
+Class Assignment
+Pairs use the computer (or the labelled screenshot) to open two windows, preview one from
+the taskbar, and record the four desktop features with what each one does. The teacher
+observes and asks each pair to demonstrate one feature.
+Home Assignment
+Draw the Windows desktop from memory and label the Start screen, tiles and the taskbar.
+Write one sentence on what a preview thumbnail shows.
+Homework
+Draw the Windows desktop from memory and label the Start screen, tiles and the taskbar.
+Write one sentence on what a preview thumbnail shows.
+
+LESSON PLAN
+Lesson Metadata
+Week
+6
+Week Ending
+16-10-2026
+School
+Achimota Basic School
+Teacher
+Persistence Teacher
+Teaching Week
+10
+Lesson Date
+16/10/2026
+Duration (minutes)
+60
+Lesson Topic
+Introduction to Computing - Health and Safety in using ICT tools
+Curriculum Alignment
+Strand
+Introduction to Computing
+Sub Strand
+Health and Safety in using ICT tools
+Content Standard
+B7.1.2.1
+Learning Indicator
+B7.1.2.1.1
+Performance Indicator
+Learners can explore and talk about Health and Safety in using ICT tools
+Core Competencies
+Communication and Collaboration
+Key Words
+Smart Phone, Pictures, health, safety
+WAPEF Special Fields
+Lesson Delivery
+Phase 1 Starter
+- This lesson builds on 'Components of Computers and Computer Systems' and moves the
+class on to Health and Safety in using ICT tools.
+- Build on the previous lesson ('Components of Computers and Computer Systems'). Recall
+the last ICT skill learned and connect it to Health and Safety in using ICT tools. If devices
+are limited, use an unplugged analogy from everyday life.
+Phase 2 Main
+- Watch and listen carefully
+- then describe each step of Health and Safety in using ICT tools in your own words
+- Complete the task for Health and Safety in using ICT tools on your own and check your
+work before you finish
+- Demonstrate the concept or steps for Health and Safety in using ICT tools. Use the board
+or an unplugged model if there are not enough devices for everyone
+- Learners practise Health and Safety in using ICT tools in small groups taking turns
+- or on paper/board using the same steps where devices are shared
+- Learners complete a short task applying Health and Safety in using ICT tools on their own
+and troubleshoot one common problem
+- Class Assignment: In groups, learners demonstrate the task for Health and Safety in using
+ICT tools while the teacher observes and records which learners have met the indicator.
+Phase 2 Resources
+- Smart Phone
+- Pictures
+Phase 3 Plenary
+- Review the steps for Health and Safety in using ICT tools, discuss the common problem
+met and how it was solved, and link to everyday technology.
+- Home Assignment: Practise the steps for Health and Safety in using ICT tools at home
+and be ready to show one step in the next lesson.
+Evaluation
+Observe learners performing Health and Safety in using ICT tools against a steps checklist,
+or mark a paper-based version where devices are not available. Assessment mode: Oral
+questions and observation of participation.
+
+Assignments
+Class Assignment
+In groups, learners demonstrate the task for Health and Safety in using ICT tools while the
+teacher observes and records which learners have met the indicator.
+Home Assignment
+Practise the steps for Health and Safety in using ICT tools at home and be ready to show
+one step in the next lesson.
+Homework
+Practise the steps for Health and Safety in using ICT tools at home and be ready to show
+one step in the next lesson.

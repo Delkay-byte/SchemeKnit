@@ -1,0 +1,98 @@
+App closure (Batch 4) acceptance — 2026-09-26T22:23:09.731Z
+BASE=http://localhost:3003
+PASS=94 FAIL=0
+
+PASS  static: no window.confirm() in application pages — count=0
+PASS  static: no raw <select>/<textarea> (shared primitives only) — count=0
+PASS  static: (app) layout guards routes (loading → spinner, logged out → /login) — useAuth + push(/login) + loading gate present
+PASS  static: dashboard links to /upgrade (orphan route has an entry point) — href="/upgrade" found
+PASS  static: upgrade CTA routes to /payments (no login-screen CTA) — payments href present, login/school-admin href absent
+PASS  static: quota notice rendered via shared Banner (tone="info") — ok
+PASS  static: allocation statuses use StatusPill — Scheduled + Needs review pills
+PASS  static: platform-admin uses "License" spelling (no Licence/licence) — ok
+PASS  static: upload accents use palette-consistent solids — no amber→orange / green→emerald
+PASS  static: inactive-license notice rendered via Banner (tone="warning") — ok
+PASS  static: PasswordInput base styled to Input primitive (h-11 rounded-lg) — ok
+PASS  static: change-password labels all carry htmlFor — labels=3 htmlFor=3
+PASS  guard: logged-out /dashboard redirects to /login — http://localhost:3003/login/
+PASS  guard: logged-out /upload redirects to /login — http://localhost:3003/login/
+PASS  teacher: exactly one application header — count=1
+PASS  teacher: desktop nav exposes all primary routes — /dashboard,/upload,/lessons,/weekly-plans,/templates
+PASS  teacher: settings entry present in header — a[href="/settings"]
+PASS  teacher: /dashboard/ loads (no 404) — status=200
+PASS  teacher: PageHeader on /dashboard/ — count=1
+PASS  teacher: /upload/ loads (no 404) — status=200
+PASS  teacher: PageHeader on /upload/ — count=1
+PASS  teacher: /lessons/ loads (no 404) — status=200
+PASS  teacher: PageHeader on /lessons/ — count=1
+PASS  teacher: /templates/ loads (no 404) — status=200
+PASS  teacher: PageHeader on /templates/ — count=1
+PASS  teacher: /settings/ loads (no 404) — status=200
+PASS  teacher: PageHeader on /settings/ — count=1
+PASS  teacher: /payments/ loads (no 404) — status=200
+PASS  teacher: PageHeader on /payments/ — count=1
+PASS  teacher: /upgrade/ loads (no 404) — status=200
+PASS  teacher: PageHeader on /upgrade/ — count=1
+PASS  teacher/lesson-detail: /lessons/ loads (no 404) — status=200
+PASS  lesson detail: every label is associated (htmlFor or wrapping) — 0 labels
+PASS  lesson detail: all buttons have accessible names — ok
+PASS  lesson detail: exactly one h1 — count=1
+PASS  nav integrity: /dashboard reachable — status=200
+PASS  nav integrity: /upload reachable — status=200
+PASS  nav integrity: /lessons reachable — status=200
+PASS  nav integrity: /weekly-plans reachable — status=200
+PASS  nav integrity: /templates reachable — status=200
+PASS  alias: /admin redirects to the school workspace (role-appropriate) — landed=/school-admin
+PASS  upgrade: PageHeader present — count=1
+PASS  upgrade: route back to dashboard — count=2
+PASS  upgrade: CTA links to /payments (subscription path) — links=1
+PASS  upgrade: no login-screen CTA inside upgrade card — count=0
+PASS  upgrade: every label is associated (htmlFor or wrapping) — 0 labels
+PASS  upgrade: all buttons have accessible names — ok
+PASS  payments: load failure renders an error banner (data-payments-error) — visible
+PASS  payments: error state offers Try Again — buttons=1
+PASS  payments: retry clears the error state — banner=0
+PASS  payments: PageHeader present — count=1
+PASS  payments: history table or empty state — ok
+PASS  payments: all buttons have accessible names — ok
+PASS  payments submit form: every label is associated (htmlFor or wrapping) — 5 labels
+PASS  payments: payer name field associated + required marker — assoc=true required=true
+PASS  settings: every label is associated (htmlFor or wrapping) — 9 labels
+PASS  settings: all buttons have accessible names — ok
+PASS  settings: exactly one h1 — count=1
+PASS  generate checks (skipped) — no generate link seeded from lessons list
+PASS  no horizontal overflow @1440 /dashboard/ — 1440/1440
+PASS  no horizontal overflow @1440 /upload/ — 1440/1440
+PASS  no horizontal overflow @1440 /lessons/ — 1440/1440
+PASS  no horizontal overflow @1440 /templates/ — 1440/1440
+PASS  no horizontal overflow @1440 /settings/ — 1440/1440
+PASS  no horizontal overflow @1440 /payments/ — 1440/1440
+PASS  no horizontal overflow @1440 /upgrade/ — 1440/1440
+PASS  no horizontal overflow @1024 /dashboard/ — 1024/1024
+PASS  no horizontal overflow @1024 /lessons/ — 1024/1024
+PASS  no horizontal overflow @1024 /settings/ — 1024/1024
+PASS  mobile: nav menu opens with links — links=6
+PASS  mobile: Escape closes the menu — closed=true
+PASS  no horizontal overflow @390 /dashboard/ — 390/390
+PASS  no horizontal overflow @390 /upload/ — 390/390
+PASS  no horizontal overflow @390 /lessons/ — 390/390
+PASS  no horizontal overflow @390 /templates/ — 390/390
+PASS  no horizontal overflow @390 /settings/ — 390/390
+PASS  no horizontal overflow @390 /payments/ — 390/390
+PASS  no horizontal overflow @390 /upgrade/ — 390/390
+PASS  school-admin: 4-tab sub-navigation — tabs=4
+PASS  school-admin: exactly one h1 — count=1
+PASS  school-admin: all buttons have accessible names — ok
+PASS  school-admin/teachers: exactly one h1 — count=1
+PASS  school-admin/teachers: every label is associated (htmlFor or wrapping) — 0 labels
+PASS  school-admin: Add Teacher dialog opens with focus inside — open=true focus=true
+PASS  school-admin: Escape closes the dialog — dialogs=0
+PASS  school-admin/license: exactly one h1 — count=1
+PASS  no horizontal overflow @1440 school-admin/license — 1440/1440
+PASS  platform-admin: 10-tab navigation (incl. teachers) — tabs=10
+PASS  platform-admin: exactly one h1 — count=1
+PASS  platform-admin: all buttons have accessible names — ok
+PASS  platform-admin: no Licence/licence spelling on screen — found=false
+PASS  platform-admin: data tables render (schools tab) — tables=1
+PASS  platform-admin: no horizontal overflow @390 — 390/390
+PASS  zero page errors across all journeys — none
