@@ -40,10 +40,23 @@ def test_class_and_home_assignments_are_regeneratable():
     assert "home_assignment" in REGENERATABLE_SECTIONS
 
 
-def test_exactly_two_teacher_facing_rewrite_modes():
-    """The UI offers two affordances — never an internal pattern name."""
-    assert set(REWRITE_MODES) == {"suggest_another_version", "make_more_practical"}
+def test_teacher_facing_rewrite_modes():
+    """The UI offers simple teacher affordances — never an internal pattern
+    name, a model id, or provider terminology. Two PRIMARY affordances plus
+    two optional extras (wired only where pedagogically useful)."""
+    assert set(REWRITE_MODES) <= {
+        "suggest_another_version", "make_more_practical",
+        "make_more_learner_centred", "make_easier_limited_resources",
+    }
+    # The two primary affordances always exist.
+    assert "suggest_another_version" in REWRITE_MODES
+    assert "make_more_practical" in REWRITE_MODES
     assert DEFAULT_REWRITE_MODE == "suggest_another_version"
+    # Every mode instruction stays teacher-safe: no provider/model/API terms.
+    for instruction in REWRITE_MODES.values():
+        low = instruction.lower()
+        assert not any(bad in low for bad in
+                       ("groq", "gemini", "openai", "api", "json schema", "model"))
 
 
 def test_request_accepts_the_rewrite_mode():
@@ -147,7 +160,7 @@ def test_prompt_uses_grounded_local_examples_only():
 class _StructuredProvider:
     """A real provider shape: implements generate_structured."""
 
-    def generate_structured(self, prompt: str) -> dict:
+    def generate_structured(self, prompt: str, schema=None) -> dict:
         return {"assessment": "New AI assessment text with concrete steps."}
 
     def generate_lesson_content(self, **kwargs):
@@ -163,15 +176,20 @@ class _LegacyProvider:
 
 def test_structured_provider_receives_the_prompt_verbatim():
     captured = []
+    seen_schema = []
 
     class P(_StructuredProvider):
-        def generate_structured(self, prompt):
+        def generate_structured(self, prompt, schema=None):
             captured.append(prompt)
+            seen_schema.append(schema)
             return {"assessment": "AI text."}
 
-    out = _section_generation(P(), "THE PROMPT", {"indicator": "ind"})
+    schema = {"type": "object", "properties": {"assessment": {"type": "string"}}}
+    out = _section_generation(P(), "THE PROMPT", {"indicator": "ind"}, schema)
     assert out == {"assessment": "AI text."}
     assert captured == ["THE PROMPT"]
+    # The strict section schema is forwarded to providers that support it.
+    assert seen_schema == [schema]
 
 
 def test_provider_without_structured_falls_back_to_legacy():
@@ -250,7 +268,7 @@ class TestRewriteOverRouter:
         class Broken:
             last_error = None
 
-            def generate_structured(self, prompt):
+            def generate_structured(self, prompt, schema=None):
                 return None
 
         u, _school, _lic = make_entitled_teacher(db, email="ai_rw_fail@t.test")

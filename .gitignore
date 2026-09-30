@@ -99,3 +99,4 @@ frontend/e2e/_*.out
 frontend/e2e/_diag-out/
 frontend/e2e/*-acceptance/
 frontend/e2e/lesson-persistence-journey/
+frontend/e2e/zeli-groq-journey/

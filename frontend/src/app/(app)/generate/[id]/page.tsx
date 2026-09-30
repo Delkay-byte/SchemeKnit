@@ -809,23 +809,19 @@ export default function GeneratePage() {
                         }}
                       >
                         <option value="OFF">OFF - Deterministic only</option>
-                        <option value="BASIC">BASIC - AI suggestions</option>
-                        <option value="ENHANCED">ENHANCED - Full AI</option>
+                        <option value="BASIC">BASIC - Zeli suggestions</option>
+                        <option value="ENHANCED">ENHANCED - Zeli assistance</option>
                       </Select>
                       {aiStatus && (
                         <p className={`mt-1 text-xs ${aiStatus.active ? 'text-green-600' : 'text-muted-foreground'}`}>
-                          {/* PART E: this label reports the backend-RESOLVED
-                              provider for the current generation context — the
-                              same resolution the generate request itself uses. */}
-                          {/* PART 13/14: the backend-resolved provider is the
-                              single source of truth. CASE A shows the actually
-                              resolved provider; CASE B names the provider that
-                              was tried and unavailable. */}
+                          {/* Zeli is the teacher-facing assistant name. The
+                              resolved provider stays in the backend-only
+                              ai-status payload (developer/admin diagnostics). */}
                           {aiStatus.active
-                            ? `AI active · provider: ${aiStatus.provider_label || aiStatus.provider}`
+                            ? 'Zeli available'
                             : config.ai_mode === 'OFF'
-                              ? 'Deterministic engine · AI provider active: No'
-                              : `AI unavailable${aiStatus.provider ? ` · ${aiStatus.provider}` : ''} — lessons will be deterministic.`}
+                              ? 'Zeli off — lessons will come from the deterministic engine.'
+                              : 'Zeli unavailable right now — lessons will be deterministic.'}
                         </p>
                       )}
                     </Field>
@@ -1666,10 +1662,10 @@ export default function GeneratePage() {
                   {aiResult && (
                     <p className="text-center text-xs text-muted-foreground">
                       {aiResult.active && aiResult.lessons_ai > 0
-                        ? `AI (${aiResult.provider}) enriched ${aiResult.lessons_ai} lesson${aiResult.lessons_ai === 1 ? '' : 's'}; ${aiResult.lessons_deterministic} used the deterministic engine.`
+                        ? `Zeli enriched ${aiResult.lessons_ai} lesson${aiResult.lessons_ai === 1 ? '' : 's'}; ${aiResult.lessons_deterministic} used the deterministic engine.`
                         : aiResult.mode === 'OFF'
-                          ? 'All lessons generated deterministically (AI OFF).'
-                          : `AI unavailable${aiResult.provider ? ` · ${aiResult.provider}` : ''} — all lessons generated deterministically.`}
+                          ? 'All lessons generated deterministically (Zeli off).'
+                          : 'Zeli unavailable right now — all lessons generated deterministically.'}
                     </p>
                   )}
                   <Button className="w-full" variant="outline" asChild>

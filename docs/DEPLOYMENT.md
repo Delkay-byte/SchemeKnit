@@ -42,6 +42,35 @@ Mandatory in production:
 | `S3_BUCKET` / `S3_ACCESS_KEY` / `S3_SECRET_KEY` | Storage credentials |
 | `PLATFORM_ADMIN_BOOTSTRAP_SECRET` | One-time first-admin setup |
 
+### Zeli (the optional AI assistant)
+
+Zeli is the teacher-facing assistant name for the optional per-section AI
+rewrite tool. Deterministic lesson generation **never** needs a provider —
+Zeli is only ever invoked when a teacher explicitly clicks
+*Suggest another version* (or a sibling affordance) on one section. Lessons
+with AI disabled are complete and quality-gated.
+
+The runtime provider is **Groq**. On Render, set these in the backend service
+(Web Service → Environment; **not** committed to the repo):
+
+| Variable | Value | Notes |
+|---|---|---|
+| `AI_MODE` | `groq` | The production configuration |
+| `GROQ_API_KEY` | *(owner-supplied secret)* | Never committed; keep empty in `.env.example` |
+| `GROQ_MODEL` | `openai/gpt-oss-120b` | Supports strict Structured Outputs |
+| `GROQ_BASE_URL` | `https://api.groq.com/openai/v1` | Optional override |
+
+Notes for the owner:
+
+* Copying the local `.env` does **not** update Render — set the variables in
+  the Render dashboard (or `render.yaml`) and trigger a deploy.
+* Leave `AI_MODE=OFF` (or unset) to run the whole product deterministically.
+  Zeli then reports *Zeli unavailable right now* while every lesson still
+  generates, exports and saves normally.
+* Quota behaviour is unchanged: a successful rewrite consumes exactly **1**
+  AI credit; any provider failure, malformed output, quality-gate failure or
+  declined suggestion consumes **0**.
+
 ## 2. Database
 
 ### Create the production database
