@@ -202,10 +202,26 @@ class DataService:
     # ── Per-lesson review drafts (pre-generation) ─────────────────────────────
 
     def get_lesson_review_drafts(self, db: Session, scheme_id: str, owner_id: str) -> dict:
-        """Teacher-saved pre-generation review data, keyed by lesson_sequence."""
+        """Teacher-saved pre-generation review data, keyed by lesson_sequence.
+
+        The read is a true database read, not an identity-map hit: the scheme
+        row is expired/refreshed first, so a generate request that follows a
+        PUT /lesson-review on the SAME session still sees the store the
+        browser just wrote (the WAPEF save boundary).
+        """
         scheme = self.get_scheme(db, scheme_id, owner_id)
         if not scheme:
             return {}
+        # Expire cached instance state so the JSON column is re-read from the
+        # database. After the PUT committed, an unexpired object could carry a
+        # pre-PUT snapshot of ``lesson_review_drafts``.
+        try:
+            db.refresh(scheme)
+        except Exception:
+            db.rollback()
+            scheme = self.get_scheme(db, scheme_id, owner_id)
+            if not scheme:
+                return {}
         drafts = getattr(scheme, "lesson_review_drafts", None)
         if isinstance(drafts, dict):
             return drafts
@@ -244,14 +260,32 @@ class DataService:
 
     def save_lesson_review_drafts(self, db: Session, scheme_id: str, owner_id: str,
                                   drafts: dict) -> dict:
-        """Replace the full draft map (or merge individual keys)."""
+        """Merge a full draft map into the stored one (per-lesson replace).
+
+        The generate page PUTs the rows it is currently showing; a multi-page
+        review or a partially-hydrated client must never erase OTHER lessons'
+        saved selections (the teacher's WAPEF choices for lessons outside the
+        payload). Each lesson key present in the payload replaces that
+        lesson's draft entirely (teacher intent per lesson is complete);
+        keys absent from the payload are preserved verbatim.
+        """
         scheme = self.get_scheme(db, scheme_id, owner_id)
         if not scheme:
             return {}
         allowed = ("keywords", "other_tlrs", "core_competencies", "structured_references",
                    "wapef_deep_hope", "wapef_storyline", "wapef_through_lines",
                    "wapef_gods_story", "remarks", "period")
-        store = {}
+        # Read the COMMITTED store through a refresh (not the identity map) so
+        # a same-session prior write is merged, never lost.
+        try:
+            db.refresh(scheme)
+        except Exception:
+            db.rollback()
+            scheme = self.get_scheme(db, scheme_id, owner_id)
+            if not scheme:
+                return {}
+        store = getattr(scheme, "lesson_review_drafts", None)
+        store = dict(store) if isinstance(store, dict) else {}
         for key, draft in (drafts or {}).items():
             if isinstance(draft, dict):
                 store[str(key)] = {k: draft[k] for k in allowed if k in draft}
