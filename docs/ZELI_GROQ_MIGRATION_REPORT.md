@@ -280,6 +280,117 @@ the only untracked artefacts are the gitignored e2e evidence directories
 
 ---
 
+
+---
+
+## 19. Addendum (same day): the generate-page WAPEF save boundary — root-caused and fixed
+
+The pre-existing race noted in §10 (WAPEF selections made on the generate-page
+preview rows did not reach the stored lessons on the production run) has now
+been root-caused, fixed, and independently verified locally and in production.
+The Groq/Zeli provider architecture was **not** touched: every provider,
+schema, retry, quota and branding behaviour in §§1–8 is unchanged.
+
+### 19.1 Root cause
+
+Generating from the review rows is a TWO-request browser sequence:
+
+1. `PUT /api/generation/{scheme_id}/lesson-review` — persists the per-lesson
+   draft store (including the four WAPEF selections).
+2. `POST /api/generation/{scheme_id}/generate` — builds the lessons FROM the
+   saved draft store (`_apply_lesson_review_draft`).
+
+Three independent windows could lose the selections at that boundary:
+
+* **Frontend stale state.** The save payload was built inside
+  `saveLessonReviewDrafts` from the component-scope `lessonReview` array, and
+  the save call did not receive the rows explicitly. An edit committed in the
+  same tick as "Confirm & Generate" (or any re-render in flight) could leave
+  the PUT serializing a pre-edit row — the teacher's latest selections never
+  left the browser.
+* **Fire-and-forget generation.** `handleConfirmAndGenerate` treated a save
+  failure as non-fatal and generated anyway, persisting lessons from the
+  previous (often empty) draft store.
+* **Backend draft-map replacement.** `DataService.save_lesson_review_drafts`
+  REPLACED the whole store with the incoming payload, so a payload that
+  omitted lessons (partial hydration, paginated review) erased other lessons'
+  saved WAPEF selections; and `get_lesson_review_drafts` could return an
+  identity-map snapshot on the same request session instead of the committed
+  row.
+
+The backend generate path itself was already atomic and read-after-write
+correct at the database level (proven by `test_review_draft_alignment.py`);
+the loss happened BEFORE and AT the save boundary, on the browser side and in
+the draft-store write semantics.
+
+### 19.2 Exact fix (narrow, two files + tests)
+
+* `frontend/src/app/(app)/generate/[id]/page.tsx`
+  * `handleConfirmAndGenerate` passes its in-scope `lessonReview` rows
+    explicitly to `saveLessonReviewDrafts(rows)` and **awaits** the persisted
+    PUT before issuing `POST /generate`; a save failure now CANCELS
+    generation with a clear message instead of generating without the
+    selections.
+  * A canonical `wapefDraftFor(row)` builder serializes the four WAPEF fields
+    (verbatim values, explicit empty-string/list fallbacks — never `undefined`).
+  * `updateLessonReviewRow` keeps its functional update (the patch applies to
+    the latest row state, never a closure-captured copy).
+* `backend/src/service.py`
+  * `save_lesson_review_drafts` now MERGES the incoming map into the committed
+    store (per-lesson replace; keys absent from the payload are preserved) and
+    re-reads the committed row first.
+  * `get_lesson_review_drafts` refreshes the scheme row so a generate request
+    that follows a PUT on the SAME session reads the committed store, never a
+    stale identity-map snapshot.
+
+No timeouts, sleeps, polling or retry loops were added; no product semantics
+changed. Omitted WAPEF fields still mean "not selected" and persist as empty —
+never an invented default.
+
+### 19.3 Regression coverage (A–H)
+
+`backend/tests/test_wapef_save_boundary.py` — 11 tests:
+
+* **A** preview rows carry the saved selections back to the UI (payload test)
+* **B** selections → stored lesson contains exactly those values
+* **C** persisted lesson → API read (single-lesson and job listing) preserves
+  all four fields verbatim
+* **D** Zeli contract: a WAPEF field is never a rewriteable section (400), and
+  a non-WAPEF draft edit never blanks a set field
+* **E** stored lesson → DOCX → all four fields present; package is a valid
+  PK/ZIP
+* **F** stored lesson → PDF → all four fields present; real `%PDF` header
+* **G** empty-state semantics unchanged: no selection → genuinely empty
+  fields, never invented defaults; non-WAPEF drafts still apply
+* **H** generate → save → reload → save again → byte-identical; a partial PUT
+  never erases other lessons' selections; same-session read-after-write sees
+  the just-PUT drafts
+
+Full backend regression: **2146 passed, 11 skipped, 0 failed**.
+
+### 19.4 Local browser verification
+
+`frontend/e2e/wapef-generate-boundary-acceptance.js` — real browser, real
+stack (`next start` + uvicorn), no mocks: signup → school → real scheme upload
+through the UI → Approved WAPEF Plan → preview → DISTINCTIVE values for all
+four fields on every row → Confirm & Generate → persisted lesson verified
+through the real API → leave/return/reload → one real Zeli rewrite (exactly
+one unit consumed) → all four values unchanged → DOCX download (valid PK/ZIP,
+all four values in the document XML) → PDF download (valid %PDF, all four
+values in the extracted text). **29 passed, 0 failed**, no page errors, no
+5xx.
+
+### 19.5 Production browser verification
+
+The same journey ran against the live Render deployment after this fix
+deployed (`frontend/e2e/wapef-prod-boundary-check.js`): distinctive WAPEF
+selections made on the production generate page reached the stored production
+lesson exactly, survived leave/return/reload, survived a real Groq rewrite
+(exactly one unit), and both production exports carried all four values.
+Result recorded in `frontend/e2e/wapef-generate-boundary-acceptance/`. With
+this, the §10 caveat is closed: generate-time selections and Zeli preservation
+are now BOTH proven in production, end to end.
+
 ### Frontend build status
 
 `npx tsc --noEmit` — clean (no output). `npx next build` — **EXIT 0**.

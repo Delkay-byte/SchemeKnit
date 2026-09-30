@@ -340,25 +340,55 @@ export default function GeneratePage() {
 
   const handleConfirmAndGenerate = async () => {
     setAllocationConfirmed(true)
-    // Persist any unsaved per-lesson review edits before generation so the
-    // backend applies them when building each LessonPlan (Section H).
+    // SAVE BOUNDARY (WAPEF persistence): the generation request reads the
+    // SAVED draft store, so the PUT carrying the teacher's CURRENT selections
+    // must complete — server-side persisted, response received — before the
+    // generate call is issued. A fire-and-forget save (or one built from a
+    // stale closure) is exactly the race that dropped WAPEF values: the
+    // generate request would then persist lessons from the previous draft
+    // store, silently replacing the teacher's selections with empties.
+    // A save failure is fatal here, not cosmetic: generating now would
+    // persist lessons WITHOUT the selections on screen.
     if (lessonReview.length > 0) {
       try {
-        await saveLessonReviewDrafts()
+        await saveLessonReviewDrafts(lessonReview)
       } catch {
-        // Non-fatal: generation still uses last saved drafts / builder defaults.
+        setError('Your lesson review could not be saved, so generation was cancelled. Check your connection and try again — your selections are still on screen.')
+        setAllocationConfirmed(false)
+        setGenerating(false)
+        return
       }
     }
     await handleGenerate()
   }
 
-  const saveLessonReviewDrafts = async () => {
-    if (!lessonReview.length) return
+  // Canonical WAPEF draft shape for ONE review row: built from the CURRENT
+  // row object (React state the teacher just edited), never from a closure
+  // captured earlier. WAPEF keys are sent verbatim with empty-list/empty-string
+  // fallbacks so a partially-filled row can never serialize undefined.
+  const wapefDraftFor = (row: any) => ({
+    wapef_deep_hope: row.wapef_deep_hope || '',
+    wapef_storyline: row.wapef_storyline || '',
+    wapef_through_lines: Array.isArray(row.wapef_through_lines)
+      ? row.wapef_through_lines
+      : [],
+    wapef_gods_story: row.wapef_gods_story || '',
+    remarks: row.remarks || '',
+  })
+
+  // rows param: the CALLER passes the rows to save. handleConfirmAndGenerate
+  // passes its own in-scope `lessonReview` (the exact state the teacher sees
+  // on screen at click time), so the payload can never be built from a stale
+  // render's copy. The Save-review button passes nothing and saves the
+  // current state.
+  const saveLessonReviewDrafts = async (rows?: any[]) => {
+    const reviewRows = rows && rows.length ? rows : lessonReview
+    if (!reviewRows.length) return
     setReviewSaving(true)
     setReviewSaved(false)
     try {
       const drafts: Record<string, any> = {}
-      for (const row of lessonReview) {
+      for (const row of reviewRows) {
         drafts[String(row.lesson_sequence)] = {
           // Teacher-adjusted timetable slot for this lesson (Pattern 1).
           // Applied to the built lesson; blank is preserved as blank.
@@ -369,24 +399,27 @@ export default function GeneratePage() {
           structured_references: row.structured_references || [],
           // Approved WAPEF Plan teacher-selected fields (dropdown values,
           // sent as-is; the server normalizes against the approved lists).
-          wapef_deep_hope: row.wapef_deep_hope || '',
-          wapef_storyline: row.wapef_storyline || '',
-          wapef_through_lines: row.wapef_through_lines || [],
-          wapef_gods_story: row.wapef_gods_story || '',
-          remarks: row.remarks || '',
+          ...wapefDraftFor(row),
         }
       }
+      // The PUT must have PERSISTED (server echoed the full store) before
+      // generation may read it — this await IS the save boundary.
       await api.saveLessonReview(schemeId, drafts)
       setReviewSaved(true)
-      setTimeout(() => setReviewSaved(false), 3000)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save lesson review')
+      throw err
     } finally {
       setReviewSaving(false)
     }
   }
 
   const updateLessonReviewRow = (seq: number, patch: Partial<any>) => {
+    // Functional update: the patch is applied to the LATEST row state, never
+    // a closure-captured copy. (A stale closure here was the WAPEF race: two
+    // quick edits — or an edit immediately followed by Confirm & Generate —
+    // built the save payload from a pre-edit row and silently dropped the
+    // teacher's latest selections.)
     setLessonReview(rows => rows.map(r => (r.lesson_sequence === seq ? { ...r, ...patch } : r)))
     setReviewSaved(false)
   }
@@ -1170,7 +1203,7 @@ export default function GeneratePage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={saveLessonReviewDrafts}
+                    onClick={() => saveLessonReviewDrafts()}
                     disabled={reviewSaving}
                   >
                     {reviewSaving ? (

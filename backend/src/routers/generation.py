@@ -635,6 +635,12 @@ async def generate_lesson_plans(
         )
 
         if hasattr(job, '_lesson_plans'):
+            # READ-AFTER-WRITE (WAPEF save boundary): the browser issues PUT
+            # /lesson-review and POST /generate as two separate requests, and
+            # on production they can land on different workers. get_lesson_review_drafts
+            # below re-reads the committed store (session-refresh inside), so
+            # the lessons are always built from the teacher's last saved
+            # review state — never a stale in-memory copy.
             drafts = data_service.get_lesson_review_drafts(db, scheme_id, user.id) or {}
             for lp in job._lesson_plans:
                 _apply_lesson_review_draft(lp, drafts)
