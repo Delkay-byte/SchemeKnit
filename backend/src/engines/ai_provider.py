@@ -24,16 +24,18 @@ NAMED_PROVIDERS = frozenset({
 })
 
 #: Auto-selection order when AI is on but no named provider is pinned.
-#: Key-only providers first (no network probe); local Ollama last.
-_AUTO_PROVIDER_ORDER = ("gemini", "groq", "openai", "opencode-zen", "ollama")
+#: Key-only providers first (no network probe); local Ollama last. Groq leads:
+#: it is the production runtime provider (AI_MODE=groq).
+_AUTO_PROVIDER_ORDER = ("groq", "gemini", "openai", "opencode-zen", "ollama")
 
 #: Default model IDs — overridable via environment (never assume obsolete IDs).
 #: Google's new authorization-key prefix is rejected by :generateContent
 #: (ACCESS_TOKEN_TYPE_UNSUPPORTED); gemini-3.x-flash is the current documented
-#: stable family. Groq retired llama-3.3-70b-versatile (2026-08-16);
-#: openai/gpt-oss-20b is its current replacement.
+#: stable family (Gemini remains as a historical provider implementation).
+#: The production runtime provider is Groq (AI_MODE=groq) with
+#: openai/gpt-oss-120b, which supports strict Structured Outputs.
 DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
-DEFAULT_GROQ_MODEL = "openai/gpt-oss-20b"
+DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b"
 DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
 
 #: Hard timeout for provider HTTP calls (seconds).
@@ -295,11 +297,15 @@ class AIProvider(ABC):
         """
         return {}
 
-    def generate_structured(self, prompt: str) -> dict:
+    def generate_structured(self, prompt: str, schema: Optional[dict] = None) -> dict:
         """Raw prompt in, parsed JSON dict out ({} on any failure).
 
         Used by section regeneration and lesson enrichment. Providers that
         support structured output override this with schema-enforced calls.
+
+        ``schema`` is an optional JSON Schema for the ONE section being
+        rewritten. Providers with strict Structured Outputs (Groq gpt-oss)
+        enforce it natively; others ignore it and keep their own JSON mode.
         """
         return {}
 
@@ -554,7 +560,9 @@ class GeminiProvider(AIProvider):
             require_lesson_schema=True,
         )
 
-    def generate_structured(self, prompt: str) -> dict:
+    def generate_structured(self, prompt: str, schema: Optional[dict] = None) -> dict:
+        # ``schema`` is accepted for interface compatibility (Groq enforces a
+        # strict schema natively); this provider keeps its own JSON mode.
         return _parse_or_diagnose(self, self._generate_content(prompt, json_mode=True))
 
     def is_available(self) -> bool:
@@ -569,11 +577,28 @@ class GeminiProvider(AIProvider):
 class GroqProvider(AIProvider):
     """Groq API provider (OpenAI-compatible chat completions).
 
-    Model is configurable via GROQ_MODEL. Auth is a Bearer header — the key
-    is never placed in URLs, logs, or frontend code.
+    The production runtime provider (``AI_MODE=groq``). Model is configurable
+    via GROQ_MODEL — default ``openai/gpt-oss-120b``, which supports strict
+    Structured Outputs. Auth is a Bearer header — the key is never placed in
+    URLs, logs, or frontend code.
+
+    Failure handling mirrors the shared provider contract:
+    * transient (429 rate limit / 5xx / network timeout) → bounded retry with
+      a light back-off (never an aggressive loop);
+    * non-transient (auth, unknown model, invalid request, unsupported
+      schema) → no retry loop; a strict schema the configured model rejects
+      degrades ONCE to plain JSON mode.
     """
 
     BASE_URL = "https://api.groq.com/openai/v1"
+
+    #: Bounded retries for TRANSIENT failures only.
+    MAX_RETRIES = 2
+    #: Light back-off between retries — honours provider rate limits rather
+    #: than working around them.
+    RETRY_DELAY_SECONDS = 1.5
+    #: HTTP statuses treated as transient (rate limit + server errors).
+    _TRANSIENT_STATUS = frozenset({429, 500, 502, 503, 504})
 
     def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
         self.api_key = api_key or _env("GROQ_API_KEY")
@@ -581,8 +606,10 @@ class GroqProvider(AIProvider):
         self.base_url = _env("GROQ_BASE_URL", self.BASE_URL) or self.BASE_URL
 
     def _chat(self, prompt: str, *, json_mode: bool = False,
-              system: Optional[str] = None) -> str:
+              system: Optional[str] = None,
+              schema: Optional[dict] = None) -> str:
         import requests
+        import time
 
         self.last_error = None
         if not self.is_available():
@@ -598,10 +625,23 @@ class GroqProvider(AIProvider):
             "temperature": 0.7,
             "max_tokens": 4096,
         }
-        if json_mode:
+        # Strict Structured Outputs: the gpt-oss family enforces the supplied
+        # JSON Schema natively, so a section rewrite is guaranteed schema-valid
+        # JSON — no markdown fences, no prose, no truncation repair needed.
+        if schema:
+            body["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "schemeknit_section",
+                    "strict": True,
+                    "schema": schema,
+                },
+            }
+        elif json_mode:
             body["response_format"] = {"type": "json_object"}
-        try:
-            resp = requests.post(
+
+        def _post() -> Any:
+            return requests.post(
                 f"{self.base_url.rstrip('/')}/chat/completions",
                 json=body,
                 headers={
@@ -610,6 +650,46 @@ class GroqProvider(AIProvider):
                 },
                 timeout=PROVIDER_TIMEOUT_SECONDS,
             )
+
+        try:
+            resp = None
+            attempt = 0
+            while True:
+                try:
+                    resp = _post()
+                except Exception as exc:
+                    # A network/timeout failure is transient → bounded retry.
+                    _record_error(self, exc)
+                    ename = type(exc).__name__.lower()
+                    if attempt < self.MAX_RETRIES and (
+                            "timeout" in ename or "connection" in ename):
+                        attempt += 1
+                        time.sleep(self.RETRY_DELAY_SECONDS)
+                        continue
+                    return ""
+                # A response_format the configured model cannot satisfy is a
+                # NON-transient but recoverable condition: step down ONE level
+                # (strict schema → JSON mode → none) and re-post. ``attempt``
+                # is not consumed, so this can never loop more than twice.
+                if resp.status_code == 400:
+                    rf = body.get("response_format")
+                    if isinstance(rf, dict) and rf.get("type") == "json_schema":
+                        body["response_format"] = {"type": "json_object"}
+                        continue
+                    if isinstance(rf, dict) and rf.get("type") == "json_object":
+                        body.pop("response_format", None)
+                        continue
+                # Transient failures get a bounded retry with a short pause.
+                if (resp.status_code in self._TRANSIENT_STATUS
+                        and attempt < self.MAX_RETRIES):
+                    attempt += 1
+                    self.last_error = (
+                        "rate_limit" if resp.status_code == 429
+                        else f"http_{resp.status_code}"
+                    )
+                    time.sleep(self.RETRY_DELAY_SECONDS)
+                    continue
+                break
             if resp.status_code == 429:
                 self.last_error = "rate_limit"
                 return ""
@@ -619,25 +699,11 @@ class GroqProvider(AIProvider):
             if resp.status_code == 404:
                 self.last_error = "model_not_found"
                 return ""
-            if resp.status_code >= 500:
+            if resp.status_code != 200:
                 self.last_error = f"http_{resp.status_code}"
                 return ""
-            if resp.status_code != 200:
-                # Some models reject response_format — retry once without it.
-                if json_mode and resp.status_code == 400:
-                    body.pop("response_format", None)
-                    resp = requests.post(
-                        f"{self.base_url.rstrip('/')}/chat/completions",
-                        json=body,
-                        headers={
-                            "Authorization": f"Bearer {self.api_key}",
-                            "Content-Type": "application/json",
-                        },
-                        timeout=PROVIDER_TIMEOUT_SECONDS,
-                    )
-                if resp.status_code != 200:
-                    self.last_error = f"http_{resp.status_code}"
-                    return ""
+            # A transient blip that succeeded on a later attempt is healthy.
+            self.last_error = None
             data = resp.json()
             choices = data.get("choices") or []
             if not choices:
@@ -706,8 +772,9 @@ class GroqProvider(AIProvider):
             require_lesson_schema=True,
         )
 
-    def generate_structured(self, prompt: str) -> dict:
-        return _parse_or_diagnose(self, self._chat(prompt, json_mode=True))
+    def generate_structured(self, prompt: str, schema: Optional[dict] = None) -> dict:
+        return _parse_or_diagnose(
+            self, self._chat(prompt, json_mode=True, schema=schema))
 
     def is_available(self) -> bool:
         return bool(self.api_key)
@@ -813,7 +880,7 @@ class OpenAIProvider(AIProvider):
             require_lesson_schema=True,
         )
 
-    def generate_structured(self, prompt: str) -> dict:
+    def generate_structured(self, prompt: str, schema: Optional[dict] = None) -> dict:
         return _parse_or_diagnose(self, self._chat(prompt, json_mode=True))
 
     def is_available(self) -> bool:
@@ -927,7 +994,7 @@ class OpenCodeZenProvider(AIProvider):
             require_lesson_schema=True,
         )
 
-    def generate_structured(self, prompt: str) -> dict:
+    def generate_structured(self, prompt: str, schema: Optional[dict] = None) -> dict:
         return _parse_or_diagnose(self, self._chat(prompt, json_mode=True))
 
     def is_available(self) -> bool:
@@ -1030,7 +1097,7 @@ previous_lesson_context=previous_lesson_context,
     )
         return _parse_or_diagnose(self, self._generate(prompt), require_lesson_schema=True)
 
-    def generate_structured(self, prompt: str) -> dict:
+    def generate_structured(self, prompt: str, schema: Optional[dict] = None) -> dict:
         if not self.is_available():
             self.last_error = "unavailable"
             return {}

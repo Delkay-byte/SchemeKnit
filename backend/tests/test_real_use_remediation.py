@@ -207,8 +207,11 @@ class TestAIStatusTruth:
         for key in ("AI_MODE", "GEMINI_API_KEY", "GROQ_API_KEY", "OPENAI_API_KEY",
                     "MINIMAX_API_KEY", "OPENCODE_ZEN_API_KEY"):
             monkeypatch.delenv(key, raising=False)
-        # _env() falls back to pydantic Settings (the .env file), so patch the
-        # provider classes directly: every real provider reports unavailable.
+        # Hermetic: _env() falls back to pydantic Settings (the .env file), so a
+        # machine-local AI_MODE pin must not leak into this test either.
+        monkeypatch.setattr(ap, "_env", lambda name, default="": default)
+        # Patch the provider classes directly: every real provider reports
+        # unavailable.
         monkeypatch.setattr(ap.GeminiProvider, "is_available", lambda self: False)
         monkeypatch.setattr(ap.GroqProvider, "is_available", lambda self: False)
         monkeypatch.setattr(ap.OpenAIProvider, "is_available", lambda self: False)
@@ -229,6 +232,10 @@ class TestAIStatusTruth:
         from src.engines import ai_provider as ap
 
         monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+        # Hermetic: stop the machine-local .env (e.g. AI_MODE=groq) pinning a
+        # different provider — only the Gemini key configured above may resolve.
+        monkeypatch.setattr(ap, "_env",
+                            lambda name, default="": "test-key" if name == "GEMINI_API_KEY" else default)
         monkeypatch.setattr(ap.GeminiProvider, "is_available", lambda self: True)
 
         res = await settings_router.ai_status("ENHANCED")

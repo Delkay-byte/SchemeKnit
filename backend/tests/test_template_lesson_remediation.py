@@ -111,20 +111,27 @@ class TestProviderResolution:
 
     def test_basic_auto_select_prefers_configured_gemini(self):
         """Auto-selection must try key-holding providers in the documented
-        order; a reachable Gemini is chosen over opencode-zen."""
+        order; a reachable Gemini is chosen over opencode-zen. (Groq now leads
+        the production order but is not configured here.)"""
         from src.engines.ai_provider import resolve_provider_mode
-        env = {"GEMINI_API_KEY": "x", "OPENCODE_ZEN_API_KEY": "y", "AI_MODE": ""}
-        with patch.dict("os.environ", env), \
+        # Hermetic: patch _env so the machine-local .env cannot pin a provider.
+        env = {"GEMINI_API_KEY": "x", "OPENCODE_ZEN_API_KEY": "y"}
+        with patch("src.engines.ai_provider._env",
+                   lambda name, default="": env.get(name, default)), \
                 patch("src.engines.ai_provider.GeminiProvider.is_available",
-                      return_value=True):
+                      return_value=True), \
+                patch("src.engines.ai_provider.GroqProvider.is_available",
+                      return_value=False):
             assert resolve_provider_mode("BASIC") == "gemini"
 
     def test_opencode_zen_displayed_when_genuinely_resolved(self):
         """AA-9: opencode-zen remains the displayed provider when it is
         genuinely the resolved one (Gemini unavailable, Zen configured)."""
         from src.engines.ai_provider import resolve_provider_mode, get_provider
-        env = {"OPENCODE_ZEN_API_KEY": "y", "GEMINI_API_KEY": "", "AI_MODE": ""}
-        with patch.dict("os.environ", env), \
+        # Hermetic: only opencode-zen is configured — no machine-local keys.
+        env = {"OPENCODE_ZEN_API_KEY": "y"}
+        with patch("src.engines.ai_provider._env",
+                   lambda name, default="": env.get(name, default)), \
                 patch("src.engines.ai_provider.GeminiProvider.is_available",
                       return_value=False):
             resolved = resolve_provider_mode("BASIC")

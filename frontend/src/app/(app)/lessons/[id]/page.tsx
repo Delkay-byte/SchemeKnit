@@ -229,8 +229,7 @@ export default function LessonDetailPage() {
         }
         setMainActivities(next)
         setRegenNote(
-          `AI suggestion inserted by ${res.provider || 'provider'}. ` +
-          'Review and Save to keep it.'
+          'Zeli rewrote this section. Review it and Save to keep it.'
         )
         return
       }
@@ -239,8 +238,7 @@ export default function LessonDetailPage() {
       if (section === 'assessment') setAssessment(text)
       if (section === 'conclusion') setConclusion(text)
       setRegenNote(
-        `AI suggestion inserted by ${res.provider || 'provider'} (mode: ${res.mode || mode}). ` +
-        'Review and Save to keep it.'
+        'Zeli rewrote this section. Review it and Save to keep it.'
       )
     } catch (err) {
       // PART H/I/J/AD: the teacher sees ONLY calm, non-technical copy; the raw
@@ -471,8 +469,8 @@ export default function LessonDetailPage() {
             <span className="text-xs text-muted-foreground">
               {aiStatus
                 ? aiStatus.active
-                  ? `AI active · provider: ${(aiStatus as any).provider_label || aiStatus.provider}`
-                  : `AI unavailable${aiStatus.provider ? ` · ${aiStatus.provider}` : ''} — suggestions are disabled until one is available.`
+                  ? 'Zeli available'
+                  : 'Zeli unavailable right now — suggestions are disabled, but you can edit everything manually.'
                 : ''}
             </span>
           </div>

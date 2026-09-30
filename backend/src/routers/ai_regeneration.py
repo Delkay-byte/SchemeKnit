@@ -46,8 +46,9 @@ REGENERATABLE_SECTIONS = [
     "teaching_learning_resources", "previous_knowledge",
 ]
 
-#: The two AI affordances a teacher sees (never an internal pattern name).
-#: AI is OFF by default and only ever runs for one section at a time.
+#: The teacher-facing AI assistant is "Zeli". These two affordances are the
+#: primary rewrite actions; the two below are opt-in extras. AI is OFF by
+#: default and only ever runs for one section at a time.
 REWRITE_MODES = {
     "suggest_another_version": (
         "Suggest ANOTHER VERSION of this section only: a different but "
@@ -56,6 +57,16 @@ REWRITE_MODES = {
     "make_more_practical": (
         "Make this section MORE PRACTICAL: concrete, hands-on, using local "
         "Ghanaian materials a teacher can actually put on the table."
+    ),
+    "make_more_learner_centred": (
+        "Make this section MORE LEARNER-CENTRED: put the learners' own talk, "
+        "work and questions at the centre while the teacher facilitates, "
+        "still delivering the SAME curriculum objective."
+    ),
+    "make_easier_limited_resources": (
+        "Make this section EASIER TO TEACH WITH LIMITED RESOURCES: keep the "
+        "SAME objective but rely only on materials every Ghanaian classroom "
+        "already has (board, exercise books, stones, sticks, learners)."
     ),
 }
 DEFAULT_REWRITE_MODE = "suggest_another_version"
@@ -191,7 +202,7 @@ async def regenerate_section(
         raise _ai_error(
             503,
             "AI_UNAVAILABLE",
-            "AI suggestion is currently unavailable. "
+            "Zeli is unavailable right now. "
             "Your existing content was preserved.",
             diagnostic=(
                 f"AI provider '{resolved}' is not available (state: {state}). "
@@ -203,6 +214,10 @@ async def regenerate_section(
         prompt = _build_section_prompt(
             lp, req.section, previous_content, req.additional_context,
             req.rewrite_mode)
+        # Strict Structured Outputs: the schema enforces the ONE section being
+        # rewritten (never the whole lesson) for providers that support it
+        # (Groq gpt-oss). Providers without structured output ignore it.
+        schema = _section_json_schema(req.section)
         gen_kwargs = dict(
             indicator=lp.indicators[0] if lp.indicators else "",
             strand=lp.strand or "",
@@ -219,7 +234,7 @@ async def regenerate_section(
         # (a rewrite of one section, not a whole-lesson regeneration). Mocks
         # and providers without that override fall back to the legacy
         # whole-lesson call, whose payload is then mined for the section.
-        result = _section_generation(provider, prompt, gen_kwargs)
+        result = _section_generation(provider, prompt, gen_kwargs, schema)
 
         # ``main_activities`` is a STRUCTURED section: the provider's
         # ``main_learning`` object must be normalized to
@@ -237,7 +252,7 @@ async def regenerate_section(
         # and a transient failure should be retried, not reported.
         if (not new_content or len(new_content.strip()) < MIN_SECTION_CHARS) and provider.get_name() == "ollama":
             logger.warning("ai_empty_retry", section=req.section)
-            result = _section_generation(provider, prompt, gen_kwargs)
+            result = _section_generation(provider, prompt, gen_kwargs, schema)
             if req.section == "main_activities":
                 new_activities = _normalize_main_activities(result)
                 new_content = "\n".join(a["description"] for a in new_activities)
@@ -261,13 +276,13 @@ async def regenerate_section(
             if provider.last_error == "rate_limit":
                 raise _ai_error(
                     502, "AI_RATE_LIMITED",
-                    "AI is busy right now. Your existing content was preserved. "
+                    "Zeli is busy right now. Your existing content was preserved. "
                     "Please try again in a moment.",
                     diagnostic=raw,
                 )
             raise _ai_error(
                 502, "AI_NO_SUGGESTION",
-                "AI suggestion unavailable right now. Your existing content "
+                "Zeli could not rewrite this section right now. Your existing content "
                 "was preserved. You can edit it manually or try again later.",
                 diagnostic=raw,
             )
@@ -278,7 +293,7 @@ async def regenerate_section(
         if len(new_content.strip()) < MIN_SECTION_CHARS:
             raise _ai_error(
                 502, "AI_NO_SUGGESTION",
-                "AI suggestion unavailable right now. Your existing content "
+                "Zeli could not rewrite this section right now. Your existing content "
                 "was preserved. You can edit it manually or try again later.",
                 diagnostic=(
                     f"No content mapped to section '{req.section}' from a valid "
@@ -317,8 +332,8 @@ async def regenerate_section(
                      section=req.section, error=str(e), exc_info=True)
         raise _ai_error(
             500, "AI_UNAVAILABLE",
-            "AI suggestion unavailable right now. Your existing content was "
-            "preserved. You can edit it manually or try again later.",
+            "Zeli could not rewrite this section right now. Your existing "
+            "content was preserved. You can edit it manually or try again later.",
             diagnostic=f"Regeneration failed: {str(e)}",
         )
 
@@ -329,20 +344,25 @@ async def list_regeneratable_sections():
     return {"sections": REGENERATABLE_SECTIONS}
 
 
-def _section_generation(provider, prompt: str, gen_kwargs: dict) -> dict:
+def _section_generation(provider, prompt: str, gen_kwargs: dict,
+                        schema: Optional[dict] = None) -> dict:
     """Send the per-section rewrite prompt through the provider's channel.
 
-    Every real provider (Gemini / Groq / OpenAI / Ollama / …) OVERRIDES
+    Every real provider (Groq / Gemini / OpenAI / Ollama / …) OVERRIDES
     :meth:`AIProvider.generate_structured`; those receive the curated section
     prompt verbatim — a rewrite of ONE section, never a whole-lesson
     regeneration whose unrelated fields then leak into the section. Providers
     that only implement the legacy whole-lesson call get that instead; the
     caller mines the returned lesson for the requested section.
+
+    ``schema`` is the strict JSON Schema for that one section: enforced
+    natively by providers with Structured Outputs (Groq gpt-oss), ignored
+    by the rest.
     """
     impl = getattr(type(provider), "generate_structured", None)
     base = getattr(AIProvider, "generate_structured", None)
     if impl is not None and base is not None and impl is not base:
-        return provider.generate_structured(prompt)
+        return provider.generate_structured(prompt, schema=schema)
     return provider.generate_lesson_content(**gen_kwargs)
 
 
@@ -624,8 +644,52 @@ def _json_contract(section: str) -> str:
         return (
             'Return JSON: {"main_learning": {"phase1": {"activity": "...", '
             '"duration_minutes": 15}, "phase2": {...}, "phase3": {...}}} '
-            "with three to five sequenced phases.")
+            "with exactly three sequenced phases named phase1, phase2, phase3.")
     return f'Return JSON: {{"{section}": "the rewritten section text"}}'
+
+
+def _section_json_schema(section: str) -> Optional[dict]:
+    """Strict JSON Schema for ONE section rewrite (Groq Structured Outputs).
+
+    Mirrors :func:`_json_contract` so what the prompt asks for is exactly what
+    the schema enforces — a single section key, NEVER a whole lesson. The
+    teacher is rewriting one section, so the provider returns only that.
+    Providers without strict structured output ignore the schema and keep
+    their own JSON mode.
+    """
+    if section == "main_activities":
+        phase = {
+            "type": "object",
+            "properties": {
+                "activity": {"type": "string"},
+                "duration_minutes": {"type": "number"},
+            },
+            "required": ["activity", "duration_minutes"],
+            "additionalProperties": False,
+        }
+        return {
+            "type": "object",
+            "properties": {
+                "main_learning": {
+                    "type": "object",
+                    "properties": {
+                        "phase1": phase,
+                        "phase2": phase,
+                        "phase3": phase,
+                    },
+                    "required": ["phase1", "phase2", "phase3"],
+                    "additionalProperties": False,
+                }
+            },
+            "required": ["main_learning"],
+            "additionalProperties": False,
+        }
+    return {
+        "type": "object",
+        "properties": {section: {"type": "string"}},
+        "required": [section],
+        "additionalProperties": False,
+    }
 
 
 def _build_section_prompt(
@@ -822,7 +886,7 @@ async def enrich_lesson(
         logger.error("enrich_invalid_output", errors=str(validated)[:300])
         raise HTTPException(
             status_code=500,
-            detail="AI returned invalid lesson data. Deterministic lesson preserved.",
+            detail="Zeli could not improve this lesson. The deterministic version was preserved.",
         )
 
     written = []

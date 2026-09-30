@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { CheckCircle, Loader2, Plus, RefreshCw, Save, Sparkles, Trash2, Wrench } from 'lucide-react'
+import { CheckCircle, Loader2, Plus, RefreshCw, Save, Sparkles, Trash2, Users, Backpack, Wrench } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { SurfaceCard } from '@/components/ui/surface-card'
@@ -321,7 +321,11 @@ export function LessonWorkspace({
   // rewrite modes; internal pattern names/scores/corpus ids never surface.
   const suggest = async (
     section: 'introduction' | 'main_activities' | 'assessment' | 'conclusion',
-    rewriteMode: 'suggest_another_version' | 'make_more_practical' = 'suggest_another_version',
+    rewriteMode:
+      | 'suggest_another_version'
+      | 'make_more_practical'
+      | 'make_more_learner_centred'
+      | 'make_easier_limited_resources' = 'suggest_another_version',
   ) => {
     if (!active || !draft) return
     setSuggesting(`${section}·${rewriteMode}`)
@@ -348,8 +352,7 @@ export function LessonWorkspace({
         if (section === 'conclusion') updateDraft({ conclusion: text })
       }
       setAiNotice(
-        `AI suggestion${res.provider ? ` from ${res.provider}` : ''} inserted. ` +
-        'Review it and Save to keep it.',
+        'Zeli rewrote this section. Review it and Save to keep it.'
       )
     } catch (err) {
       setAiNotice(aiFailure(err).message)
@@ -582,6 +585,8 @@ export function LessonWorkspace({
               busyKey={suggesting}
               onSuggest={() => suggest('main_activities')}
               onSuggestPractical={() => suggest('main_activities', 'make_more_practical')}
+              onSuggestLearnerCentred={() => suggest('main_activities', 'make_more_learner_centred')}
+              onSuggestLowResource={() => suggest('main_activities', 'make_easier_limited_resources')}
             >
               {draft.mainActivities.length > 0 ? (
                 <div className="space-y-2">
@@ -1022,6 +1027,8 @@ function WorkspaceSection({
   busyKey,
   onSuggest,
   onSuggestPractical,
+  onSuggestLearnerCentred,
+  onSuggestLowResource,
   children,
 }: {
   title: string
@@ -1031,17 +1038,22 @@ function WorkspaceSection({
   busyKey?: string | null
   onSuggest?: () => void
   onSuggestPractical?: () => void
+  /** Optional extra Zeli affordance (only where it is pedagogically useful). */
+  onSuggestLearnerCentred?: () => void
+  onSuggestLowResource?: () => void
   children: React.ReactNode
 }) {
   const suggestSpinning = busyKey === `${sectionKey}·suggest_another_version`
   const practicalSpinning = busyKey === `${sectionKey}·make_more_practical`
+  const learnerSpinning = busyKey === `${sectionKey}·make_more_learner_centred`
+  const resourceSpinning = busyKey === `${sectionKey}·make_easier_limited_resources`
   const anySpinning = Boolean(sectionKey && busyKey && busyKey.startsWith(`${sectionKey}·`))
   return (
     <section className="mt-5 border-t border-slate-100 pt-4">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">{title}</h3>
         {onSuggest && (
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
             {onSuggestPractical && (
               <Button
                 size="sm"
@@ -1054,6 +1066,36 @@ function WorkspaceSection({
                   <><Loader2 className="mr-1 h-3 w-3 animate-spin" aria-hidden="true" /> Reworking…</>
                 ) : (
                   <><Wrench className="mr-1 h-3 w-3" aria-hidden="true" /> Make this more practical</>
+                )}
+              </Button>
+            )}
+            {onSuggestLearnerCentred && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs"
+                onClick={onSuggestLearnerCentred}
+                disabled={anySpinning}
+              >
+                {learnerSpinning ? (
+                  <><Loader2 className="mr-1 h-3 w-3 animate-spin" aria-hidden="true" /> Reworking…</>
+                ) : (
+                  <><Users className="mr-1 h-3 w-3" aria-hidden="true" /> More learner-centred</>
+                )}
+              </Button>
+            )}
+            {onSuggestLowResource && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs"
+                onClick={onSuggestLowResource}
+                disabled={anySpinning}
+              >
+                {resourceSpinning ? (
+                  <><Loader2 className="mr-1 h-3 w-3 animate-spin" aria-hidden="true" /> Reworking…</>
+                ) : (
+                  <><Backpack className="mr-1 h-3 w-3" aria-hidden="true" /> Easier with limited resources</>
                 )}
               </Button>
             )}

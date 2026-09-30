@@ -241,7 +241,8 @@ See [`backend/.env.example`](backend/.env.example) for the full list of environm
 | `S3_ENDPOINT` | R2/S3 endpoint URL | When `STORAGE_BACKEND=s3` |
 | `S3_BUCKET` | Object storage bucket | When `STORAGE_BACKEND=s3` |
 | `RESEND_API_KEY` | Resend email API key | Production |
-| `AI_MODE` | `OFF`, `opencode-zen`, `ollama`, etc. | Optional |
+| `AI_MODE` | `groq` (Zeli, optional AI assistant; `OFF` = deterministic only) | Optional |
+| `GROQ_API_KEY` / `GROQ_MODEL` | Zeli runtime provider credentials — never committed | When `AI_MODE=groq` |
 | `PLATFORM_ADMIN_BOOTSTRAP_SECRET` | One-time bootstrap secret | First deploy |
 | `PREVIEW_MODE` | Allow test email sender | Preview builds |
 
