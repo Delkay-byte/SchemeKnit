@@ -511,13 +511,19 @@ print("\\n".join(written))
     console.log(`[diag] post-generate workspace: ${JSON.stringify(afterGenerate._diag)},
       deepHope=${JSON.stringify((afterGenerate.deepHope || '').slice(0, 30))},
       through=${JSON.stringify(afterGenerate.throughLines)}`)
-    // When does the JOB endpoint carry the selections? (read-after-write lag)
+    // When do the stored lessons carry the selections? (read-after-write lag)
+    // The generate URL carries the SCHEME id, so the job-scoped route
+    // (/{job_id}/lessons) is the wrong key for it and answers 404 — poll the
+    // scheme-scoped route, which returns the same lesson_plans payload.
     const jobMatch = page.url().match(/generate\/([a-f0-9-]+)/i)
     if (jobMatch) {
+      const lessonsPath = jobMatch[1] === schemeId
+        ? `/api/generation/schemes/${jobMatch[1]}/lessons`
+        : `/api/generation/${jobMatch[1]}/lessons`
       for (let i = 0; i < 12; i += 1) {
-        const jobLessons = await apiGet(page, `/api/generation/${jobMatch[1]}/lessons`)
+        const jobLessons = await apiGet(page, lessonsPath)
         const jl = (jobLessons.body?.lesson_plans || [])[0] || {}
-        console.log(`[diag] t+${i * 2}s job-API deep=${jl.wapef_deep_hope ? 'SET' : 'EMPTY'} tmpl=${jl.template_id || 'none'}`)
+        console.log(`[diag] t+${i * 2}s stored-API deep=${jl.wapef_deep_hope ? 'SET' : 'EMPTY'} tmpl=${jl.template_id || 'none'}`)
         if (jl.wapef_deep_hope) break
         await sleep(2000)
       }

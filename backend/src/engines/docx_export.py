@@ -30,6 +30,9 @@ from .official_ges_levels import (
 from .official_ges_template import (
     is_ges_form_template,
     render_document as render_official_ges_document,
+    activity_rows,
+    row_description,
+    row_in_phase,
 )
 from .wapef_template import (
     is_wapef_template,
@@ -548,15 +551,34 @@ def _activity_lines(lp, key: str) -> list:
 def _activity_block(lp, kind: str) -> str:
     """Positional delivery-grid content by row phase kind.
 
-    starter → introduction; main/unknown → learner + main activities;
+    starter → introduction + starter; main/unknown → the Phase 2 rows of the
+    learner and main columns (the PHASE 1 / PHASE 3 boundary rows exist so the
+    stored timeline sums to the lesson duration, and their prose is what the
+    introduction and reflection cells already print — one sentence, one cell);
     reflection → assessment + conclusion.
     """
     if kind == "starter":
-        return _lesson_field_value(lp, "introduction")
+        parts = [_lesson_field_value(lp, "introduction"),
+                 _lesson_field_value(lp, "starter_activity")]
+        out, seen = [], set()
+        for part in parts:
+            for line in (part or "").splitlines():
+                line = line.strip()
+                if line and line not in seen:
+                    seen.add(line)
+                    out.append(line)
+        return "\n".join(out)
     if kind == "reflection":
         parts = [_lesson_field_value(lp, "assessment"), _lesson_field_value(lp, "conclusion")]
         return "\n".join(p for p in parts if p)
-    lines = _activity_lines(lp, "learner_activities") + _activity_lines(lp, "main_activities")
+    lines: List[str] = []
+    for key in ("learner_activities", "main_activities"):
+        for item in activity_rows(lp, key):
+            if not row_in_phase(item, 2):
+                continue
+            desc = row_description(item)
+            if desc and desc not in lines:
+                lines.append(desc)
     return "\n".join(lines)
 
 

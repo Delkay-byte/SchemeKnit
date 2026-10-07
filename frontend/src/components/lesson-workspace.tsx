@@ -41,6 +41,15 @@ function normalizeActivities(raw: unknown): MainActivity[] {
   return out
 }
 
+/**
+ * Phase 1 / Phase 3 boundary rows of the stored timeline — their prose is the
+ * introduction/starter and the conclusion, which the Phase 1 and Phase 3
+ * sections already show, so Phase 2 must not list them a second time.
+ */
+export function isBoundaryPhase(phase?: string): boolean {
+  return /^\s*phase\s*[13]\b/i.test(phase || '')
+}
+
 interface LessonData {
   id: string
   scheme_id: string
@@ -59,11 +68,12 @@ interface LessonData {
   indicators?: string[] | null
   lesson_topic: string | null
   introduction: string | null
+  starter_activity?: string | null
   assessment: string | null
   conclusion: string | null
   lesson_date?: string | null
   learning_objectives?: { description: string }[]
-  main_activities?: { description: string; duration_minutes?: number; resources?: string[] }[]
+  main_activities?: { phase?: string; description: string; duration_minutes?: number; resources?: string[] }[]
   keywords?: string[]
   source_tlrs?: string[]
   other_tlrs?: string[]
@@ -112,6 +122,9 @@ interface ReferenceDraft {
 interface Draft {
   topic: string
   introduction: string
+  //: The Phase 1 opening activity itself (the framing sentence above is the
+  //: introduction). Stored separately so Phase 2 lists only its own steps.
+  starter: string
   assessment: string
   conclusion: string
   mainActivities: MainActivity[]
@@ -136,6 +149,7 @@ function draftFrom(l: LessonData): Draft {
   return {
     topic: l.lesson_topic || '',
     introduction: l.introduction || '',
+    starter: l.starter_activity || '',
     assessment: l.assessment || '',
     conclusion: l.conclusion || '',
     mainActivities: normalizeActivities(l.main_activities),
@@ -271,6 +285,7 @@ export function LessonWorkspace({
       const updated = await api.updateLesson(active.id, {
         lesson_topic: draft.topic,
         introduction: draft.introduction,
+        starter_activity: draft.starter,
         assessment: draft.assessment,
         conclusion: draft.conclusion,
         class_assignment: draft.classAssignment,
@@ -424,6 +439,16 @@ export function LessonWorkspace({
     if (stepIndex < GUIDED_STEPS.length - 1) setGuidedStep(GUIDED_STEPS[stepIndex + 1])
   }
 
+  // Phase 2 lists only its own steps. The PHASE 1 / PHASE 3 boundary rows
+  // live in main_activities so the stored timeline sums exactly to the lesson
+  // duration, and their prose is what the Phase 1 and Phase 3 sections already
+  // show — one sentence, one place. The rows stay in the draft (and in the
+  // save payload); filtering here only, so the indices used to edit and remove
+  // remain the stored ones.
+  const phase2Activities = draft.mainActivities
+    .map((activity, index) => ({ activity, index }))
+    .filter(({ activity }) => !isBoundaryPhase(activity.phase))
+
   return (
     <div data-lesson-workspace className="space-y-4">
       {/* Lesson selector — one chip per generated lesson. */}
@@ -569,11 +594,23 @@ export function LessonWorkspace({
               onSuggest={() => suggest('introduction')}
               onSuggestPractical={() => suggest('introduction', 'make_more_practical')}
             >
+              <p className="text-xs font-medium text-muted-foreground">
+                Framing
+              </p>
               <TextArea
                 value={draft.introduction}
                 onChange={(e) => updateDraft({ introduction: e.target.value })}
                 rows={3}
                 aria-label="Phase 1 starter"
+              />
+              <p className="mt-2 text-xs font-medium text-muted-foreground">
+                Starter activity
+              </p>
+              <TextArea
+                value={draft.starter}
+                onChange={(e) => updateDraft({ starter: e.target.value })}
+                rows={3}
+                aria-label="Phase 1 starter activity"
               />
             </WorkspaceSection>
           )}
@@ -588,24 +625,24 @@ export function LessonWorkspace({
               onSuggestLearnerCentred={() => suggest('main_activities', 'make_more_learner_centred')}
               onSuggestLowResource={() => suggest('main_activities', 'make_easier_limited_resources')}
             >
-              {draft.mainActivities.length > 0 ? (
+              {phase2Activities.length > 0 ? (
                 <div className="space-y-2">
-                  {draft.mainActivities.map((a, i) => (
-                    <div key={i} className="flex items-start gap-2">
-                      <span className="mt-2.5 text-xs font-semibold text-slate-400">{i + 1}</span>
+                  {phase2Activities.map(({ activity: a, index }, position) => (
+                    <div key={index} className="flex items-start gap-2">
+                      <span className="mt-2.5 text-xs font-semibold text-slate-400">{position + 1}</span>
                       <TextArea
                         value={a.description}
-                        onChange={(e) => updateActivity(i, { description: e.target.value })}
+                        onChange={(e) => updateActivity(index, { description: e.target.value })}
                         rows={2}
-                        aria-label={`Main learning activity ${i + 1}`}
+                        aria-label={`Main learning activity ${position + 1}`}
                         className="flex-1"
                       />
                       <button
                         type="button"
-                        aria-label={`Remove activity ${i + 1}`}
+                        aria-label={`Remove activity ${position + 1}`}
                         onClick={() =>
                           updateDraft({
-                            mainActivities: draft.mainActivities.filter((_, j) => j !== i),
+                            mainActivities: draft.mainActivities.filter((_, j) => j !== index),
                           })
                         }
                         className="mt-2 text-slate-400 hover:text-red-600"
@@ -624,14 +661,25 @@ export function LessonWorkspace({
                 size="sm"
                 variant="outline"
                 className="mt-2"
-                onClick={() =>
-                  updateDraft({
-                    mainActivities: [
-                      ...draft.mainActivities,
-                      { phase: 'main_learning', description: '', duration_minutes: null, resources: [] },
-                    ],
+                onClick={() => {
+                  // New steps join Phase 2 — never after the stored
+                  // PHASE 3 · PLENARY row that closes the timeline.
+                  let at = draft.mainActivities.length
+                  for (let k = draft.mainActivities.length - 1; k >= 0; k -= 1) {
+                    if (!isBoundaryPhase(draft.mainActivities[k].phase)) {
+                      at = k + 1
+                      break
+                    }
+                  }
+                  const next = [...draft.mainActivities]
+                  next.splice(at, 0, {
+                    phase: 'main_learning',
+                    description: '',
+                    duration_minutes: null,
+                    resources: [],
                   })
-                }
+                  updateDraft({ mainActivities: next })
+                }}
               >
                 <Plus className="mr-1 h-3 w-3" /> Add activity
               </Button>

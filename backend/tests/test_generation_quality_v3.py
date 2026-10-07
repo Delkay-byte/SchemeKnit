@@ -152,7 +152,9 @@ class TestSubjectPedagogy:
         assert lp.conclusion
         assert len(lp.main_activities) >= 3
         main_total = sum(a.duration_minutes for a in lp.main_activities)
-        assert 0 < main_total < lp.duration_minutes
+        # Priority 2 §10 — hard invariant: the stored phase rows must add up
+        # to the lesson duration EXACTLY (no orphan minutes, no overshoot).
+        assert main_total == lp.duration_minutes
         assert lp.duration_minutes == 50
 
     def test_differentiation_is_relevant(self):

@@ -1,0 +1,967 @@
+{
+  "summary": {
+    "lessons": 11,
+    "subjects": [
+      "Creative Arts and Design",
+      "English Language",
+      "ICT",
+      "Mathematics",
+      "Science",
+      "Social Studies"
+    ],
+    "teacher_ready": 11,
+    "teacher_ready_rate": 1.0,
+    "mean_total": 73.7,
+    "mean_scores": {
+      "indicator_fidelity": 5.0,
+      "objective_specificity": 5.0,
+      "topic_specificity": 5.0,
+      "phase1_usefulness": 5.0,
+      "phase2_usefulness": 5.0,
+      "phase3_usefulness": 5.0,
+      "activity_specificity": 4.64,
+      "teacher_action_clarity": 5.0,
+      "learner_action_clarity": 5.0,
+      "assessment_alignment": 5.0,
+      "resource_realism": 4.55,
+      "timing_integrity": 5.0,
+      "subject_pedagogy_fit": 4.82,
+      "ghana_context": 4.73,
+      "teachability": 5.0
+    },
+    "hard_failure_counts": {},
+    "ai_mode": "OFF",
+    "zeli": "OFF"
+  },
+  "lessons": [
+    {
+      "subject": "Mathematics",
+      "week": 1,
+      "code": "B7.1.1.1.1",
+      "indicator": "Use place value to read and write numbers",
+      "provenance": "NaCCA B7 indicator used in tests/test_curriculum_v2.py; exemplar record B7.1.1.1.1",
+      "scores": {
+        "indicator_fidelity": 5,
+        "objective_specificity": 5,
+        "topic_specificity": 5,
+        "phase1_usefulness": 5,
+        "phase2_usefulness": 5,
+        "phase3_usefulness": 5,
+        "activity_specificity": 5,
+        "teacher_action_clarity": 5,
+        "learner_action_clarity": 5,
+        "assessment_alignment": 5,
+        "resource_realism": 4,
+        "timing_integrity": 5,
+        "subject_pedagogy_fit": 5,
+        "ghana_context": 5,
+        "teachability": 5
+      },
+      "total": 74,
+      "max": 75,
+      "hard_failures": [],
+      "teacher_ready": true,
+      "excerpt": {
+        "objective": "Learners can Use place value to read and write numbers",
+        "topic": "Use place value to read and write numbers",
+        "starter": "Build on the previous lesson ('Number and Numeration Systems'). Tell a one-minute local scenario about Use place value to read and write numbers (a market, home or community situation) and ask: 'what would you do here, and why?' What to look for: Learners can use place value to read and write numbers correctly in a situation the lesson did not show.",
+        "phase2": [
+          {
+            "phase": "PHASE 1 · STARTER",
+            "minutes": 9,
+            "description": "Build on the previous lesson ('Number and Numeration Systems'). Tell a one-minute local scenario about Use place value to read and write numbers (a market, home or community situation) and ask: 'what would you do here, and why?' What to look for: Learners can use place value to read and write numbers correctly in a situation the lesson did not show."
+          },
+          {
+            "phase": "PROBLEM SCENARIO",
+            "minutes": 13,
+            "description": "Present a scenario, question or source about Use place value to read and write numbers and let learners identify the key issue involved. Look for: learners can name the key features of Use place value to read and write numbers before you move on."
+          },
+          {
+            "phase": "INVESTIGATION",
+            "minutes": 17,
+            "description": "Learners explore the pattern or relationship in Use place value to read and write numbers with concrete materials, record the results in a table, and state what they notice. Step 2 · Investigation: check each learner's work on Use place value to read and write numbers and note anyone who needs help before the next step."
+          },
+          {
+            "phase": "SOLVE AND REPORT",
+            "minutes": 9,
+            "description": "Each learner solves two problems on Use place value to read and write numbers alone, then the class analyses one common wrong answer and explains why it fails. Learners solve the practice problem with correct steps and a correct answer, and can state the method."
+          },
+          {
+            "phase": "PHASE 3 · PLENARY",
+            "minutes": 12,
+            "description": "Two groups report their findings on Use place value to read and write numbers; the class agrees the strongest evidence and one open question. Preview the next lesson ('Use place value to read and write numbers')."
+          }
+        ],
+        "learner_sample": [
+          "Learners state what they remember about Use place value to read and write numbers and write one keyword in their books.",
+          "Follow the worked example for Use place value to read and write numbers on the board, noting each step and the reason for it."
+        ],
+        "assessment": "Written class exercise of 2-3 problems that test Use place value to read and write numbers; mark for correct method and correct answer. Use the wrong answers to identify learners who need a guided re-teach next lesson. Assessment mode: Written problem-solving with step marks.",
+        "resources": [
+          "multi-base blocks",
+          "place value chart",
+          "exercise books",
+          "manipulatives",
+          "chalkboard",
+          "rulers",
+          "protractors",
+          "grid paper",
+          "locally available materials",
+          "counting materials or number cards"
+        ],
+        "class_assignment": "In pairs, learners work through two problems on Use place value to read and write numbers in their exercise books. The teacher moves round, checks each pair's method and asks one pair to explain their reasoning to the class.",
+        "home_assignment": "Write and solve three short problems of the same type as today's work on Use place value to read and write numbers. Show each step clearly.",
+        "conclusion": "Two groups report their findings on Use place value to read and write numbers; the class agrees the strongest evidence and one open question. Preview the next lesson ('Use place value to read and write numbers').",
+        "duration_minutes": 60,
+        "stored_minutes_total": 60
+      }
+    },
+    {
+      "subject": "Mathematics",
+      "week": 2,
+      "code": "B7.1.1.1.1",
+      "indicator": "Use place value to read and write numbers",
+      "provenance": "REPEAT of week 1 occurrence (progression probe)",
+      "scores": {
+        "indicator_fidelity": 5,
+        "objective_specificity": 5,
+        "topic_specificity": 5,
+        "phase1_usefulness": 5,
+        "phase2_usefulness": 5,
+        "phase3_usefulness": 5,
+        "activity_specificity": 5,
+        "teacher_action_clarity": 5,
+        "learner_action_clarity": 5,
+        "assessment_alignment": 5,
+        "resource_realism": 5,
+        "timing_integrity": 5,
+        "subject_pedagogy_fit": 5,
+        "ghana_context": 5,
+        "teachability": 5
+      },
+      "total": 75,
+      "max": 75,
+      "hard_failures": [],
+      "teacher_ready": true,
+      "excerpt": {
+        "objective": "Learners can Use place value to read and write numbers",
+        "topic": "Use place value to read and write numbers",
+        "starter": "Build on the previous lesson ('Use place value to read and write numbers'). Perform the first step of Use place value to read and write numbers without explaining it and ask learners to predict what you will do next and why. What to look for: Learners can use place value to read and write numbers correctly in a situation the lesson did not show.",
+        "phase2": [
+          {
+            "phase": "PHASE 1 · STARTER",
+            "minutes": 9,
+            "description": "Build on the previous lesson ('Use place value to read and write numbers'). Perform the first step of Use place value to read and write numbers without explaining it and ask learners to predict what you will do next and why. What to look for: Learners can use place value to read and write numbers correctly in a situation the lesson did not show."
+          },
+          {
+            "phase": "DEMONSTRATION",
+            "minutes": 13,
+            "description": "Teacher works through one fully-reasoned example of Use place value to read and write numbers on the board, thinking aloud so learners see the method and the reason for each step. Look for: learners can name the key features of Use place value to read and write numbers before you move on."
+          },
+          {
+            "phase": "GUIDED PRACTICE",
+            "minutes": 17,
+            "description": "Learners carry out the practical task for Use place value to read and write numbers in small groups using multi-base blocks, with the teacher correcting technique. Step 2 · Guided practice: check each learner's work on Use place value to read and write numbers and note anyone who needs help before the next step."
+          },
+          {
+            "phase": "INDEPENDENT APPLICATION",
+            "minutes": 9,
+            "description": "Learners apply what they practised to complete one task on Use place value to read and write numbers and inspect their own product. Learners solve the practice problem with correct steps and a correct answer, and can state the method."
+          },
+          {
+            "phase": "PHASE 3 · PLENARY",
+            "minutes": 12,
+            "description": "Ask learners to state the rule or method for Use place value to read and write numbers in one sentence. Summarise the key steps on the board and set one similar problem as homework. Preview the next lesson ('Solve word problems involving addition and subtraction'). Exit check: each learner answers one question about Use place value to read and write numbers and the teacher marks each answer before leaving."
+          }
+        ],
+        "learner_sample": [
+          "Learners state what they remember about Use place value to read and write numbers and write one keyword in their books.",
+          "Follow the worked example for Use place value to read and write numbers on the board, noting each step and the reason for it."
+        ],
+        "assessment": "Written class exercise of 2-3 problems that test Use place value to read and write numbers; mark for correct method and correct answer. Use the wrong answers to identify learners who need a guided re-teach next lesson. Assessment mode: Written problem-solving with step marks.",
+        "resources": [
+          "multi-base blocks",
+          "place value chart",
+          "exercise books",
+          "manipulatives",
+          "chalkboard",
+          "rulers",
+          "protractors",
+          "grid paper",
+          "locally available materials",
+          "counting materials or number cards"
+        ],
+        "class_assignment": "In pairs, learners work through two problems on Use place value to read and write numbers in their exercise books. The teacher moves round, checks each pair's method and asks one pair to explain their reasoning to the class. Set it in a situation from the learners' home, the nearby market or their local community.",
+        "home_assignment": "Write and solve three short problems of the same type as today's work on Use place value to read and write numbers. Show each step clearly.",
+        "conclusion": "Ask learners to state the rule or method for Use place value to read and write numbers in one sentence. Summarise the key steps on the board and set one similar problem as homework. Preview the next lesson ('Solve word problems involving addition and subtraction'). Exit check: each learner answers one question about Use place value to read and write numbers and the teacher marks each answer before leaving.",
+        "duration_minutes": 60,
+        "stored_minutes_total": 60
+      }
+    },
+    {
+      "subject": "Mathematics",
+      "week": 3,
+      "code": "B7.1.1.1.3",
+      "indicator": "Solve word problems involving addition and subtraction",
+      "provenance": "SchemeKnit fixture occurrence (tests/test_generation_quality_v3.py MATH_CODES)",
+      "scores": {
+        "indicator_fidelity": 5,
+        "objective_specificity": 5,
+        "topic_specificity": 5,
+        "phase1_usefulness": 5,
+        "phase2_usefulness": 5,
+        "phase3_usefulness": 5,
+        "activity_specificity": 5,
+        "teacher_action_clarity": 5,
+        "learner_action_clarity": 5,
+        "assessment_alignment": 5,
+        "resource_realism": 5,
+        "timing_integrity": 5,
+        "subject_pedagogy_fit": 5,
+        "ghana_context": 5,
+        "teachability": 5
+      },
+      "total": 75,
+      "max": 75,
+      "hard_failures": [],
+      "teacher_ready": true,
+      "excerpt": {
+        "objective": "Learners can Solve word problems involving addition and subtraction",
+        "topic": "Solve word problems involving addition and subtraction",
+        "starter": "Build on the previous lesson ('Use place value to read and write numbers'). Quick recall: ask three learners to state what they remember about Solve word problems involving addition and subtraction from the last lesson. Write one keyword on the board and have the class read it together. What to look for: Learners can solve word problems involving addition and subtraction correctly in a situation the lesson did not show.",
+        "phase2": [
+          {
+            "phase": "PHASE 1 · STARTER",
+            "minutes": 9,
+            "description": "Build on the previous lesson ('Use place value to read and write numbers'). Quick recall: ask three learners to state what they remember about Solve word problems involving addition and subtraction from the last lesson. Write one keyword on the board and have the class read it together. What to look for: Learners can solve word problems involving addition and subtraction correctly in a situation the lesson did not show."
+          },
+          {
+            "phase": "RETRIEVE",
+            "minutes": 10,
+            "description": "Recall the experience or learning so far linked to Solve word problems involving addition and subtraction and ask learners what stood out. Look for: learners can name the key features of Solve word problems involving addition and subtraction before you move on."
+          },
+          {
+            "phase": "NEW CONCEPT",
+            "minutes": 10,
+            "description": "Teacher works through one fully-reasoned example of Solve word problems involving addition and subtraction on the board, thinking aloud so learners see the method and the reason for each step. Step 2 · New concept: check each learner's work on Solve word problems involving addition and subtraction and note anyone who needs help before the next step."
+          },
+          {
+            "phase": "PRACTICE",
+            "minutes": 13,
+            "description": "In mixed-ability pairs, learners solve a parallel problem on Solve word problems involving addition and subtraction. Move between pairs and correct any wrong step immediately. Step 3 · Practice: check each learner's work on Solve word problems involving addition and subtraction and note anyone who needs help before the next step."
+          },
+          {
+            "phase": "CHECK",
+            "minutes": 6,
+            "description": "Each learner solves two problems on Solve word problems involving addition and subtraction alone, then the class analyses one common wrong answer and explains why it fails. Learners solve the practice problem with correct steps and a correct answer, and can state the method."
+          },
+          {
+            "phase": "PHASE 3 · PLENARY",
+            "minutes": 12,
+            "description": "Exit question: every learner answers one question on Solve word problems involving addition and subtraction in their book or orally before leaving; use the answers to plan re-teaching. Exit check: each learner answers one question about Solve word problems involving addition and subtraction and the teacher marks each answer before leaving."
+          }
+        ],
+        "learner_sample": [
+          "Learners state what they remember about Solve word problems involving addition and subtraction and write one keyword in their books.",
+          "Follow the worked example for Solve word problems involving addition and subtraction on the board, noting each step and the reason for it."
+        ],
+        "assessment": "Written class exercise of 2-3 problems that test Solve word problems involving addition and subtraction; mark for correct method and correct answer. Success = Learners can solve word problems involving addition and subtraction correctly in a situation the lesson did not show. Assessment mode: Written problem-solving with step marks.",
+        "resources": [
+          "exercise books",
+          "chalkboard",
+          "word problem cards",
+          "manipulatives",
+          "rulers",
+          "protractors",
+          "grid paper",
+          "locally available materials",
+          "counting materials or number cards"
+        ],
+        "class_assignment": "In pairs, learners work through two problems on Solve word problems involving addition and subtraction in their exercise books. The teacher moves round, checks each pair's method and asks one pair to explain their reasoning to the class. Set it in a situation from the learners' home, the nearby market or their local community.",
+        "home_assignment": "Write and solve three short problems of the same type as today's work on Solve word problems involving addition and subtraction. Show each step clearly.",
+        "conclusion": "Exit question: every learner answers one question on Solve word problems involving addition and subtraction in their book or orally before leaving; use the answers to plan re-teaching. Exit check: each learner answers one question about Solve word problems involving addition and subtraction and the teacher marks each answer before leaving.",
+        "duration_minutes": 60,
+        "stored_minutes_total": 60
+      }
+    },
+    {
+      "subject": "Science",
+      "week": 1,
+      "code": "B7.1.1.1.1",
+      "indicator": "Classify materials as solids, liquids and gases",
+      "provenance": "Exemplar record B7/JHS1.1.1.1.1 (src/curriculum/exemplars/science.py)",
+      "scores": {
+        "indicator_fidelity": 5,
+        "objective_specificity": 5,
+        "topic_specificity": 5,
+        "phase1_usefulness": 5,
+        "phase2_usefulness": 5,
+        "phase3_usefulness": 5,
+        "activity_specificity": 5,
+        "teacher_action_clarity": 5,
+        "learner_action_clarity": 5,
+        "assessment_alignment": 5,
+        "resource_realism": 5,
+        "timing_integrity": 5,
+        "subject_pedagogy_fit": 4,
+        "ghana_context": 5,
+        "teachability": 5
+      },
+      "total": 74,
+      "max": 75,
+      "hard_failures": [],
+      "teacher_ready": true,
+      "excerpt": {
+        "objective": "Learners can Classify materials as solids, liquids and gases",
+        "topic": "Classify materials as solids, liquids and gases",
+        "starter": "Show a real object or a picture connected to Classify materials as solids, liquids and gases and ask learners to say three things they notice about it before any explanation. What to look for: Learners can classify materials as solids, liquids and gases and explain it in their own words with one example.",
+        "phase2": [
+          {
+            "phase": "PHASE 1 · STARTER",
+            "minutes": 9,
+            "description": "Show a real object or a picture connected to Classify materials as solids, liquids and gases and ask learners to say three things they notice about it before any explanation. What to look for: Learners can classify materials as solids, liquids and gases and explain it in their own words with one example."
+          },
+          {
+            "phase": "OBSERVE",
+            "minutes": 12,
+            "description": "Learners observe Classify materials as solids, liquids and gases closely and record exactly what they see or measure in a simple labelled table. Look for: learners can name the key features of Classify materials as solids, liquids and gases before you move on."
+          },
+          {
+            "phase": "CLASSIFY",
+            "minutes": 15,
+            "description": "Learners sort/group the given items according to the rule for Classify materials as solids, liquids and gases, explaining the basis of each group using local samples (water. Step 2 · Classify: check each learner's work on Classify materials as solids, liquids and gases and note anyone who needs help before the next step."
+          },
+          {
+            "phase": "EXPLAIN THE RULE",
+            "minutes": 12,
+            "description": "Groups compare their evidence on Classify materials as solids, liquids and gases with the earlier prediction and agree one conclusion the evidence actually supports."
+          },
+          {
+            "phase": "PHASE 3 · PLENARY",
+            "minutes": 12,
+            "description": "Ask learners to state the rule or method for Classify materials as solids, liquids and gases in one sentence, then give one new example that fits it. Preview the next lesson ('Describe the characteristics of living things'). Exit check: each learner answers one question about Classify materials as solids, liquids and gases and the teacher marks each answer before leaving."
+          }
+        ],
+        "learner_sample": [
+          "Learners look at the object or picture and name three things they notice about Classify materials as solids, liquids and gases.",
+          "Examine the two contrasting examples for Classify materials as solids, liquids and gases and identify what is the same and what is different."
+        ],
+        "assessment": "A classification exercise on Classify materials as solids, liquids and gases: learners must sort items and justify each group. Success = Learners can classify materials as solids, liquids and gases and explain it in their own words with one example. Assessment mode: Classification exercise with accuracy check.",
+        "resources": [
+          "local samples (water",
+          "sand",
+          "stone)",
+          "containers",
+          "recording sheets",
+          "specimens",
+          "charts",
+          "diagrams",
+          "practical materials",
+          "locally available materials",
+          "sorting cards/items",
+          "labelled containers",
+          "recording sheet or table",
+          "exercise books"
+        ],
+        "class_assignment": "Pairs sort or group the given items by the rule for Classify materials as solids, liquids and gases and write one reason for each group. The teacher checks a sample and asks two pairs to justify a borderline item. Set it in a situation from the learners' home, the nearby market or their local community.",
+        "home_assignment": "Collect or draw five items you can group and write the rule you used to group them for Classify materials as solids, liquids and gases.",
+        "conclusion": "Ask learners to state the rule or method for Classify materials as solids, liquids and gases in one sentence, then give one new example that fits it. Preview the next lesson ('Describe the characteristics of living things'). Exit check: each learner answers one question about Classify materials as solids, liquids and gases and the teacher marks each answer before leaving.",
+        "duration_minutes": 60,
+        "stored_minutes_total": 60
+      }
+    },
+    {
+      "subject": "Science",
+      "week": 2,
+      "code": "B7.2.1.1.1",
+      "indicator": "Describe the characteristics of living things",
+      "provenance": "SchemeKnit fixture occurrence (tests/test_generation_quality_v3.py SCI_CODES)",
+      "scores": {
+        "indicator_fidelity": 5,
+        "objective_specificity": 5,
+        "topic_specificity": 5,
+        "phase1_usefulness": 5,
+        "phase2_usefulness": 5,
+        "phase3_usefulness": 5,
+        "activity_specificity": 5,
+        "teacher_action_clarity": 5,
+        "learner_action_clarity": 5,
+        "assessment_alignment": 5,
+        "resource_realism": 5,
+        "timing_integrity": 5,
+        "subject_pedagogy_fit": 5,
+        "ghana_context": 4,
+        "teachability": 5
+      },
+      "total": 74,
+      "max": 75,
+      "hard_failures": [],
+      "teacher_ready": true,
+      "excerpt": {
+        "objective": "Learners can Describe the characteristics of living things",
+        "topic": "Describe the characteristics of living things",
+        "starter": "Build on the previous lesson ('Classify materials as solids, liquids and gases'). Ask learners to predict what will happen with Describe the characteristics of living things: record two or three predictions on the board without judging them yet. What to look for: Learners can describe the characteristics of living things from memory and name one further example.",
+        "phase2": [
+          {
+            "phase": "PHASE 1 · STARTER",
+            "minutes": 9,
+            "description": "Build on the previous lesson ('Classify materials as solids, liquids and gases'). Ask learners to predict what will happen with Describe the characteristics of living things: record two or three predictions on the board without judging them yet. What to look for: Learners can describe the characteristics of living things from memory and name one further example."
+          },
+          {
+            "phase": "QUESTION AND PREDICT",
+            "minutes": 12,
+            "description": "In groups, learners carry out the fair test or activity for Describe the characteristics of living things, keep one condition constant and record every result honestly. Look for: learners can name the key features of Describe the characteristics of living things before you move on."
+          },
+          {
+            "phase": "DISCOVERY AND EVIDENCE",
+            "minutes": 15,
+            "description": "Learners observe Describe the characteristics of living things closely and record exactly what they see or measure in a simple labelled table. Step 2 · Discovery and evidence: check each learner's work on Describe the characteristics of living things and note anyone who needs help before the next step."
+          },
+          {
+            "phase": "DRAW CONCLUSIONS",
+            "minutes": 12,
+            "description": "Groups compare their evidence on Describe the characteristics of living things with the earlier prediction and agree one conclusion the evidence actually supports."
+          },
+          {
+            "phase": "PHASE 3 · PLENARY",
+            "minutes": 12,
+            "description": "Ask the class to answer the question that opened the lesson about Describe the characteristics of living things, and to explain how their evidence supports the answer. Recap: each learner states in one sentence what they can now do with Describe the characteristics of living things."
+          }
+        ],
+        "learner_sample": [
+          "Learners state what they remember about Describe the characteristics of living things and write one keyword in their books.",
+          "Record your prediction about Describe the characteristics of living things and the reason for it before starting."
+        ],
+        "assessment": "Observe learners carrying out Describe the characteristics of living things using a short checklist, then ask them to explain their result in writing. Check that the explanation matches the evidence, not a memorised answer. Assessment mode: Lab report or investigation record with findings.",
+        "resources": [
+          "leaf samples",
+          "chalkboard",
+          "exercise books",
+          "specimens",
+          "charts",
+          "diagrams",
+          "practical materials",
+          "locally available materials",
+          "simple measuring tools",
+          "recording sheet/table",
+          "specimen or sample",
+          "containers",
+          "recording sheet or table"
+        ],
+        "class_assignment": "Groups carry out the investigation into Describe the characteristics of living things and record what they observe in a table. The teacher checks that each group records what they actually saw, not what they expected.",
+        "home_assignment": "Find one more example of Describe the characteristics of living things at home or in your community and write what you observed and what it shows.",
+        "conclusion": "Ask the class to answer the question that opened the lesson about Describe the characteristics of living things, and to explain how their evidence supports the answer. Recap: each learner states in one sentence what they can now do with Describe the characteristics of living things.",
+        "duration_minutes": 60,
+        "stored_minutes_total": 60
+      }
+    },
+    {
+      "subject": "English Language",
+      "week": 1,
+      "code": "B7.1.1.1.1",
+      "indicator": "Use formal and informal register in conversation",
+      "provenance": "Exemplar record B7/JHS1.1.1.1.1 (src/curriculum/exemplars/english.py)",
+      "scores": {
+        "indicator_fidelity": 5,
+        "objective_specificity": 5,
+        "topic_specificity": 5,
+        "phase1_usefulness": 5,
+        "phase2_usefulness": 5,
+        "phase3_usefulness": 5,
+        "activity_specificity": 3,
+        "teacher_action_clarity": 5,
+        "learner_action_clarity": 5,
+        "assessment_alignment": 5,
+        "resource_realism": 4,
+        "timing_integrity": 5,
+        "subject_pedagogy_fit": 5,
+        "ghana_context": 5,
+        "teachability": 5
+      },
+      "total": 72,
+      "max": 75,
+      "hard_failures": [],
+      "teacher_ready": true,
+      "excerpt": {
+        "objective": "Learners can Use formal and informal register in conversation",
+        "topic": "Use formal and informal register in conversation",
+        "starter": "Build on the previous lesson ('Speaking and Listening'). Build a quick word wall for Use formal and informal register in conversation: learners say the key words they already know, and the teacher adds the two they will need today.",
+        "phase2": [
+          {
+            "phase": "PHASE 1 · STARTER",
+            "minutes": 9,
+            "description": "Build on the previous lesson ('Speaking and Listening'). Build a quick word wall for Use formal and informal register in conversation: learners say the key words they already know, and the teacher adds the two they will need today."
+          },
+          {
+            "phase": "MODEL",
+            "minutes": 13,
+            "description": "Teacher reads the model text aloud, highlighting the target language feature for Use formal and informal register in conversation so learners both see and hear it in use. Look for: learners can name the key features of Use formal and informal register in conversation before you move on."
+          },
+          {
+            "phase": "PAIR PRACTICE",
+            "minutes": 17,
+            "description": "Learners read the text and underline the evidence for Use formal and informal register in conversation, pausing to ask and answer questions."
+          },
+          {
+            "phase": "INDIVIDUAL PERFORMANCE",
+            "minutes": 9,
+            "description": "Each learner completes and improves their piece on Use formal and informal register in conversation against a short checklist. In the communicative task learners use the target feature correctly at least twice and stay intelligible."
+          },
+          {
+            "phase": "PHASE 3 · PLENARY",
+            "minutes": 12,
+            "description": "Ask two learners to explain Use formal and informal register in conversation to the class in their own words, and ask one other learner whether they agree. Preview the next lesson ('Ask questions to elicit elaboration in conversation'). Exit check: each learner answers one question about Use formal and informal register in conversation and the teacher marks each answer before leaving."
+          }
+        ],
+        "learner_sample": [
+          "Learners state what they remember about Use formal and informal register in conversation and write one keyword in their books.",
+          "Study the model showing how Use formal and informal register in conversation is done and note the features to reproduce."
+        ],
+        "assessment": "Assess the independent production task against a short checklist for Use formal and informal register in conversation. Also note oral contributions during guided practice for learners who struggle with writing. Assessment mode: Comprehension questions or oral reading assessment. Success = Learners can use formal and informal register in conversation correctly in a situation the lesson did not show.",
+        "resources": [
+          "conversation cards",
+          "chalkboard",
+          "exercise books",
+          "textbook",
+          "charts",
+          "real objects",
+          "role play",
+          "picture cards",
+          "writing materials",
+          "writing frame",
+          "conversation or prompt cards",
+          "reader or story text"
+        ],
+        "class_assignment": "Learners draft their own piece on Use formal and informal register in conversation using the model as a scaffold. The teacher circulates, corrects one shared error and asks two learners to read their opening sentence aloud. Set it in a situation from the learners' home, the nearby market or their local community.",
+        "home_assignment": "Write a short paragraph on Use formal and informal register in conversation, using at least three of today's key words.",
+        "conclusion": "Ask two learners to explain Use formal and informal register in conversation to the class in their own words, and ask one other learner whether they agree. Preview the next lesson ('Ask questions to elicit elaboration in conversation'). Exit check: each learner answers one question about Use formal and informal register in conversation and the teacher marks each answer before leaving.",
+        "duration_minutes": 60,
+        "stored_minutes_total": 60
+      }
+    },
+    {
+      "subject": "English Language",
+      "week": 2,
+      "code": "B7.1.1.1.2",
+      "indicator": "Ask questions to elicit elaboration in conversation",
+      "provenance": "Exemplar record B7/JHS1.1.1.1.2 (src/curriculum/exemplars/english.py)",
+      "scores": {
+        "indicator_fidelity": 5,
+        "objective_specificity": 5,
+        "topic_specificity": 5,
+        "phase1_usefulness": 5,
+        "phase2_usefulness": 5,
+        "phase3_usefulness": 5,
+        "activity_specificity": 4,
+        "teacher_action_clarity": 5,
+        "learner_action_clarity": 5,
+        "assessment_alignment": 5,
+        "resource_realism": 4,
+        "timing_integrity": 5,
+        "subject_pedagogy_fit": 5,
+        "ghana_context": 5,
+        "teachability": 5
+      },
+      "total": 73,
+      "max": 75,
+      "hard_failures": [],
+      "teacher_ready": true,
+      "excerpt": {
+        "objective": "Learners can Ask questions to elicit elaboration in conversation",
+        "topic": "Ask questions to elicit elaboration in conversation",
+        "starter": "Build on the previous lesson ('Use formal and informal register in conversation'). Tell a one-minute local scenario about Ask questions to elicit elaboration in conversation (a market, home or community situation) and ask: 'what would you do here, and why?' What to look for: Learners can ask questions to elicit elaboration in conversation and explain it in their own words with one example.",
+        "phase2": [
+          {
+            "phase": "PHASE 1 · STARTER",
+            "minutes": 9,
+            "description": "Build on the previous lesson ('Use formal and informal register in conversation'). Tell a one-minute local scenario about Ask questions to elicit elaboration in conversation (a market, home or community situation) and ask: 'what would you do here, and why?' What to look for: Learners can ask questions to elicit elaboration in conversation and explain it in their own words with one example."
+          },
+          {
+            "phase": "STORY OR SCENARIO",
+            "minutes": 13,
+            "description": "Learners read the text and underline the evidence for Ask questions to elicit elaboration in conversation, pausing to ask and answer questions."
+          },
+          {
+            "phase": "DISCUSSION",
+            "minutes": 17,
+            "description": "Organise a group discussion on Ask questions to elicit elaboration in conversation. Learners must give reasons and respond to other views. Step 2 · Discussion: check each learner's work on Ask questions to elicit elaboration in conversation and note anyone who needs help before the next step."
+          },
+          {
+            "phase": "APPLY TO LIFE",
+            "minutes": 9,
+            "description": "Each learner completes and improves their piece on Ask questions to elicit elaboration in conversation against a short checklist. In the communicative task learners use the target feature correctly at least twice and stay intelligible."
+          },
+          {
+            "phase": "PHASE 3 · PLENARY",
+            "minutes": 12,
+            "description": "Each learner names one way they will apply Ask questions to elicit elaboration in conversation this week in their home or community; two or three share with the class. Exit check: each learner answers one question about Ask questions to elicit elaboration in conversation and the teacher marks each answer before leaving. Recap: each learner states in one sentence what they can now do with Ask questions to elicit elaboration in conversation."
+          }
+        ],
+        "learner_sample": [
+          "Learners state what they remember about Ask questions to elicit elaboration in conversation and write one keyword in their books.",
+          "Study the model showing how Ask questions to elicit elaboration in conversation is done and note the features to reproduce."
+        ],
+        "assessment": "Assess the independent production task against a short checklist for Ask questions to elicit elaboration in conversation. Also note oral contributions during guided practice for learners who struggle with writing. Assessment mode: Comprehension questions or oral reading assessment. Success = Learners can ask questions to elicit elaboration in conversation and explain it in their own words with one example.",
+        "resources": [
+          "question cards",
+          "chalkboard",
+          "exercise books",
+          "textbook",
+          "charts",
+          "real objects",
+          "role play",
+          "picture cards",
+          "writing materials",
+          "writing frame",
+          "conversation or prompt cards",
+          "reader or story text"
+        ],
+        "class_assignment": "Learners draft their own piece on Ask questions to elicit elaboration in conversation using the model as a scaffold. The teacher circulates, corrects one shared error and asks two learners to read their opening sentence aloud.",
+        "home_assignment": "Write a short paragraph on Ask questions to elicit elaboration in conversation, using at least three of today's key words.",
+        "conclusion": "Each learner names one way they will apply Ask questions to elicit elaboration in conversation this week in their home or community; two or three share with the class. Exit check: each learner answers one question about Ask questions to elicit elaboration in conversation and the teacher marks each answer before leaving. Recap: each learner states in one sentence what they can now do with Ask questions to elicit elaboration in conversation.",
+        "duration_minutes": 60,
+        "stored_minutes_total": 60
+      }
+    },
+    {
+      "subject": "ICT",
+      "week": 1,
+      "code": "B7.1.1.1.2",
+      "indicator": "Distinguish between manual and automatic devices",
+      "provenance": "Fixture occurrence (tests/test_lesson_quality_remediation.py) + exemplar record B7.1.1.1.2",
+      "scores": {
+        "indicator_fidelity": 5,
+        "objective_specificity": 5,
+        "topic_specificity": 5,
+        "phase1_usefulness": 5,
+        "phase2_usefulness": 5,
+        "phase3_usefulness": 5,
+        "activity_specificity": 5,
+        "teacher_action_clarity": 5,
+        "learner_action_clarity": 5,
+        "assessment_alignment": 5,
+        "resource_realism": 4,
+        "timing_integrity": 5,
+        "subject_pedagogy_fit": 5,
+        "ghana_context": 5,
+        "teachability": 5
+      },
+      "total": 74,
+      "max": 75,
+      "hard_failures": [],
+      "teacher_ready": true,
+      "excerpt": {
+        "objective": "Learners can Distinguish between manual and automatic devices",
+        "topic": "Distinguish between manual and automatic devices",
+        "starter": "Show a real object or a picture connected to Distinguish between manual and automatic devices and ask learners to say three things they notice about it before any explanation. What to look for: Learners can distinguish between manual and automatic devices and state how the parts relate to each other.",
+        "phase2": [
+          {
+            "phase": "PHASE 1 · STARTER",
+            "minutes": 9,
+            "description": "Show a real object or a picture connected to Distinguish between manual and automatic devices and ask learners to say three things they notice about it before any explanation. What to look for: Learners can distinguish between manual and automatic devices and state how the parts relate to each other."
+          },
+          {
+            "phase": "EXAMPLES AND NON-EXAMPLES",
+            "minutes": 13,
+            "description": "Learners sort devices, pictures or parts for Distinguish between manual and automatic devices into groups by how they work, and justify each group. Look for: learners can name the key features of Distinguish between manual and automatic devices before you move on."
+          },
+          {
+            "phase": "SORT",
+            "minutes": 17,
+            "description": "Present the second item and have learners note how it differs for Distinguish between manual and automatic devices. Step 2 · Sort: check each learner's work on Distinguish between manual and automatic devices and note anyone who needs help before the next step."
+          },
+          {
+            "phase": "JUSTIFY THE GROUPS",
+            "minutes": 9,
+            "description": "Learners compare two devices or two ways of doing Distinguish between manual and automatic devices and state which is faster or more reliable and why. Learners classify at least 4 of 5 examples correctly and give a reason for each classification."
+          },
+          {
+            "phase": "PHASE 3 · PLENARY",
+            "minutes": 12,
+            "description": "Ask learners to state the rule or method for Distinguish between manual and automatic devices in one sentence, then give one new example that fits it. Preview the next lesson ('Demonstrate how to use the Start screen, tiles and taskbar'). Exit check: each learner answers one question about Distinguish between manual and automatic devices and the teacher marks each answer before leaving."
+          }
+        ],
+        "learner_sample": [
+          "Learners look at the object or picture and name three things they notice about Distinguish between manual and automatic devices.",
+          "Examine the first item for Distinguish between manual and automatic devices and note its features."
+        ],
+        "assessment": "Mark the comparison chart for Distinguish between manual and automatic devices for accurate similarities and differences. Success = Learners can distinguish between manual and automatic devices and state how the parts relate to each other. Assessment mode: Comparison chart or Venn diagram assessment.",
+        "resources": [
+          "sample input devices (keyboard",
+          "mouse",
+          "scanner)",
+          "chart",
+          "exercise books",
+          "computers",
+          "unplugged activities",
+          "diagrams",
+          "flowcharts",
+          "locally available materials",
+          "comparison chart/Venn diagram",
+          "the two items to compare",
+          "sorting cards or real items",
+          "chalkboard"
+        ],
+        "class_assignment": "Learners complete a comparison chart for Distinguish between manual and automatic devices, listing the similarities and differences. The teacher checks three charts against the class model. Set it in a situation from the learners' home, the nearby market or their local community.",
+        "home_assignment": "Draw a table comparing two things related to Distinguish between manual and automatic devices and list one similarity and one difference.",
+        "conclusion": "Ask learners to state the rule or method for Distinguish between manual and automatic devices in one sentence, then give one new example that fits it. Preview the next lesson ('Demonstrate how to use the Start screen, tiles and taskbar'). Exit check: each learner answers one question about Distinguish between manual and automatic devices and the teacher marks each answer before leaving.",
+        "duration_minutes": 60,
+        "stored_minutes_total": 60
+      }
+    },
+    {
+      "subject": "ICT",
+      "week": 2,
+      "code": "B7.1.1.2.1",
+      "indicator": "Demonstrate how to use the Start screen, tiles and taskbar",
+      "provenance": "Derived from exemplar record B7.1.1.2.1 learning focus + curriculum action verbs",
+      "scores": {
+        "indicator_fidelity": 5,
+        "objective_specificity": 5,
+        "topic_specificity": 5,
+        "phase1_usefulness": 5,
+        "phase2_usefulness": 5,
+        "phase3_usefulness": 5,
+        "activity_specificity": 4,
+        "teacher_action_clarity": 5,
+        "learner_action_clarity": 5,
+        "assessment_alignment": 5,
+        "resource_realism": 5,
+        "timing_integrity": 5,
+        "subject_pedagogy_fit": 5,
+        "ghana_context": 3,
+        "teachability": 5
+      },
+      "total": 72,
+      "max": 75,
+      "hard_failures": [],
+      "teacher_ready": true,
+      "excerpt": {
+        "objective": "Learners can Demonstrate how to use the Start screen, tiles and taskbar",
+        "topic": "Demonstrate how to use the Start screen, tiles and taskbar",
+        "starter": "Build on the previous lesson ('Distinguish between manual and automatic devices'). Perform the first step of Demonstrate how to use the Start screen, tiles and taskbar without explaining it and ask learners to predict what you will do next and why. What to look for: Learners can demonstrate how to use the Start screen, tiles and taskbar correctly in a situation the lesson did not show.",
+        "phase2": [
+          {
+            "phase": "PHASE 1 · STARTER",
+            "minutes": 9,
+            "description": "Build on the previous lesson ('Distinguish between manual and automatic devices'). Perform the first step of Demonstrate how to use the Start screen, tiles and taskbar without explaining it and ask learners to predict what you will do next and why. What to look for: Learners can demonstrate how to use the Start screen, tiles and taskbar correctly in a situation the lesson did not show."
+          },
+          {
+            "phase": "DEMONSTRATION",
+            "minutes": 13,
+            "description": "Teacher demonstrates Demonstrate how to use the Start screen, tiles and taskbar on a real device or a labelled diagram, naming each part as it is used; learners observe the steps and the effect of each action. Look for: learners can name the key features of Demonstrate how to use the Start screen, tiles and taskbar before you move on."
+          },
+          {
+            "phase": "GUIDED PRACTICE",
+            "minutes": 17,
+            "description": "Learners repeat or reproduce the demonstration for Demonstrate how to use the Start screen, tiles and taskbar with the teacher's prompts, using computer or projected screen where available. Step 2 · Guided practice: check each learner's work on Demonstrate how to use the Start screen, tiles and taskbar and note anyone who needs help before the next step."
+          },
+          {
+            "phase": "INDEPENDENT APPLICATION",
+            "minutes": 9,
+            "description": "Learners perform the task for Demonstrate how to use the Start screen, tiles and taskbar on their own and check their work against the demonstrated steps."
+          },
+          {
+            "phase": "PHASE 3 · PLENARY",
+            "minutes": 12,
+            "description": "Summarise the key points of Demonstrate how to use the Start screen, tiles and taskbar, ask learners what they learned and set a short follow-up task. Exit check: each learner answers one question about Demonstrate how to use the Start screen, tiles and taskbar and the teacher marks each answer before leaving."
+          }
+        ],
+        "learner_sample": [
+          "Learners state what they remember about Demonstrate how to use the Start screen, tiles and taskbar and write one keyword in their books.",
+          "Watch the demonstration of Demonstrate how to use the Start screen, tiles and taskbar and note each step and the reason for it."
+        ],
+        "assessment": "Ask oral questions and set a short task that tests Demonstrate how to use the Start screen, tiles and taskbar. Success = Learners can demonstrate how to use the Start screen, tiles and taskbar correctly in a situation the lesson did not show. Assessment mode: Observation of practical performance with checklist.",
+        "resources": [
+          "computer or projected screen where available",
+          "unplugged keyboard diagram",
+          "exercise books",
+          "computers",
+          "unplugged activities",
+          "diagrams",
+          "flowcharts",
+          "locally available materials",
+          "chart",
+          "chalkboard",
+          "the real apparatus or an unplugged model"
+        ],
+        "class_assignment": "In groups, learners demonstrate the task for Demonstrate how to use the Start screen, tiles and taskbar while the teacher observes and records which learners have met the indicator.",
+        "home_assignment": "Practise the steps for Demonstrate how to use the Start screen, tiles and taskbar at home and be ready to show one step in the next lesson.",
+        "conclusion": "Summarise the key points of Demonstrate how to use the Start screen, tiles and taskbar, ask learners what they learned and set a short follow-up task. Exit check: each learner answers one question about Demonstrate how to use the Start screen, tiles and taskbar and the teacher marks each answer before leaving.",
+        "duration_minutes": 60,
+        "stored_minutes_total": 60
+      }
+    },
+    {
+      "subject": "Creative Arts and Design",
+      "week": 1,
+      "code": "B7.5.1.1.1",
+      "indicator": "Create a simple pattern using local materials",
+      "provenance": "SchemeKnit fixture occurrence (tests/test_generation_quality_v3.py CRE_CODES)",
+      "scores": {
+        "indicator_fidelity": 5,
+        "objective_specificity": 5,
+        "topic_specificity": 5,
+        "phase1_usefulness": 5,
+        "phase2_usefulness": 5,
+        "phase3_usefulness": 5,
+        "activity_specificity": 5,
+        "teacher_action_clarity": 5,
+        "learner_action_clarity": 5,
+        "assessment_alignment": 5,
+        "resource_realism": 5,
+        "timing_integrity": 5,
+        "subject_pedagogy_fit": 5,
+        "ghana_context": 5,
+        "teachability": 5
+      },
+      "total": 75,
+      "max": 75,
+      "hard_failures": [],
+      "teacher_ready": true,
+      "excerpt": {
+        "objective": "Learners can Create a simple pattern using local materials",
+        "topic": "Create a simple pattern using local materials",
+        "starter": "Build on the previous lesson ('Pattern and Decoration'). Perform the first step of Create a simple pattern using local materials without explaining it and ask learners to predict what you will do next and why. What to look for: Learners can create a simple pattern using local materials and the result meets two stated criteria.",
+        "phase2": [
+          {
+            "phase": "PHASE 1 · STARTER",
+            "minutes": 9,
+            "description": "Build on the previous lesson ('Pattern and Decoration'). Perform the first step of Create a simple pattern using local materials without explaining it and ask learners to predict what you will do next and why. What to look for: Learners can create a simple pattern using local materials and the result meets two stated criteria."
+          },
+          {
+            "phase": "CREATIVE DEMONSTRATION",
+            "minutes": 13,
+            "description": "Teacher demonstrates the technique for Create a simple pattern using local materials with locally available materials, naming each step and the tools used. Look for: learners can name the key features of Create a simple pattern using local materials before you move on."
+          },
+          {
+            "phase": "GUIDED CREATION",
+            "minutes": 17,
+            "description": "Learners create their own work applying Create a simple pattern using local materials, using local materials (seeds; the teacher supports individuals. Step 2 · Guided creation: check each learner's work on Create a simple pattern using local materials and note anyone who needs help before the next step."
+          },
+          {
+            "phase": "SHARE AND CRITIQUE",
+            "minutes": 9,
+            "description": "Learners create their own work on Create a simple pattern using local materials using the technique and locally available materials; the teacher supports individuals. The finished work applies the stated criteria and the learner can justify two design choices."
+          },
+          {
+            "phase": "PHASE 3 · PLENARY",
+            "minutes": 12,
+            "description": "Three learners display or perform their work on Create a simple pattern using local materials; the class gives one kind, specific point of feedback each. Exit check: each learner answers one question about Create a simple pattern using local materials and the teacher marks each answer before leaving. Recap: each learner states in one sentence what they can now do with Create a simple pattern using local materials."
+          }
+        ],
+        "learner_sample": [
+          "Learners state what they remember about Create a simple pattern using local materials and write one keyword in their books.",
+          "Examine the sample connected to Create a simple pattern using local materials and notice how it was made or performed."
+        ],
+        "assessment": "Assess the created work or performance on Create a simple pattern using local materials against a simple rubric (technique, effort, expression). Success = Learners can create a simple pattern using local materials and the result meets two stated criteria. Assessment mode: Product or performance assessment with rubric.",
+        "resources": [
+          "local materials (seeds",
+          "leaves",
+          "cloth scraps)",
+          "manila paper",
+          "glue",
+          "art materials",
+          "locally available materials",
+          "colours",
+          "paper",
+          "clay",
+          "instruments",
+          "locally available materials for making",
+          "display space",
+          "local materials for making",
+          "glue or thread"
+        ],
+        "class_assignment": "Learners create their own work applying Create a simple pattern using local materials, using locally available materials. The teacher observes technique and gives short feedback while they work. Set it in a situation from the learners' home, the nearby market or their local community.",
+        "home_assignment": "Finish or improve the work you started today on Create a simple pattern using local materials and bring it to the next lesson.",
+        "conclusion": "Three learners display or perform their work on Create a simple pattern using local materials; the class gives one kind, specific point of feedback each. Exit check: each learner answers one question about Create a simple pattern using local materials and the teacher marks each answer before leaving. Recap: each learner states in one sentence what they can now do with Create a simple pattern using local materials.",
+        "duration_minutes": 60,
+        "stored_minutes_total": 60
+      }
+    },
+    {
+      "subject": "Social Studies",
+      "week": 1,
+      "code": "B7.1.1.2.1",
+      "indicator": "Explain sources of energy in Ghana and ways of conserving energy",
+      "provenance": "Exemplar record B7/JHS1 1.1.2.1 (src/curriculum/exemplars/social_studies.py)",
+      "scores": {
+        "indicator_fidelity": 5,
+        "objective_specificity": 5,
+        "topic_specificity": 5,
+        "phase1_usefulness": 5,
+        "phase2_usefulness": 5,
+        "phase3_usefulness": 5,
+        "activity_specificity": 5,
+        "teacher_action_clarity": 5,
+        "learner_action_clarity": 5,
+        "assessment_alignment": 5,
+        "resource_realism": 4,
+        "timing_integrity": 5,
+        "subject_pedagogy_fit": 4,
+        "ghana_context": 5,
+        "teachability": 5
+      },
+      "total": 73,
+      "max": 75,
+      "hard_failures": [],
+      "teacher_ready": true,
+      "excerpt": {
+        "objective": "Learners can Explain sources of energy in Ghana and ways of conserving energy",
+        "topic": "Explain sources of energy in Ghana and ways of conserving energy",
+        "starter": "Build on the previous lesson ('Energy Resources'). Tell a one-minute local scenario about Explain sources of energy in Ghana and ways of conserving energy (a market, home or community situation) and ask: 'what would you do here, and why?' What to look for: Learners can explain sources of energy in Ghana and ways of conserving energy and explain it in their own words with one.",
+        "phase2": [
+          {
+            "phase": "PHASE 1 · STARTER",
+            "minutes": 9,
+            "description": "Build on the previous lesson ('Energy Resources'). Tell a one-minute local scenario about Explain sources of energy in Ghana and ways of conserving energy (a market, home or community situation) and ask: 'what would you do here, and why?' What to look for: Learners can explain sources of energy in Ghana and ways of conserving energy and explain it in their own words with one."
+          },
+          {
+            "phase": "CASE STUDY",
+            "minutes": 13,
+            "description": "Introduce the key words needed for Explain sources of energy in Ghana and ways of conserving energy and let learners preview the text, predicting its content from the title. Look for: learners can name the key features of Explain sources of energy in Ghana and ways of conserving energy before you move on."
+          },
+          {
+            "phase": "GROUP ANALYSIS",
+            "minutes": 17,
+            "description": "Learners break down the information for Explain sources of energy in Ghana and ways of conserving energy, identifying patterns, causes or relationships. Step 2 · Group analysis: check each learner's work on Explain sources of energy in Ghana and ways of conserving energy and note anyone who needs help before the next step."
+          },
+          {
+            "phase": "GROUP PRESENTATION",
+            "minutes": 9,
+            "description": "Learners investigate the case about Explain sources of energy in Ghana and ways of conserving energy in groups, giving reasons and listening to other views before reporting. Groups perform the scenario accurately and one learner states what it shows about Explain sources of energy in Ghana and ways of conserving energy."
+          },
+          {
+            "phase": "PHASE 3 · PLENARY",
+            "minutes": 12,
+            "description": "Each group presents its analysis of Explain sources of energy in Ghana and ways of conserving energy in one minute; the teacher records the strongest reason and one disagreement. Exit check: each learner answers one question about Explain sources of energy in Ghana and ways of conserving energy and the teacher marks each answer before leaving. Recap: each learner states in one sentence what they can now do with Explain sources of energy in Ghana and ways of conserving energy."
+          }
+        ],
+        "learner_sample": [
+          "Learners state what they remember about Explain sources of energy in Ghana and ways of conserving energy and write one keyword in their books.",
+          "Examine the scenario or question about Explain sources of energy in Ghana and ways of conserving energy and identify the key issue involved, writing it in one sentence."
+        ],
+        "assessment": "Ask oral questions and set a short written task requiring learners to give a reason for a view on Explain sources of energy in Ghana and ways of conserving energy. Look for reasoning, not just recall. Assessment mode: Oral questions and observation of participation.",
+        "resources": [
+          "chart of local energy sources",
+          "chalkboard",
+          "exercise books",
+          "maps",
+          "charts",
+          "local scenarios",
+          "case studies",
+          "newspaper clippings",
+          "question cards",
+          "chart",
+          "open space",
+          "simple props"
+        ],
+        "class_assignment": "Groups discuss the question on Explain sources of energy in Ghana and ways of conserving energy and prepare two reasons for their position. Each group presents for one minute and the teacher records the strongest points on the board.",
+        "home_assignment": "Ask one adult at home about Explain sources of energy in Ghana and ways of conserving energy and write two points you learned from the conversation.",
+        "conclusion": "Each group presents its analysis of Explain sources of energy in Ghana and ways of conserving energy in one minute; the teacher records the strongest reason and one disagreement. Exit check: each learner answers one question about Explain sources of energy in Ghana and ways of conserving energy and the teacher marks each answer before leaving. Recap: each learner states in one sentence what they can now do with Explain sources of energy in Ghana and ways of conserving energy.",
+        "duration_minutes": 60,
+        "stored_minutes_total": 60
+      }
+    }
+  ]
+}

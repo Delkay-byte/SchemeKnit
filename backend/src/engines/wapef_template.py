@@ -32,6 +32,9 @@ from .official_ges_template import (
     _iter_paragraphs,
     _sectpr,
     PLACEHOLDER_RE,
+    activity_rows,
+    row_description,
+    row_in_phase,
 )
 from .wapef_fields import (
     format_through_lines,
@@ -193,13 +196,22 @@ def format_wapef_date(value) -> str:
         return ""
 
 
-def _activities_lines(lesson, *names: str) -> List[str]:
-    """Description lines from one or more activity/objective list fields."""
+def _activities_lines(lesson, *names: str, phase_index: Optional[int] = None) -> List[str]:
+    """Description lines from one or more activity list fields.
+
+    Activity descriptions are SENTENCES ("In pairs, learners sort the cards,
+    then explain the rule") — the list normalizer that is right for resources
+    would shatter them into comma fragments on the form, so each row's own
+    description is read whole.
+    """
     lines: List[str] = []
     for name in names:
-        for item in _text_items(_get(lesson, name)):
-            if item not in lines:
-                lines.append(item)
+        for item in activity_rows(lesson, name):
+            if phase_index is not None and not row_in_phase(item, phase_index):
+                continue
+            desc = row_description(item)
+            if desc and desc not in lines:
+                lines.append(desc)
     return lines
 
 
@@ -237,19 +249,17 @@ def _phase_block(lesson, phase_index: int) -> str:
 
     The source structure is one LEARNER ACTIVITIES column per phase row, so
     the lesson's phases map positionally: starter -> introduction/starter,
-    main -> main/learner activities, plenary -> assessment/conclusion.
+    main -> main/learner activities, plenary -> assessment/conclusion. Each
+    cell shows ITS OWN phase only (see ``row_in_phase``): the stored boundary
+    rows that keep the timeline's minutes exact render in their phase cell,
+    never inside the neighbouring one.
     """
     if phase_index == 1:
         lines = _prose_lines(lesson, "introduction", "starter_activity")
+        lines += _activities_lines(lesson, "learner_activities", phase_index=1)
     elif phase_index == 2:
-        lines = _activities_lines(lesson, "learner_activities", "main_activities")
-        # main_activities items render "description (N min)" — keep description only
-        cleaned = []
-        for line in lines:
-            desc = line.split(" (")[0].strip() if line.endswith(")") and " (" in line else line
-            if desc and desc not in cleaned:
-                cleaned.append(desc)
-        lines = cleaned
+        lines = _activities_lines(
+            lesson, "learner_activities", "main_activities", phase_index=2)
         # PART 15: the approved form has no dedicated assignment row, so the
         # IN-LESSON assignment is placed in the MAIN phase it belongs to. It is
         # labelled so a reader can tell the task from the activities.
@@ -258,6 +268,7 @@ def _phase_block(lesson, phase_index: int) -> str:
             lines = lines + [f"Class Assignment: {class_task}"]
     else:
         lines = _prose_lines(lesson, "conclusion")
+        lines += _activities_lines(lesson, "learner_activities", phase_index=3)
         # PART 15: the follow-up task sits in the PLENARY / REFLECTION phase,
         # the form's own place for setting work after the lesson.
         home_task = " ".join(

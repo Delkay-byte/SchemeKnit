@@ -1056,12 +1056,24 @@ def _lesson_text(lesson: Dict[str, Any]) -> str:
     # positive, not padding.
     intro = str(lesson.get("introduction", ""))
     starter = str(lesson.get("starter_activity", ""))
+    conclusion = str(lesson.get("conclusion", ""))
+
+    def _norm(value: str) -> str:
+        return re.sub(r"\s+", " ", (value or "")).strip().lower()
+
+    # The stored timeline carries PHASE 1 / PHASE 3 rows so the lesson's
+    # minutes sum exactly (Priority 2 §10). Those rows MIRROR the canonical
+    # starter/conclusion fields by construction — the same sentence stored in
+    # two places is schema, not padding. Only the canonical copy is counted;
+    # a genuinely repeated sentence inside one field still is.
+    canonical = {_norm(v) for v in (intro, starter, conclusion) if v and v.strip()}
+
     parts: List[str] = [
         str(lesson.get("lesson_topic", "")),
         intro,
         "" if starter and starter.strip() == intro.strip() else starter,
         str(lesson.get("assessment", "")),
-        str(lesson.get("conclusion", "")),
+        conclusion,
         str(lesson.get("differentiation", "")),
         str(lesson.get("homework", "")),
         str(lesson.get("previous_knowledge", "")),
@@ -1070,9 +1082,12 @@ def _lesson_text(lesson: Dict[str, Any]) -> str:
     for key in ("main_activities", "learner_activities", "teacher_activities"):
         for act in lesson.get(key, []) or []:
             if isinstance(act, dict):
-                parts.append(str(act.get("description", "")))
+                desc = str(act.get("description", ""))
             else:
-                parts.append(str(act))
+                desc = str(act)
+            if desc and _norm(desc) in canonical:
+                continue
+            parts.append(desc)
     for obj in lesson.get("learning_objectives", []) or []:
         if isinstance(obj, dict):
             parts.append(str(obj.get("description", "")))
