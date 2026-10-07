@@ -256,6 +256,54 @@ class TestObjectiveShaping:
         out = _learner_phrase(src, "French")
         assert out == f"Learners can {src}"
 
+    @pytest.mark.parametrize("indicator,subject,expected", [
+        # Real-scheme leads the shared inventories lack: a verb sentence must
+        # never fall through to the noun path ("Describe listen to …").
+        ("B7.1.2.1.1. Listen to level-appropriate text attentively",
+         "English Language", "Learners can Listen to level-appropriate text attentively"),
+        ("B9.1.2.3.3 Simplify given surds.",
+         "Mathematics", "Learners can Simplify given surds."),
+        ("B7.2.1.1.3. Generate and answer questions",
+         "English Language", "Learners can Generate and answer questions"),
+        ("B6.1.2.2.1: Experiment with available visual arts media",
+         "Creative Arts and Design",
+         "Learners can Experiment with available visual arts media"),
+        # Slashed verb pair in the first token.
+        ("B6.4.9.3.2: Edit/proofread draft, checking capitalization",
+         "English Language",
+         "Learners can Edit/proofread draft, checking capitalization"),
+        # Adverb lead keeps the source sentence.
+        ("B6.2.5.1.1: Orally produce three-syllable words",
+         "English Language", "Learners can Orally produce three-syllable words"),
+        # Gerund maths lead reduces to its base verb (y-stem rule).
+        ("Multiplying multi-digit numbers by 2- or 3-digit numbers",
+         "Mathematics",
+         "Learners can Multiply multi-digit numbers by 2- or 3-digit numbers"),
+        # Dashed list item: the bullet is a separator, the lead stays source.
+        ("- Écouter et comprendre le dialogue",
+         "English Language", "Learners can Écouter et comprendre le dialogue"),
+    ])
+    def test_real_scheme_verb_leads_are_kept(self, indicator, subject, expected):
+        from src.curriculum.lesson_builder import _learner_phrase
+        assert _learner_phrase(indicator, subject) == expected
+
+    @pytest.mark.parametrize("indicator", [
+        "REVISION", "END OF TERM ASSESSMENT", "SBA ACTIVITIES AND VACATION",
+    ])
+    def test_special_week_caps_cells_stay_verbatim(self, indicator):
+        from src.curriculum.lesson_builder import _learner_phrase
+        out = _learner_phrase(indicator, "Mathematics")
+        assert out == f"Learners can {indicator}", out
+        assert "rEVISION" not in out
+
+    def test_list_marker_fragment_is_not_releaded(self):
+        from src.curriculum.lesson_builder import _learner_phrase
+        out = _learner_phrase(
+            "ii. Relative pronouns to link ideas or add information",
+            "English Language")
+        assert out == ("Learners can ii. Relative pronouns to link ideas "
+                       "or add information")
+
     @pytest.mark.parametrize("indicator,subject", [
         ("B7.1.1.1.1 : Discuss the water cycle", "Science"),
         ("Explore and talk about communication skills", "English Language"),
