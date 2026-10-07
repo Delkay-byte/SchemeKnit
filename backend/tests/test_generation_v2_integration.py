@@ -306,8 +306,9 @@ class TestAllocationIntegration:
         # Week 1: 2 indicators → 2 lessons. Week 2: 3 indicators → 3 lessons.
         assert coverage.total_generated_lessons == 5
 
-    def test_carry_forward(self):
-        # Week 1: 3 indicators, only 2 teaching days → 1 carries to week 2
+    def test_no_carry_forward(self):
+        # Week 1: 3 indicators, only 2 teaching days — ALL 3 still belong to
+        # week 1 (Priority 1: timetable capacity never moves a lesson plan).
         weeks = [
             Week(
                 week_number=1,
@@ -349,8 +350,13 @@ class TestAllocationIntegration:
         )
         engine = AllocationEngine()
         coverage = engine.allocate(weeks, calendar, config)
-        carried = sum(1 for a in coverage.allocations if a.carry_forward)
-        assert carried >= 1
+        w1 = [a for a in coverage.allocations if a.week_number == 1]
+        w2 = [a for a in coverage.allocations if a.week_number == 2]
+        assert len(w1) == 3
+        assert len(w2) == 1
+        assert not any(a.carry_forward for a in coverage.allocations)
+        assert all(a.teaching_week == a.week_number
+                   for a in coverage.allocations)
 
     def test_generate_lesson_plans_from_coverage(self):
         weeks = self._make_weeks()

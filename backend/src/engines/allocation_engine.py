@@ -2,20 +2,24 @@
 SchemeKnit Lesson Allocation Engine
 ====================================
 
-Deterministic curriculum-to-lesson allocation following the confirmed
-teaching rule:
+Deterministic curriculum-to-lesson allocation following the authoritative
+weekly-coverage rule (Priority 1):
 
-    ONE WEEK       = a curriculum CONTAINER (not one lesson)
-    ONE INDICATOR  = ONE TEACHING PERIOD = ONE LESSON PLAN
+    SOURCE OCCURRENCE → WEEKLY LESSON PLAN
 
-A scheme week may contain 1, 2, 3, 5 or any number of indicators.
-Each indicator is allocated its own teaching period within the week,
-and each period becomes a separate, complete lesson plan.
+A source occurrence is ONE indicator entry extracted from the teacher's
+scheme for a given source week. Every instructional source occurrence gets
+EXACTLY ONE lesson plan, and that lesson plan stays in its SOURCE week.
 
-Example:
-    Week 1: Indicator 1 → Period 1 → Lesson 1
-            Indicator 2 → Period 2 → Lesson 2
-            Indicator 3 → Period 3 → Lesson 3
+    Week 5 (source): occurrence 1 → Lesson (Week 5)
+                     occurrence 2 → Lesson (Week 5)
+                     occurrence 3 → Lesson (Week 5)
+                     occurrence 4 → Lesson (Week 5)
+
+Teaching periods (``config.period``, teaching days, "2 periods", "Monday"…)
+are TIMETABLE METADATA describing when the school teaches. They never cap,
+defer, move or rebalance curriculum lesson plans. A week with 2 teaching
+periods and 4 source occurrences produces 4 lesson plans in that week.
 
 Special weeks (revision, assessment, SBA) are NOT subject to the
 indicator→period rule — they retain their existing behaviour.
@@ -219,10 +223,24 @@ def scheme_has_indicators(weeks) -> bool:
     return False
 
 
-class AllocationEngine:
-    """Deterministic engine for allocating curriculum indicators to lessons.
+def _source_occurrence_id(week_number: int, position: int, code: str) -> str:
+    """Stable identity of ONE source occurrence in the teacher's scheme.
 
-    Core rule: ONE INDICATOR → ONE TEACHING PERIOD → ONE LESSON PLAN.
+    Format ``week<source_week>:<position_in_week>:<indicator_code>``. The id
+    is derived ONLY from the source document's own structure — source week,
+    position of the indicator entry within that week, and its indicator code.
+    The timetable never participates, so the identity survives timetable
+    changes, and the same indicator code appearing in two different source
+    weeks yields two distinct ids (legitimate distinct occurrences).
+    """
+    safe = re.sub(r"[^A-Za-z0-9.]+", "_", (code or "").strip()).strip("_") or "row"
+    return f"week{week_number}:{position}:{safe}"
+
+
+class AllocationEngine:
+    """Deterministic engine for allocating curriculum occurrences to lessons.
+
+    Core rule: ONE SOURCE OCCURRENCE → ONE LESSON PLAN, IN ITS SOURCE WEEK.
     """
 
     # ── Allocation ──────────────────────────────────────────────────────
@@ -234,21 +252,29 @@ class AllocationEngine:
         config: TermConfig,
         include_special_weeks: bool = False,
     ) -> CurriculumCoverage:
-        """Allocate each instruction indicator to its own teaching period.
+        """Allocate exactly one lesson-plan occurrence per source occurrence.
 
-        Teaching model (§6-§9):
-          ONE INDICATOR → ONE TEACHING PERIOD → ONE LESSON PLAN
+        Canonical rule (Priority 1 — weekly curriculum coverage semantics):
 
-        Indicators are processed in curriculum order. Each is placed in the next
-        available teaching period of its source week. When a source week contains
-        more indicators than it has teaching periods, the surplus CARRY FORWARD
-        to the following teaching week(s) — in order, never merged, never
-        dropped, never duplicated. Unused periods in a week are left unused; a
-        later week's indicator is never moved backwards into an earlier week.
+            SOURCE OCCURRENCE → WEEKLY LESSON PLAN
 
-        Every allocation keeps BOTH the source curriculum week and the actual
-        teaching week so the lesson stays connected to its scheme origin while
-        accurately representing when it is taught.
+        Each instructional source occurrence in a source week becomes exactly
+        one allocation, and that allocation keeps the source week as BOTH its
+        curriculum week and its teaching week. Nothing is carried forward,
+        rebalanced, deferred or dropped because of timetable capacity — the
+        teacher's scheme defines curriculum placement, the timetable only
+        describes context.
+
+        Teaching dates are still attached when the calendar has one for the
+        occurrence's position (honest scheduling context); when a week holds
+        more occurrences than teaching days — or the timetable is unspecified
+        — the lesson still belongs to its source week and the date simply stays
+        empty for the teacher to fill in. A warning states that state plainly;
+        it never blocks generation.
+
+        Repeated indicator codes in DIFFERENT source weeks are distinct source
+        occurrences and are never treated as duplicates. Duplicate detection
+        keys on the source occurrence identity (week + position + code).
         """
         allocations: List[AllocatedIndicator] = []
         warnings: List[str] = []
@@ -296,16 +322,11 @@ class AllocationEngine:
             return self._allocate_week_units(
                 instruction_weeks, calendar, config, warnings, conflicts)
 
-        last_teaching_week = instruction_weeks[-1].week_number
-
-        # Carried-over indicators awaiting a teaching period in a later week.
-        # Each pending item carries its SOURCE week's curriculum context (strand,
-        # sub-strand, content standard) so a carried lesson still describes the
-        # right curriculum even though it is taught later.
-        pending: List[Dict[str, Any]] = []
-        total_indicators = 0
-        #: period counters per ACTUAL teaching week (1-based).
+        #: period index counter per SOURCE week (1-based lesson ordinal within
+        #: the week). Teaching-week counters no longer exist: a lesson's week
+        #: IS its source week.
         period_counter: Dict[int, int] = defaultdict(int)
+        total_indicators = 0
 
         def _make_alloc(item: Dict[str, Any], teaching_week: int,
                         lesson_date: Optional[date], period_index: int,
@@ -313,6 +334,7 @@ class AllocationEngine:
             return AllocatedIndicator(
                 indicator_code=item["code"],
                 indicator_description=self._indicator_description(item["text"]),
+                source_occurrence_id=item.get("source_occurrence_id", ""),
                 content_standard_code=item["cs_code"],
                 content_standard_description=item["cs_text"],
                 strand=item["strand"],
@@ -442,68 +464,66 @@ class AllocationEngine:
                 deduped_items.append(item)
             own_items = deduped_items
 
-            # ── Conflict detection (§7) ──────────────────────────────
-            # A source week with more indicators than its own teaching periods.
-            if len(own_items) > len(available_dates) and own_items:
-                overflow = len(own_items) - len(available_dates)
-                conflicts.append(
-                    f"Week {week.week_number} contains {len(own_items)} "
-                    f"indicators but only {len(available_dates)} teaching periods "
-                    f"are available; {overflow} indicator"
-                    f"{'s' if overflow != 1 else ''} will continue in the next "
-                    f"teaching week(s)."
-                )
-
-            if not own_items and not pending:
+            if not own_items:
                 warnings.append(f"Week {week.week_number}: no indicators found")
                 if not available_dates:
                     warnings.append(
-                        f"Week {week.week_number}: no teaching dates available"
+                        f"Week {week.week_number}: teaching periods not specified"
                     )
                 continue
 
-            # Carried indicators fill the earliest periods, then this week's own
-            # indicators. Anything that does not fit becomes the new backlog.
-            work = pending + own_items
-            pending = []
+            # ── Source occurrence identity (Priority 1) ──────────────────
+            # Each deduped entry IS one source occurrence of this scheme. Its
+            # identity is (source week, position in the week, indicator code)
+            # — stable across regeneration and never derived from the timetable.
+            for position, item in enumerate(own_items):
+                item["source_occurrence_id"] = _source_occurrence_id(
+                    week.week_number, position, item["code"]
+                )
 
-            for idx, item in enumerate(work):
-                if idx >= len(available_dates):
-                    # No period left this week → carry forward to next week.
-                    pending.append(item)
-                    continue
+            # ── Timetable context, never a cap (Priority 1) ───────────────
+            # The timetable may hold fewer teaching days than the week has
+            # curriculum occurrences (or none at all). That is context for the
+            # teacher, NOT a reason to defer, move or drop a lesson plan: the
+            # week's lesson count follows its source occurrences.
+            if len(own_items) > len(available_dates):
+                n_occ = len(own_items)
+                n_days = len(available_dates)
+                warnings.append(
+                    f"Week {week.week_number}: {n_occ} curriculum indicator"
+                    f"{'s' if n_occ != 1 else ''} · {n_days} timetable period"
+                    f"{'s' if n_days != 1 else ''} — {n_occ} lesson plan"
+                    f"{'s' if n_occ != 1 else ''} required for this week. "
+                    f"Teaching periods describe the timetable; they do not "
+                    f"cap, defer or move curriculum lesson plans."
+                )
+                if n_days == 0:
+                    warnings.append(
+                        f"Week {week.week_number}: teaching periods not "
+                        f"specified — lesson plans still belong to Week "
+                        f"{week.week_number}."
+                    )
 
-                carry = item["source_week"] != week.week_number
+            # ── The allocation: one lesson plan per source occurrence ─────
+            # Every occurrence is allocated HERE, in its own source week.
+            # Teaching dates are attached to the first N occurrences as
+            # scheduling context; occurrences beyond the timetable keep an
+            # empty date (the lesson builder falls back to the week-ending
+            # date) — they are never moved to a later week.
+            for idx, item in enumerate(own_items):
+                lesson_date = (
+                    available_dates[idx] if idx < len(available_dates) else None
+                )
                 period_counter[week.week_number] += 1
                 allocations.append(_make_alloc(
                     item,
                     teaching_week=week.week_number,
-                    lesson_date=available_dates[idx],
+                    lesson_date=lesson_date,
                     period_index=period_counter[week.week_number],
-                    carry_forward=carry,
+                    carry_forward=False,
                     needs_review=False,
                 ))
                 total_indicators += 1
-
-        # ── Any indicators still pending have no teaching week left ──────
-        # (the scheme ran out of teaching weeks). They are still allocated —
-        # never dropped — but flagged for teacher review.
-        for item in pending:
-            carry = item["source_week"] != last_teaching_week
-            period_counter[last_teaching_week] += 1
-            allocations.append(_make_alloc(
-                item,
-                teaching_week=last_teaching_week,
-                lesson_date=None,
-                period_index=period_counter[last_teaching_week],
-                carry_forward=carry,
-                needs_review=True,
-            ))
-            total_indicators += 1
-            warnings.append(
-                f"Indicator {item['code']} (Week {item['source_week']}) has no "
-                f"remaining teaching period in the term and needs review."
-            )
 
         # ── Assign global lesson sequence (curriculum order) ─────────────
         # Special-period metadata rows do NOT take a lesson sequence: they are
@@ -521,10 +541,19 @@ class AllocationEngine:
         # excluded from every lesson/indicator count.
         real_allocations = [a for a in allocations
                             if not getattr(a, "is_special_period", False)]
-        code_counts: Dict[str, int] = defaultdict(int)
+        # Duplicate detection keys on the SOURCE OCCURRENCE identity (week +
+        # position + code), never on indicator_code alone: the same indicator
+        # code in two different source weeks is two legitimate occurrences,
+        # not a duplicate allocation. A duplicate can only be the SAME source
+        # occurrence allocated more than once — which the per-week dedupe
+        # above prevents at build time.
+        occurrence_counts: Dict[str, int] = defaultdict(int)
         for a in real_allocations:
-            code_counts[a.indicator_code] += 1
-        duplicated = {c: n for c, n in code_counts.items() if n > 1}
+            occurrence_counts[
+                a.source_occurrence_id
+                or f"week{a.week_number}:{a.indicator_code}"
+            ] += 1
+        duplicated = {k: n for k, n in occurrence_counts.items() if n > 1}
 
         indicators_allocated = total_indicators
         indicators_unallocated = 0  # every indicator gets an allocation
@@ -597,6 +626,8 @@ class AllocationEngine:
                 # the description records the actual source row focus.
                 indicator_code="",
                 indicator_description="",
+                source_occurrence_id=_source_occurrence_id(
+                    week.week_number, 0, ""),
                 content_standard_code="",
                 content_standard_description=cs_text,
                 strand=week.strand or "",

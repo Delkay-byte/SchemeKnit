@@ -43,8 +43,8 @@ of work     in one      section      content     to teaching plans         lesso
 2. **Detect** — if one document contains several subjects for the same level, confirm which subject section to use
 3. **Review** the extracted strands, sub-strands, content standards, and indicators
 4. **Validate** — SchemeKnit flags missing or duplicate indicators
-5. **Allocate** indicators to teaching periods within the school calendar
-6. **Generate** lesson plans for each teaching period
+5. **Allocate** — one lesson plan per curriculum occurrence, in its own source week
+6. **Generate** lesson plans for every curriculum occurrence in the scheme
 7. **Edit** any generated lesson to match your teaching style
 8. **Export** as DOCX, PDF, XLSX, or download everything as a ZIP
 
@@ -52,19 +52,21 @@ of work     in one      section      content     to teaching plans         lesso
 
 SchemeKnit enforces a single core rule:
 
-> **ONE INDICATOR → ONE TEACHING PERIOD → ONE LESSON PLAN**
+> **SOURCE OCCURRENCE → WEEKLY LESSON PLAN**
 
-A *week* in the scheme represents curriculum scope — the content to be covered. Within that week, each indicator maps to one teaching period and produces one lesson plan. If a week has three indicators, SchemeKnit generates three separate lesson plans.
+A *week* in the scheme represents curriculum scope — the content to be covered. Every curriculum occurrence extracted from the teacher's scheme for a given source week becomes exactly one lesson plan, and that lesson plan stays in its source week. If a week holds four indicators, SchemeKnit generates four lesson plans for that week — even when the timetable lists only two teaching periods.
 
-This ensures every indicator receives dedicated teaching time and no lesson plan tries to cover multiple unrelated objectives.
+> **Curriculum lesson coverage follows source occurrences in the teacher's scheme. Teaching periods describe timetable context and do not cap, defer, or move lesson-plan occurrences between curriculum weeks.**
 
-When a curriculum week contains more indicators than the teacher has teaching periods, the remaining indicators **carry forward** to the following teaching week. Every lesson keeps both its original curriculum week and the actual teaching week it is taught in, and nothing is dropped, duplicated, or merged.
+> **Repeated indicator codes across different source weeks are legitimate distinct occurrences unless they refer to the exact same source occurrence.**
+
+Teaching periods (`1st period`, `2 & 4`, `Monday`, `2 periods`) stay visible as descriptive context — the school decides how the teaching is practically handled. The monthly Free Tier quota remains the only commercial limit on how many lesson plans are generated; timetable capacity is never a generation limit.
 
 ## Key features
 
 - **Scheme parsing** — extracts curriculum structure from DOCX/PDF scheme documents
-- **Curriculum validation** — detects missing, duplicate, and unallocated indicators
-- **Allocation engine** — maps indicators to teaching periods with conflict detection
+- **Curriculum validation** — detects missing and duplicate source occurrences
+- **Allocation engine** — source-occurrence weekly coverage; timetable periods are context, never a cap
 - **Lesson generation** — produces complete lesson plans with objectives, activities, assessment, and conclusion
 - **AI enrichment** — optional AI-assisted content generation (via OpenCode Zen free models)
 - **Approved GES templates** — built-in lesson plan templates matching the official Ghana Education Service format

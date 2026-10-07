@@ -434,15 +434,28 @@ export default function GeneratePage() {
     setReviewSaved(false)
   }
 
-  // Allocation preview grouped by ACTUAL teaching week, with carried-forward
-  // lessons marked in simple language (§10). Falls back to curriculum-week
-  // grouping when the API response predates teaching-week grouping.
+  // Allocation preview grouped by curriculum week. Weekly coverage follows
+  // SOURCE OCCURRENCES: every occurrence in a source week becomes its own
+  // lesson plan in that same week — the timetable is context, never a cap.
+  // Falls back to curriculum-week grouping when the API response predates
+  // teaching-week grouping.
   const previewTeachingWeeks: any[] = (() => {
     if (!allocationPreview) return []
+    const weekMeta: Map<number, any> = new Map<number, any>(
+      (allocationPreview.weeks || []).map((w: any) => [w.week_number, w]),
+    )
+    const toWeek = (tw: any) => {
+      const meta: any = weekMeta.get(tw)
+      return {
+        teaching_week: tw,
+        lesson_count: meta?.lesson_count ?? tw.lessons?.length ?? 0,
+        indicator_count: meta?.indicator_count ?? 0,
+        teaching_period_count: meta?.teaching_period_count ?? 0,
+      }
+    }
     if (allocationPreview.teaching_weeks?.length) {
       return allocationPreview.teaching_weeks.map((tw: any) => ({
-        teaching_week: tw.teaching_week,
-        lesson_count: tw.lessons?.length || 0,
+        ...toWeek(tw.teaching_week),
         periods: (tw.lessons || []).map((l: any) => ({
           period_index: l.period_index,
           lesson_sequence: l.lesson_sequence,
@@ -451,21 +464,17 @@ export default function GeneratePage() {
           indicator_description: l.indicator_description,
           status: l.status || 'scheduled',
           source_week: l.source_week,
+          source_occurrence_id: l.source_occurrence_id,
           week_ending: l.week_ending,
           source_tlrs: l.source_tlrs,
         })),
       }))
     }
     return (allocationPreview.weeks || []).map((w: any) => ({
-      teaching_week: w.week_number,
-      lesson_count: w.lesson_count,
+      ...toWeek(w.week_number),
       periods: (w.periods || []).map((p: any) => ({
         ...p,
-        status: p.needs_review
-          ? 'needs_review'
-          : p.carry_forward
-            ? 'carried_forward'
-            : 'scheduled',
+        status: p.needs_review ? 'needs_review' : 'scheduled',
       })),
     }))
   })()
@@ -997,7 +1006,7 @@ export default function GeneratePage() {
               >
                 <h2 className="text-lg font-semibold text-[#102A43]">Allocation Preview</h2>
                 <p className="text-sm text-muted-foreground">
-                  One indicator → one teaching period → one lesson plan
+                  Every curriculum occurrence in your scheme becomes its own lesson plan, in its source week
                 </p>
 
                 <div className="mt-4 space-y-4">
@@ -1018,8 +1027,8 @@ export default function GeneratePage() {
                         )}
                         {allocationPreview.indicators_duplicated > 0 && (
                           <p>
-                            Duplicate indicator allocation detected — an indicator is the
-                            primary focus of more than one lesson.
+                            Duplicate source occurrence detected — the same source
+                            occurrence would be generated more than once.
                           </p>
                         )}
                       </div>
@@ -1114,9 +1123,10 @@ export default function GeneratePage() {
                     </div>
                   )}
 
-                  {/* Allocation preview, grouped by ACTUAL teaching week. A lesson
-                      carried forward from an earlier curriculum week says so in
-                      plain language. */}
+                  {/* Allocation preview, grouped by curriculum week. Weekly
+                      coverage follows source occurrences: each occurrence in
+                      the source week becomes one lesson plan in that same
+                      week. Timetable periods are shown as context only. */}
                   <div className="max-h-72 space-y-3 overflow-y-auto" data-allocation-weeks>
                     {previewTeachingWeeks.map((week: any) => (
                       <div key={`tw-${week.teaching_week}`}>
@@ -1126,6 +1136,19 @@ export default function GeneratePage() {
                             ({week.lesson_count} lesson{week.lesson_count === 1 ? '' : 's'})
                           </span>
                         </h3>
+                        <p className="mb-1.5 text-[11px] text-muted-foreground" data-week-coverage>
+                          {week.indicator_count > 0
+                            ? `${week.indicator_count} curriculum indicator${week.indicator_count === 1 ? '' : 's'}`
+                            : `${week.lesson_count} curriculum row${week.lesson_count === 1 ? '' : 's'}`}
+                          {' · '}
+                          {week.teaching_period_count > 0
+                            ? `${week.teaching_period_count} timetable period${week.teaching_period_count === 1 ? '' : 's'}`
+                            : 'teaching periods not specified'}
+                          {' → '}
+                          <span className="font-medium text-foreground">
+                            {week.lesson_count} lesson plan{week.lesson_count === 1 ? '' : 's'} required for this week
+                          </span>
+                        </p>
                         <div className="overflow-x-auto">
                           <table className="w-full border-collapse text-xs">
                             <thead>
@@ -1154,10 +1177,6 @@ export default function GeneratePage() {
                                     <td className="py-1.5">
                                       {alloc.status === 'needs_review' ? (
                                         <StatusPill tone="warning">Needs review</StatusPill>
-                                      ) : alloc.status === 'carried_forward' ? (
-                                        <StatusPill tone="info">
-                                          Carried forward from Week {alloc.source_week}
-                                        </StatusPill>
                                       ) : (
                                         <StatusPill tone="success">Scheduled</StatusPill>
                                       )}
@@ -1669,8 +1688,8 @@ export default function GeneratePage() {
                       {(allocationPreview.allocation_conflicts?.length > 0 ||
                         allocationPreview.indicators_unallocated > 0) && (
                         <p className="mt-2 text-center text-xs text-yellow-700">
-                          Indicators carry forward to the next teaching week — none are dropped
-                          or merged.
+                          Every curriculum occurrence stays in its own source
+                          week — none are dropped, merged or moved to a later week.
                         </p>
                       )}
                     </>

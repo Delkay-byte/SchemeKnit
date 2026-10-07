@@ -219,12 +219,19 @@ class LessonPlanDB(Base):
 
     #: Source curriculum week (the scheme week the indicator belongs to).
     week_number = Column(Integer, nullable=False)
+    #: Stable identity of the source occurrence the lesson was generated from
+    #: (week<source_week>:<position_in_week>:<indicator_code>). Canonical key
+    #: for weekly coverage; the timetable never contributes to it. Added by
+    #: migration v032 (additive; legacy rows stay NULL/empty).
+    source_occurrence_id = Column(String, default="", nullable=True)
     #: Source week-ending date for that curriculum week (authoritative).
     week_ending = Column(Date, nullable=True)
     week_ending_derived = Column(Boolean, default=False, nullable=False)
-    #: Actual teaching week the lesson is delivered in. Differs from
-    #: week_number only when the indicator carried forward.
+    #: Actual teaching week the lesson is delivered in. Source-occurrence
+    #: semantics: always the source week — nothing carries forward. The column
+    #: predates that rule and is kept for rows generated before Priority 1.
     teaching_week = Column(Integer, nullable=True)
+    #: Legacy column: only pre-Priority-1 rows can be True.
     carry_forward = Column(Boolean, default=False)
     lesson_sequence = Column(Integer, nullable=False)
     lesson_date = Column(Date, nullable=True)

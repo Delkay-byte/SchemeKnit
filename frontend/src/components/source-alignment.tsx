@@ -141,9 +141,6 @@ export function SourceAlignment({
           {p.source_review_status === 'special' && (
             <Row label="Source check" value="Special period in your scheme" />
           )}
-          {p.carry_forward && (
-            <Row label="Note" value="Carried forward from an earlier curriculum week." />
-          )}
         </dl>
       )}
     </div>

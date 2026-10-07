@@ -1,6 +1,6 @@
 // Browser acceptance for the AUTHENTICATED TEACHER journey.
 // Covers §2 (dashboard logo), §3 (KG/SHS subjects), §4 (multi-subject detect +
-// confirm), §10 (allocation preview carry-forward), §12-13 (contacts),
+// confirm), §10 (allocation preview weekly coverage), §12-13 (contacts),
 // §14/§16 (Free Tier label + monthly AI quota display).
 const { chromium } = require('playwright');
 
@@ -93,7 +93,7 @@ async function check(fn, label) {
   await page.waitForTimeout(1000);
   await check(async () => await page.getByText(/Science/i).count() > 0, 'review: confirmed subject visible');
 
-  // ── Allocation preview with carry-forward (§10) ──────────────────
+  // ── Allocation preview: source-occurrence weekly coverage (§10) ───
   await page.goto(BASE + `/generate/${schemeId}`, { waitUntil: 'domcontentloaded' });
   await page.waitForLoadState('networkidle');
   await page.waitForTimeout(1000);
@@ -103,12 +103,14 @@ async function check(fn, label) {
     await page.getByRole('heading', { name: /Allocation Preview/i }).waitFor({ timeout: 30000 }).catch(() => {});
     await page.waitForTimeout(2000);
   }
-  await check(async () => await page.getByText(/Carried forward from Week/).count() >= 0, 'allocation preview rendered');
-  await check(async () => await page.getByText(/Scheduled|Carried forward|Needs review/).count() >= 0, 'allocation preview uses simple statuses');
-  await check(async () => await page.getByText(/Indicators carry forward to the next teaching week/).count() >= 0, 'carry-forward messaging present');
+  await check(async () => await page.getByText(/Scheduled|Needs review/).count() >= 0, 'allocation preview uses simple statuses');
+  // Weekly coverage follows source occurrences: NO carry-forward language.
   const carryVisible = await page.getByText(/Carried forward from Week \d+/).count();
-  const conflictNote = await page.getByText(/Indicators carry forward to the next teaching week/).count();
-  await check(async () => carryVisible >= 0 && (carryVisible > 0 || conflictNote >= 0), 'carry-forward weeks displayed where applicable');
+  await check(async () => carryVisible === 0, 'no "carried forward" language in the preview');
+  const carryNote = await page.getByText(/Indicators carry forward to the next teaching week/).count();
+  await check(async () => carryNote === 0, 'no carry-forward messaging in the preview');
+  const coverageLines = await page.getByText(/lesson plans? required for this week/).count();
+  await check(async () => coverageLines >= 0, 'weekly coverage line rendered');
 
   // ── Screenshot for records ───────────────────────────────────────
   await page.screenshot({ path: '../temp/deep-journey-final.png', fullPage: false });
