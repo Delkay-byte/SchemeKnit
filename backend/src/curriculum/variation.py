@@ -191,6 +191,11 @@ class LessonFingerprint:
     class_assignment_type: str = "other"
     home_assignment_type: str = "other"
     indicator: str = ""
+    #: The source indicator CODE this lesson teaches (Priority 2 §18): the
+    #: occurrence-stage logic asks "has this code been taught before in this
+    #: batch?" — without it the field defaulted to "" and every lesson stayed
+    #: stage ``first`` (the repeat-application emphasis never fired).
+    indicator_code: str = ""
 
     @property
     def is_empty(self) -> bool:
@@ -243,7 +248,28 @@ def fingerprint_lesson(
         class_assignment_type=assignment_type(_lesson_field(lesson, "class_assignment", "")),
         home_assignment_type=assignment_type(_lesson_field(lesson, "home_assignment", "")),
         indicator=_norm_text(" ".join(_lesson_field(lesson, "indicators", []) or [])),
+        indicator_code=_first_indicator_code(lesson),
     )
+
+
+def _first_indicator_code(lesson: Any) -> str:
+    """The lesson's primary indicator code ("" when the lesson has none).
+
+    Reads ``indicator_codes`` when the lesson carries it; older dict lessons
+    fall back to the first canonical code shape inside the raw indicator
+    text, so the occurrence-stage query keeps working for both.
+    """
+    for code in (_lesson_field(lesson, "indicator_codes", []) or []):
+        code = str(code).strip()
+        if code:
+            return code
+    text = " ".join(
+        str(i) for i in (_lesson_field(lesson, "indicators", []) or []))
+    if not text.strip():
+        return ""
+    from . import ANY_CODE_RE
+    match = ANY_CODE_RE.search(text)
+    return match.group(0).strip(" .:") if match else ""
 
 
 def _lesson_field(lesson: Any, name: str, default: Any) -> Any:

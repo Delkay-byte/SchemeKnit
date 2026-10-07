@@ -263,3 +263,35 @@ npx tsc --noEmit && npm run build
 node e2e/lesson-persistence-journey.js     # backend :8000 + `npm start` :3000
 npm run e2e:workspace
 ```
+
+---
+
+## Part 7 — Priority 2.1 hardening pass (after this document)
+
+Priority 2.1 was one focused hardening pass over the engine this document
+describes — no architecture change, no AI, no Zeli. It executed the A–L
+re-audit, expanded the activity/resource/subject banks, made verb/intent,
+progression and variation handling deterministic but subject-sensitive, froze
+and re-ran two NEW corpora (a 40-lesson expanded corpus and a 19-lesson messy
+corpus built from real district/GES documents) before/after every edit, and
+verified locally AND against the deployed production app.
+
+Headline (full tables, change list, honest gaps and both verification records
+in `docs/DETERMINISTIC_LESSON_HARDENING_REPORT.md`):
+
+| Corpus (AI OFF, Zeli OFF) | Teacher-ready before | after | Hard failures before | after |
+|---|---|---|---|---|
+| Expanded — 40 lessons, 12 subjects | 23/40 (57.5%) | **31/40 (77.5%)** | generic_objective 14, generic_activity 1, filler_text 1 | generic_objective 7 only |
+| Messy — 19 lessons, 9 subjects (verbatim district rows) | 9/19 (47.4%) | **12/19 (63.2%)** | generic_objective 7, duplicate_phases 1 | generic_objective 7 only |
+| Priority 2 rubric corpus (frozen) | 11/11 @ 73.7 | **11/11 @ 73.7 (unchanged)** | none | none |
+
+The remaining `generic_objective` failures are a MEASUREMENT gap in the
+frozen rubric's `_MEASURABLE_VERBS` inventory (its verbatim text keeps verbs
+like *add, multiply, install, indicate, assess, relate, recognise, skip count*
+and French leads out), not generic generator prose — classified lesson by
+lesson in the hardening report, with the recommended Priority 3 fix.
+
+New coverage: `backend/tests/test_priority21_hardening.py` (61 tests) pins the
+library scale/selection, verb-matched assessment, PHE/history/early-childhood
+strategies, objective cleanup, resource realism, the 30–80 minute timing
+invariant and the repeat-stage progression.

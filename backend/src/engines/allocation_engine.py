@@ -718,12 +718,21 @@ class AllocationEngine:
             review, export and provenance quote the scheme exactly. Rebuilt
             from code + description; an ``indicator_code`` that is not a real
             code (the extractor's prose fallback) is never re-attached.
+
+            The real-code test recognises EVERY canonical shape
+            (``src/curriculum/__init__.py``): the dotted-only test above used
+            to reject "B7/JHS1 1.1.1.1" (RME / Social Studies / Creative Arts
+            schemes), so the code was never re-attached and a partially
+            stripped description reached the builder as prose.
             """
+            from ..curriculum import INDICATOR_CODE_RE
+
             code = (a.indicator_code or "").strip()
             desc = a.indicator_description or ""
             if not desc:
                 return code
-            if not re.fullmatch(r'[BbKk]?\d+(?:\.\d+){2,4}', code):
+            if not (INDICATOR_CODE_RE.fullmatch(code)
+                    or re.fullmatch(r'[BbKk]?\d+(?:\.\d+){2,4}', code)):
                 return desc
             return f"{code} {desc}"
 
@@ -906,19 +915,41 @@ class AllocationEngine:
         and produced bare-code descriptions like "K2.1.1.1.1" for KG rows. A
         code-only cell has NO description — "" — never the code as its own
         prose.
+
+        The removal uses the CANONICAL code shape list (``INDICATOR_CODE_RE``,
+        which covers "B7.1.1.1.1", "B7/JHS1 1.1.1.1", "B7/JHS1.1.1.1.1" and
+        bare "1.1.1.1"). The old dotted-only pattern matched the "1.1.1.1"
+        TAIL inside "B7/JHS1 1.1.1.1 Attributes of God …", leaving "B7/JHS1"
+        in the prose — which the lesson then phrased as "Learners can B7/JHS1
+        Attributes of God …". Only the code is removed: the source's own
+        separator (" : ", " . ") stays, so the rebuilt source string keeps
+        quoting the scheme verbatim.
         """
         if not text:
             return ""
-        desc = re.sub(r'[BbKk]?\d+(?:\.\d+){2,4}[.:]?', ' ', text).strip()
-        if not re.search(r'[A-Za-z]', desc):
+        from ..curriculum import INDICATOR_CODE_RE
+        # Only complete codes are removed: anything else in the cell (the
+        # source's own " : " separator, an orphan ".2" fragment) is the
+        # scheme's verbatim text and must survive so the rebuilt source
+        # string keeps quoting the scheme exactly. Fragments are cleaned at
+        # the phrasing layer (``_first_clause`` / ``_learner_phrase``), never
+        # here.
+        desc = INDICATOR_CODE_RE.sub(" ", text).strip()
+        if not re.search(r"[A-Za-z]", desc):
             return ""
         return desc
 
     @staticmethod
     def _strip_indicator_code(text: str) -> str:
-        """Remove a leading curriculum indicator code (e.g. B7.4.3.1.2 / K2.1.1.1) from text."""
-        import re
-        stripped = re.sub(r'^\s*[BbKk]?\d+(?:\.\d+){2,4}[.:]?\s*', '', text).strip()
+        """Remove a leading curriculum code in ANY canonical shape.
+
+        Uses the shared ``CODE_PREFIX_RE`` so "B7/JHS1 1.1.1.1" (RME, Social
+        Studies, Creative Arts schemes) and "K2.1.1.1.1-3" ranges are removed
+        exactly like the dotted "B7.4.3.1.2" — the dotted-only pattern used
+        here left "/JHS" fragments in learner-facing prose.
+        """
+        from ..curriculum import CODE_PREFIX_RE
+        stripped = CODE_PREFIX_RE.sub("", text).strip()
         return stripped or text.strip()
 
     @staticmethod

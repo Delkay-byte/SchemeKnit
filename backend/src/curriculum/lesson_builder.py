@@ -1043,7 +1043,8 @@ _STEP_ROLE_WEIGHTS: Dict[str, float] = {
 }
 
 
-def _render_pattern_step(step, fmt: Dict[str, str], profile, act_key):
+def _render_pattern_step(step, fmt: Dict[str, str], profile, act_key,
+                         used=None):
     """Render ONE pattern step as (name, description, weight).
 
     The step's activity bank supplies the shared classroom skeleton; when the
@@ -1052,6 +1053,14 @@ def _render_pattern_step(step, fmt: Dict[str, str], profile, act_key):
     pattern reads differently in Computing, Mathematics and RME. Fallbacks
     keep the step fully specified: a pattern step is never rendered as a bare
     heading.
+
+    ``used`` carries the descriptions earlier steps of the SAME lesson already
+    rendered (normalized). Candidate descriptions are tried in the established
+    priority order and the first one not already used wins, so two steps that
+    resolve to the same subject move ("Group presentation" and "Case study"
+    both landing on the English reading move) never produce identical phase
+    prose — the exact "duplicate phases" defect. With ``used`` empty the
+    first candidate is chosen, byte-for-byte the established output.
     """
     from .pedagogy import subject_move
     from .patterns import PatternStep
@@ -1060,6 +1069,13 @@ def _render_pattern_step(step, fmt: Dict[str, str], profile, act_key):
         return None
 
     weight = _STEP_ROLE_WEIGHTS.get(step.role, 0.25)
+    used = used if used is not None else set()
+    fallback_desc = _safe_format(
+        "Carry out {focus_short} following the demonstrated steps.", **fmt)
+    step_scoped_desc = _safe_format(
+        "{name}: learners work through {focus_short} step by step and record "
+        "each step in their books.", name=step.name, **fmt)
+    candidates: List[str] = []
 
     # 1. INDICATOR-FOLLOWING steps: the indicator's OWN activity bank is the
     #    canonical classroom structure for this curriculum work — a
@@ -1074,39 +1090,51 @@ def _render_pattern_step(step, fmt: Dict[str, str], profile, act_key):
             tmpl = bank[min(idx, len(bank) - 1)][1]
             desc = _safe_format(tmpl, **fmt)
             if desc.strip():
-                return (step.name, desc, weight)
+                candidates.append(desc)
 
     # 2. Subject moves (Layer 2): the subject's own way of doing the step's
     #    activity, so one pattern reads differently across subjects.
-    move = subject_move(profile.key, step.activity_key)
-    if move is None:
-        move = subject_move(profile.key, step.role)
-    if move is None and act_key and act_key != step.activity_key:
-        move = subject_move(profile.key, act_key)
-    if move is None:
-        move = subject_move("generic", step.role) or subject_move(
-            "generic", step.activity_key)
+    move = None
+    if not candidates:
+        move = subject_move(profile.key, step.activity_key)
+        if move is None:
+            move = subject_move(profile.key, step.role)
+        if move is None and act_key and act_key != step.activity_key:
+            move = subject_move(profile.key, act_key)
+        if move is None:
+            move = subject_move("generic", step.role) or subject_move(
+                "generic", step.activity_key)
 
-    if move:
-        desc = _safe_format(move, **fmt)
-    else:
-        # 3. Shared activity bank for the step's own activity key.
-        bank = _PHASE_BANK.get(step.activity_key) or _PHASE_BANK.get(
-            act_key or "") or []
-        if bank:
-            idx = 0 if step.role == "input" else (
-                1 if step.role == "guided" else min(len(bank) - 1, 2))
-            tmpl = bank[min(idx, len(bank) - 1)][1]
-            desc = _safe_format(tmpl, **fmt)
+        if move:
+            desc = _safe_format(move, **fmt)
+            if desc.strip():
+                candidates.append(desc)
+            # An empty move rendering ends the established flow at the
+            # generic fallback — the bank was never consulted after a move
+            # existed; kept that way for byte-identical output.
+            candidates.append(fallback_desc)
         else:
-            desc = _safe_format(
-                "Carry out {focus_short} following the demonstrated steps.", **fmt)
+            # 3. Shared activity bank for the step's own activity key.
+            bank = _PHASE_BANK.get(step.activity_key) or _PHASE_BANK.get(
+                act_key or "") or []
+            if bank:
+                idx = 0 if step.role == "input" else (
+                    1 if step.role == "guided" else min(len(bank) - 1, 2))
+                tmpl = bank[min(idx, len(bank) - 1)][1]
+                desc = _safe_format(tmpl, **fmt)
+                if desc.strip():
+                    candidates.append(desc)
+            candidates.append(fallback_desc)
 
-    if not desc.strip():
-        desc = _safe_format(
-            "Carry out {focus_short} following the demonstrated steps.", **fmt)
+    # Last resort carries the step's own name: distinct for EVERY step, so a
+    # lesson can never end with two identical phases however the resolution
+    # above landed.
+    candidates.append(step_scoped_desc)
 
-    return (step.name, desc, weight)
+    chosen = next(
+        (c for c in candidates if _normalize_prose(c).lower() not in used),
+        candidates[0])
+    return (step.name, chosen, weight)
 
 
 def strip_indicator_code(text: str) -> str:
@@ -1142,15 +1170,184 @@ def _is_code_only(text: str) -> bool:
     return not re.search(r"[A-Za-z]", without_codes)
 
 
-def _learner_phrase(indicator: str) -> str:
-    """Phrase the indicator as an approved learner-facing performance statement."""
+#: Subject → the measurable lead verb an objective receives when the source
+#: indicator states no usable verb of its own. A noun-phrase cell ("Attributes
+#: of God in the three major religions", "Food nutrients needed for physical
+#: activity") cannot become "Learners can Attributes of God …" — it is not an
+#: objective and it is not assessable. Matched on lowercased substrings of the
+#: SOURCE subject, in order (the "" entry is the fallback): deterministic, so
+#: the same subject + the same cell always yields the same objective.
+_NOUN_LEAD_VERBS: Tuple[Tuple[str, str], ...] = (
+    ("physical", "identify"), ("health educ", "identify"), ("phe", "identify"),
+    ("mathemat", "use"), ("numeracy", "use"),
+    ("comput", "identify"), ("ict", "identify"), ("digital", "identify"),
+    ("science", "investigate"), ("agricultur", "investigate"),
+    ("social", "explain"), ("history", "explain"), ("geography", "explain"),
+    ("our world", "explain"), ("religio", "explain"), ("moral", "explain"),
+    ("rme", "explain"), ("career", "explain"), ("business", "explain"),
+    ("entrepreneur", "explain"),
+    ("creative", "describe"), ("general knowledge in art", "describe"),
+    ("music", "describe"),
+    ("early", "describe"), ("nursery", "describe"),
+    ("kindergarten", "describe"),
+    ("language", "describe"), ("english", "describe"),
+    ("", "describe"),
+)
+
+#: Generic learning words ("explore", "understand", "discuss", "learn …") are
+#: exactly the phrasing the quality bar rejects as an objective: no assessable
+#: outcome. The indicator's own wording after the lead is kept — only the lead
+#: is swapped for a measurable verb (the established defect this fixes: one
+#: "explore and talk about" objective for every indicator).
+_GENERIC_LEAD_RE = re.compile(
+    r"^(?:explore|understand|discuss|know|learn(?:\s+about)?|"
+    r"talk\s+about|be\s+aware(?:\s+of)?)\b[\s:]*", re.I)
+
+#: Lead verbs published NaCCA indicators use that the shared leading-verb list
+#: (``lesson_evidence.primary_verb``) does not carry. Listed so they are KEPT
+#: as written — never mistaken for a noun phrase and rephrased.
+_EXTRA_LEAD_VERBS = frozenset((
+    "assess", "relate", "install", "indicate", "skip", "study",
+    "critique", "sequence", "browse", "operate", "locate", "retell",
+    "draft", "rehearse", "publish", "present", "report", "monitor",
+    "maintain", "troubleshoot", "format", "insert", "share", "sketch",
+    "recommend", "argue", "defend", "prioritise", "prioritize",
+))
+
+_LEAD_LEXICON: Optional[frozenset] = None
+
+
+def _lead_verb_lexicon() -> frozenset:
+    """Verbs that may open an objective (shared inventories + extras).
+
+    Built lazily from the project's own verb sources — the builder's
+    measurable-objective verbs and the interpreter's Bloom lists — so a lead
+    such as "Demonstrating …" can be reduced to its base form ("demonstrate")
+    and a real lead such as "assess" is never rewritten.
+    """
+    global _LEAD_LEXICON
+    if _LEAD_LEXICON is None:
+        words = set(_MEASURABLE_OBJECTIVE_VERBS)
+        try:
+            from .indicator_interpreter import BLOOM_CATEGORIES
+            for verbs in BLOOM_CATEGORIES.values():
+                words.update(str(v).strip().lower() for v in verbs)
+        except Exception:  # pragma: no cover - interpreter is core, but a
+            words.update(  # lexicon must never be the reason a lesson fails
+                "list", "recall", "name", "state", "define", "label",
+                "summarise", "summarize", "contrast", "clarify", "execute",
+                "implement", "build", "make", "complete", "differentiate",
+                "organise", "organize", "find", "judge", "review", "argue",
+                "defend", "decide", "develop", "plan", "invent", "produce",
+                "assemble", "add", "subtract", "multiply", "divide", "count",
+                "sing", "colour", "color", "trace", "paste", "fold", "cut",
+                "play", "round", "express", "research", "participate",
+            )
+        words.update(_EXTRA_LEAD_VERBS)
+        _LEAD_LEXICON = frozenset(words)
+    return _LEAD_LEXICON
+
+
+def _noun_lead_verb(subject_name: str) -> str:
+    subject = (subject_name or "").strip().lower()
+    for fragment, verb in _NOUN_LEAD_VERBS:
+        if not fragment or fragment in subject:
+            return verb
+    return "describe"
+
+
+def _generic_lead_verb(subject_name: str) -> str:
+    """The verb a generic lead ("discuss/explore/understand …") becomes.
+
+    The generic word itself carries no outcome; the replacement names what the
+    learners will DO with the indicator's own wording. "explain" is the
+    natural transitive for every subject's reworded content ("explain the
+    steps", "explain the seasons") — the subject's own verb map is used for
+    NOUN-phrase leads instead, where there is no wording to carry.
+    """
+    return "explain"
+
+
+def _learner_phrase(indicator: str, subject_name: str = "") -> str:
+    """Phrase the indicator as an approved learner-facing performance statement.
+
+    The source wording is the source of truth; only its SHAPE is corrected
+    (Priority 2.1 §D), in this order:
+
+      1. leading curriculum codes and the source's own " : "/" . " separator
+         are stripped — "Learners can B7/JHS1 Attributes …" and
+         "Learners can : Discuss …" are artifacts, not prose;
+      2. non-English source prose (a French lesson's own objectives are
+         written in French) is never reshaped;
+      3. a generic lead (explore / understand / discuss / learn …) is swapped
+         for a measurable verb, keeping the indicator's wording;
+      4. a gerund lead ("Demonstrating the attributes …") becomes its base
+         verb ("demonstrate the attributes …"), the approved objective form;
+      5. a lead that states no usable verb ("Attributes of God …",
+         "Food nutrients needed …") receives the subject's measurable verb;
+      6. a genuine lead verb is kept verbatim (source authority).
+    """
     clean = strip_indicator_code(indicator)
     lower = clean.lower()
     for prefix in _LEARNER_PREFIXES:
         if lower.startswith(prefix):
             clean = clean[len(prefix):]
             break
-    return f"Learners can {clean}".strip()
+    # Source separator / bullet before the text (" : Discuss …", ".2 Learn …").
+    clean = re.sub(r"^[\s:;.]+", "", clean).strip()
+    if not clean:
+        return "Learners can".strip()
+    # (2) A French lesson stays French; any non-ASCII lead is source prose the
+    # English objective machinery must not touch.
+    subject = (subject_name or "").strip().lower()
+    if subject.startswith("french") or not clean[0].isascii():
+        return f"Learners can {clean}".strip()
+
+    # (3) Generic lead → measurable verb, indicator wording kept.
+    generic = _GENERIC_LEAD_RE.match(clean)
+    if generic:
+        rest = clean[generic.end():].strip()
+        rest = _objective_focus(rest) if rest else ""
+        verb = _generic_lead_verb(subject_name)
+        phrase = f"{verb} {rest}".strip() if rest else verb
+        return f"Learners can {phrase[0].upper()}{phrase[1:]}".strip()
+
+    words = clean.split()
+    lead = re.sub(r"[^A-Za-z']", "", words[0]) if words else ""
+    lead_l = lead.lower()
+    lexicon = _lead_verb_lexicon()
+
+    # (4) Gerund lead → base verb ("Demonstrating …" → "demonstrate …").
+    if lead_l.endswith("ing") and len(lead_l) > 4:
+        stem = lead_l[:-3]
+        base = ""
+        if f"{stem}e" in lexicon:
+            base = f"{stem}e"
+        elif stem in lexicon:
+            base = stem
+        elif stem.endswith("z") and f"{stem}ize" in lexicon:
+            base = f"{stem}ize"
+        if base:
+            words[0] = base.capitalize() if lead[:1].isupper() else base
+            clean = " ".join(words)
+        elif stem in ("learn", "talk", "explore", "know", "discuss"):
+            # "Learning about the …" — still the generic lead, gerund form.
+            rest = " ".join(words[1:])
+            rest = re.sub(r"^about\s+", "", rest, flags=re.I)
+            rest = _objective_focus(rest) if rest else ""
+            verb = _generic_lead_verb(subject_name)
+            phrase = f"{verb} {rest}".strip() if rest else verb
+            return f"Learners can {phrase[0].upper()}{phrase[1:]}".strip()
+
+    # (5)/(6) Real lead verb (shared leading-verb list, extras) is kept;
+    # anything else is a noun phrase and receives the subject's verb.
+    if _indicator_primary_verb(clean) or lead_l in _EXTRA_LEAD_VERBS or lead_l in lexicon:
+        return f"Learners can {clean}".strip()
+    focus = clean
+    if focus[:1].isupper() and focus.split(" ", 1)[0].lower() not in _PROPER_NOUN_STARTS:
+        focus = focus[:1].lower() + focus[1:]
+    phrase = f"{_noun_lead_verb(subject_name)} {focus}"
+    return f"Learners can {phrase[0].upper()}{phrase[1:]}".strip()
 
 
 def _derive_topic(alloc: AllocatedIndicator, exemplar=None) -> str:
@@ -1174,7 +1371,7 @@ def _derive_topic(alloc: AllocatedIndicator, exemplar=None) -> str:
         clause = re.sub(r"^(?:[BbKk]?\d+(?:\.\d+)*\.?\s*)+", "", clause).strip() or clause
         words = clause.split()
         if len(words) > 12:
-            clause = " ".join(words[:12]).rstrip(",:;")
+            clause = " ".join(_trim_dangling_tail(words[:12])).rstrip(",:;")
         clause = clause.strip().rstrip(".").strip()
         if clause:
             return clause
@@ -1296,6 +1493,50 @@ def _distribute(total: int, weights: List[float]) -> List[int]:
     return out
 
 
+#: Words a truncated focus phrase may never END on (Priority 2.1 §E). Cutting
+#: a long indicator at ``max_words`` can land on an object-taking verb or a
+#: preposition ("… three numbers using", "… the method by"); inserted into a
+#: sentence that renders as filler ("solve a problem on … using." /
+#: "… using;"), which fails the lesson-quality bar. The tail is trimmed back
+#: to the last content word instead.
+_DANGLING_TAIL_WORDS = frozenset((
+    "using", "with", "from", "of", "in", "on", "to", "for", "by", "and",
+    "or", "at", "as", "into", "about", "through", "that", "which", "the",
+    "a", "an", "their", "our", "is", "are", "be", "can", "will", "would",
+    "should", "may", "does", "do", "how", "when", "what", "why",
+))
+
+
+def _trim_dangling_tail(words: List[str], min_words: int = 3) -> List[str]:
+    while (len(words) > min_words
+           and words[-1].lower().strip(".,:;") in _DANGLING_TAIL_WORDS):
+        words = words[:-1]
+    return words
+
+
+#: Resources a Ghanaian classroom cannot be assumed to have — the same
+#: practicality bar the lesson-quality gate enforces (a lesson that REQUIRES
+#: a projector or an internet connection is not teachable in most Ghanaian
+#: classrooms). The scheme's own wording stays on ``source_tlrs`` verbatim
+#: (source authority — PART 6); it is the lesson's REQUIRED-resource display
+#: list and the ``{resource}`` substitution that skip them. Computing/ICT
+#: lessons are exempt, mirroring the quality benchmark: computers and the
+#: internet ARE the subject matter there.
+_IMPOSSIBLE_RESOURCE_RE = re.compile(
+    r"projector|smart\s?board|interactive\s+board|laptop|tablet|"
+    r"computer\s+lab|laboratory\s+equipment|internet", re.I)
+
+
+def _resource_is_available(resource: str, subject_name: str) -> bool:
+    """True when the lesson may REQUIRE this resource (Priority 2.1 §F)."""
+    if not (resource or "").strip():
+        return False
+    subject = (subject_name or "").strip().lower()
+    if subject == "ict" or "comput" in subject or "digital" in subject:
+        return True
+    return not _IMPOSSIBLE_RESOURCE_RE.search(resource)
+
+
 def _first_clause(text: str, max_words: int = 12) -> str:
     """Short, human-readable focus phrase from the indicator text."""
     clean = strip_indicator_code(text or "").strip()
@@ -1311,7 +1552,14 @@ def _first_clause(text: str, max_words: int = 12) -> str:
     part = re.sub(r"^[.:;,)\]]*\s*\d*[.:;,)\]]*\s*", "", part).strip() or part
     words = part.split()
     if len(words) > max_words:
-        part = " ".join(words[:max_words])
+        words = _trim_dangling_tail(words[:max_words])
+        part = " ".join(words)
+    elif words:
+        # Even an untruncated clause may end on a dangling connector when the
+        # source cell itself stops there ("… using").
+        trimmed = _trim_dangling_tail(words)
+        if len(trimmed) < len(words):
+            part = " ".join(trimmed)
     return part
 
 
@@ -1625,6 +1873,73 @@ _BASIC_NO_INDICATOR_OBJECTIVE: Dict[str, str] = {
         "Learners can show and talk about {focus} with two examples"),
 }
 
+#: The ONE sentence each stage of a repeated indicator adds (Priority 2 §18,
+#: hardened §E): variant 1 is the established text — the FIRST revisit of a
+#: code stays byte-identical to before — and later revisits rotate through
+#: related applications so a term plan never stamps the same "Apply it:"
+#: sentence on every occurrence. Keyed by which stage is being closed;
+#: ``{focus_short}`` is the lesson's own focus.
+_REPEAT_ADDENDUMS: Dict[str, Tuple[str, ...]] = {
+    "learner": (
+        " Apply the same skill to a new example the class has not seen "
+        "before and give a reason.",
+        " Apply the same skill to a related case from the learners' own "
+        "community and explain the connection.",
+        " Compare two examples the class has not seen and justify which "
+        "approach fits each.",
+    ),
+    "conclusion": (
+        " Apply it: learners use {focus_short} in a situation not shown "
+        "in the first lesson and justify their choice.",
+        " Apply it: learners reuse {focus_short} with data from their own "
+        "community and explain why it fits.",
+        " Apply it: learners combine {focus_short} with what they learned "
+        "earlier and justify the combined approach.",
+    ),
+    "challenge": (
+        " Extend to a new situation: apply {focus_short} to a case not "
+        "covered in the first lesson and justify the answer.",
+        " Extend to a new situation: apply {focus_short} to a case from the "
+        "learners' own community and justify the answer.",
+        " Extend to a new situation: apply {focus_short} to an unfamiliar "
+        "case, check the result against the earlier method and justify it.",
+    ),
+    "assignment": (
+        " Then apply the same skill to one new example the class has not "
+        "seen and give a reason for the result.",
+        " Then apply the skill to one new example from the learners' own "
+        "community and give a reason for the result.",
+        " Then apply the skill to two new examples, compare the results and "
+        "give a reason for any difference.",
+    ),
+}
+
+
+def _repeat_addendum(kind: str, focus_short: str, prior: int) -> str:
+    """The progression sentence for occurrence ``prior`` of the same code.
+
+    ``prior`` counts earlier lessons in this batch that taught the same
+    indicator: 1 is the first revisit (established text), 2+ rotate.
+    """
+    variants = _REPEAT_ADDENDUMS[kind]
+    index = max(1, int(prior or 1))
+    return _safe_format(
+        variants[(index - 1) % len(variants)], focus_short=focus_short)
+
+
+#: Opening sentences appended when the SAME starter text recurs inside one
+#: batch (Priority 2 §18/§E). Index 0 is the established text — a lesson
+#: whose opener has not appeared before is byte-identical to before; each
+#: recurrence appends one alternate instruction so a term plan never opens
+#: two lessons with the exact same sentences.
+_STARTER_VARIANTS = (
+    "",
+    " Take notes: the class will refer back to these responses later in "
+    "the lesson.",
+    " Keep both answers on the board; today's task will test which one "
+    "holds.",
+)
+
 
 def build_lesson(
     alloc: AllocatedIndicator,
@@ -1769,6 +2084,7 @@ def build_lesson(
     # indicator in a later source week keeps its content but shifts emphasis
     # from first teaching to application — history informs, never rewrites.
     stage = "first"
+    prior = 0
     try:
         if batch_history is not None and lesson_ev.indicator_code:
             prior = sum(
@@ -1776,7 +2092,7 @@ def build_lesson(
                 if getattr(fp, "indicator_code", "") == lesson_ev.indicator_code)
             stage = "repeat" if prior else "first"
     except Exception:
-        stage = "first"
+        stage, prior = "first", 0
     activity = activity_library.select_activity(
         lesson_ev.action_verbs or ([verb] if verb and verb != "learn" else []),
         profile.key if not early_years else "",
@@ -1794,14 +2110,26 @@ def build_lesson(
     # REAL resource for {resource} substitution (Priority 2 §19): the scheme's
     # own TLR first, else the selected activity's materials, else the subject
     # profile's base resources — never an empty substitution that renders
-    # "using ." artifacts.
+    # "using ." artifacts. Resources most Ghanaian classrooms cannot assume
+    # (projector, internet …) are skipped here so prose never REQUIRES them;
+    # the scheme's own wording survives on ``source_tlrs`` below (§F).
     _resource_pool: List[str] = []
     for _r in normalize_text_items(list(getattr(alloc, "source_resources", []) or [])):
         _r = (_r or "").strip()
-        if _r and _r.lower() not in [x.lower() for x in _resource_pool]:
+        if (_r and _resource_is_available(_r, subject_name)
+                and _r.lower() not in [x.lower() for x in _resource_pool]):
             _resource_pool.append(_r)
     if not _resource_pool:
         for _r in list(activity.materials) + list(profile.resources):
+            _r = (_r or "").strip()
+            if (_r and _resource_is_available(_r, subject_name)
+                    and _r.lower() not in [x.lower() for x in _resource_pool]):
+                _resource_pool.append(_r)
+    if not _resource_pool:
+        # Pathological: every named resource is unavailable — the first
+        # source entry still beats an empty "{resource}" substitution.
+        for _r in normalize_text_items(
+                list(getattr(alloc, "source_resources", []) or [])):
             _r = (_r or "").strip()
             if _r and _r.lower() not in [x.lower() for x in _resource_pool]:
                 _resource_pool.append(_r)
@@ -1869,6 +2197,31 @@ def build_lesson(
                 _look_for += "."
             starter = f"{starter} What to look for: {_look_for}"
     starter = _normalize_prose(starter)
+    # A starter that recurs inside this batch gets one alternate instruction
+    # appended (Priority 2.1 §E): the FIRST lesson with this opener keeps the
+    # established text exactly; only a literal repeat inside the batch moves
+    # on. Plenary/assignment text already varies with {focus_short} and the
+    # repeat addendum above, so the opener is the only stage needing this.
+    if batch_history is not None and not early_years:
+        try:
+            from .variation import normalized_starter
+            # Candidates include THIS lesson's possible opening states (base
+            # text + each variant), so counting matches against prior
+            # fingerprints works whether an earlier lesson kept the base or
+            # already carried a variant suffix.
+            _starter_states = [normalized_starter(starter)] + [
+                normalized_starter(starter + _v)
+                for _v in _STARTER_VARIANTS[1:]]
+            _prior_same = sum(
+                1 for fp in (batch_history.fingerprints or [])
+                if (getattr(fp, "starter", "") or "") in _starter_states)
+            if _prior_same:
+                starter = _normalize_prose(
+                    starter
+                    + _STARTER_VARIANTS[min(_prior_same,
+                                            len(_STARTER_VARIANTS) - 1)])
+        except Exception:
+            pass
     # ``introduction`` is the lesson-level framing (how this lesson connects to
     # the last one and where it sits in the topic); ``starter_activity`` is the
     # concrete opening activity. Keeping them distinct stops the same sentence
@@ -1901,10 +2254,17 @@ def build_lesson(
     # only supplies the teaching shape.
     if pattern is not None:
         pattern_specs: List[Tuple[str, str, float]] = []
+        used_phase_descs: set = set()
         for step in pattern.steps:
-            rendered = _render_pattern_step(step, fmt, profile, act_key)
+            rendered = _render_pattern_step(step, fmt, profile, act_key,
+                                            used=used_phase_descs)
             if rendered and rendered[1].strip():
                 pattern_specs.append(rendered)
+                # Priority 2.1 §E: every emitted phase text blocks later steps
+                # from reusing it — two pattern steps that resolve through the
+                # same subject move must never render identical prose.
+                used_phase_descs.add(
+                    _normalize_prose(rendered[1]).lower())
         if len(pattern_specs) >= 2:
             # A pattern with fewer than two renderable steps falls back to the
             # established composition rather than producing a thin MAIN block.
@@ -2048,9 +2408,8 @@ def build_lesson(
         if stage == "repeat" and idx == last_idx and not early_years:
             if not re.search(r"new (situation|example|case)|not seen before",
                              learner_desc, re.I):
-                learner_desc = (
-                    f"{learner_desc} Apply the same skill to a new example "
-                    f"the class has not seen before and give a reason.")
+                learner_desc = learner_desc + _repeat_addendum(
+                    "learner", focus_short, prior)
         learner_activities.append(TeachingActivity(
             phase="LEARNER",
             description=learner_desc,
@@ -2135,13 +2494,12 @@ def build_lesson(
             f"with {focus_short}."
         )
     if stage == "repeat" and not early_years:
-        # Second occurrence of the SAME indicator: deeper pedagogical emphasis
-        # (application + justification), faithful to the indicator — the week
-        # and the indicator text never change.
-        conclusion += (
-            f" Apply it: learners use {focus_short} in a situation not shown "
-            "in the first lesson and justify their choice."
-        )
+        # Second and later occurrences of the SAME indicator: deeper
+        # pedagogical emphasis (application + justification), faithful to the
+        # indicator — the week and the indicator text never change. Variant 1
+        # (the first revisit) is the established sentence; later revisits
+        # rotate (§E).
+        conclusion += _repeat_addendum("conclusion", focus_short, prior)
     conclusion = _normalize_prose(conclusion)
 
     # Phase 3 boundary row — the plenary carries its own minutes so the stored
@@ -2175,9 +2533,8 @@ def build_lesson(
                        else profile.extension_template)
     _challenge = _safe_format(_challenge_tmpl, **fmt)
     if stage == "repeat" and not early_years:
-        _challenge = (
-            f"{_challenge} Extend to a new situation: apply {focus_short} to "
-            "a case not covered in the first lesson and justify the answer.")
+        _challenge = _challenge + _repeat_addendum(
+            "challenge", focus_short, prior)
 
     # ── Differentiation — tied to the actual task ───────────────────────
     differentiation = "\n".join([
@@ -2214,8 +2571,7 @@ def build_lesson(
         # task moves up the ladder from guided practice to application on a
         # NEW case — the indicator, the week and the objective never change.
         class_assignment = _normalize_prose(
-            f"{class_assignment} Then apply the same skill to one new example "
-            "the class has not seen and give a reason for the result.")
+            class_assignment + _repeat_addendum("assignment", focus_short, prior))
 
     # ── Resources — THIS lesson's scheme TLRs first, then activity extras ──
     # SOURCE TLRs: from the scheme for this subject + source week + indicator.
@@ -2261,6 +2617,16 @@ def build_lesson(
         r = (r or "").strip()
         if r and r.lower() not in [x.lower() for x in resources]:
             resources.append(r)
+    # Priority 2.1 §F: the DISPLAY list (rendered as the lesson's required
+    # resources, read by the quality gate and the benchmark) must not REQUIRE
+    # equipment most Ghanaian classrooms lack. ``source_tlrs`` above keeps the
+    # scheme's own wording verbatim — only the lesson's requirements move on
+    # to the next real item.
+    _teachable = [r for r in resources
+                  if _resource_is_available(r, subject_name)]
+    if not _teachable:
+        _teachable = list(profile.resources)
+    resources = _teachable or resources
 
     # ── Lived experience (Priority 2 §16) — a Ghanaian lesson is taught in a
     # real place ──────────────────────────────────────────────────────────
@@ -2372,7 +2738,7 @@ def build_lesson(
         # observation and oral response, and the completed WAPEF samples phrase
         # outcomes as demonstrable actions, never board work.
         description=(
-            _learner_phrase(alloc.indicator_description)
+            _learner_phrase(alloc.indicator_description, subject_name)
             if alloc.indicator_description and not _is_code_only(alloc.indicator_description)
             else (
                 f"Learners can identify, talk about and act out "
