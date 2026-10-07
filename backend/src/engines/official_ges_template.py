@@ -210,6 +210,93 @@ def _bullet_block(lines: Iterable[str]) -> str:
     return "\n".join(f"- {line}" for line in lines if line)
 
 
+# ── Activity rows shared by every form renderer ──────────────────────────────
+
+def activity_rows(lesson, name: str) -> List[Any]:
+    """Stored activity rows for one column, in whatever shape they are stored.
+
+    Shared by the GES and WAPEF renderers (WAPEF imports it) so both forms
+    read the timeline the same way — SQLite hands list columns back as JSON
+    strings on some paths and as lists on others.
+    """
+    value = _get(lesson, name)
+    if value is None or value == "":
+        return []
+    if isinstance(value, str):
+        text = value.strip()
+        if text[:1] in "[{":
+            try:
+                value = json.loads(text)
+            except Exception:
+                return []
+        else:
+            return []
+    if isinstance(value, dict):
+        value = [value]
+    if not isinstance(value, (list, tuple)):
+        return []
+    return [item for item in value if item is not None]
+
+
+def row_description(item: Any) -> str:
+    """One activity row's description as WHOLE text — never comma-split."""
+    if isinstance(item, dict):
+        raw = item.get("description") or item.get("text") or item.get("title") or ""
+    else:
+        raw = getattr(item, "description", None)
+    return str(raw or "").strip()
+
+
+def row_phase_label(item: Any) -> str:
+    if isinstance(item, dict):
+        raw = item.get("phase")
+    else:
+        raw = getattr(item, "phase", None)
+    return str(raw or "").strip()
+
+
+def row_in_phase(item: Any, phase_index: int) -> bool:
+    """Does this stored row belong to the phase cell being rendered?
+
+    The deterministic timeline stores PHASE 1 / PHASE 3 boundary rows inside
+    ``main/learner/teacher_activities`` so the stored minutes sum exactly to
+    the lesson duration (Priority 2 §10), while ``introduction``/
+    ``starter_activity``/``conclusion`` carry the same prose for the cells
+    that render those phases. A row therefore renders ONLY in its own phase —
+    the boundary rows never appear inside the MAIN cell next to the prose
+    fields that already say them (no sentence printed twice on one form).
+    """
+    label = row_phase_label(item).lower()
+    if not label:
+        # Unlabelled rows (AI-written lists of sentences) belong to MAIN.
+        return phase_index == 2
+    boundary1 = label.startswith("phase 1")
+    boundary3 = label.startswith("phase 3")
+    if phase_index == 1:
+        return boundary1
+    if phase_index == 3:
+        return boundary3
+    return not (boundary1 or boundary3)
+
+
+def phase_items(lesson, name: str, phase_index: int) -> List[str]:
+    """Whole descriptions of the rows that belong to one delivery phase."""
+    return [row_description(item) for item in activity_rows(lesson, name)
+            if row_in_phase(item, phase_index) and row_description(item)]
+
+
+def dedupe_lines(lines: Iterable[str]) -> List[str]:
+    """First occurrence of each line, in order (mirrored prose printed once)."""
+    out: List[str] = []
+    seen = set()
+    for line in lines:
+        key = line.strip()
+        if key and key not in seen:
+            seen.add(key)
+            out.append(line)
+    return out
+
+
 _ORDINAL_SUFFIXES = {1: "st", 2: "nd", 3: "rd"}
 
 
@@ -343,14 +430,23 @@ def _resolve(field: Optional[str], lesson, ctx: Dict[str, Any]) -> str:
     if field == "level_or_theme":
         return _level_or_theme(lesson)
     if field == "introduction":
-        starter = (_text_items(_get(lesson, "introduction"))
-                   or _text_items(_get(lesson, "starter_activity")))
-        return _bullet_block(starter)
+        # The form has ONE Phase 1 cell: the framing sentence AND the starter
+        # prompt belong to it (the deterministic lesson keeps the starter in
+        # its own field so the MAIN cell can stay Phase-2-only). Each sentence
+        # prints once — never also as a MAIN bullet.
+        lines = (_text_items(_get(lesson, "introduction"))
+                 + _text_items(_get(lesson, "starter_activity")))
+        return _bullet_block(dedupe_lines(lines))
     if field == "main_activities":
-        steps = (_text_items(_get(lesson, "main_activities"))
-                 + _text_items(_get(lesson, "teacher_activities"))
-                 + _text_items(_get(lesson, "learner_activities")))
-        return _bullet_block(steps)
+        # MAIN shows the lesson's Phase 2 steps from the teacher's and the
+        # learners' columns; the PHASE 1 / PHASE 3 boundary rows (which exist
+        # so the stored timeline sums to the lesson duration) are skipped here
+        # because the introduction and conclusion cells already carry that
+        # prose. Same sentence, one place on the form.
+        steps = (phase_items(lesson, "main_activities", 2)
+                 + phase_items(lesson, "teacher_activities", 2)
+                 + phase_items(lesson, "learner_activities", 2))
+        return _bullet_block(dedupe_lines(steps))
     if field == "assessment":
         # PART 15: the official form has no dedicated assignment row, so the
         # IN-LESSON assignment is placed with the assessment it evidences. The

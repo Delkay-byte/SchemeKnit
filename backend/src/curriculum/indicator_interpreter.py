@@ -54,7 +54,9 @@ BLOOM_CATEGORIES = {
     ],
 }
 
-# Activity type keywords
+# Activity type keywords. Single-word keywords are matched on WORD BOUNDARIES
+# (Priority 2 §6): "read" must never claim "already", "reading" must never
+# claim a Mathematics indicator that says "read and write numbers".
 ACTIVITY_KEYWORDS = {
     "demonstration": ["demonstrate", "show", "illustrate", "model"],
     "investigation": ["investigate", "explore", "examine", "enquiry", "inquiry"],
@@ -72,6 +74,82 @@ ACTIVITY_KEYWORDS = {
     "creation": ["create", "design", "invent", "develop", "plan"],
     "analysis": ["analyze", "analyse", "examine", "break down"],
 }
+
+
+# ── Subject fitness of an activity type (Priority 2 §6) ──────────────────────
+#
+# The same activity type is not teachable in every subject. A Mathematics
+# indicator that says "read and write numbers" is a NUMBER indicator: the word
+# "read" does not make it a reading lesson. Each subject therefore declares the
+# activity types it genuinely teaches, in preference order, and the interpreter
+# picks the FIRST matched type this subject allows — falling back to the
+# subject's own default when the indicator matches only another subject's type
+# (or none at all). Deterministic: same subject + same text = same type.
+
+SUBJECT_ACTIVITY_PREFERENCE: Dict[str, Tuple[str, ...]] = {
+    "mathematics": ("problem_solving", "comparison", "classification",
+                    "demonstration", "investigation", "analysis", "observation",
+                    "practical", "discussion", "reflection"),
+    "science": ("investigation", "observation", "classification", "demonstration",
+                "comparison", "analysis", "problem_solving", "practical",
+                "discussion", "reflection"),
+    "english": ("reading", "writing", "discussion", "comparison", "reflection",
+                "demonstration", "creation", "analysis", "observation",
+                "practical"),
+    "ghanaian_language": ("reading", "writing", "discussion", "comparison",
+                          "reflection", "demonstration", "creation", "analysis",
+                          "observation", "practical"),
+    "french": ("reading", "writing", "discussion", "comparison", "reflection",
+               "demonstration", "creation", "analysis", "observation",
+               "practical"),
+    "computing": ("demonstration", "practical", "problem_solving", "creation",
+                  "investigation", "analysis", "classification", "comparison",
+                  "observation", "discussion"),
+    "creative_arts": ("creation", "practical", "demonstration", "observation",
+                      "comparison", "discussion", "reflection"),
+    "social_studies": ("discussion", "comparison", "analysis", "investigation",
+                       "observation", "reflection", "demonstration",
+                       "classification", "practical"),
+    "rme": ("discussion", "reflection", "comparison", "demonstration",
+            "observation", "practical", "analysis"),
+    "career_technology": ("practical", "demonstration", "investigation",
+                          "problem_solving", "creation", "analysis",
+                          "comparison", "observation", "discussion"),
+    "phe": ("practical", "demonstration", "observation", "comparison",
+            "discussion", "reflection"),
+}
+
+#: Unknown subject names: the neutral teaching sequence every subject shares.
+DEFAULT_ACTIVITY_PREFERENCE: Tuple[str, ...] = (
+    "discussion", "demonstration", "observation", "comparison",
+    "classification", "problem_solving", "investigation", "practical",
+    "reading", "writing", "creation", "analysis", "reflection",
+)
+
+
+def activity_preference_for(subject: str) -> Tuple[str, ...]:
+    """The activity types this subject genuinely teaches, best first."""
+    key = SUBJECT_TO_STRATEGY.get((subject or "").lower().strip(), "")
+    return SUBJECT_ACTIVITY_PREFERENCE.get(key, DEFAULT_ACTIVITY_PREFERENCE)
+
+
+def keyword_matches(keyword: str, text: str) -> bool:
+    """True when ``keyword`` appears in ``text`` as its own word/phrase."""
+    kw = (keyword or "").strip().lower()
+    hay = (text or "").lower()
+    if not kw:
+        return False
+    if " " in kw:
+        return kw in hay
+    return re.search(rf"\b{re.escape(kw)}\b", hay) is not None
+
+
+def activity_type_matches(activity_type: str, text: str) -> bool:
+    """True when any of the activity type's own keywords occurs in ``text``."""
+    for kw in ACTIVITY_KEYWORDS.get((activity_type or "").strip().lower(), []):
+        if keyword_matches(kw, text):
+            return True
+    return False
 
 
 @dataclass
@@ -230,37 +308,101 @@ def _extract_verbs(text: str) -> List[str]:
 
 
 def _determine_bloom_level(verbs: List[str]) -> str:
-    """Determine the primary Bloom's taxonomy level from verbs."""
+    """Determine the primary Bloom's level from verbs.
+
+    The indicator's LEADING action decides the level (Priority 2 §3): "Use
+    place value to read and write numbers" is APPLY even though "write" also
+    appears — taking the highest level found anywhere would mis-read every
+    indicator that names two actions.
+    """
+    level_of: Dict[str, str] = {}
+    for level, verb_list in BLOOM_CATEGORIES.items():
+        for v in verb_list:
+            level_of.setdefault(v, level)
+    for v in verbs:
+        if v in level_of:
+            return level_of[v]
     for level in ["create", "evaluate", "analyze", "apply", "understand", "remember"]:
-        level_verbs = BLOOM_CATEGORIES[level]
-        for v in verbs:
-            if v in level_verbs:
-                return level
+        if any(v in BLOOM_CATEGORIES[level] for v in verbs):
+            return level
     return "understand"
 
 
-def _determine_activity_type(verbs: List[str], text: str) -> str:
-    """Determine the primary activity type from verbs and context."""
-    text_lower = text.lower()
+def _determine_activity_type(verbs: List[str], text: str,
+                             subject: str = "") -> str:
+    """Determine the primary activity type from verbs, context AND subject.
+
+    Priority 2 §6: the indicator's matched activity types are filtered through
+    the subject's own preference list, so a Mathematics indicator is never
+    taught through a reading skeleton (and an English passage task never
+    becomes an observation task). Falls back to the subject's default type.
+    """
+    text_lower = (text or "").lower()
+    matched: List[str] = []
     for act_type, keywords in ACTIVITY_KEYWORDS.items():
-        for kw in keywords:
-            if kw in text_lower or any(kw in v for v in verbs):
-                return act_type
-    return "discussion"
+        hit = any(keyword_matches(kw, text_lower) for kw in keywords)
+        if not hit:
+            hit = any(keyword_matches(kw, v) for kw in keywords for v in verbs)
+        if hit:
+            matched.append(act_type)
+    preference = activity_preference_for(subject)
+    for act_type in preference:
+        if act_type in matched:
+            return act_type
+    # No subject-allowed match: keep the old neutral default when the subject
+    # is unknown, else the subject's own default teaching sequence.
+    if not SUBJECT_TO_STRATEGY.get((subject or "").lower().strip(), ""):
+        if "discussion" in matched:
+            return "discussion"
+        return DEFAULT_ACTIVITY_PREFERENCE[0]
+    return preference[0]
+
+
+def _performance_clause(indicator_text: str) -> str:
+    """The indicator's own action phrase, ready to sit inside a sentence."""
+    text = (indicator_text or "").strip()
+    try:
+        from . import CODE_PREFIX_RE
+        text = CODE_PREFIX_RE.sub("", text).strip()
+    except Exception:  # pragma: no cover - corpus regex always present
+        text = re.sub(r"^[A-Za-z]{0,2}\d+(?:\.\d+)+\s*", "", text).strip()
+    text = re.sub(r"^(?:by the end of the lesson,? learners (?:should be able to|will)\s*:?\s*)",
+                  "", text, flags=re.I)
+    text = re.sub(r"^learners (?:can|will|should be able to)\s+", "", text, flags=re.I)
+    text = text.strip().rstrip(".").strip()
+    if not text:
+        return ""
+    return text[:1].lower() + text[1:]
 
 
 def _derive_evidence_of_achievement(bloom_level: str, activity_type: str,
                                      indicator_text: str) -> str:
-    """Derive what evidence would show the learner achieved the indicator."""
-    evidence_map = {
-        "remember": "Learner can recall and list key facts or terms.",
-        "understand": "Learner can explain or describe the concept in own words.",
-        "apply": "Learner can correctly use the concept in a given situation.",
-        "analyze": "Learner can break down the concept and identify relationships.",
-        "evaluate": "Learner can make justified judgments based on criteria.",
-        "create": "Learner can produce original work applying the concept.",
+    """Derive what evidence would show the learner achieved the indicator.
+
+    Priority 2 §15: the evidence states THIS indicator's own performance
+    ("learners can classify animals into groups …"), never the vague
+    "the concept / this topic" filler the quality gate rejects.
+    """
+    performance = _performance_clause(indicator_text)
+    templates = {
+        "remember": "Learners can {p} from memory and name one further example.",
+        "understand": "Learners can {p} and explain it in their own words with one example.",
+        "apply": "Learners can {p} correctly in a situation the lesson did not show.",
+        "analyze": "Learners can {p} and state how the parts relate to each other.",
+        "evaluate": "Learners can {p} and justify the judgement with one reason.",
+        "create": "Learners can {p} and the result meets two stated criteria.",
     }
-    return evidence_map.get(bloom_level, "Learner demonstrates understanding.")
+    fallback = {
+        "remember": "Learners can name three things they remember about the lesson focus.",
+        "understand": "Learners can explain the lesson focus in their own words with one example.",
+        "apply": "Learners can use the lesson focus correctly in one new example.",
+        "analyze": "Learners can break the lesson focus into its parts and say how they relate.",
+        "evaluate": "Learners can judge the lesson focus against two criteria and give a reason.",
+        "create": "Learners can produce one piece of work about the lesson focus that meets two criteria.",
+    }
+    if performance:
+        return templates.get(bloom_level, templates["understand"]).format(p=performance)
+    return fallback.get(bloom_level, fallback["understand"])
 
 
 def _derive_misconception_risks(indicator_text: str, subject: str) -> str:
@@ -351,10 +493,11 @@ def interpret_indicator(indicator: Indicator, subject: str) -> IndicatorInterpre
     text = indicator.description or indicator.exact_text
     code = indicator.code
 
-    # Extract verbs and determine Bloom's level
+    # Extract verbs and determine Bloom's level (activity type is SUBJECT-FIT:
+    # a Mathematics indicator never selects the reading skeleton)
     verbs = _extract_verbs(text)
     bloom_level = _determine_bloom_level(verbs)
-    activity_type = _determine_activity_type(verbs, text)
+    activity_type = _determine_activity_type(verbs, text, subject)
 
     # Derive pedagogical fields
     evidence = _derive_evidence_of_achievement(bloom_level, activity_type, text)

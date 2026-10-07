@@ -46,6 +46,8 @@ from ..models import (
 )
 from .pedagogy import profile_for_subject, SubjectPedagogy
 from ..ai_resource_text import normalize_text_items
+from .lesson_evidence import build_evidence, primary_verb as _indicator_primary_verb
+from . import activity_library
 
 #: Layer 3/4 integration — imported lazily inside ``build_lesson`` to avoid an
 #: import cycle (patterns imports nothing from the builder; the typing-only
@@ -349,19 +351,21 @@ _LEARNER_PHASE_BANK: Dict[str, List[Tuple[str, str]]] = {
          "Record your prediction about {focus_short} and the reason for it "
          "before starting."),
         ("Investigation",
-         "Carry out the activity for {focus_short} in your group using "
-         "{resource}, recording what you observe or measure."),
+         "Carry out the investigation for {focus_short} in groups of four "
+         "using {resource}, and record what you observe or measure in a "
+         "table."),
         ("Explanation",
-         "Explain how your group's evidence supports or contradicts your "
-         "prediction about {focus_short}."),
+         "Write one sentence stating whether your group's evidence supports "
+         "or contradicts your prediction about {focus_short}."),
     ],
     "practical": [
         ("Demonstration",
          "Watch the demonstration of {focus_short} and note the order of steps "
          "and the safety points."),
         ("Guided practical",
-         "Carry out the practical task for {focus_short} in your group using "
-         "{resource}, following the demonstrated steps."),
+         "Carry out the practical task for {focus_short} in groups of four "
+         "using {resource}, following the demonstrated steps, and note any "
+         "step that does not work."),
         ("Application",
          "Complete one task on {focus_short} and inspect your own product "
          "against the steps."),
@@ -404,8 +408,8 @@ _LEARNER_PHASE_BANK: Dict[str, List[Tuple[str, str]]] = {
          "Study the model showing how {focus_short} is done and note the "
          "features to reproduce."),
         ("Guided writing",
-         "Plan and draft your own piece for {focus_short} using the model as "
-         "a scaffold."),
+         "Write a plan for {focus_short}, then draft your own piece in your "
+         "book using the model as a scaffold."),
         ("Independent writing",
          "Complete and improve your piece on {focus_short} against a short "
          "checklist."),
@@ -413,10 +417,11 @@ _LEARNER_PHASE_BANK: Dict[str, List[Tuple[str, str]]] = {
     "discussion": [
         ("Stimulus",
          "Examine the scenario or question about {focus_short} and identify "
-         "the key issue involved."),
+         "the key issue involved, writing it in one sentence."),
         ("Structured discussion",
          "Take part in the group discussion on {focus_short}, giving reasons "
-         "and responding to other views."),
+         "and responding to other views, and note the strongest reason you "
+         "heard."),
         ("Application",
          "Apply the discussion to a local situation and answer 'what would we "
          "do here?' about {focus_short}."),
@@ -467,8 +472,8 @@ _LEARNER_PHASE_BANK: Dict[str, List[Tuple[str, str]]] = {
          "Watch the demonstration of {focus_short} and note each step and the "
          "reason for it."),
         ("Guided imitation",
-         "Repeat or reproduce the demonstration for {focus_short} with the "
-         "teacher's prompts, using {resource}."),
+         "Repeat the demonstration of {focus_short} with your partner using "
+         "{resource} and note each step in your book."),
         ("Independent application",
          "Perform the task for {focus_short} on your own and check your work "
          "against the demonstrated steps."),
@@ -650,6 +655,30 @@ _PLENARY_BANK: Dict[str, str] = {
         "learned and set a short follow-up task."
     ),
 }
+
+#: The observable-evidence vocabulary a Phase 3 closing must contain (Priority 2
+#: §9): what the teacher RECORDS before the class leaves. Shared definition —
+#: the deterministic lesson quality benchmark scores the same words, so a
+#: lesson that passes here cannot fail on "the plenary proves nothing".
+_EVIDENCE_CUE = re.compile(
+    r"\b(success|evidence|check that|check|observe|mark|rubric|look for|"
+    r"correct|accurate|accuracy|at least|out of|\d\s*/\s*\d)\b", re.I)
+
+#: The consolidation vocabulary a Phase 3 closing must contain: the move that
+#: ENDS the learning (summarise, report, one sentence, preview …) — a plenary
+#: that only states an activity has not closed the lesson.
+_CLOSURE_CUE = re.compile(
+    r"\b(exit question|summaris|summariz|recap|report|one sentence|"
+    r"in their own words|reflect|conclude|conclusion|preview|what they learned|"
+    r"what you learned|state the rule|explain to|teach)\b", re.I)
+
+#: Lived-experience vocabulary (Priority 2 §16): a Ghanaian lesson is taught in
+#: a real place. Every lesson must ground at least once in the learner's own
+#: home/community/locality — the same marker set the quality benchmark counts.
+_LOCAL_CONTEXT_CUE = re.compile(
+    r"\b(ghana|ghanaian|market|community|local|neighbour|neighbor|village|"
+    r"home|town|cedi|trotro|kente|adinkra|mosque|church|compound|household|"
+    r"farm|our own|nearby|region|district)\b", re.I)
 
 #: CLASS ASSIGNMENT templates keyed by activity type (PART 15): the task the
 #: class completes IN the lesson, aligned to the indicator's own action — a
@@ -1124,9 +1153,119 @@ def _learner_phrase(indicator: str) -> str:
     return f"Learners can {clean}".strip()
 
 
-def _derive_topic(alloc: AllocatedIndicator) -> str:
+def _derive_topic(alloc: AllocatedIndicator, exemplar=None) -> str:
+    """A teachable lesson topic derived from THIS occurrence's evidence.
+
+    Priority 2 §4 — topic rules, in order:
+      1. the source indicator's own clause (specific, class-level appropriate);
+      2. the official corpus learning focus for a code-only source;
+      3. the sub-strand for indicatorless rows (KG/Nursery week-units), where
+         the source row itself is the honest curriculum focus;
+      4. "Lesson" only when the source carries nothing else.
+
+    NEVER the strand + sub-strand concatenation — taxonomy labels are not a
+    lesson topic.
+    """
+    raw = alloc.indicator_description or ""
+    if raw and not _is_code_only(raw):
+        text = strip_indicator_code(raw)
+        clause = re.split(r"[.;]", text)[0].strip() or text
+        # Drop any orphan leading code fragment the strip left behind.
+        clause = re.sub(r"^(?:[BbKk]?\d+(?:\.\d+)*\.?\s*)+", "", clause).strip() or clause
+        words = clause.split()
+        if len(words) > 12:
+            clause = " ".join(words[:12]).rstrip(",:;")
+        clause = clause.strip().rstrip(".").strip()
+        if clause:
+            return clause
+    if exemplar is not None and (getattr(exemplar, "learning_focus", "") or "").strip():
+        return exemplar.learning_focus.strip()
+    if (alloc.sub_strand or "").strip():
+        return alloc.sub_strand.strip()
     parts = [p for p in (alloc.strand, alloc.sub_strand) if p]
     return " - ".join(parts) if parts else "Lesson"
+
+
+def _verb_in_text(verb: str, text: str) -> bool:
+    """True when the indicator's action verb (any close form) appears."""
+    verb = (verb or "").strip().lower()
+    if not verb:
+        return False
+    text_l = (text or "").lower()
+    stem = verb.split()[0]
+    for suffix in ("ing", "ed", "es", "s", "ation", "ations"):
+        if stem.endswith(suffix) and len(stem) - len(suffix) >= 4:
+            stem = stem[: -len(suffix)]
+            break
+    if len(stem) < 4:
+        stem = verb.split()[0]
+    return stem in text_l
+
+
+#: Mechanical cleanup only (Priority 2 §19, last step — never the main fix):
+#: dangling connectors before punctuation, doubled punctuation, empty
+#: parentheses and excess whitespace introduced by template composition.
+_DANGLING_CONNECTOR_RE = re.compile(
+    r"\b(using|with|from|of|in|on|to|for|by|and|or|at|as)\s+([,;.!?])", re.I)
+
+
+def _normalize_prose(text: str) -> str:
+    if not text:
+        return text
+    text = _DANGLING_CONNECTOR_RE.sub(r"\2", text)
+    text = re.sub(r"\s+([,.;:!?])", r"\1", text)
+    text = re.sub(r"([,;])\s*\1+", r"\1", text)
+    text = re.sub(r"\(\s*\)", "", text)
+    text = re.sub(r"\s{2,}", " ", text)
+    text = re.sub(r"\s+([,;])(\s|$)", r"\1\2", text)
+    return text.strip()
+
+
+#: Learner action for the Phase 1 boundary row, keyed by what the starter
+#: actually does — concrete, never "listen carefully".
+_STARTER_LEARNER_RULES: List[Tuple[str, str]] = [
+    ("recall|retrieve|remember|previous|prior|review",
+     "Learners state what they remember about {focus} and write one keyword "
+     "in their books."),
+    ("object|picture|show a real|observe|notice",
+     "Learners look at the object or picture and name three things they "
+     "notice about {focus}."),
+    ("predict",
+     "Learners write two predictions about {focus} and compare them with a "
+     "partner."),
+    ("game|song|warm|call-and-response|thumbs",
+     "Learners join the warm-up on {focus} and answer at least once."),
+    ("question|scenario|challenge|probe|statement|error|wrong",
+     "Learners answer the opening question about {focus} and justify their "
+     "answer to a partner."),
+]
+
+
+def _starter_learner_desc(starter: str, focus: str) -> str:
+    low = (starter or "").lower()
+    for pattern, template in _STARTER_LEARNER_RULES:
+        if re.search(pattern, low):
+            return template.format(focus=focus)
+    return ("Learners respond to the opening task about {focus} and share two "
+            "ideas with the class.").format(focus=focus)
+
+
+def _closing_learner_desc(conclusion: str, focus: str) -> str:
+    low = (conclusion or "").lower()
+    if re.search(r"exit question|answer", low):
+        return ("Learners answer the closing question about {focus} in their "
+                "books and hand it in before leaving.").format(focus=focus)
+    if re.search(r"demonstrat|perform", low):
+        return ("Two learners demonstrate {focus} while the class checks each "
+                "step against the criteria.").format(focus=focus)
+    if re.search(r"summar|recap|one-minute|one minute", low):
+        return ("Each learner writes one sentence stating what they can now do "
+                "with {focus}; two read theirs aloud.").format(focus=focus)
+    if re.search(r"present|report|share", low):
+        return ("Learners present their work on {focus} in one minute and name "
+                "one thing they would improve.").format(focus=focus)
+    return ("Learners give a one-sentence summary of {focus} and answer one "
+            "closing question in their books.").format(focus=focus)
 
 
 def _safe_format(template: str, **values) -> str:
@@ -1228,10 +1367,13 @@ def _activity_key(interp, indicator_text: str) -> Optional[str]:
     """Resolve the phase-bank key for an indicator, or None when the indicator
     does not genuinely express a recognised activity.
 
-    The interpreter defaults to "discussion" when no activity keyword matches,
-    so a plain "describe …" indicator would otherwise be forced through the
-    discussion skeleton. Returning None in that case lets the SUBJECT pedagogy
-    supply the correct structure instead.
+    The interpreter resolves the activity type SUBJECT-FIT (a Mathematics
+    indicator never yields the reading skeleton — Priority 2 §6), and it
+    defaults to the subject's own type when no keyword matches. Returning None
+    in that case lets the SUBJECT pedagogy supply the correct structure instead
+    of forcing a skeleton the indicator never expressed. The keyword check runs
+    on WORD BOUNDARIES so "read" cannot claim "already" / "read and write
+    numbers" as a reading lesson.
     """
     if interp is None:
         return None
@@ -1239,14 +1381,42 @@ def _activity_key(interp, indicator_text: str) -> Optional[str]:
     if key not in _PHASE_BANK:
         return None
     try:
-        from .indicator_interpreter import ACTIVITY_KEYWORDS
-        kws = ACTIVITY_KEYWORDS.get(key, [])
-    except Exception:
-        kws = []
-    text_lower = (indicator_text or "").lower()
-    if kws and any(k in text_lower for k in kws):
+        from .indicator_interpreter import activity_type_matches
+    except Exception:  # pragma: no cover - interpreter is always present
+        return None
+    if activity_type_matches(key, indicator_text or ""):
         return key
     return None
+
+
+#: Profile key → the activity-bank key this subject falls back to when the
+#: indicator itself does not express an activity (Priority 2 §6). Used for the
+#: parts of the lesson that MUST still be subject-specific — learner actions,
+#: assignments, activity resources, competencies — while the phase structure
+#: keeps coming from the subject profile's own pedagogy. Never a random pick:
+#: each default matches the profile's own main-phase sequence (Mathematics
+#: worked example → practice, Science predict → investigate → explain, …).
+_SUBJECT_DEFAULT_ACTIVITY: Dict[str, str] = {
+    "mathematics": "problem_solving",
+    "science": "investigation",
+    "english": "writing",
+    "social_studies": "discussion",
+    "creative_arts": "creation",
+    "ict": "demonstration",
+    "rme": "discussion",
+    "career_technology": "practical",
+    "phe": "demonstration",
+    "early_childhood": "discussion",
+    "nursery": "discussion",
+    "generic": "discussion",
+}
+
+
+def _bank_key(profile: SubjectPedagogy, act_key: Optional[str]) -> str:
+    """The activity-bank key for subject-specific banks (never random)."""
+    if act_key:
+        return act_key
+    return _SUBJECT_DEFAULT_ACTIVITY.get(profile.key, "demonstration")
 
 
 def _compose_main_phases(
@@ -1416,6 +1586,46 @@ def _exemplar_phases(exemplar, fmt: Dict[str, str]) -> List[Tuple[str, str, floa
     return phases
 
 
+#: Indicatorless Basic-level rows (source carried only a sub-strand, no
+#: indicator prose): the objective still states a measurable learner
+#: performance shaped by the subject's own pedagogy — never the banned
+#: "explore and talk about" filler. Keyed by profile key; the default applies
+#: to unknown/generic profiles.
+_BASIC_NO_INDICATOR_OBJECTIVE: Dict[str, str] = {
+    "mathematics": (
+        "Learners can solve two {focus} problems showing each step of the "
+        "method"),
+    "science": (
+        "Learners can explain {focus} with one example from their own "
+        "observation"),
+    "english": (
+        "Learners can use {focus} correctly in two spoken or written "
+        "sentences"),
+    "ict": (
+        "Learners can demonstrate {focus} step by step and state one rule "
+        "they followed"),
+    "social_studies": (
+        "Learners can explain {focus} using two Ghanaian examples and give "
+        "one reason"),
+    "rme": (
+        "Learners can state what {focus} means and give one example of how "
+        "it is practised"),
+    "creative_arts": (
+        "Learners can create one piece of work showing {focus} and name two "
+        "features of it"),
+    "career_technology": (
+        "Learners can demonstrate {focus} using the correct tools and state "
+        "one safety rule"),
+    "phe": (
+        "Learners can perform {focus} correctly and name one rule or safety "
+        "point"),
+    "early_childhood": (
+        "Learners can show and talk about {focus} with two examples"),
+    "nursery": (
+        "Learners can show and talk about {focus} with two examples"),
+}
+
+
 def build_lesson(
     alloc: AllocatedIndicator,
     config: TermConfig,
@@ -1519,11 +1729,7 @@ def build_lesson(
     if not skill and alloc.sub_strand:
         skill = alloc.sub_strand
         focus_short = alloc.sub_strand
-    topic = _derive_topic(alloc)
-    if exemplar and not skill_from_source(alloc):
-        # Code-only source: the corpus focus is more useful than the shared
-        # sub-strand as the lesson topic.
-        topic = exemplar.learning_focus
+    topic = _derive_topic(alloc, exemplar=exemplar)
     duration = int(config.lesson_duration_minutes or 60)
 
     prev_short = _first_clause(previous_indicator or "") if previous_indicator else ""
@@ -1532,6 +1738,10 @@ def build_lesson(
     # Interpret the indicator: what learners must DO and how deeply.
     interp = _interpret(alloc, subject_name)
     act_key = _activity_key(interp, alloc.indicator_description)
+    # Subject-fit bank key for the banks that must stay subject-specific even
+    # when the indicator expressed no activity keyword (assignments, learner
+    # actions, activity resources, competencies).
+    bank_key = _bank_key(profile, act_key)
     bloom = (getattr(interp, "bloom_level", "") or "understand") if interp else "understand"
     verb = (getattr(interp, "primary_action", "") or "learn") if interp else "learn"
     evidence = (
@@ -1545,6 +1755,35 @@ def build_lesson(
         getattr(interp, "misconception_risks", "") if interp else ""
     )
 
+    # ── Canonical curriculum evidence (Priority 2 §2) ────────────────────────
+    # Assembled BEFORE any prose is written: full indicator text, content
+    # standard, action verbs, key concepts, provenance. ``lesson_ev`` (not
+    # ``evidence`` — that local holds the interpreter's success sentence used
+    # by the phase templates) drives topic, activity, assessment and
+    # differentiation decisions below.
+    lesson_ev = build_evidence(
+        subject=subject_name, class_level=class_level, alloc=alloc,
+        exemplar=exemplar, interp=interp)
+    early_years = profile.key in ("early_childhood", "nursery")
+    # Occurrence stage for REPEATED indicators (Priority 2 §18): the same
+    # indicator in a later source week keeps its content but shifts emphasis
+    # from first teaching to application — history informs, never rewrites.
+    stage = "first"
+    try:
+        if batch_history is not None and lesson_ev.indicator_code:
+            prior = sum(
+                1 for fp in (batch_history.fingerprints or [])
+                if getattr(fp, "indicator_code", "") == lesson_ev.indicator_code)
+            stage = "repeat" if prior else "first"
+    except Exception:
+        stage = "first"
+    activity = activity_library.select_activity(
+        lesson_ev.action_verbs or ([verb] if verb and verb != "learn" else []),
+        profile.key if not early_years else "",
+        stage=stage,
+        activity_type=lesson_ev.activity_type,
+    )
+
     # The raw code/range is curriculum metadata, not prose: phase templates
     # that reference {indicators} get the honest focus text instead when the
     # source cell was code-only.
@@ -1552,14 +1791,28 @@ def build_lesson(
         "" if alloc.indicator_description and _is_code_only(alloc.indicator_description)
         else (alloc.indicator_description or "")
     )
+    # REAL resource for {resource} substitution (Priority 2 §19): the scheme's
+    # own TLR first, else the selected activity's materials, else the subject
+    # profile's base resources — never an empty substitution that renders
+    # "using ." artifacts.
+    _resource_pool: List[str] = []
+    for _r in normalize_text_items(list(getattr(alloc, "source_resources", []) or [])):
+        _r = (_r or "").strip()
+        if _r and _r.lower() not in [x.lower() for x in _resource_pool]:
+            _resource_pool.append(_r)
+    if not _resource_pool:
+        for _r in list(activity.materials) + list(profile.resources):
+            _r = (_r or "").strip()
+            if _r and _r.lower() not in [x.lower() for x in _resource_pool]:
+                _resource_pool.append(_r)
     fmt = dict(
         skill=skill, focus=skill, focus_short=focus_short, topic=topic,
         indicators=indicators_for_templates,
         strand=alloc.strand or "", sub_strand=alloc.sub_strand or "",
         class_level=class_level, prev=prev_short, next=next_short,
         content_standard=alloc.content_standard_description or "",
-        verb=verb, bloom=bloom, evidence=evidence, activity=act_key,
-        resource="",  # filled per-phase below
+        verb=verb, bloom=bloom, evidence=evidence, activity=act_key or "",
+        resource=(_resource_pool[0] if _resource_pool else ""),
     )
 
     # ── STARTER — prepares learners for THIS indicator's activity ───────
@@ -1599,6 +1852,23 @@ def build_lesson(
             starter = f"Build on the previous lesson ('{prev_short}'). " + starter
         if misconceptions and "Monitor for general" not in misconceptions:
             starter += f" Watch for: {misconceptions}"
+    # Phase 1 must answer WHAT THE TEACHER LOOKS FOR (Priority 2 §7): when the
+    # selected starter carries no monitoring cue of its own, attach the
+    # indicator's own evidence of achievement — the starter then links
+    # directly to today's indicator instead of ending as an open question.
+    if not re.search(r"look for|watch for|listen|note who|observe|check",
+                     starter, re.I):
+        _look_for = (lesson_ev.expected_performance or "").strip()
+        if not _look_for:
+            _look_for = _safe_format(activity.evidence, **fmt)
+        _look_for = _look_for.strip()
+        if _look_for:
+            if len(_look_for.split()) > 22:
+                _look_for = " ".join(_look_for.split()[:22]).rstrip(".;") + "."
+            if not _look_for.endswith("."):
+                _look_for += "."
+            starter = f"{starter} What to look for: {_look_for}"
+    starter = _normalize_prose(starter)
     # ``introduction`` is the lesson-level framing (how this lesson connects to
     # the last one and where it sits in the topic); ``starter_activity`` is the
     # concrete opening activity. Keeping them distinct stops the same sentence
@@ -1620,8 +1890,6 @@ def build_lesson(
                  f"'{link}' and develops {skill}.")
 
     # ── MAIN — phases follow the indicator's activity type ──────────────
-    starter_min = max(5, round(duration * 0.15))
-    plenary_min = max(5, round(duration * 0.20))
     # An official exemplar record supplies the MAIN block from its own derived
     # activity patterns; otherwise the indicator's activity bank / subject
     # profile composes it (unchanged behaviour for subjects without a record).
@@ -1661,31 +1929,128 @@ def build_lesson(
     else:
         phase_specs = _compose_main_phases(profile, fmt, act_key,
                                            position_index=position_index)
-    main_total = max(duration - starter_min - plenary_min, len(phase_specs))
+    # ── TIMING — hard invariant (Priority 2 §10) ──────────────────────────
+    # Partition the lesson duration EXACTLY across the three phases:
+    #   Phase 1 starter + Phase 2 steps + Phase 3 plenary == duration_minutes.
+    # Each phase's minutes are stored on its own activity row, so the stored
+    # steps always add up — no prose-only phases, no arbitrary labels.
+    n_steps = max(len(phase_specs), 1)
+    starter_min = max(1, round(duration * 0.15))
+    plenary_min = max(1, round(duration * 0.20))
+    while starter_min + plenary_min + n_steps > duration:
+        # Degenerate short durations: shrink the outer phases, never the steps.
+        if starter_min >= plenary_min and starter_min > 1:
+            starter_min -= 1
+        elif plenary_min > 1:
+            plenary_min -= 1
+        else:
+            break
+    main_total = duration - starter_min - plenary_min
+    if main_total < n_steps:
+        main_total = n_steps
     phase_minutes = _distribute(main_total, [p[2] for p in phase_specs])
+    # _distribute preserves the sum; assert-level guarantee for the invariant.
+    if sum(phase_minutes) != main_total and phase_minutes:
+        phase_minutes[-1] += main_total - sum(phase_minutes)
 
     # Learner activities come from the SAME activity-type bank as the teacher's,
     # so the learner column is equally specific to the indicator — never the
     # generic "Watch and listen carefully" / "Complete the task" fallbacks.
-    learner_bank = _LEARNER_PHASE_BANK.get(act_key) or []
+    learner_bank = _LEARNER_PHASE_BANK.get(bank_key) or []
 
     main_activities: List[TeachingActivity] = []
     learner_activities: List[TeachingActivity] = []
     teacher_activities: List[TeachingActivity] = []
+
+    # Per-row resources: this lesson's scheme TLRs first, then the selected
+    # activity's own materials — each activity row carries the resources it
+    # actually needs (they were previously all empty).
+    _row_base = [r for r in _resource_pool[:2] if r]
+    _library_learner_used = False
+
+    # Phase 1 boundary row — the starter carries its own minutes so the stored
+    # timeline sums exactly to the lesson duration. ``starter_activity`` keeps
+    # the same prose for templates that render Phase 1 from its own field.
+    main_activities.append(TeachingActivity(
+        phase="PHASE 1 · STARTER", description=starter,
+        duration_minutes=starter_min, resources=list(_row_base),
+    ))
+    learner_activities.append(TeachingActivity(
+        phase="PHASE 1 · STARTER",
+        description=_starter_learner_desc(starter, focus_short),
+        duration_minutes=starter_min, resources=[],
+    ))
+    teacher_activities.append(TeachingActivity(
+        phase="PHASE 1 · STARTER", description=starter,
+        duration_minutes=starter_min, resources=[],
+    ))
+
+    last_idx = len(phase_specs) - 1
+    # Per-role step counter: the 2nd guided step of a lesson gets the 2nd
+    # teacher/learner sentence of that role, never the same one twice.
+    _role_occurrence: Dict[str, int] = {}
     for idx, ((phase_name, desc, _), minutes) in enumerate(
         zip(phase_specs, phase_minutes)
     ):
+        row_desc = _normalize_prose(desc)
+        _role = _phase_role(phase_name)
+        _occ = _role_occurrence.get(_role, 0)
+        _role_occurrence[_role] = _occ + 1
+        # Expected evidence on EVERY step (Priority 2 §8): position-aware so
+        # each step says what the teacher should see, without repeating one
+        # sentence across all rows.
+        if not re.search(r"look for|success|evidence|check that|check the",
+                         row_desc, re.I):
+            if idx == last_idx:
+                _ev = _safe_format(activity.evidence, **fmt)
+            elif idx == 0:
+                _ev = (f"Look for: learners can name the key features of "
+                       f"{focus_short} before you move on.")
+            else:
+                # Named per step: two middle steps of one lesson never carry
+                # the same check sentence (padding), and the teacher reads
+                # which step the check belongs to.
+                _ev = (f"Step {idx + 1} · {phase_name.capitalize()}: check each "
+                       f"learner's work on {focus_short} and note anyone who "
+                       "needs help before the next step.")
+            _ev = _ev.strip()
+            if _ev:
+                if not _ev.endswith("."):
+                    _ev += "."
+                row_desc = f"{row_desc} {_ev}"
+        row_res = list(_row_base)
+        for _m in list(activity.materials)[:2]:
+            _m = (_m or "").strip()
+            if _m and _m.lower() not in [x.lower() for x in row_res]:
+                row_res.append(_m)
         main_activities.append(TeachingActivity(
-            phase=phase_name.upper(), description=desc,
-            duration_minutes=minutes, resources=[],
+            phase=phase_name.upper(), description=row_desc,
+            duration_minutes=minutes, resources=row_res,
         ))
-        # Prefer the learner bank's own phase at the same position; fall back
-        # to a learner reframing of the teacher phase name only when the bank
-        # has no entry for this activity type.
+        # Prefer the learner bank's own phase at the same position; the
+        # selected ACTIVITY's learner action replaces only the generic
+        # "take an active part" fallback, and never repeats across rows.
         if idx < len(learner_bank):
             learner_desc = _safe_format(learner_bank[idx][1], **fmt)
         else:
-            learner_desc = _learner_task(phase_name, focus_short)
+            _generic_task = _learner_task(phase_name, focus_short, _occ)
+            if (_generic_task.startswith("Take an active part")
+                    and activity.learner_action
+                    and not _library_learner_used):
+                learner_desc = _safe_format(activity.learner_action, **fmt)
+                _library_learner_used = True
+            else:
+                learner_desc = _generic_task
+        learner_desc = _normalize_prose(learner_desc)
+        # Repeated occurrence (Priority 2 §18): the same indicator in a later
+        # week emphasises application — the learner step names the new-situation
+        # demand once, never changing the indicator or the week.
+        if stage == "repeat" and idx == last_idx and not early_years:
+            if not re.search(r"new (situation|example|case)|not seen before",
+                             learner_desc, re.I):
+                learner_desc = (
+                    f"{learner_desc} Apply the same skill to a new example "
+                    f"the class has not seen before and give a reason.")
         learner_activities.append(TeachingActivity(
             phase="LEARNER",
             description=learner_desc,
@@ -1693,7 +2058,7 @@ def build_lesson(
         ))
         teacher_activities.append(TeachingActivity(
             phase="TEACHER",
-            description=_teacher_move(phase_name, focus_short),
+            description=_normalize_prose(_teacher_move(phase_name, focus_short, _occ)),
             duration_minutes=minutes, resources=[],
         ))
 
@@ -1718,6 +2083,26 @@ def build_lesson(
             f" Evidence: each child shows or names one example of "
             f"{(alloc.sub_strand or alloc.strand or 'the lesson focus').strip()}."
         )
+    # Assessment must measure the indicator's OWN action (Priority 2 §15):
+    # when the composed check does not contain the indicator's leading verb,
+    # attach the verb-matched check for it — never stacked twice.
+    focus_verb = lesson_ev.primary_verb or (
+        verb if verb not in ("learn", "") else "")
+    if focus_verb and not early_years and not _verb_in_text(focus_verb, assessment):
+        _verb_check = activity_library.assessment_for_verb(focus_verb, focus_short)
+        if _verb_check:
+            assessment = f"{assessment} {_verb_check}"
+    # An assessment that never says what SUCCESS looks like cannot be used at
+    # the desk (Priority 2 §15): attach this indicator's success sentence when
+    # the composed check carries no evidence cue of its own. The interpreter's
+    # own sentence is used (not the phase row's) so the two fields say the same
+    # truth in different words instead of printing one sentence twice.
+    if not early_years and not _EVIDENCE_CUE.search(assessment):
+        _succ = _safe_format(evidence or activity.evidence, **fmt).strip()
+        if _succ:
+            if not re.search(r"[.!?]$", _succ):
+                _succ += "."
+            assessment = f"{assessment} Success = {_succ}"
 
     # ── PLENARY — consolidates THIS indicator ───────────────────────────
     if pattern is not None and pattern.plenary_mode in PLENARY_MODE_TEMPLATES:
@@ -1733,11 +2118,75 @@ def build_lesson(
         )
         if next_short:
             conclusion += f" Preview the next lesson ('{next_short}')."
+    # Phase 3 must CLOSE with evidence the objective was reached (Priority 2
+    # §9). Two guarantees, each appended only when the composed closing lacks
+    # it (never both, never twice):
+    #   * an OBSERVABLE evidence cue — what the teacher records before the
+    #     class leaves, and
+    #   * a CONSOLIDATION cue — the closing move that ends the learning.
+    if not early_years and not _EVIDENCE_CUE.search(conclusion):
+        conclusion += (
+            " Exit check: each learner answers one question about "
+            f"{focus_short} and the teacher marks each answer before leaving."
+        )
+    if not early_years and not _CLOSURE_CUE.search(conclusion):
+        conclusion += (
+            f" Recap: each learner states in one sentence what they can now do "
+            f"with {focus_short}."
+        )
+    if stage == "repeat" and not early_years:
+        # Second occurrence of the SAME indicator: deeper pedagogical emphasis
+        # (application + justification), faithful to the indicator — the week
+        # and the indicator text never change.
+        conclusion += (
+            f" Apply it: learners use {focus_short} in a situation not shown "
+            "in the first lesson and justify their choice."
+        )
+    conclusion = _normalize_prose(conclusion)
+
+    # Phase 3 boundary row — the plenary carries its own minutes so the stored
+    # timeline sums exactly to the lesson duration; ``conclusion`` keeps the
+    # same prose for templates that render Phase 3 from its own field.
+    main_activities.append(TeachingActivity(
+        phase="PHASE 3 · PLENARY", description=conclusion,
+        duration_minutes=plenary_min,
+        resources=["exercise books"] if not early_years else [],
+    ))
+    learner_activities.append(TeachingActivity(
+        phase="PHASE 3 · PLENARY",
+        description=_normalize_prose(_closing_learner_desc(conclusion, focus_short)),
+        duration_minutes=plenary_min, resources=[],
+    ))
+    teacher_activities.append(TeachingActivity(
+        phase="PHASE 3 · PLENARY", description=conclusion,
+        duration_minutes=plenary_min, resources=[],
+    ))
+
+    # Differentiation tiers come from the SELECTED ACTIVITY (Priority 2 §14):
+    # support/challenge describe this task, the core tier states the evidence
+    # every learner must show — never one generic "support struggling"
+    # sentence reused across subjects.
+    _core_evidence = _safe_format(activity.evidence, **fmt).strip()
+    if _core_evidence and not _core_evidence.endswith("."):
+        _core_evidence += "."
+    _support_tmpl = (activity.support if (activity.support and not early_years)
+                     else profile.support_template)
+    _challenge_tmpl = (activity.challenge if (activity.challenge and not early_years)
+                       else profile.extension_template)
+    _challenge = _safe_format(_challenge_tmpl, **fmt)
+    if stage == "repeat" and not early_years:
+        _challenge = (
+            f"{_challenge} Extend to a new situation: apply {focus_short} to "
+            "a case not covered in the first lesson and justify the answer.")
 
     # ── Differentiation — tied to the actual task ───────────────────────
     differentiation = "\n".join([
-        f"Support: {_safe_format(profile.support_template, **fmt)}",
-        f"Extension: {_safe_format(profile.extension_template, **fmt)}",
+        f"Support: {_safe_format(_support_tmpl, **fmt)}",
+        (f"Core: all learners complete the main task on {focus_short}; the "
+         f"teacher checks that {_core_evidence}") if _core_evidence else
+        (f"Core: all learners complete the main task on {focus_short} "
+         "independently with standard guidance."),
+        f"Challenge: {_challenge}",
         f"Grouping: {profile.grouping}",
     ])
 
@@ -1752,14 +2201,21 @@ def build_lesson(
         class_assignment = _safe_format(exemplar.class_assignment_pattern, **fmt)
     else:
         class_assignment = _safe_format(
-            _CLASS_ASSIGNMENT_BANK.get(act_key)
+            _CLASS_ASSIGNMENT_BANK.get(bank_key)
             or _CLASS_ASSIGNMENT_BANK["demonstration"], **fmt)
     if exemplar and exemplar.home_assignment_pattern.strip():
         home_assignment = _safe_format(exemplar.home_assignment_pattern, **fmt)
     else:
         home_assignment = _safe_format(
-            _HOME_ASSIGNMENT_BANK.get(act_key)
+            _HOME_ASSIGNMENT_BANK.get(bank_key)
             or _HOME_ASSIGNMENT_BANK["demonstration"], **fmt)
+    if stage == "repeat" and not early_years:
+        # Same indicator, later source week (Priority 2 §18): the in-class
+        # task moves up the ladder from guided practice to application on a
+        # NEW case — the indicator, the week and the objective never change.
+        class_assignment = _normalize_prose(
+            f"{class_assignment} Then apply the same skill to one new example "
+            "the class has not seen and give a reason for the result.")
 
     # ── Resources — THIS lesson's scheme TLRs first, then activity extras ──
     # SOURCE TLRs: from the scheme for this subject + source week + indicator.
@@ -1786,8 +2242,8 @@ def build_lesson(
         if r.lower() not in [x.lower() for x in resources]:
             resources.append(r)
     # Subject/activity-specific support materials (deterministic, lesson-scoped).
-    if act_key and interp is not None:
-        for r in list(getattr(interp, "suggested_resources", []) or []) + _ACTIVITY_RESOURCES.get(act_key, []):
+    if bank_key and interp is not None:
+        for r in list(getattr(interp, "suggested_resources", []) or []) + _ACTIVITY_RESOURCES.get(bank_key, []):
             r = (r or "").strip()
             if r and r.lower() not in [x.lower() for x in resources]:
                 resources.append(r)
@@ -1798,6 +2254,33 @@ def build_lesson(
             r = (r or "").strip()
             if r and r.lower() not in [x.lower() for x in resources]:
                 resources.append(r)
+    # The SELECTED ACTIVITY's own materials (Priority 2 §5/§12): the resources
+    # of the activity this lesson actually performs — realistic, low-cost
+    # classroom items — always present even when the scheme named none.
+    for r in list(activity.materials):
+        r = (r or "").strip()
+        if r and r.lower() not in [x.lower() for x in resources]:
+            resources.append(r)
+
+    # ── Lived experience (Priority 2 §16) — a Ghanaian lesson is taught in a
+    # real place ──────────────────────────────────────────────────────────
+    # The WHOLE lesson is read (framing, rows, task, closing): it is rooted in
+    # learners' lives when any place word appears — home, market, village,
+    # community … The bare adjective "local" (as in "local materials") is NOT
+    # such a connection: a lesson that only says "local" still gets the
+    # grounding sentence on its in-class task.
+    _lesson_prose = " ".join([
+        topic, intro, starter,
+        " ".join(a.description or "" for a in main_activities),
+        " ".join(a.description or "" for a in learner_activities),
+        conclusion, assessment, differentiation,
+        class_assignment, home_assignment, " ".join(resources),
+    ])
+    _places = {m.group(0).lower() for m in _LOCAL_CONTEXT_CUE.finditer(_lesson_prose)}
+    if not (_places - {"local"}):
+        class_assignment = _normalize_prose(
+            f"{class_assignment} Set it in a situation from the learners' "
+            "home, the nearby market or their local community.")
 
     # ── Keywords / vocabulary — PER-LESSON, curriculum-derived (PART G) ──
     # Priority: exact lesson indicator / learning focus first, then sub-strand,
@@ -1856,7 +2339,7 @@ def build_lesson(
         # (PART 1) rather than the activity-type default.
         comp_sources.extend(exemplar.core_competencies)
     else:
-        comp_sources.extend(_COMPETENCIES_BY_ACTIVITY.get(act_key or "demonstration", []))
+        comp_sources.extend(_COMPETENCIES_BY_ACTIVITY.get(bank_key, []))
     for c in comp_sources:
         c = (c or "").strip()
         if c and c.lower() not in [x.lower() for x in competencies]:
@@ -1904,7 +2387,11 @@ def build_lesson(
                     f"Learners can show and talk about "
                     f"{(alloc.sub_strand or alloc.strand or 'the lesson focus').strip()}"
                     if class_level in ("Nursery", "Nursery 1", "Nursery 2")
-                    else f"Learners can explore and talk about {(alloc.sub_strand or alloc.strand or 'the lesson focus').strip()}"
+                    else _BASIC_NO_INDICATOR_OBJECTIVE.get(
+                        profile.key,
+                        "Learners can explain {focus} in their own words "
+                        "with one example",
+                    ).format(focus=(alloc.sub_strand or alloc.strand or 'the lesson focus').strip())
                 )
             )
         ),
@@ -1929,7 +2416,7 @@ def build_lesson(
     )
 
     essential_question = _safe_format(
-        _ESSENTIAL_BANK.get(act_key) or profile.essential_question, **fmt
+        _ESSENTIAL_BANK.get(bank_key) or profile.essential_question, **fmt
     )
 
     lp = LessonPlan(
@@ -2022,39 +2509,138 @@ def build_lesson(
     return lp
 
 
-def _learner_task(phase_name: str, skill: str) -> str:
+def _phase_role(phase_name: str) -> str:
+    """Map a step's own phase name to its pedagogical role.
+
+    Step names come from the activity pattern ("PROBLEM SCENARIO",
+    "CLASSIFY", "SOLVE AND REPORT" …), so the matcher works on word STEMS —
+    "OBSERVE" must land on the guided branch that only says "observation"
+    never would, and every named step gets a real teacher/learner move
+    instead of the generic "facilitate the activity" fallback.
+    """
     name = (phase_name or "").lower()
-    if "play" in name or "game" in name or "song" in name or "rhyme" in name:
-        # Early-years playful practice (Nursery/KG "Playful practice"): the
-        # child joins in — doing, saying, sorting, singing — with the group.
-        return f"Join in the play or song about {skill} and try it yourself."
-    if "demonstrat" in name or "model" in name or "explanation" in name or "teaching" in name or "predict" in name or "stimulus" in name or "inspiration" in name or "present" in name or "vocabulary" in name:
-        return f"Watch and listen carefully, then describe each step of {skill} in your own words."
-    if "independent" in name or "application" in name or "challenge" in name or "creation" in name or "try" in name or "comprehension" in name or "findings" in name or "sharing" in name or "accuracy" in name or "practice" in name:
-        # "practice" belongs with independent attempts: a guided step and a
-        # practice step must not emit the same learner sentence.
-        return f"Complete the task for {skill} on your own and check your work before you finish."
-    if "guided" in name or "observation" in name or "discussion" in name or "recording" in name or "investigation" in name or "analysis" in name or "guided writing" in name or "guided reading" in name or "comparison" in name or "first item" in name or "second item" in name or "experience" in name or "participation" in name:
-        return f"Work with your partner/group to carry out the task for {skill} and record what you find."
-    if "critique" in name or "reflection" in name or "revision" in name or "improve" in name:
-        return f"Look at your work on {skill}, decide what went well and what to improve."
-    return f"Take an active part in the activity for {skill}."
+    if re.search(r"\b(play|game|song|rhyme|singing|dance|action)\b", name):
+        return "play"
+    if re.search(r"critique|reflect|revis|improv", name):
+        return "reflect"
+    if re.search(r"retriev|recall|warm|scenario|story|word wall|stimulus|"
+                 r"hook|question and|predict|opening", name):
+        return "open"
+    if re.search(r"demonstrat|model\b|explan(ation|ed|ing)|new concept|"
+                 r"introduc|teach|example|vocabulary|inspiration", name):
+        return "input"
+    if re.search(r"guid|observ|discuss|record|investigat|analys|sort|"
+                 r"classif|justify|explain the|examin|compar|case stud|"
+                 r"discovery|collect|participat", name):
+        return "guided"
+    if re.search(r"present|shar\b|display|exhibit", name):
+        return "share"
+    if re.search(r"independ|practi|appl|challenge|creat|try|comprehension|"
+                 r"findings|shar|accurac|solve|report|performance|present|"
+                 r"conclusion|check|exit|individual|pair|evidence", name):
+        return "independent"
+    return "other"
 
 
-def _teacher_move(phase_name: str, skill: str) -> str:
-    name = (phase_name or "").lower()
-    if "play" in name or "game" in name or "song" in name or "rhyme" in name:
+#: Learner and teacher moves per phase ROLE, in order of first use within one
+#: lesson: two guided steps must never print the same action twice (a repeated
+#: sentence is padding — the lesson quality benchmark counts it as such), so
+#: the second row of a role takes the next sentence in its bank. The learner
+#: bank is the Phase 2 default only: the activity library's own learner action
+#: still replaces the first fallback row (see ``build_lesson``).
+_LEARNER_TASKS: Dict[str, List[str]] = {
+    "play": [
+        "Join in the play or song about {skill} and try it yourself.",
+    ],
+    "open": [
+        "Write one answer to the opening question about {skill} and compare "
+        "it with your partner's.",
+    ],
+    "input": [
+        "Watch and listen carefully, then describe each step of {skill} in "
+        "your own words.",
+        "Copy one worked example of {skill}, then tell your partner what each "
+        "step does.",
+    ],
+    "guided": [
+        "Work with your partner/group to carry out the task for {skill} and "
+        "record what you find.",
+        "Compare your group's result for {skill} with another group and agree "
+        "which method is clearer.",
+    ],
+    "independent": [
+        "Complete the task for {skill} on your own and check your work before "
+        "you finish.",
+        "Work through the practice set for {skill} alone, then solve one more "
+        "question to check your method.",
+    ],
+    "share": [
+        "Present your group's work on {skill} in one minute and answer one "
+        "question from the class.",
+    ],
+    "reflect": [
+        "Look at your work on {skill}, decide what went well and what to "
+        "improve.",
+    ],
+    "other": [
+        "Work on {skill} and write down one thing you found and one thing you "
+        "still need help with.",
+    ],
+}
+
+_TEACHER_MOVES: Dict[str, List[str]] = {
+    "play": [
         # Early-years playful practice (Nursery/KG): the teacher watches,
         # encourages and names what each child is doing — no written marking.
-        return f"Watch the children as they play at {skill}, encourage them by name and praise their attempts."
-    if "demonstrat" in name or "model" in name or "explanation" in name or "teaching" in name or "predict" in name or "stimulus" in name or "inspiration" in name:
-        return f"Model {skill} slowly, think aloud, and check that all learners can see and hear."
-    if "independent" in name or "application" in name or "challenge" in name or "creation" in name or "try" in name or "comprehension" in name or "findings" in name or "sharing" in name or "accuracy" in name or "practice" in name:
-        return f"Circulate, give brief individual feedback, and note learners who need re-teaching of {skill}."
-    if "guided" in name or "observation" in name or "discussion" in name or "recording" in name or "investigation" in name or "analysis" in name or "guided writing" in name or "guided reading" in name or "participation" in name:
-        # "participation" is a guided step (the teacher helps each child by
-        # name), not an independent-practice step.
-        return f"Move around the room, observe each group, and correct misconceptions about {skill} on the spot."
-    if "critique" in name or "reflection" in name or "revision" in name:
-        return f"Lead a short, kind critique and highlight good examples relating to {skill}."
-    return f"Facilitate the activity and keep every learner focused on {skill}."
+        "Watch the children as they play at {skill}, encourage them by name "
+        "and praise their attempts.",
+    ],
+    "open": [
+        "Pose one opening question about {skill}, take three responses on the "
+        "board, and note which learners are already secure.",
+    ],
+    "input": [
+        "Model {skill} slowly, think aloud, and check that all learners can "
+        "see and hear.",
+        "Work one example of {skill} on the board step by step, then check "
+        "that every learner can name the next step.",
+    ],
+    "guided": [
+        "Move around the room, observe each group, and correct misconceptions "
+        "about {skill} on the spot.",
+        "Check each group's work on {skill} as they go, and ask one probing "
+        "question per group.",
+        "Listen to two groups explain their method for {skill}, and note "
+        "where the reasoning breaks down.",
+    ],
+    "independent": [
+        "Circulate, give brief individual feedback, and note learners who "
+        "need re-teaching of {skill}.",
+        "Observe individuals attempt {skill} without prompts, and record "
+        "which learners finish accurately.",
+        "Set a short time limit for {skill}, then mark which books show a "
+        "method error to address in the plenary.",
+    ],
+    "share": [
+        "Listen to each group's report on {skill}, write one strong reason "
+        "from each group on the board, and note which is strongest.",
+    ],
+    "reflect": [
+        "Lead a short, kind critique, note one strength and one fix for each "
+        "example relating to {skill}.",
+    ],
+    "other": [
+        "Move between groups, ask each group one question about {skill}, and "
+        "note what needs re-teaching.",
+    ],
+}
+
+
+def _learner_task(phase_name: str, skill: str, occurrence: int = 0) -> str:
+    bank = _LEARNER_TASKS.get(_phase_role(phase_name)) or _LEARNER_TASKS["other"]
+    return bank[occurrence % len(bank)].format(skill=skill)
+
+
+def _teacher_move(phase_name: str, skill: str, occurrence: int = 0) -> str:
+    bank = _TEACHER_MOVES.get(_phase_role(phase_name)) or _TEACHER_MOVES["other"]
+    return bank[occurrence % len(bank)].format(skill=skill)

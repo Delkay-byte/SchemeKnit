@@ -51,6 +51,11 @@ function normalizeActivities(raw: unknown): MainActivity[] {
   return out
 }
 
+/** Phase 1 / Phase 3 boundary rows of the stored timeline (see Phase 2 below). */
+function isBoundaryPhase(phase?: string): boolean {
+  return /^\s*phase\s*[13]\b/i.test(phase || '')
+}
+
 interface LessonData {
   id: string
   job_id: string
@@ -71,10 +76,11 @@ interface LessonData {
   indicator_codes?: string[]
   lesson_topic: string | null
   introduction: string | null
+  starter_activity?: string | null
   assessment: string | null
   conclusion: string | null
   learning_objectives?: { description: string; indicator_code?: string }[]
-  main_activities?: { description: string; duration_minutes?: number; resources?: string[] }[]
+  main_activities?: { phase?: string; description: string; duration_minutes?: number; resources?: string[] }[]
   keywords?: string[]
   source_tlrs?: string[]
   other_tlrs?: string[]
@@ -103,6 +109,10 @@ export default function LessonDetailPage() {
   // Editable fields
   const [topic, setTopic] = useState('')
   const [introduction, setIntroduction] = useState('')
+  // The Phase 1 opening activity itself — its prose also lives in the stored
+  // timeline's PHASE 1 row (so the lesson's minutes sum exactly), which the
+  // Phase 2 list below deliberately does not repeat.
+  const [starter, setStarter] = useState('')
   const [assessment, setAssessment] = useState('')
   const [conclusion, setConclusion] = useState('')
   // Assignments (PART 15): class = guided practice during the lesson,
@@ -166,6 +176,7 @@ export default function LessonDetailPage() {
       setLesson(data)
       setTopic(data.lesson_topic || '')
       setIntroduction(data.introduction || '')
+      setStarter(data.starter_activity || '')
       setAssessment(data.assessment || '')
       setConclusion(data.conclusion || '')
       setHomework(data.homework || '')
@@ -250,10 +261,20 @@ export default function LessonDetailPage() {
   }
 
   const addActivity = () =>
-    setMainActivities(prev => [
-      ...prev,
-      { description: '', duration_minutes: null, resources: [] },
-    ])
+    setMainActivities(prev => {
+      // Insert with the other Phase 2 steps — never after the stored
+      // PHASE 3 · PLENARY row that closes the timeline.
+      let at = prev.length
+      for (let i = prev.length - 1; i >= 0; i -= 1) {
+        if (!isBoundaryPhase(prev[i].phase)) {
+          at = i + 1
+          break
+        }
+      }
+      const next = [...prev]
+      next.splice(at, 0, { description: '', duration_minutes: null, resources: [] })
+      return next
+    })
 
   const updateActivity = (idx: number, patch: Partial<MainActivity>) =>
     setMainActivities(prev => prev.map((a, i) => (i === idx ? { ...a, ...patch } : a)))
@@ -263,12 +284,25 @@ export default function LessonDetailPage() {
 
   const moveActivity = (idx: number, delta: number) =>
     setMainActivities(prev => {
-      const next = [...prev]
       const target = idx + delta
-      if (target < 0 || target >= next.length) return prev
+      if (target < 0 || target >= prev.length) return prev
+      // Only Phase 2 steps reorder among themselves; the boundary rows stay
+      // pinned at the ends so the timeline keeps its shape.
+      if (isBoundaryPhase(prev[idx].phase) || isBoundaryPhase(prev[target].phase)) {
+        return prev
+      }
+      const next = [...prev]
       ;[next[idx], next[target]] = [next[target], next[idx]]
       return next
     })
+
+  // Phase 2 lists only its own steps: the boundary rows restate the Phase 1
+  // starter and the Phase 3 plenary, which those sections already show. The
+  // rows stay in state (and in the save payload) — only this list is
+  // filtered, so edit/remove/move keep working on the stored indices.
+  const phase2Activities = mainActivities
+    .map((activity, index) => ({ activity, index }))
+    .filter(({ activity }) => !isBoundaryPhase(activity.phase))
 
   const handleSave = async () => {
     try {
@@ -289,6 +323,7 @@ export default function LessonDetailPage() {
       const updated = await api.updateLesson(lessonId, {
         lesson_topic: topic,
         introduction,
+        starter_activity: starter,
         main_activities: activities,
         assessment,
         conclusion,
@@ -529,6 +564,16 @@ export default function LessonDetailPage() {
               onChange={(e) => setIntroduction(e.target.value)}
               rows={4}
             />
+            <p className="mb-1 mt-3 text-xs font-medium text-muted-foreground">
+              Starter activity
+            </p>
+            <TextArea
+              id="lesson-starter"
+              aria-label="Starter activity"
+              value={starter}
+              onChange={(e) => setStarter(e.target.value)}
+              rows={4}
+            />
           </section>
 
           {/* Phase 2 · Main Learning — fully editable, AI-suggestible (PART A/B). */}
@@ -560,26 +605,26 @@ export default function LessonDetailPage() {
               </div>
             </div>
 
-            {mainActivities.length === 0 && (
+            {phase2Activities.length === 0 && (
               <p className="mb-2 text-sm text-muted-foreground">
                 No main learning activities yet.
               </p>
             )}
 
             <div className="space-y-3">
-              {mainActivities.map((act, i) => (
+              {phase2Activities.map(({ activity: act, index: i }, position) => (
                 <div key={i} className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
                   <div className="mb-1.5 flex items-center justify-between gap-2">
                     <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                      Activity {i + 1}
+                      Activity {position + 1}
                     </span>
                     <div className="flex items-center gap-1">
                       <Button
                         type="button"
                         size="sm"
                         variant="ghost"
-                        aria-label={`Move activity ${i + 1} up`}
-                        disabled={i === 0}
+                        aria-label={`Move activity ${position + 1} up`}
+                        disabled={position === 0}
                         onClick={() => moveActivity(i, -1)}
                       >
                         <ChevronUp className="h-4 w-4" />
@@ -588,8 +633,8 @@ export default function LessonDetailPage() {
                         type="button"
                         size="sm"
                         variant="ghost"
-                        aria-label={`Move activity ${i + 1} down`}
-                        disabled={i === mainActivities.length - 1}
+                        aria-label={`Move activity ${position + 1} down`}
+                        disabled={position === phase2Activities.length - 1}
                         onClick={() => moveActivity(i, 1)}
                       >
                         <ChevronDown className="h-4 w-4" />
@@ -598,7 +643,7 @@ export default function LessonDetailPage() {
                         type="button"
                         size="sm"
                         variant="ghost"
-                        aria-label={`Remove activity ${i + 1}`}
+                        aria-label={`Remove activity ${position + 1}`}
                         onClick={() => removeActivity(i)}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -606,20 +651,20 @@ export default function LessonDetailPage() {
                     </div>
                   </div>
                   <TextArea
-                    aria-label={`Activity ${i + 1} description`}
+                    aria-label={`Activity ${position + 1} description`}
                     value={act.description}
                     onChange={(e) => updateActivity(i, { description: e.target.value })}
                     rows={2}
                   />
                   <div className="mt-2 flex items-center gap-2">
                     <label
-                      htmlFor={`activity-duration-${i}`}
+                      htmlFor={`activity-duration-${position}`}
                       className="text-xs text-muted-foreground"
                     >
                       Duration
                     </label>
                     <Input
-                      id={`activity-duration-${i}`}
+                      id={`activity-duration-${position}`}
                       type="number"
                       min={1}
                       value={act.duration_minutes ?? ''}
