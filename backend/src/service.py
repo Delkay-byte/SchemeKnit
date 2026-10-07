@@ -381,6 +381,8 @@ class DataService:
             wapef_gods_story=getattr(lp, "wapef_gods_story", "") or "",
             remarks=getattr(lp, "remarks", "") or "",
             week_number=lp.week_number,
+            source_occurrence_id=(
+                getattr(lp, "source_occurrence_id", "") or ""),
             week_ending=getattr(lp, "week_ending", None),
             week_ending_derived=bool(getattr(lp, "week_ending_derived", False)),
             teaching_week=getattr(lp, "teaching_week", 0) or lp.week_number,

@@ -618,6 +618,12 @@ class TeachingCalendar(BaseModel):
 class AllocatedIndicator(BaseModel):
     indicator_code: str
     indicator_description: str
+    #: Stable identity of the SOURCE OCCURRENCE this allocation was built
+    #: from (``week<source_week>:<position_in_week>:<indicator_code>``). The
+    #: canonical key for weekly coverage and duplicate detection: the same
+    #: indicator code in two different source weeks is TWO distinct
+    #: occurrences, never a duplicate allocation.
+    source_occurrence_id: str = ""
     content_standard_code: str
     content_standard_description: str
     strand: str
@@ -634,11 +640,14 @@ class AllocatedIndicator(BaseModel):
     # Period 1 = first lesson of the teaching week, Period 2 = second, etc.
     period_index: int = 0
     allocated: bool = False
-    #: Actual teaching week the lesson is delivered in. Equal to week_number
-    #: when no carry-forward was required, otherwise a later teaching week.
+    #: Actual teaching week the lesson is delivered in. Source-occurrence
+    #: semantics: this ALWAYS equals ``week_number`` — a lesson is never moved
+    #: to another curriculum week because of timetable capacity. The field is
+    #: retained for contract stability (older rows may differ).
     teaching_week: int = 0
-    #: True when the indicator carried forward out of its source week because
-    #: that week had more indicators than available teaching periods.
+    #: Legacy flag: True only when an older allocation moved the indicator out
+    #: of its source week. The current engine never sets it — teaching periods
+    #: are timetable metadata, never a cap, so nothing carries forward.
     carry_forward: bool = False
     #: The source week the indicator carried forward from (None when not moved).
     carry_forward_from_week: Optional[int] = None
@@ -730,6 +739,10 @@ class LessonPlan(BaseModel):
     remarks: str = ""
     #: Source curriculum week the lesson's indicator belongs to.
     week_number: int
+    #: Stable identity of the source occurrence (scheme week + position in
+    #: that week + indicator code) this lesson was generated from. Preserved
+    #: through generation, persistence, reload and export.
+    source_occurrence_id: str = ""
     #: Source week-ending date for that curriculum week. Authoritative when
     #: the document supplied it; export must not recompute over this value.
     week_ending: Optional[date] = None
@@ -738,12 +751,14 @@ class LessonPlan(BaseModel):
     lesson_sequence: int
     lesson_date: date
     lesson_number: int = 0
-    #: Actual teaching week the lesson is delivered in. Retains the link to the
-    #: source curriculum week via ``week_number`` while representing when the
-    #: teacher is actually scheduled to teach it.
+    #: Actual teaching week the lesson is delivered in. Source-occurrence
+    #: semantics: always equal to ``week_number`` — lesson plans are never
+    #: moved between curriculum weeks by timetable capacity. Retained for
+    #: contract stability with rows generated before Priority 1.
     teaching_week: int = 0
-    #: True when this lesson carries an indicator forward from an earlier
-    #: source week.
+    #: Legacy flag retained for contract stability. The allocation engine no
+    #: longer carries indicators forward, so newly generated lessons are
+    #: always False.
     carry_forward: bool = False
     # Timetable slot, e.g. "1st & 2nd". Teacher-configured; never invented.
     period: str = ""

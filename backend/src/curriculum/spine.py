@@ -483,6 +483,8 @@ def lesson_provenance(
         "scheme": (getattr(scheme_db, "filename", "") if scheme_db else "") or "",
         "curriculum_source": "Teacher scheme",
         "source_week": getattr(lp, "week_number", None),
+        # Canonical identity of the source occurrence this lesson covers.
+        "source_occurrence_id": getattr(lp, "source_occurrence_id", "") or "",
         "teaching_week": getattr(lp, "teaching_week", None) or getattr(lp, "week_number", None),
         "strand": getattr(lp, "strand", "") or "",
         "sub_strand": getattr(lp, "sub_strand", "") or "",

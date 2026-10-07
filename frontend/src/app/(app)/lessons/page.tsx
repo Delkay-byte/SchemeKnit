@@ -187,11 +187,6 @@ export default function LessonsPage() {
                         </TableCell>
                         <TableCell className="whitespace-nowrap">
                           W{teachingWeek}
-                          {lesson.carry_forward && lesson.week_number !== teachingWeek && (
-                            <span className="block text-[11px] text-muted-foreground">
-                              from W{lesson.week_number}
-                            </span>
-                          )}
                         </TableCell>
                         <TableCell className="whitespace-nowrap">
                           {lesson.period || '—'}

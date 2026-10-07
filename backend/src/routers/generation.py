@@ -210,6 +210,21 @@ async def preview_allocation(
     )
     report = pipeline.coverage_validator.generate_report(scheme.weeks, coverage)
 
+    # ── Weekly coverage semantics (Priority 1) ───────────────────────────
+    # The week table tells the teacher the truth about coverage: how many
+    # curriculum occurrences the source week holds, how many periods the
+    # timetable defines (context only), and how many lesson plans that means.
+    # The timetable count NEVER changes the lesson count.
+    from collections import defaultdict
+    timetable_periods: Dict[int, int] = defaultdict(int)
+    for _day in calendar.days:
+        if _day.is_teaching_day and _day.week_number:
+            timetable_periods[_day.week_number] += 1
+    for _ws in report.get("weeks", []):
+        _wn = _ws.get("week_number")
+        _ws["teaching_period_count"] = timetable_periods.get(_wn, 0)
+        _ws["lesson_plans_required"] = _ws.get("lesson_count", 0)
+
     # Free Tier context for the allocation screen (PART C): how many lesson-plan
     # units remain this calendar month and how many indicators this scheme has.
     from ..entitlements import resolve_entitlement, lesson_quota_status
@@ -291,6 +306,8 @@ async def preview_allocation(
             "week_ending": a.week_ending.isoformat() if a.week_ending else None,
             "week_ending_derived": bool(a.week_ending_derived),
             "teaching_week": a.teaching_week or a.week_number,
+            "source_occurrence_id": (
+                getattr(a, "source_occurrence_id", "") or ""),
             "source_tlrs": list(a.source_resources or []),
             # Special-period rows (PART R): the review UI shows the period
             # banner and NO editable lesson fields for these.
@@ -316,6 +333,8 @@ async def preview_allocation(
                 "scheme": getattr(scheme_db, "filename", "") or "",
                 "curriculum_source": "Teacher scheme",
                 "source_week": a.week_number,
+                "source_occurrence_id": (
+                    getattr(a, "source_occurrence_id", "") or ""),
                 "teaching_week": a.teaching_week or a.week_number,
                 "strand": a.strand or "",
                 "sub_strand": a.sub_strand or "",
@@ -885,16 +904,20 @@ async def get_curriculum_coverage(
 
     lessons = data_service.get_lesson_plans_for_job(db, job_id, user.id)
 
-    # In the indicator→period model each lesson carries exactly one primary
-    # indicator, so total_indicators == total lessons with an indicator.
+    # In the source-occurrence model each lesson carries exactly one primary
+    # indicator for ONE source occurrence, so total_indicators == total lessons
+    # with an indicator.
     total_lessons = len(lessons)
     total_indicators = sum(1 for lp in lessons if lp.indicator_codes)
     indicators_duplicated = 0
     from collections import Counter
+    # Duplicate detection keys on the SOURCE OCCURRENCE identity (source week
+    # + indicator), never on indicator_code alone: the same code in two
+    # different source weeks is two legitimate occurrences, not duplicates.
     code_counter = Counter()
     for lp in lessons:
         for c in (lp.indicator_codes or []):
-            code_counter[c] += 1
+            code_counter[(lp.week_number, c)] += 1
     indicators_duplicated = sum(n - 1 for n in code_counter.values() if n > 1)
 
     coverage_pct = (
@@ -1653,6 +1676,8 @@ def _serialize_lesson(lp, scheme_db=None) -> dict:
         "job_id": lp.job_id,
         "week_number": lp.week_number,
         "source_week": lp.week_number,
+        "source_occurrence_id": (
+            getattr(lp, "source_occurrence_id", "") or ""),
         "week_ending": (
             lp.week_ending.isoformat()
             if getattr(lp, "week_ending", None)
@@ -1756,6 +1781,7 @@ def _db_to_lesson_model(lp) -> LessonPlan:
         scheme_of_work_id=lp.scheme_id,
         term_config_id=lp.job_id,
         week_number=lp.week_number,
+        source_occurrence_id=(getattr(lp, "source_occurrence_id", "") or ""),
         week_ending=getattr(lp, "week_ending", None),
         week_ending_derived=bool(getattr(lp, "week_ending_derived", False)),
         teaching_week=getattr(lp, "teaching_week", None) or lp.week_number,

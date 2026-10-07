@@ -3,13 +3,14 @@ SchemeKnit Curriculum Coverage Validation
 ==========================================
 
 Validates that every instruction indicator is allocated to exactly one
-lesson. The core invariant of the indicator→period allocation model:
+lesson. The core invariant of the source-occurrence allocation model:
 
-    ONE INDICATOR → EXACTLY ONE PRIMARY LESSON
+    ONE SOURCE OCCURRENCE → EXACTLY ONE LESSON, IN ITS SOURCE WEEK
 
 No indicator may disappear (missing allocation).
-No indicator may appear as the primary indicator of multiple lessons
-(duplicate allocation).
+No source occurrence may be generated twice (duplicate allocation).
+The same indicator code in two different source weeks is two legitimate
+occurrences — never a duplicate.
 """
 
 from typing import List, Dict, Tuple
@@ -56,18 +57,32 @@ class CoverageValidator:
             ))
 
         # ── 3. Duplicate primary allocations ─────────────────────────
-        # An indicator must be the primary focus of EXACTLY ONE lesson.
-        code_counter: Counter = Counter()
+        # A source occurrence must be the primary focus of EXACTLY ONE lesson.
+        # The key is the SOURCE OCCURRENCE (source week + indicator code +
+        # indicator text) — never the indicator code alone, because the same
+        # code in two different source weeks is two legitimate occurrences.
+        # Special-period metadata rows are not lessons and never count.
+        occurrence_counter: Dict[Tuple[int, str, str], int] = defaultdict(int)
         for alloc in coverage.allocations:
-            code_counter[alloc.indicator_code] += 1
+            if getattr(alloc, "is_special_period", False):
+                continue
+            occurrence_counter[
+                (alloc.week_number, alloc.indicator_code,
+                 alloc.indicator_description)
+            ] += 1
 
-        duplicated = {code: count for code, count in code_counter.items() if count > 1}
+        duplicated = {
+            key: count for key, count in occurrence_counter.items() if count > 1
+        }
         if duplicated:
-            for code, count in sorted(duplicated.items()):
+            for (week_no, code, _text), count in sorted(duplicated.items()):
                 issues.append(ValidationIssue(
                     severity=ValidationSeverity.WARNING,
                     field="indicator",
-                    message=f"Indicator {code} is the primary indicator of {count} lessons (expected exactly 1)",
+                    message=(
+                        f"Week {week_no}: indicator {code} is the primary "
+                        f"indicator of {count} lessons (expected exactly 1)"
+                    ),
                 ))
 
         # ── 4. Missing indicators ────────────────────────────────────
@@ -188,9 +203,12 @@ class CoverageValidator:
                         "strand": a.strand,
                         "sub_strand": a.sub_strand,
                         "lesson_date": a.lesson_date.isoformat() if a.lesson_date else None,
-                        # Source curriculum week is week_number; the actual
-                        # teaching week is preserved separately so the preview
-                        # can show carry-forward without losing curriculum origin.
+                        # Canonical identity of the source occurrence this
+                        # lesson covers (source week + position + indicator
+                        # code). The teaching week always equals the source
+                        # week: nothing moves between curriculum weeks.
+                        "source_occurrence_id": (
+                            getattr(a, "source_occurrence_id", "") or ""),
                         "source_week": a.week_number,
                         "week_ending": a.week_ending.isoformat() if a.week_ending else None,
                         "week_ending_derived": bool(a.week_ending_derived),
@@ -228,11 +246,16 @@ class CoverageValidator:
                         "strand": a.strand,
                         "sub_strand": a.sub_strand,
                         "lesson_date": a.lesson_date.isoformat() if a.lesson_date else None,
+                        "source_occurrence_id": (
+                            getattr(a, "source_occurrence_id", "") or ""),
                         "source_week": a.week_number,
                         "week_ending": a.week_ending.isoformat() if a.week_ending else None,
                         "week_ending_derived": bool(a.week_ending_derived),
                         "teaching_week": a.teaching_week or a.week_number,
                         "source_tlrs": list(a.source_resources or []),
+                        # "carried_forward" exists only for rows generated
+                        # before source-occurrence semantics; the current
+                        # engine never moves a lesson to another week.
                         "status": (
                             "needs_review" if a.needs_review
                             else "carried_forward" if a.carry_forward

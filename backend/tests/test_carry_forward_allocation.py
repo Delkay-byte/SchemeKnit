@@ -1,12 +1,20 @@
 """
-Indicator carry-forward allocation tests (§6-§10).
+Weekly coverage: NO capacity-driven carry-forward (Priority 1 semantics).
 
-    ONE INDICATOR → ONE TEACHING PERIOD → ONE LESSON PLAN
+Historical note: this suite used to assert the REMOVED behaviour — surplus
+indicators in a week with fewer teaching periods were carried into the
+following teaching week. The authoritative rule is now:
 
-When a source curriculum week contains more indicators than it has teaching
-periods, the surplus must CARRY FORWARD to the following teaching week(s):
-never dropped, never merged, never duplicated, and with BOTH the source
-curriculum week and the actual teaching week preserved.
+    SOURCE OCCURRENCE → WEEKLY LESSON PLAN
+
+Teaching periods are timetable metadata; they never cap, defer, move or
+rebalance curriculum lesson plans. Every source occurrence keeps its own
+source week, and duplicate detection keys on the source occurrence identity
+(week + position + code), never on indicator_code alone.
+
+The full regression matrix (T1-T14) lives in
+``tests/test_weekly_coverage_semantics.py``; this module pins the specific
+shapes that used to carry forward.
 """
 
 from datetime import date, timedelta
@@ -70,39 +78,34 @@ def calendar_engine():
 
 
 class TestFiveIndicatorsThreePeriods:
-    """§7 canonical example: 5 indicators / 3 teaching periods."""
+    """§7 canonical example: 5 indicators / 3 teaching periods → 5 in week 1."""
 
     def _coverage(self, engine, calendar_engine):
         weeks = [
             make_week(1, [indicator(1, i) for i in range(1, 6)]),
-            make_week(2, []),  # next teaching week receives the carry-forward
+            make_week(2, []),
         ]
         config = make_config()
         cal = calendar_engine.build_calendar(config, weeks, [])
         return engine.allocate(weeks, cal, config), config
 
-    def test_first_three_in_week_one(self, engine, calendar_engine):
+    def test_all_five_stay_in_week_one(self, engine, calendar_engine):
         coverage, _ = self._coverage(engine, calendar_engine)
-        w1 = [a for a in coverage.allocations if a.teaching_week == 1]
-        assert len(w1) == 3
-        assert sorted(a.period_index for a in w1) == [1, 2, 3]
+        w1 = [a for a in coverage.allocations if a.week_number == 1]
+        assert len(w1) == 5
+        assert sorted(a.period_index for a in w1) == [1, 2, 3, 4, 5]
 
-    def test_remaining_two_carry_to_week_two(self, engine, calendar_engine):
+    def test_week_two_receives_nothing(self, engine, calendar_engine):
         coverage, _ = self._coverage(engine, calendar_engine)
-        w2 = [a for a in coverage.allocations if a.teaching_week == 2]
-        assert len(w2) == 2
-        assert sorted(a.period_index for a in w2) == [1, 2]
-        assert all(a.carry_forward for a in w2)
+        w2 = [a for a in coverage.allocations if a.week_number == 2]
+        assert w2 == []
+        assert not any(a.teaching_week == 2 for a in coverage.allocations)
 
-    def test_source_week_preserved(self, engine, calendar_engine):
+    def test_nothing_is_ever_marked_carried(self, engine, calendar_engine):
         coverage, _ = self._coverage(engine, calendar_engine)
-        # Every indicator still reports its ORIGINAL curriculum week.
-        assert all(a.week_number == 1 for a in coverage.allocations)
-
-    def test_carry_forward_from_week_recorded(self, engine, calendar_engine):
-        coverage, _ = self._coverage(engine, calendar_engine)
-        carried = [a for a in coverage.allocations if a.carry_forward]
-        assert all(a.carry_forward_from_week == 1 for a in carried)
+        assert not any(a.carry_forward for a in coverage.allocations)
+        assert not any(a.carry_forward_from_week
+                       for a in coverage.allocations)
 
     def test_no_indicator_dropped_or_duplicated(self, engine, calendar_engine):
         coverage, _ = self._coverage(engine, calendar_engine)
@@ -118,27 +121,18 @@ class TestFiveIndicatorsThreePeriods:
         plans = engine.generate_lesson_plans(coverage, config, "scheme-1")
         assert len(plans) == 5
         for plan in plans:
+            assert plan.week_number == 1
             assert len(plan.indicators) == 1
             assert len(plan.indicator_codes) == 1
 
-    def test_actual_teaching_week_on_lesson(self, engine, calendar_engine):
-        coverage, config = self._coverage(engine, calendar_engine)
-        plans = engine.generate_lesson_plans(coverage, config, "scheme-1")
-        carried = [p for p in plans if p.carry_forward]
-        assert len(carried) == 2
-        assert all(p.teaching_week == 2 for p in carried)
-        # ...and the curriculum origin is not overwritten by the teaching week.
-        assert all(p.week_number == 1 for p in carried)
-
-    def test_carry_forward_conflict_reported(self, engine, calendar_engine):
+    def test_no_capacity_conflict_is_reported(self, engine, calendar_engine):
         coverage, _ = self._coverage(engine, calendar_engine)
-        assert coverage.allocation_conflicts
-        msg = coverage.allocation_conflicts[0]
-        assert "5" in msg and "3" in msg
+        assert coverage.allocation_conflicts == []
+        assert not any("continue in the next" in w for w in coverage.warnings)
 
 
 class TestEightIndicatorsThreePeriods:
-    """§9: 8 indicators / 3 periods → 3, 3, 2 across three teaching weeks."""
+    """§9: 8 indicators / 3 periods → ALL 8 stay in their source week."""
 
     def _coverage(self, engine, calendar_engine):
         weeks = [
@@ -154,10 +148,10 @@ class TestEightIndicatorsThreePeriods:
         coverage = self._coverage(engine, calendar_engine)
         per_week = {}
         for a in coverage.allocations:
-            per_week.setdefault(a.teaching_week, []).append(a)
-        assert len(per_week[1]) == 3
-        assert len(per_week[2]) == 3
-        assert len(per_week[3]) == 2
+            per_week.setdefault(a.week_number, []).append(a)
+        assert len(per_week[1]) == 8
+        assert per_week.get(2, []) == []
+        assert per_week.get(3, []) == []
 
     def test_total_and_uniqueness(self, engine, calendar_engine):
         coverage = self._coverage(engine, calendar_engine)
@@ -165,12 +159,11 @@ class TestEightIndicatorsThreePeriods:
         codes = [a.indicator_code for a in coverage.allocations]
         assert len(set(codes)) == 8
 
-    def test_period_numbers_reset_each_teaching_week(self, engine, calendar_engine):
+    def test_period_numbers_run_within_the_source_week(self, engine, calendar_engine):
         coverage = self._coverage(engine, calendar_engine)
-        w2 = sorted(
-            (a.period_index for a in coverage.allocations if a.teaching_week == 2)
-        )
-        assert w2 == [1, 2, 3]
+        w1 = sorted(a.period_index for a in coverage.allocations
+                    if a.week_number == 1)
+        assert w1 == [1, 2, 3, 4, 5, 6, 7, 8]
 
 
 class TestDeterminismAndOrdering:
@@ -186,7 +179,9 @@ class TestDeterminismAndOrdering:
         assert len(first.allocations) == len(second.allocations)
         for a, b in zip(first.allocations, second.allocations):
             assert a.indicator_code == b.indicator_code
+            assert a.week_number == b.week_number
             assert a.teaching_week == b.teaching_week
+            assert a.source_occurrence_id == b.source_occurrence_id
             assert a.period_index == b.period_index
             assert a.carry_forward == b.carry_forward
             assert a.lesson_date == b.lesson_date

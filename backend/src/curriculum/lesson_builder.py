@@ -1936,6 +1936,8 @@ def build_lesson(
         scheme_of_work_id=scheme_id,
         term_config_id=config.id,
         week_number=alloc.week_number,
+        source_occurrence_id=(
+            getattr(alloc, "source_occurrence_id", "") or ""),
         # INTERNAL diagnostic only (never persisted, never shown): the teaching
         # pattern this lesson was sequenced from, so the batch benchmark can
         # verify selection genuinely varied. Empty when no pattern was used.

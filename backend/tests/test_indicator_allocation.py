@@ -201,7 +201,10 @@ class TestIndicatorPeriodConflict:
         assert len(plans) == 3
         assert coverage.indicators_unallocated == 0
 
-    def test_conflict_is_reported(self, engine, calendar_engine):
+    def test_no_capacity_conflict_is_reported(self, engine, calendar_engine):
+        """Priority 1: surplus indicators are NOT a conflict and never
+        "continue in the next teaching week" — they stay in their source
+        week, and the timetable context is stated as a warning instead."""
         indicators = [
             "B9.1.1.1.1 Describe the nature of matter.",
             "B9.1.1.1.2 Classify materials.",
@@ -212,10 +215,10 @@ class TestIndicatorPeriodConflict:
         cal = calendar_engine.build_calendar(config, weeks, [])
         coverage = engine.allocate(weeks, cal, config)
 
-        assert len(coverage.allocation_conflicts) > 0
-        conflict = coverage.allocation_conflicts[0]
-        assert "3 indicators" in conflict
-        assert "2 teaching periods" in conflict
+        assert coverage.allocation_conflicts == []
+        assert all(a.week_number == 1 for a in coverage.allocations)
+        assert all(not a.carry_forward for a in coverage.allocations)
+        assert not any("continue in the next" in w for w in coverage.warnings)
 
 
 # ── 4. Multiple weeks ──────────────────────────────────────────────────
