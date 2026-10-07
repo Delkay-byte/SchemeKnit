@@ -1212,6 +1212,15 @@ _EXTRA_LEAD_VERBS = frozenset((
     "draft", "rehearse", "publish", "present", "report", "monitor",
     "maintain", "troubleshoot", "format", "insert", "share", "sketch",
     "recommend", "argue", "defend", "prioritise", "prioritize",
+    # Leads observed verbatim in real_documents/ GES schemes that the shared
+    # inventories (measurable list + Bloom) do not carry. Without these a real
+    # verb sentence took the noun-phrase path below and was mangled into
+    # "Describe listen to …" / "Use simplify given surds." — worse than the
+    # source it was meant to repair.
+    "listen", "give", "follow", "elaborate", "tell", "answer",
+    "experiment", "pay", "discover", "propose", "translate", "extend",
+    "mention", "simplify", "approximate", "derive", "generate", "blend",
+    "dramatize", "edit", "proofread",
 ))
 
 _LEAD_LEXICON: Optional[frozenset] = None
@@ -1293,8 +1302,9 @@ def _learner_phrase(indicator: str, subject_name: str = "") -> str:
         if lower.startswith(prefix):
             clean = clean[len(prefix):]
             break
-    # Source separator / bullet before the text (" : Discuss …", ".2 Learn …").
-    clean = re.sub(r"^[\s:;.]+", "", clean).strip()
+    # Source separator / bullet before the text (" : Discuss …", ".2 Learn …",
+    # "- Écouter …" — a dashed list item keeps its non-ASCII lead guard below).
+    clean = re.sub(r"^[\s:;.\-–—•]+", "", clean).strip()
     if not clean:
         return "Learners can".strip()
     # (2) A French lesson stays French; any non-ASCII lead is source prose the
@@ -1327,6 +1337,13 @@ def _learner_phrase(indicator: str, subject_name: str = "") -> str:
             base = stem
         elif stem.endswith("z") and f"{stem}ize" in lexicon:
             base = f"{stem}ize"
+        elif lead_l.endswith("ying") and len(lead_l) > 5 and (
+                (lead_l[:-4] + "y") in lexicon
+                or _indicator_primary_verb(lead_l[:-4] + "y")):
+            # "Multiplying …" -> "multiply …" (verified against the shared
+            # leading-verb matcher, which carries maths verbs the lexicon
+            # inventory does not).
+            base = lead_l[:-4] + "y"
         if base:
             words[0] = base.capitalize() if lead[:1].isupper() else base
             clean = " ".join(words)
@@ -1340,8 +1357,27 @@ def _learner_phrase(indicator: str, subject_name: str = "") -> str:
             return f"Learners can {phrase[0].upper()}{phrase[1:]}".strip()
 
     # (5)/(6) Real lead verb (shared leading-verb list, extras) is kept;
-    # anything else is a noun phrase and receives the subject's verb.
-    if _indicator_primary_verb(clean) or lead_l in _EXTRA_LEAD_VERBS or lead_l in lexicon:
+    # anything else is a noun phrase and receives the subject's verb. A few
+    # SOURCE SHAPES are never noun phrases and are kept verbatim too:
+    # a slashed verb pair ("Edit/proofread draft …"), an adverb lead
+    # ("Orally produce …"), a list-marker fragment ("ii. Relative pronouns …")
+    # and whole-cell caps ("REVISION", "END OF TERM ASSESSMENT" — lower-casing
+    # their first letter would mangle them into "rEVISION").
+    raw_first = words[0] if words else ""
+    keep = bool(_indicator_primary_verb(clean)) or lead_l in _EXTRA_LEAD_VERBS or lead_l in lexicon
+    if not keep and re.search(r"[/&]", raw_first):
+        for seg in re.split(r"[/&]", raw_first):
+            seg_l = re.sub(r"[^A-Za-z']", "", seg).lower()
+            if seg_l and (seg_l in lexicon or seg_l in _EXTRA_LEAD_VERBS):
+                keep = True
+                break
+    if not keep and lead_l.endswith("ly") and len(lead_l) > 3:
+        keep = True
+    if not keep and raw_first.endswith(".") and re.fullmatch(r"[ivxlcdm]+", lead_l):
+        keep = True
+    if not keep and clean.isupper():
+        keep = True
+    if keep:
         return f"Learners can {clean}".strip()
     focus = clean
     if focus[:1].isupper() and focus.split(" ", 1)[0].lower() not in _PROPER_NOUN_STARTS:
