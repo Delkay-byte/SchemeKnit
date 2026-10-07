@@ -87,6 +87,23 @@ structure:
   base verb ("Demonstrating…" → "Demonstrate…") → verbless noun phrase
   receives the subject's verb (`_NOUN_LEAD_VERBS`: PHE→identify, RME→explain,
   maths→use, science→investigate, …) → genuine lead verbs kept verbatim.
+- **Follow-up fix (`a38e35c`, found while building the production deploy
+  marker):** running every indicator cell of `backend/real_documents/` through
+  the repair showed 21 real NaCCA lead verbs absent from the shared
+  inventories were falling into the noun path and being mangled
+  ("Learners can Listen to …" → "Describe listen to …", "Simplify given
+  surds." → "Use simplify …"). Those leads were added to
+  `_EXTRA_LEAD_VERBS (listen, give, follow, elaborate, tell, answer,
+  experiment, pay, discover, propose, translate, extend, mention, simplify,
+  approximate, derive, generate, blend, dramatize, edit, proofread), plus
+  four never-noun source shapes are now kept verbatim: slashed verb pairs
+  ("Edit/proofread draft …"), adverb leads ("Orally produce …"), dotted list
+  markers ("ii. Relative pronouns …") and whole-cell specials
+  ("REVISION"/"END OF TERM ASSESSMENT" — first-letter lower-casing mangled
+  them into "rEVISION"); dashed list bullets are separators so the non-ASCII
+  guard sees the text, and a y-stem rule reduces "Multiplying …" →
+  "Multiply …". After the fix a full scan of real_documents/ shows no verb
+  sentence taking the noun path (12 regression tests cover these exact cells).
 - `_first_clause`/`_trim_dangling_tail`: connector tails ("using", "with",
   "from"…) trimmed so no clause ends on a preposition (filler_text 1 → 0).
 - `_render_pattern_step(step, fmt, profile, act_key, used=None)`: ordered
@@ -216,15 +233,16 @@ was made to chase those checks.
 
 | Gate | Result |
 |---|---|
-| Full backend suite | `pytest tests -q -p no:randomly -m "not live"` → **2222 passed, 11 skipped, 5 deselected, 0 failed** (2161 pre-existing + 61 new hardening tests) |
-| New hardening tests | `tests/test_priority21_hardening.py` → **61/61** (library scale & churn guards, assessment bank, PHE/history/early-childhood strategies, objective cleanup incl. French, resource realism, 30–80 timing, fingerprint/repeat/starter progression) |
-| Frozen rubric benchmark | **11/11 teacher-ready, 73.7/75, no hard failures** — byte-identical summary to the Priority 2 `after.json` |
-| Hardening benchmark | expanded **23→31/40**, messy **9→12/19** (tables above) |
+| Full backend suite | `pytest tests -q -p no:randomly -m "not live"` → **2234 passed, 11 skipped, 5 deselected, 0 failed** (2161 pre-existing + 73 hardening tests) |
+| New hardening tests | `tests/test_priority21_hardening.py` → **73/73** (library scale & churn guards, assessment bank, PHE/history/early-childhood strategies, objective cleanup incl. French + the real-scheme verb-lead regression cases, resource realism, 30–80 timing, fingerprint/repeat/starter progression) |
+| Frozen rubric benchmark | **11/11 teacher-ready, 73.7/75, no hard failures** — byte-identical summary to the Priority 2 `after.json`, re-verified after the `a38e35c` fix |
+| Hardening benchmark | expanded **23→31/40**, messy **9→12/19** (tables above; unchanged by `a38e35c` — those corpora contain none of the fixed leads) |
 | Export inspection (GES + WAPEF, Mathematics + Science) | exit 0; Phase 1/2/3 cells carry their own rows; no new duplication |
 | Browser journey (real app, AI OFF) | `frontend/e2e/lesson-persistence-journey.js` → **70/70** |
 | Curriculum workspace acceptance | `npm run e2e:workspace` → **75/75** |
 | Frontend typecheck | `npx tsc --noEmit` → clean |
 | Frontend build | `npm run build` → clean |
+| Old-vs-new pipeline diff (deploy marker) | same docx + same 2 selected codes through isolated instances of `6189b6a` and `HEAD`: objectives **"Learners can Discuss the formation…"** vs **"Learners can Explain the formation…"** — deterministic, idempotent to re-check (`already_counted` billing) |
 
 **Local environment note (reported, not hidden):** the local Free-Tier
 lesson quota for `accept.teacher@schemeknit.test` was exhausted (5/5 for
@@ -235,13 +253,58 @@ was reset to 0/5 in `backend/teachflow.db` (local fixture only) and the
 journey then passed **75/75**. No product code, no entitlement logic and no
 production data were touched.
 
-### 5b. PRODUCTION (deployed app — run after push/redeploy)
+### 5b. PRODUCTION (deployed app, `schemeknit-frontend/-api.onrender.com`)
 
-*Run against `https://schemeknit-frontend.onrender.com` /
-`https://schemeknit-api.onrender.com` with the dedicated test account after
-the deploy of this commit; results are recorded in section 5b of the commit
-that follows the deploy (see the final verification appendix at the end of
-this document).*
+**Deploy status: the deployed build does NOT contain this change set.**
+After pushing `a08e838` and `a38e35c` to `main`, the live backend was polled
+for ~55 minutes with the deploy-marker generation (same scheme, same two
+codes, re-billing suppressed by `already_counted`). The marker never moved
+off the baseline. There is no deploy hook in the repo or `.env`, no CI
+workflow, and no Render dashboard access from this environment (the
+environment limitation already recorded in
+`docs/RENDER_DEPLOYMENT_FIX_REPORT.md` — a redeploy must be triggered from
+the Render dashboard, owner-side). **A production run of our code is
+therefore blocked on an owner-side redeploy; everything below was verified
+against the build currently deployed.**
+
+What IS verified on the live environment (dedicated test accounts created
+through the app's own registration flow; no customer data touched; no
+quota/payment/entitlement state modified):
+
+| Check | Result |
+|---|---|
+| API health | `GET /api/health` → **200**, `{"status":"healthy","service":"SchemeKnit","version":"1.0.5"}` |
+| Frontend | `GET /` → **200** |
+| Registration + login | `POST /api/auth/register/individual` → **200**; `POST /api/auth/login` → **200** (one transient **500** on `register` during a cold start, resolved on retry 20 s later — the known Render cold-start auth blip; four further registrations 200) |
+| Full generation flow (API) | upload → detection (single subject, Science/Basic 9) → weeks → `POST /api/generation/{id}/generate` (AI OFF, 2 selected codes) → lessons: **all 200**, deterministic lesson JSON returned |
+| Curriculum workspace acceptance | `npm run e2e:workspace` (production URLs, dedicated account) → **75/75 checks passed** |
+| Browser persistence journey | `node e2e/lesson-persistence-journey.js` (production URLs, self-registering account) → **68/70**; the 2 failures are `workspace reflects the Through lines chosen before generation` and `Deep Hope set before generation survives into the workspace` — exactly the WAPEF pre-generation save-boundary defect fixed later by `2bf2b9a`, i.e. stale-build symptoms (local run of the same script: **70/70**) |
+
+**Deploy marker (why the deployed build is pre-Priority-2).** The same
+scheme (`BASIC 9 SCIENCE SCHEME OF LEARNING.docx`) and the same two selected
+codes (`B9.1.1.1.2`, `B9.1.2.1.1`) were generated on an isolated instance of
+`6189b6a`, on an isolated instance of `HEAD`, and on production:
+
+| Source | Objective produced |
+|---|---|
+| `6189b6a` baseline (local, isolated DB) | "Learners can **Discuss** the formation of binary chemical compounds Describe the characteristics …" |
+| `HEAD` = `a38e35c` (local, isolated DB) | "Learners can **Explain** the formation of binary chemical compounds Describe the characteristics …" |
+| **Production (deployed build)** | "Learners can **Discuss** the formation …" — identical to the `6189b6a` baseline |
+
+Production additionally shows two pre-Priority-2 signatures in the same
+lesson JSON: `lesson_topic` is still the strand + sub-strand concatenation
+("Diversity of Matter - Materials") instead of the indicator-derived topic,
+and `main_activities` has no `PHASE 1 · STARTER` / `PHASE 3 · PLENARY`
+boundary rows (the Priority 2 timing invariant's rows) — so the deployed
+backend predates Priority 2 entirely.
+
+**Observation (deployed build, reported not changed).** The marker account
+was charged 2 lessons per run in the generation response, yet
+`GET /api/generation/quota` on production reported
+`used: 0, remaining: 5` after four stored lessons. On current code (local
+instance of `HEAD`) the same endpoint reports `used: 2` immediately after
+two lessons. The deployed build's quota ledger therefore reports differently
+from this branch; no production state was altered to probe further.
 
 ---
 
@@ -257,7 +320,16 @@ this document).*
 4. GES export cell resource duplication ("x2" in `export_inspect.py`) is a
    template-merge behaviour predating this pass (source list + activity
    materials rendered together); it is informational and unchanged here.
-5. No vector store, no paid dependency, no second lesson model, no AI call was
+5. **Production deploy**: the deployed Render build predates Priority 2 and
+   cannot be updated from this environment (no deploy hook / CI / dashboard
+   access — owner-side redeploy required). Until then, production evidence
+   covers the deployed build only; the marker in 5b re-checks our code for
+   free (`already_counted`) the moment a redeploy lands.
+6. **Deployed-build quota observation** (5b): production reported
+   `used: 0/5` after four stored lessons on the marker account, while
+   current code reports usage immediately. Reported, not changed — production
+   state was not touched.
+7. No vector store, no paid dependency, no second lesson model, no AI call was
    added. Zeli remains optional everywhere.
 
 ---
@@ -271,7 +343,7 @@ this document).*
 | `backend/src/curriculum/lesson_builder.py` | `_learner_phrase`, dangling-tail trim, distinct step fallbacks, repeat stage/addenda, starter variants, resource realism |
 | `backend/src/curriculum/variation.py` | `LessonFingerprint.indicator_code` + extraction |
 | `backend/src/engines/allocation_engine.py` | INDICATOR_CODE_RE-aware description/source/strip |
-| `backend/tests/test_priority21_hardening.py` | **new** — 61 tests |
+| `backend/tests/test_priority21_hardening.py` | **new** — 73 tests |
 | `backend/tests/benchmark_hardening.py` | **new** — frozen expanded + messy corpora |
 | `docs/benchmark/hardening_{before,after}.json` | **new** — snapshots |
 | `docs/DETERMINISTIC_LESSON_AUTHORING.md` | Part 7 — hardening section |
@@ -279,6 +351,41 @@ this document).*
 
 ---
 
-## Appendix — production verification results
+## Appendix — production verification record
 
-*(filled after the production run — see section 5b)*
+Environment: `https://schemeknit-frontend.onrender.com` (frontend),
+`https://schemeknit-api.onrender.com` (API, `version 1.0.5`), 2026-10-07.
+All accounts created through `POST /api/auth/register/individual` on the live
+app; none pre-existed; no customer data read or written; no quota, payment or
+entitlement state modified from outside the product.
+
+| Account (dedicated test) | Used for |
+|---|---|
+| `p21.prod.marker@schemeknit.test` | API marker generations (upload → generate → lessons); re-run ~15× for the deploy poll |
+| `persist.teacher.<timestamp>@schemeknit.test` | persistence journey (self-registered by the script) |
+| `p21.workspace.prod@schemeknit.test` | workspace acceptance (login flow) |
+| `p21.retry*/probe.*@schemeknit.test` | transient-500 retry probes (registration only) |
+
+Commands:
+
+```bash
+# marker (deploy status) — local: "Explain", production: "Discuss"
+backend/venv/Scripts/python <temp>/marker_driver.py \
+  https://schemeknit-api.onrender.com p21.prod.marker@... 'MarkerProd#2026' out.json
+
+# browser journeys against the deployed app
+TF_WEB_URL=https://schemeknit-frontend.onrender.com \
+TF_API_URL=https://schemeknit-api.onrender.com \
+node e2e/lesson-persistence-journey.js          # 68/70 (2 = stale-build WAPEF checks)
+
+TF_WEB_URL=... TF_API_URL=... \
+TF_TEACHER_EMAIL=p21.workspace.prod@schemeknit.test \
+TF_TEACHER_PASSWORD='Workspace#2026' \
+npm run e2e:workspace                           # 75/75
+```
+
+Results: health 200 · register/login 200 (one transient 500, retry OK) ·
+full generation flow 200 · workspace acceptance **75/75** · persistence
+journey **68/70** (stale-build symptoms, see 5b) · deploy marker =
+**pre-Priority-2 build** after ~55 minutes of polling across pushes
+`a08e838` and `a38e35c` → owner-side redeploy required (blocker, reported).

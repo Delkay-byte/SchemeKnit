@@ -291,7 +291,16 @@ like *add, multiply, install, indicate, assess, relate, recognise, skip count*
 and French leads out), not generic generator prose — classified lesson by
 lesson in the hardening report, with the recommended Priority 3 fix.
 
-New coverage: `backend/tests/test_priority21_hardening.py` (61 tests) pins the
+New coverage: `backend/tests/test_priority21_hardening.py` (73 tests) pins the
 library scale/selection, verb-matched assessment, PHE/history/early-childhood
-strategies, objective cleanup, resource realism, the 30–80 minute timing
-invariant and the repeat-stage progression.
+strategies, objective cleanup (including the real-scheme verb-lead regression
+cases fixed in `a38e35c` — "Listen to…"/"Simplify…"/"REVISION…" cells from
+`backend/real_documents/`), resource realism, the 30–80 minute timing
+invariant and the repeat-stage progression. Full suite: **2234 passed**.
+
+Production caveat: the deployed Render build predates Priority 2 and is not
+auto-deployed from `main` (owner-side redeploy required, no deploy hook in
+this environment) — the hardening report's §5b records the deployed-build
+verification (workspace 75/75, persistence 68/70 with the two stale-build
+WAPEF checks) and the deploy marker that re-checks our code for free once a
+redeploy lands.
