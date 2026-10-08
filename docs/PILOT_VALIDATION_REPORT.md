@@ -1,37 +1,35 @@
-# PILOT VALIDATION REPORT — Post-Redeployment Verification
+# PILOT VALIDATION REPORT — Final Smoke Retry
 
 **Date:** 2026-10-08  
-**Source:** 50bd887 (HEAD==origin/main)  
-**Production (deployed commit):** UNKNOWN (no public marker)  
-**Deployment:** Redeployed reported (frontend+backend) by owner  
-**Status:** BLOCKED — end-to-end production smoke not executed (no credentials/test account session)
+**Source (HEAD==origin/main):** 9d7e401  
+**Intended baseline:** 50bd887 (diff since: docs-only)  
+**P4 commit:** ae84f19  
+**Production deployed commit:** UNKNOWN  
+**Status:** NO-GO (no runtime production evidence)
 
-## 1) Deployment verification
-- Pushes up to 50bd887 on origin/main. Redeployment reported complete; deployed commit SHA not publicly exposed. Health OK.
+## 1) Source/deployment equivalence
+- Commits after 50bd887 are documentation-only (PILOT_VALIDATION_REPORT.md, pilot/production-version.md). Application code unchanged vs 50bd887.
+- Redeployment reported complete; deployed commit not exposed publicly. API healthy (v1.0.5). Cannot confirm build equivalence from public metadata.
 
-## 2) Deterministic marker
-**NOT EXECUTED.** Marker driver requires credentials and a real scheme run in production. Current local implementation (P2/P4) produces deterministic objectives/topics; pre-P2 showed strand-concatenation topics and "Discuss..." style objectives in the stale marker case. Runtime comparison required against production.
+## 2) Registration
+- /signup reachable (200). Attempted API self-registration returned 500 (internal error). Cannot complete automated signup without credentials or owner-assisted session. No secrets requested.
 
-## 3) Production smoke test (planned but not performed)
-Cannot perform: auth/login, upload, detection, Autopilot AI-OFF, generate, P4 execution evidence, persistence/reload, DOCX/PDF without production test credentials/session. All scoped as non-destructive production verification requiring normal account flow.
+## 3) Deterministic marker
+- Not executed (no authenticated session). Marker requires production run comparing canonical input against current implementation. Pre-P2 stale case showed "Discuss..." style; current impl per after.json uses deterministic form.
 
-## 4) P4 execution evidence
-Local verified: 58 gate tests pass, WAPEF boundary 11 pass, calibration matches frozen corpora. **Production:** NOT EVIDENCED (journey not executed).
+## 4) Production P4 execution / journey
+- Blocked by auth. Cannot verify: upload/extraction/detection, Autopilot AI-OFF, generate, P4 gate execution evidence, persistence/reload, DOCX/PDF, quota.
 
-## 5) Priority 1/WAPEF/exports
-Not tested in production.
+## 5) Answers to final questions
+1. upload→downloadable minimal intervention: AMBER (local validation only)
+2. deterministic lessons usable without Zeli: GREEN (P4 floors verified locally)
+3. production behaves like current main: RED (deployed commit unconfirmed; no runtime evidence)
+4. ready for broader teacher pilot: AMBER/NO-GO
 
-## 6) Final answers
+**"Was the intended implementation verified in the actual production application, and was P4 execution demonstrated there?"**  
+**NO.** Intended implementation (ae84f19+docs, equivalent to 50bd887 app-wise) not verified in production; P4 execution not demonstrated (blocked by auth). Local evidence only (58 gate tests pass).
 
-1. "Can a normal returning teacher use SchemeKnit from upload to downloadable lesson plans with minimal intervention?" — **AMBER** (design/flow validated locally; production end-to-end untested on this session)
-2. "Are the deterministic lessons genuinely usable without Zeli?" — **GREEN** (P4 teacher-ready floors; edit-rate target ≥90% pending production pilot)
-3. "Does production behave like the current main branch?" — **RED** (deployed commit unconfirmed; marker not executed)
-4. "Is SchemeKnit ready for a broader teacher pilot?" — **AMBER/NO-GO** (pre-prod solid; requires confirmed deployed build + minimal production smoke evidence)
+## 6) Remaining blocker
+Owner-assisted authenticated session (non-secret: sanitized screenshots/response excerpts) OR valid test account credentials to execute minimal smoke: deterministic marker, Autopilot AI-OFF generate, P4 execution evidence, persistence/reload, DOCX/PDF validity. If deploy metadata unavailable, marker is required.
 
-**"Is the intended SchemeKnit implementation deployed, and has the deterministic quality gate been verified in the actual production application?"**  
-**NO.** Intended 50bd887; deployed commit unknown. P4 verified locally only; no runtime production evidence collected in this session (blocked by missing production test credentials/session).
-
-## 7) Remaining blocker
-Execute production smoke with dedicated test account (auth/upload/detection/Autopilot AI-OFF/generate) to collect: deterministic marker comparison (current vs prod), P4 execution evidence (quality metrics/rebuild if exposed), persistence/reload, DOCX/PDF validity. If deployed commit cannot be confirmed, marker must prove current implementation is running.
-
-**GO/NO-GO:** **NO-GO** (no production runtime evidence collected).
+**GO/NO-GO:** **NO-GO** (insufficient production runtime evidence). No code changes made.
