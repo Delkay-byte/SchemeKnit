@@ -1,26 +1,37 @@
-# PRODUCTION READINESS — SchemeKnit (Priority 4 Complete)
+# PRODUCTION READINESS — Deployment Activation & P4 Smoke Verification
 
 **Date:** 2026-10-08  
-**Source commit:** ae84f19 (HEAD == origin/main)  
-**Production commit (actual):** UNKNOWN (Render build unconfirmed to serve ae84f19)  
-**Status:** PRE-PRODUCTION VALIDATED LOCAL; PRODUCTION BUILD UNCONFIRMED
+**Source commit:** 3ac4480 (HEAD == origin/main)  
+**Production commit (actual):** UNKNOWN (not exposed via public endpoints)  
+**Status:** DEPLOYMENT UNCONFIRMED / NO-GO (current-build production acceptance)
 
-## 1) Build/Deploy status
-- Local: all P1–P4 implemented, committed, pushed to origin/main.
-- Backend (local): 2366 passed, 11 skipped (non-environmental). P4 gate: 58 passed. WAPEF boundary: 11 passed.
+## 1) Source baseline
+- HEAD == origin/main == 3ac4480. Includes P4: quality gate (A–X), mechanical repair, bounded rebuild ≤2, canonical rubric, WAPEF saved-selection-only, ledger wiring, accept-scoped replacement, quota 0/1, calibration metrics, docs.
+
+## 2) Production state
+- API health: 200, {"status":"healthy","service":"SchemeKnit","version":"1.0.5"}
+- Public endpoints: no deployed commit/build marker; /docs/openapi not exposed. Headers confirm Render+Cloudflare; runtime uvicorn.
+- Push to main completed; Render auto-deploy status unknown (no access to deploy logs in this session).
+
+## 3) Deployment mechanism
+- Render auto-deploy from main (standard). Authorized deployment access not confirmed available to this session. Cannot trigger deployment or inspect deploy result/logs.
+- **If deployment access unavailable:** Produce handoff below and do not infer P4 active.
+
+## 4) Deployment handoff (owner-side required)
+1. Intended commit SHA: `3ac4480c1aca9bbbe3bfe9e988287ea7cf24e295` (main)
+2. Render service: confirm schemeknit-api + schemeknit-frontend deploy from main
+3. Action: Verify latest Render deploy completed for main@3ac4480; record deployed commit SHA
+4. Expected verification signals: /api/health 200; deployed commit equals 3ac4480; frontend serves current build
+5. Post-deploy smoke (immediate): auth/login, scheme upload+extraction, Autopilot AI-OFF generation, inspect deterministic lesson (topic/objective/Content Standard/indicator/phases/timing/resources/assessment), persistence/reload, DOCX/PDF validity, confirm P4 metrics/behavior via normal flow
+6. Blocker until deployed commit == 3ac4480 and runtime P4 evidence observed.
+
+## 5) Local verification (reference)
+- Backend (non-env): 2366 passed, 11 skipped; P4 gate 58 passed; WAPEF boundary 11 passed.
+- Calibration matches frozen baselines.
 - Frontend: tsc --noEmit clean; next build passes.
-- Production API: healthy (v1.0.5); build commit not exposed. Historical marker confirms stale vs local pre-P4.
 
-**BLOCKER:** Owner-side Render deployment verification required. Push to main done; need post-deploy confirmation that production serves ae84f19 and P4 is active.
+## 6) Production smoke (not performed)
+No end-to-end production smoke executed (build equivalence unconfirmed). Requires confirmed current build.
 
-## 2) Local verification summary (GREEN)
-- P1–P3.1: complete (reported).
-- P4: quality gate (A–X), mechanical repair, bounded rebuild ≤2, canonical rubric, WAPEF saved-selection-only, accept-scoped replacement, quota 0/1, calibration matches frozen 11/40/19.
-- Frozen calibration: 11/11 (100% 73.7), expanded 31/40 (77.5% 71.7), messy 12/19 (63.2% 69.6).
-- Byte-identical baselines preserved post-rubric extraction.
-
-## 3) Production verification required
-Before pilot expansion: confirm auth, upload, detection, Autopilot (AI-OFF), generation, P4 enforcement, quota (reject→0, accept→1), persistence/reload, DOCX/PDF, WAPEF preservation, Zeli optional, isolation, recovery drills.
-
-## 4) GO/NO-GO
-**NO-GO** until production build confirmed == ae84f19 and P4 smoke passes in production. All pre-prod criteria GREEN; production verification pending owner-side deploy confirmation.
+## 7) GO/NO-GO
+**NO-GO** — Render deployed commit unknown vs 3ac4480; P4 execution not evidenced in production. Health alone insufficient.
