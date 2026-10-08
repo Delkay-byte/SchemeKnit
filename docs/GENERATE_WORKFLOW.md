@@ -135,7 +135,7 @@ Local (fresh backend `:8000`, `next start` `:3000`, committed fixtures
 | UI source + priority-3 API tests | 28/28 |
 | `deep-journey` | 21/21 |
 | `phase17` run A (quota/allowance/idempotency/exhaustion) | 30/30 |
-| `phase17` run B (AI burn-down) | 17/21 — blocked by Groq daily token limit (429 → deterministic fallback; retries exhausted); re-run when the provider window sheds |
+| `phase17` run B (AI burn-down) | 17/21 · 14/21 · 17/21 across three attempts in one day — the failures are only the AI burn/block chain: the provider's daily token window (shared by run A and the suites earlier the same day) served ~2 of the 5 required burns per run, 429s fell back to deterministic content by design; everything else (quota gating, OFF-after-exhaustion, exports, no-unexpected-requests) stayed green. Re-run on a fresh provider day. |
 | `curriculum-workspace` | 75/75 |
 | `app-ui` / `app-surfaces` / `app-closure` | 57/57 · 114/114 · 95/95 |
 | `entitlement-download` | 28/28 |
