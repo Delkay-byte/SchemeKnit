@@ -1,21 +1,14 @@
-# Production Version Check
+# Production Version Check (Post-Redeployment)
 
-Date: 2026-10-08
-Time: ~23:12 UTC (execution)
+Date: 2026-10-08 23:43 UTC
 
-SOURCE COMMIT (HEAD==origin/main): 3ac4480c1aca9bbbe3bfe9e988287ea7cf24e295
-ORIGIN COMMIT: 3ac4480c1aca9bbbe3bfe9e988287ea7cf24e295
-INTENDED DEPLOYMENT SHA: 3ac4480
+SOURCE (HEAD==origin/main): 50bd8872e2fe73c5e4b459b37ab94bf233434e88
+INTENDED DEPLOYMENT: 50bd887 (current)
 
-ACTUAL DEPLOYED PRODUCTION COMMIT: UNKNOWN
-- Public endpoints do not expose deployed commit SHA (no /api/version, /api/health metadata limited to service/version)
+ACTUAL DEPLOYED COMMIT: UNKNOWN (no public deploy metadata)
 - API: https://schemeknit-api.onrender.com/api/health -> 200 {"status":"healthy","service":"SchemeKnit","version":"1.0.5"}
-- Render headers: rndr-id, x-render-origin-server (uvicorn), Server (cloudflare)
+- Frontend: https://schemeknit-frontend.onrender.com -> 200 (Render origin)
 
-BUILD EQUIVALENCE: CANNOT CONFIRM (production build commit unknown). Push to origin/main succeeded (3ac4480); Render auto-deploy may not have completed/new build not yet serving ae84f19/3ac4480 P4 behavior.
+BUILD EQUIVALENCE: CANNOT BE PROVEN from public endpoints. Redeployment reported complete; no commit SHA exposed. Deterministic marker is the only runtime evidence of build equivalence.
 
-DEPLOYMENT MECHANISM: Render auto-deploy from main (standard). No authenticated Render CLI/tooling used in this session; cannot trigger/inspect deploy logs. Deployment access not confirmed available to this session.
-
-BLOCKER: Owner-side Render deployment verification required. Need: confirm latest Render deploy completed for main@3ac4480, confirm deployed commit SHA, and run post-deploy smoke. Until then, production P4 enforcement cannot be verified.
-
-NON-DESTRUCTIVE CHECKS ONLY: No DB tampering, no quota bypass, no auth changes.
+RUNTIME EVIDENCE REQUIRED: Production smoke (auth/upload/detection/Autopilot AI-OFF/generate) must demonstrate current deterministic behavior (P2/P4). Without executing that journey, equivalence remains unconfirmed.
