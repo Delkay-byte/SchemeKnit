@@ -1,0 +1,29 @@
+{
+  "url": "/assignments",
+  "text": "BACK TO SCHOOL\nDouble AI credits until 11th November 2026. · Open the store\nDouble AI credits until 11th November 2026. · Open the store\n20\nCredit Store\nGhanaEd\nDashboard\nMy Classroom\nSchool Management\nGuides\n$\n20 credits\nF\nForensic\nTeacher\nF\nForensic\nTeacher\nAsk Akua\n$\n20 credits\nDashboard\nProfile\nLesson Planner\n6 tools\nLessons\nSelf-Tutor\nAssignments\nAssessment\nTermly Exams\nPracticals\nStudent Progress\nDiscussions\nSchool Management\nStudent Manual\nTeacher Guide\nSchool Manual\nTutorials\n$\nBuy Credits\nDark Mode\nSign out\nHome\n/Assignments\nAssignments\n\nBrowse by level & subject — quizzes and written work\n\nASSIGNMENT HUB\nYour assignments\n\nBrowse by class level and subject — quizzes and written work with clear due dates.\n\n0\nshown\n0\ndue this week\n0\noverdue\n0\nquizzes\n+ New assignment\nStudy notes\nTYPE\nAll\nQuiz\nWritten\nSTATUS\nAll\nOpen\nDue soon\nOverdue\nDraft\n\nNo assignments yet. Create one to get started.",
+  "inputs": [
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "ph": "Search title, instructions, teacher…",
+      "label": ""
+    }
+  ],
+  "buttons": [
+    "My Classroom",
+    "School Management",
+    "Guides",
+    "Lesson Planner 6 tools",
+    "Dark Mode",
+    "Sign out",
+    "+ New assignment",
+    "All",
+    "Quiz",
+    "Written",
+    "All",
+    "Open",
+    "Due soon",
+    "Overdue",
+    "Draft"
+  ]
+}

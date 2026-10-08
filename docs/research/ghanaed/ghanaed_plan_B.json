@@ -1,0 +1,195 @@
+{
+  "_id": "lplan:user:forensic-research-basic-school:skforensic42188:muxajvco",
+  "type": "lplan",
+  "userId": "user:forensic-research-basic-school:skforensic42188",
+  "schoolId": "forensic-research-basic-school",
+  "schemeId": "",
+  "sourceHub": "",
+  "subject": "Creative Arts and Design",
+  "level": "JHS",
+  "className": "B9",
+  "term": 1,
+  "week": 1,
+  "duration": "50 minutes",
+  "status": "draft",
+  "plan": {
+    "topic": "Plan and execute design projects using the creative process",
+    "objectives": [
+      "Learners can define the meaning of design in nature and the manmade environment (B9.1.1.1.1).",
+      "Learners can identify and reflect on how natural designs have influenced manmade designs (B9.1.1.1.2).",
+      "Learners can record the importance and role of design in their surroundings (B9.1.1.1.1)."
+    ],
+    "strand": "1 DESIGN",
+    "subStrand": "1.1. DESIGN IN NATURE AND MANMADE ENVIRONMENT",
+    "contentStandard": "B9.1.1.1 Demonstrate understanding of design as a concept in relation to the elements (form, value) and principles (variety, proportion) of design and as a medium for creative expression of design in nature and the manmade environment.",
+    "indicators": [
+      "B9.1.1.1.1. and its importance and role as a medium for creative expression of design in nature and the manmade environment. Communication and Collaboration (CC), Critical Thinking and Problem Solving (CP), Creativity and Innovation (CI), Digital Literacy (DL) Exemplar CC9.1: Demonstrate behaviour and skills of working towards group goals CP5.1: Ability to combine Information and ideas from several sources to reach a conclusion CI5.5: Ability to try new alternatives and different approaches DL6.1: Use digital tools to create novel things",
+      "B9.1.1.1.2. the ‘elements of design’ in nature and as building blocks for creative expression of design ideas.",
+      "B9.1.1.1.3. constitutes the principles of design and describe how they are used to organise the elements of design into building blocks for creative expression of design in nature and the manmade environment. Exemplar CC8.2: Explain ideas in a clear order with relevant detail, using correct construction and structure of speech. CP6.5: Ability to select alternative(s) that adequately meet selected criteria CI6.2: Ability to reflect on approaches to creative tasks and evaluate the effectiveness of tools used DL5.6:Preparedness to make better decisions using available information"
+    ],
+    "performanceIndicator": "Learners can research and discuss the meaning and role of design in nature and the manmade environment.",
+    "rpk": "Students have previously learned about basic design concepts in nature.",
+    "coreCompetencies": [
+      "Critical Thinking and Problem Solving",
+      "Creativity and Innovation",
+      "Communication and Collaboration"
+    ],
+    "keywords": [
+      "design",
+      "nature",
+      "manmade environment",
+      "influence",
+      "importance"
+    ],
+    "references": "NaCCA / GES curriculum title for this subject and class",
+    "teachingMethods": [
+      "demonstration",
+      "collaborative"
+    ],
+    "phase1": {
+      "duration": "10 minutes",
+      "firstTime": true,
+      "piShare": "Learners can research and discuss the meaning and role of design in nature and the manmade environment.",
+      "warmupType": "qa",
+      "warmupScript": "What do you think design means in nature? Can you name any examples of designs in our environment?",
+      "steps": [
+        {
+          "time": "5 min",
+          "teacher": "Ask students to share examples of designs they see in nature.",
+          "learner": "Respond with examples such as leaves, flowers, and animal shapes.",
+          "resourceUse": "",
+          "formative": "",
+          "n": 1
+        },
+        {
+          "time": "5 min",
+          "teacher": "Guide students to discuss how these designs might inspire manmade objects.",
+          "learner": "Discuss and provide examples like the kingfisher bird inspiring trains.",
+          "resourceUse": "",
+          "formative": "",
+          "n": 2
+        }
+      ],
+      "resources": "Chalkboard, markers",
+      "assessment": "Check if students can name and discuss examples of designs in nature.",
+      "activities": "(5 min) Teacher: Ask students to share examples of designs they see in nature. Learners: Respond with examples such as leaves, flowers, and animal shapes.\n(5 min) Teacher: Guide students to discuss how these designs might inspire manmade objects. Learners: Discuss and provide examples like the kingfisher bird inspiring trains.\nShare PI: Learners can research and discuss the meaning and role of design in nature and the manmade environment.\nWarm-up (qa): What do you think design means in nature? Can you name any examples of designs in our environment?"
+    },
+    "phase2": {
+      "duration": "30 minutes",
+      "coreConcept": "Today, we will research and discuss the meaning and role of design in nature and how it influences manmade designs.",
+      "steps": [
+        {
+          "time": "10 min",
+          "teacher": "Divide students into pairs and provide them with materials to research the meaning of design.",
+          "learner": "Work together to define design and its importance in nature and manmade environments.",
+          "resourceUse": "",
+          "formative": "",
+          "n": 1,
+          "exemplarN": 1
+        },
+        {
+          "time": "10 min",
+          "teacher": "Instruct students to find examples of natural designs that have influenced manmade designs.",
+          "learner": "Identify and record examples such as the palm tree design in architecture.",
+          "resourceUse": "",
+          "formative": "",
+          "n": 2,
+          "exemplarN": 2
+        },
+        {
+          "time": "10 min",
+          "teacher": "Ask each pair to present their findings to the class, highlighting the influence of nature on design.",
+          "learner": "Present their research and discuss their findings with the class.",
+          "resourceUse": "",
+          "formative": "",
+          "n": 3,
+          "exemplarN": 2
+        }
+      ],
+      "tables": [],
+      "imageNeeds": [],
+      "differentiation": {
+        "support": "Pair struggling learners with more capable peers.",
+        "core": "All students participate in research and presentation.",
+        "challenge": "Encourage advanced learners to explore additional examples."
+      },
+      "misconceptions": [],
+      "resources": "Research materials (books, internet access), paper, pens",
+      "assessment": "Monitor group discussions and presentations for understanding.",
+      "activities": "(10 min) Teacher: Divide students into pairs and provide them with materials to research the meaning of design. Learners: Work together to define design and its importance in nature and manmade environments.\n(10 min) Teacher: Instruct students to find examples of natural designs that have influenced manmade designs. Learners: Identify and record examples such as the palm tree design in architecture.\n(10 min) Teacher: Ask each pair to present their findings to the class, highlighting the influence of nature on design. Learners: Present their research and discuss their findings with the class.\nCore concept: Today, we will research and discuss the meaning and role of design in nature and how it influences manmade designs."
+    },
+    "phase3": {
+      "duration": "10 minutes",
+      "qa": [
+        {
+          "question": "What is one way nature influences manmade design?",
+          "expected": "Students might say the beak of the kingfisher inspired train design."
+        },
+        {
+          "question": "Why is it important to study design in nature?",
+          "expected": "Students may respond that it helps us create better designs."
+        }
+      ],
+      "summaryPoints": [
+        "Design in nature can inspire innovative manmade designs.",
+        "Understanding design helps us appreciate our environment.",
+        "Researching design enhances our creativity."
+      ],
+      "realLife": "In Ghana, traditional architecture often reflects natural elements.",
+      "feedbackPrompt": "Raise your hand if you can explain how nature influences design.",
+      "steps": [
+        {
+          "time": "5 min",
+          "teacher": "Summarize the key points discussed in class.",
+          "learner": "Listen and reflect on the summary.",
+          "resourceUse": "",
+          "formative": "",
+          "n": 1
+        },
+        {
+          "time": "5 min",
+          "teacher": "Ask students to share one new thing they learned today.",
+          "learner": "Share their thoughts with the class.",
+          "resourceUse": "",
+          "formative": "",
+          "n": 2
+        }
+      ],
+      "resources": "Chalkboard, markers",
+      "assessment": "Check for understanding through student responses.",
+      "activities": "(5 min) Teacher: Summarize the key points discussed in class. Learners: Listen and reflect on the summary.\n(5 min) Teacher: Ask students to share one new thing they learned today. Learners: Share their thoughts with the class.\nReal life: In Ghana, traditional architecture often reflects natural elements.\nFeedback: Raise your hand if you can explain how nature influences design."
+    },
+    "homework": "Write a short paragraph about a design in nature that inspires you.",
+    "teacherNotes": "Ensure all students participate in discussions and presentations.",
+    "safetyNotes": "",
+    "exemplars": [
+      {
+        "n": 1,
+        "text": "Research to determine and record the meaning, importance and role of design in nature and the manmade environment for reflection and discussion.",
+        "visual": "none"
+      },
+      {
+        "n": 2,
+        "text": "Identify and reflect on selected natural and manmade designs to appreciate and determine how design in nature has influenced manmade designs to benefit society for appreciation and discussion. Source: Pinterest.com Beak of kingfisher bird inspired Shinkansen Bullet Train – Japan Design inspired by the palm Colourful bird -- 45 of 136 -- 3© NaCCA, Ministry of Education 2021 CONTENT STANDARD INDICATORS AND EXEMPLARS CORE COMPETENCIES",
+        "visual": "none"
+      }
+    ],
+    "exemplarContinuation": false
+  },
+  "teachingMethods": [
+    "demonstration",
+    "collaborative"
+  ],
+  "dayLabel": "Monday",
+  "weekEndingDate": "",
+  "classSize": 0,
+  "teacherName": "Forensic Researcher",
+  "schoolName": "Forensic Research Basic School",
+  "academicYear": "2026/2027",
+  "bulkJobId": null,
+  "exemplarContinuation": false,
+  "printTemplateId": "jhs-daily",
+  "period": "",
+  "createdAt": "2026-10-06T23:09:47.256Z",
+  "updatedAt": "2026-10-06T23:09:47.256Z"
+}

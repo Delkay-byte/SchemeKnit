@@ -25,6 +25,7 @@ Special weeks (revision, assessment, SBA) are NOT subject to the
 indicator→period rule — they retain their existing behaviour.
 """
 
+from dataclasses import dataclass, field
 from datetime import date
 from typing import List, Optional, Dict, Tuple, Any
 from collections import defaultdict
@@ -36,6 +37,34 @@ from ..models import (
     LessonStatus, Subject, ClassLevel
 )
 from ..ai_resource_text import normalize_text_items
+
+
+@dataclass
+class BuildContext:
+    """What one lesson was built from (Priority 4 quality gate rebuild).
+
+    Holds the exact allocation handed to ``build_lesson`` — its
+    ``indicator_description`` is the source string WITH the curriculum code —
+    plus the neighbouring-indicator context and the pattern id that shaped it,
+    so the gate can rebuild a failed lesson deterministically with a DIFFERENT
+    pattern through the same code path.
+    """
+
+    alloc: AllocatedIndicator
+    previous_indicator: Optional[str] = None
+    next_indicator: Optional[str] = None
+    pattern_id: str = ""
+
+
+@dataclass
+class BuildLedger:
+    """Per-run record of every lesson's build context + the batch history."""
+
+    #: lesson id → what it was built from.
+    contexts: Dict[str, BuildContext] = field(default_factory=dict)
+    #: The batch history after the run (pattern/fingerprint state the gate
+    #: needs to rebuild with the same variation context).
+    history: Any = None
 
 
 def is_special_period_text(text) -> bool:
@@ -674,6 +703,8 @@ class AllocationEngine:
         coverage: CurriculumCoverage,
         config: TermConfig,
         scheme_id: str,
+        *,
+        ledger: Optional[BuildLedger] = None,
     ) -> List[LessonPlan]:
         """Generate ONE LessonPlan per allocated indicator.
 
@@ -806,6 +837,20 @@ class AllocationEngine:
                 pattern=lesson_pattern,
                 batch_history=batch_history,
             )
+            if ledger is not None:
+                # Priority 4: remember exactly what this lesson was built from
+                # so the quality gate can rebuild it deterministically with a
+                # different teaching pattern (same evidence, same neighbours).
+                ledger.contexts[lp.id] = BuildContext(
+                    alloc=(
+                        alloc.model_copy(update={"indicator_description": source_text})
+                        if source_text != (alloc.indicator_description or "")
+                        else alloc
+                    ),
+                    previous_indicator=previous_indicator,
+                    next_indicator=next_indicator,
+                    pattern_id=getattr(lesson_pattern, "id", "") or "",
+                )
             # Curriculum order and period label are assigned here so the
             # builder stays position-independent (and deterministic).
             # Stable numbering (Priority 3): when the pipeline stamped a
@@ -826,6 +871,10 @@ class AllocationEngine:
             lp.special_period_label = alloc.special_period_label
             lp.special_period_type = alloc.special_period_type
             lesson_plans.append(lp)
+
+        if ledger is not None:
+            # The gate rebuilds with the same variation context the batch used.
+            ledger.history = batch_history
 
         return lesson_plans
 

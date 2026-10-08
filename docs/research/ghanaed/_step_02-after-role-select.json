@@ -1,0 +1,20 @@
+{
+  "url": "/register",
+  "title": "GhanaEd LMS — AI-Powered Learning & School Management for Ghana & Africa | BSTEM • NaCCA • BECE",
+  "text": "Create your account\n\nJoin GhanaEd — free starter credits included\n\n1\nSCHOOL\n2\nROLE\n3\nACCOUNT\n← Back\nFind your organisation\n\nSearch by name or ID — schools, offices, private institutions\n\nNot listed? Register your organisation\nContinue\nAlready have an account? Sign in",
+  "fields": [
+    {
+      "tag": "INPUT",
+      "type": "search",
+      "id": "",
+      "name": "",
+      "placeholder": "Type school or organisation name…",
+      "label": ""
+    }
+  ],
+  "buttons": [
+    "← Back",
+    "Not listed? Register your organisation",
+    "Continue"
+  ]
+}

@@ -215,9 +215,12 @@ class GenerationPipeline:
             )
             job.progress = 30
 
+            from ..engines.allocation_engine import BuildLedger
+            build_ledger = BuildLedger()
             lesson_plans = self.allocation_engine.generate_lesson_plans(
-                coverage, config, scheme.id
+                coverage, config, scheme.id, ledger=build_ledger,
             )
+            job._build_ledger = build_ledger
 
             educational_level = CLASS_LEVEL_TO_EDUCATIONAL_LEVEL.get(
                 scheme.class_level, EducationalLevel.JHS

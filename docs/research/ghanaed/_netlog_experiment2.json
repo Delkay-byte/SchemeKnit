@@ -1,0 +1,260 @@
+[
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/subscription/promo"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/auth/me"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/auth/me",
+    "response": "{\"id\":\"user:forensic-research-basic-school:skforensic42188\",\"name\":\"Forensic Researcher\",\"username\":\"\",\"email\":\"\",\"role\":\"teacher\",\"schoolId\":\"forensic-research-basic-school\",\"isIndependent\":false,\"authProvider\":\"password\",\"photoUrl\":\"\",\"joinStatus\":\"none\",\"pendingSchoolId\":null,\"pendingSchoolName\":null,\"isHeadTeacher\":false,\"isSiso\":false,\"circuitIds\":[],\"pinEnabled\":false,\"hasPassword\":true,\"staff\":null,\"accountActive\":true,\"credits\":10,\"onboardingCompleted\":true,\"gamePoints\":0,\"referralCode\":\"52dcb3a3\",\"hasPhoto\":false}"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/subscription/promo",
+    "response": "{\"promo\":{\"active\":true,\"name\":\"back-to-school\",\"multiplier\":2,\"endsAt\":\"2026-11-11T23:59:59.000Z\",\"headline\":\"Double AI credits until 11th November 2026.\"}}"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/subscription/status"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/ads/status"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/subscription/status",
+    "response": "{\"accountActive\":true,\"credits\":10,\"history\":[{\"ref\":\"starter\",\"credits\":20,\"amount\":0,\"package\":\"Starter\",\"paidAt\":\"2026-10-06T22:53:05.250Z\"}],\"promo\":{\"active\":true,\"name\":\"back-to-school\",\"multiplier\":2,\"endsAt\":\"2026-11-11T23:59:59.000Z\",\"headline\":\"Double AI credits until 11th November 2026.\"}}"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/subscription/status"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/lesson-planner/jobs"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/lesson-planner/schemes?schoolId=forensic-research-basic-school"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/ads/status",
+    "response": "{\"adsEnabled\":false,\"rewardsRemainingToday\":5,\"cooldownMs\":0,\"dailyCap\":5,\"pointsPerAd\":5}"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/lesson-planner/jobs",
+    "response": "{\"jobs\":[]}"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/lesson-planner/schemes?schoolId=forensic-research-basic-school",
+    "response": "{\"schemes\":[]}"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/subscription/status",
+    "response": "{\"accountActive\":true,\"credits\":10,\"history\":[{\"ref\":\"starter\",\"credits\":20,\"amount\":0,\"package\":\"Starter\",\"paidAt\":\"2026-10-06T22:53:05.250Z\"}],\"promo\":{\"active\":true,\"name\":\"back-to-school\",\"multiplier\":2,\"endsAt\":\"2026-11-11T23:59:59.000Z\",\"headline\":\"Double AI credits until 11th November 2026.\"}}"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/lesson-planner/jobs"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/lesson-planner/jobs",
+    "response": "{\"jobs\":[]}"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/lesson-planner/curriculum?subject=Creative+Arts+and+Design&level=JHS&className=B9"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/lesson-planner/curriculum?subject=Creative+Arts+and+Design&level=JHS&className=B9",
+    "response": "{\"strands\":[{\"name\":\"1 DESIGN\",\"subStrands\":[{\"name\":\"1.1. DESIGN IN NATURE AND MANMADE ENVIRONMENT\",\"contentStandards\":[{\"code\":\"B9.1.1.1\",\"description\":\"Demonstrate understanding of design as a concept in relation to the elements (form, value) and principles (variety, proportion) of design and as a medium for creative expression of design in nature and the manmade environment.\",\"indicators\":[{\"id\":\"\",\"description\":\"3. Compare and contrast selected natural and manmade designs to\"},{\"id\":\"\",\"description\":\"4. Identify , describe and record examples of principles of design in nature\"},{\"id\":\"\",\"description\":\"5. Apply knowledge gained to select examples of elements and principles\"},{\"id\":\"B9.1.1.1.1\",\"description\":\"Demonstrate understanding of design as a concept by using the elements and principles of design as a medium for creative expression of design in nature and the manmade environment. (CC), Critical Thinking and Problem Solving (CP), Creativity and Innovation (CI), Digital Literacy (DL)\"},{\"id\":\"B9.1.1.1.2\",\"description\":\"Research to identify and record what constitutes the ‘elements of design’ in nature and as building blocks for creative expression of design ideas.\"},{\"id\":\"B9.1.1.1.3\",\"description\":\"Research to identify and record in writing what constitutes the principles of design and describe how they are used to organise the elements of design into building blocks for creative expression of design in nature and the manmade environment.\"}]}]},{\"name\":\"1.2. DRAWING, SHADING, COLOURING AND MODELLING FOR DESIGN\",\"contentStandards\":[{\"code\":\"B9.1.2.1\",\"description\":\"Design Demonstrate understanding and use of (3- D drawing, shading, colouring and modelling) media and techniques for creative expression of design ideas.\",\"indicators\":[{\"id\":\"\",\"description\":\"2. Identify , select and experiment the use of available manual tools, materials\"},{\"id\":\"\",\"description\":\"6. Identify , select and experiment the use of available digital tools, materials\"},{\"id\":\"\",\"description\":\"6. Identify simple products and generate drawings to illustrate templates\"},{\"id\":\"B9.1.2.1.1\",\"description\":\"Explore available manual and digital tools, materials and techniques for 3-D drawing, shading and colouring to create designs from lines, simple shapes and forms. (CP), Creativity and Innovation (CI), Development and Leadership (PL), (CG)\"},{\"id\":\"B9.1.2.1.3\",\"description\":\"Demonstrate ability to generate design ideas and develop models of simple shapes and forms for appreciation and display.\"}]}]},{\"name\":\"1.3. CREATIVITY, INNOVATION AND THE DESIGN PROCESS\",\"contentStandards\":[{\"code\":\"B9.1.3.1\",\"description\":\"Design Demonstrate understanding of in terms of the design process, and its application in developing design solutions to problems in society.\",\"indicators\":[{\"id\":\"\",\"description\":\"2. Apply knowledge of creativity and innovation to evaluate the design\"},{\"id\":\"\",\"description\":\"3. Examine specific artefacts available in the local community and report\"},{\"id\":\"\",\"description\":\"2. Analyse information gathered and describe the steps in the design\"},{\"id\":\"\",\"description\":\"3 Evaluate the design of different products and suggest ways in which\"},{\"id\":\"\",\"description\":\"1. Apply knowledge of creativity and innovation to evaluate specific\"},{\"id\":\"B9.1.3.1.1\",\"description\":\"Distinguish between creativity and innovation and their application for developing design solutions to problems in society.\"},{\"id\":\"B9.1.3.1.2\",\"description\":\"Demonstrate understanding of the design process in relation to\"},{\"id\":\"B9.1.3.1.3\",\"description\":\"Demonstrate ability to apply the design process to create artefacts that solve specific problems in the local community.\"}]}]},{\"name\":\"1.1 Design in Nature and the Manmade Environment\",\"contentStandards\":[{\"code\":\"B9.1.1.1\",\"description\":\"Demonstrate understanding of design as a concept in relation to the elements (value) and principles (emphasis) of design and as a medium for creative expression of design in nature and the manmade environment. 1.2 Drawing, Shading, Colouring and Modelling for Design\",\"indicators\":[]},{\"code\":\"B9.1.2.1\",\"description\":\"Demonstrate understanding and ability to use ( 3-D drawing, shading, colouring and modelling media and techniques for creative expression of design ideas. 1.3 Creativity, Innovation and the Design Process\",\"indicators\":[]},{\"code\":\"B9.1.3.1\",\"description\":\"Demonstrate understanding of the design process and models of its application in problem solving in various disciplines.\",\"indicators\":[]}]}]},{\"name\":\"2 CREATIVE ARTS\",\"subStrands\":[{\"name\":\"2.1 MEDIA AND TECHNIQUES\",\"contentStandards\":[{\"code\":\"B9.2.2.1\",\"description\":\"Visual Arts Exhibit art works produced from competencies and skills acquired from the application the philosophies, designs and processes learnt from different times and cultures\",\"indicators\":[]},{\"code\":\"B9.2.2.2\",\"description\":\"Music Exhibit competencies in the application of the design process to produce and display own creative musical works that reflect a range of different times, cultures and topical issues.\",\"indicators\":[]},{\"code\":\"B9.2.2.3\",\"description\":\"Dance and Drama: Producing a Dance Drama by exhibiting competencies in the application of design process and skills to produce and display own creative artworks that reflect a range of different times, cultures and topical issues. 2.3 Connections in Local and Global Cultures\",\"indicators\":[]},{\"code\":\"B9.2.3.1\",\"description\":\"Visual Arts Demonstrate the skill to correlate and generate ideas from creative artworks of African artists that reflect a range of different times, cultures and topical issues.\",\"indicators\":[]},{\"code\":\"B9.2.3.2\",\"description\":\"Music Demonstrate the skill to correlate and generate ideas from indigenous creative musical forms of African composers that reflect the history, culture, environment and topical issues.\",\"indicators\":[]},{\"code\":\"B9.2.3.3\",\"description\":\"Dance and Drama: Demonstrate the skill to correlate African dance and drama that reflect the history, culture and topical issues BASIC 7\",\"indicators\":[]},{\"code\":\"B9.2.1.1\",\"description\":\"Visual Arts: Demonstrate understanding and apply media and techniques in casting, assemblage and folding\",\"indicators\":[{\"id\":\"\",\"description\":\"1. Identify , describe, discuss and record information on available tools,\"},{\"id\":\"\",\"description\":\"3. Apply the tools, materials and equipment safely and skilfully to create\"},{\"id\":\"\",\"description\":\"4. Apply knowledge and skills in safety, maintenance and sustainability\"},{\"id\":\"\",\"description\":\"1. Identify the techniques in casting such as filled-in, hump and hollow to create\"},{\"id\":\"\",\"description\":\"1. Identify the techniques in folding such as creasing, pleating, knotting, to make\"},{\"id\":\"\",\"description\":\"2. Use the techniques in folding such as creasing, pleating and knotting to make\"},{\"id\":\"\",\"description\":\"1. Identify variety of techniques in construction by observing\"},{\"id\":\"B9.2.1.1.1\",\"description\":\"Explore and identify media and techniques used to create visual artworks by casting, assemblage and folding Literacy (DL), Personal Development and Leadership (PL), Cultural Identity and Global Citizenship (CG)\"},{\"id\":\"B9.2.1.1.2\",\"description\":\"Experiment by using techniques in casting to create visual artworks\"},{\"id\":\"B9.2.1.1.3\",\"description\":\"Apply artistic techniques in folding by using available media to make creative artworks.\"},{\"id\":\"B9.2.1.1.4\",\"description\":\"Experiment by using techniques in construction using available media to create own ideas and make visual artworks\"}]},{\"code\":\"B9.2.1.2\",\"description\":\"Performing Arts - Music: Demonstrate knowledge, understanding and application of triads, chord progression and improvisation in music\",\"indicators\":[{\"id\":\"B9.2.1.2.5\",\"description\":\"Sing in pitch triads on all the seven degrees of the scale horizontally (arpeggios) and vertically (harmony) Communication and Collaboration (CC), (CI), Digital Literacy (DL), Leadership (PL)\"},{\"id\":\"B9.2.1.2.6\",\"description\":\"Create/improvise a melody using (I, VI, IV, V) as the ostinato bass line\"}]},{\"code\":\"B9.2.1.3\",\"description\":\"Dance and Drama: Demonstrate understanding and application of media and techniques in Dance and Drama\",\"indicators\":[{\"id\":\"\",\"description\":\"1. Identify and select materials for creating a Dance Drama and/or one act play.\"},{\"id\":\"\",\"description\":\"1. Identify additional parts of the performance space.\"},{\"id\":\"\",\"description\":\"3. Explain masking, aside, apron, linear and circular patterns, etc., in dance and\"},{\"id\":\"\",\"description\":\"3. Identify the positions on stage.\"},{\"id\":\"B9.2.1.3.7\",\"description\":\"Create a simple Dance Drama and/or one act based on a topical issue Development and Leadership (PL), Thinking and Problem Solving (CP)\"},{\"id\":\"B9.2.1.3.8\",\"description\":\"Explore and identify the various approaches to improvisation, creating harmony/balance and blocking for dance and drama\"},{\"id\":\"B9.2.1.3.9\",\"description\":\"Experiment and practise by using the techniques of improvisation, creation of harmony/balance and blocking in dance and drama\"}]}]},{\"name\":\"2.3. CONNECTIONS IN LOCAL AND GLOBAL CULTURES\",\"contentStandards\":[{\"code\":\"B9.2.3.1\",\"description\":\"Visual Art Demonstrate the skill to correlate and generate ideas from creative artworks of African artists that reflect a range of different times, cultures and topical issues\",\"indicators\":[{\"id\":\"\",\"description\":\"3. Analyse and make presentations on the contributions of artworks of\"},{\"id\":\"\",\"description\":\"1. Discuss and compare the approach, significance and achievements of\"},{\"id\":\"\",\"description\":\"3. Examine , record and make presentation on how prominent African visual\"},{\"id\":\"B9.2.3.1.1\",\"description\":\"Identify, discuss, and analyse creative artworks of African visual artists that reflect their background, influence and way of solving continental issues (CP), Creativity and Innovation (CI), Global Citizenship (CG).\"},{\"id\":\"B9.2.3.1.2\",\"description\":\"Examine and reflect on how African visual artists use their influence and personal responses to connect with other creative arts and subjects in Africa\"}]},{\"code\":\"B9.2.3.2\",\"description\":\"Performing Arts - Music: Demonstrate the skill to correlate African music that reflect the history, culture and topical issues\",\"indicators\":[{\"id\":\"\",\"description\":\"1. Compare Akin Euba and J. H. K. Nketia.\"},{\"id\":\"\",\"description\":\"2. Compare and contrast two of the selected indigenous musical types and two\"},{\"id\":\"B9.2.3.2.3\",\"description\":\"Distinguish different ways musical works of African art composers reflect the history, culture, environment and topical issues\"},{\"id\":\"B9.2.3.2.4\",\"description\":\"Appreciate and appraise at least three (3) African indigenous dance genres and three (3) popular musical genres from an African nation based on their style, instruments, song themes, forms, dance movements, etc\"}]},{\"code\":\"B9.2.3.3\",\"description\":\"Dance and Drama: Demonstrate the skill to correlate African dance and drama that reflect the history, culture and topical issues\",\"indicators\":[{\"id\":\"\",\"description\":\"1. Discuss and document some important aspects of history, culture, and topical\"},{\"id\":\"B9.2.3.3.5\",\"description\":\"Reflect on a selected African creative work (dance and/or drama) and appreciate the ideas embedded Literacy(DL), Personal Development and Leadership (PL)Cultural Identity and Global Citizenship (CG)\"},{\"id\":\"B9.2.3.3.6\",\"description\":\"Create and perform a one act play or dance based on your selected African creative work (dance/drama)\"},{\"id\":\"B9.2.3.3.7\",\"description\":\"Conduct a performance review\"}]}]},{\"name\":\"2.2 CREATIVE AND AESTHETIC EXPRESSION\",\"contentStandards\":[{\"code\":\"B9.2.2.1\",\"description\":\"Visual Arts: Exhibit art works produced from competences and skills acquired from the application the philosophies, designs and processes learnt from different times and cultures\",\"indicators\":[{\"id\":\"\",\"description\":\"2. Use the information gathered on the selected artist to plan and use some of\"},{\"id\":\"\",\"description\":\"1. Investigate and apply the knowledge and skills in organising exhibition in\"},{\"id\":\"B9.2.2.1.1\",\"description\":\"Design and produce own visual artworks that reflect a range of different times, cultures and topical issues (CC), Critical Thinking and Problem Solving (CP), Creativity and Innovation (CI), Digital Literacy (DL), Personal Development and Leadership (PL), (CG)\"},{\"id\":\"B9.2.2.1.2\",\"description\":\"Plan and display artworks that reflect the influence of a range of different times, cultures and topical issues\"},{\"id\":\"B9.2.2.1.3\",\"description\":\"Organise an appreciation and appraisal of artworks produced using inspiration and ideas from different times, cultures and other relevant topical issues\"}]},{\"code\":\"B9.2.2.2\",\"description\":\"Performing Arts - Music: Exhibit competences in the application of the design process to produce and display own creative musical work that reflect a range of different times, cultures and topical issues\",\"indicators\":[{\"id\":\"B9.2.2.2.4\",\"description\":\"Design and produce own musical work that reflects a range of different times and cultures that promote and sensitise the public on emerging topical issues (CP), Digital Literacy (DL), Personal Development and Leadership (PL), (CG).\"},{\"id\":\"B9.2.2.2.5\",\"description\":\"Plan and display own and others’ musical works within the African continent that promote and sensitise the public on emerging topical issues\"},{\"id\":\"B9.2.2.2.6\",\"description\":\"Organise an appreciation and appraisal of own original musical works and those of others on the African continent that promote and sensitise the public on emerging topical issues\"}]},{\"code\":\"B9.2.2.3\",\"description\":\"Dance and Drama: Producing a dance drama\",\"indicators\":[{\"id\":\"B9.2.2.3.7\",\"description\":\"Perform an original dance drama and/or one act play on socio-cultural issues (CP),Cultural Identity and Global Citizenship (CG)\"},{\"id\":\"B9.2.2.3.8\",\"description\":\"Post-performance analysis of the original dance drama and/ or one act play\"},{\"id\":\"B9.2.2.3.9\",\"description\":\"Organise an appreciation and appraisal of own and others’ dance and drama artworks that reflect a range of different times, cultures and topical issues\"}]}]}]}]}"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/lesson-planner/jobs"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/lesson-planner/jobs",
+    "response": "{\"jobs\":[]}"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/lesson-planner/jobs"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/lesson-planner/jobs",
+    "response": "{\"jobs\":[]}"
+  },
+  {
+    "phase": "request",
+    "method": "POST",
+    "url": "https://ghanaed.com/api/lesson-planner/generate",
+    "body": "{\"schoolId\":\"forensic-research-basic-school\",\"schemeId\":\"\",\"week\":1,\"subject\":\"Creative Arts and Design\",\"level\":\"JHS\",\"className\":\"B9\",\"term\":1,\"topic\":\"Plan and execute design projects using the creative process\",\"strand\":\"1 DESIGN\",\"subStrand\":\"\",\"contentStandard\":\"\",\"indicators\":[],\"dayLabel\":\"Monday\",\"weekEndingDate\":\"\",\"classSize\":0,\"teacherName\":\"Forensic Researcher\",\"schoolName\":\"Forensic Research Basic School\",\"academicYear\":\"2026/2027\",\"durationOverride\":\"\",\"bulkJobId\":null,\"printTemplateId\":\"jhs-daily\",\"period\":\"\",\"teachingMethods\":[\"demonstration\",\"collaborative\"],\"firstTime\":true,\"learnerNeeds\":\"\",\"ghanaianLanguage\":\"\",\"includeImages\":false}"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/lesson-planner/jobs"
+  },
+  {
+    "phase": "response",
+    "status": 402,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/lesson-planner/jobs",
+    "response": "{\"error\":\"credits_required\",\"message\":\"You have no credits remaining. Please purchase credits to continue.\",\"credits\":0}"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/lesson-planner/jobs"
+  },
+  {
+    "phase": "response",
+    "status": 402,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/lesson-planner/jobs",
+    "response": "{\"error\":\"credits_required\",\"message\":\"You have no credits remaining. Please purchase credits to continue.\",\"credits\":0}"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/lesson-planner/jobs"
+  },
+  {
+    "phase": "response",
+    "status": 402,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/lesson-planner/jobs",
+    "response": "{\"error\":\"credits_required\",\"message\":\"You have no credits remaining. Please purchase credits to continue.\",\"credits\":0}"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/lesson-planner/jobs"
+  },
+  {
+    "phase": "response",
+    "status": 402,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/lesson-planner/jobs",
+    "response": "{\"error\":\"credits_required\",\"message\":\"You have no credits remaining. Please purchase credits to continue.\",\"credits\":0}"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/lesson-planner/jobs"
+  },
+  {
+    "phase": "response",
+    "status": 402,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/lesson-planner/jobs",
+    "response": "{\"error\":\"credits_required\",\"message\":\"You have no credits remaining. Please purchase credits to continue.\",\"credits\":0}"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/lesson-planner/jobs"
+  },
+  {
+    "phase": "response",
+    "status": 402,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/lesson-planner/jobs",
+    "response": "{\"error\":\"credits_required\",\"message\":\"You have no credits remaining. Please purchase credits to continue.\",\"credits\":0}"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "POST",
+    "url": "https://ghanaed.com/api/lesson-planner/generate",
+    "response": "{\"lessonPlan\":{\"_id\":\"lplan:user:forensic-research-basic-school:skforensic42188:muxajvco\",\"type\":\"lplan\",\"userId\":\"user:forensic-research-basic-school:skforensic42188\",\"schoolId\":\"forensic-research-basic-school\",\"schemeId\":\"\",\"sourceHub\":\"\",\"subject\":\"Creative Arts and Design\",\"level\":\"JHS\",\"className\":\"B9\",\"term\":1,\"week\":1,\"duration\":\"50 minutes\",\"status\":\"draft\",\"plan\":{\"topic\":\"Plan and execute design projects using the creative process\",\"objectives\":[\"Learners can define the meaning of design in nature and the manmade environment (B9.1.1.1.1).\",\"Learners can identify and reflect on how natural designs have influenced manmade designs (B9.1.1.1.2).\",\"Learners can record the importance and role of design in their surroundings (B9.1.1.1.1).\"],\"strand\":\"1 DESIGN\",\"subStrand\":\"1.1. DESIGN IN NATURE AND MANMADE ENVIRONMENT\",\"contentStandard\":\"B9.1.1.1 Demonstrate understanding of design as a concept in relation to the elements (form, value) and principles (variety, proportion) of design and as a medium for creative expression of design in nature and the manmade environment.\",\"indicators\":[\"B9.1.1.1.1. and its importance and role as a medium for creative expression of design in nature and the manmade environment. Communication and Collaboration (CC), Critical Thinking and Problem Solving (CP), Creativity and Innovation (CI), Digital Literacy (DL) Exemplar CC9.1: Demonstrate behaviour and skills of working towards group goals CP5.1: Ability to combine Information and ideas from several sources to reach a conclusion CI5.5: Ability to try new alternatives and different approaches DL6.1: Use digital tools to create novel things\",\"B9.1.1.1.2. the ‘elements of design’ in nature and as building blocks for creative expression of design ideas.\",\"B9.1.1.1.3. constitutes the principles of design and describe how they are used to organise the elements of design into building blocks for creative expression of design in nature and the manmade environment. Exemplar CC8.2: Explain ideas in a clear order with relevant detail, using correct construction and structure of speech. CP6.5: Ability to select alternative(s) that adequately meet selected criteria CI6.2: Ability to reflect on approaches to creative tasks and evaluate the effectiveness of tools used DL5.6:Preparedness to make better decisions using available information\"],\"performanceIndicator\":\"Learners can research and discuss the meaning and role of design in nature and the manmade environment.\",\"rpk\":\"Students have previously learned about basic design concepts in nature.\",\"coreCompetencies\":[\"Critical Thinking and Problem Solving\",\"Creativity and Innovation\",\"Communication and Collaboration\"],\"keywords\":[\"design\",\"nature\",\"manmade environment\",\"influence\",\"importance\"],\"references\":\"NaCCA / GES curriculum title for this subject and class\",\"teachingMethods\":[\"demonstration\",\"collaborative\"],\"phase1\":{\"duration\":\"10 minutes\",\"firstTime\":true,\"piShare\":\"Learners can research and discuss the meaning and role of design in nature and the manmade environment.\",\"warmupType\":\"qa\",\"warmupScript\":\"What do you think design means in nature? Can you name any examples of designs in our environment?\",\"steps\":[{\"time\":\"5 min\",\"teacher\":\"Ask students to share examples of designs they see in nature.\",\"learner\":\"Respond with examples such as leaves, flowers, and animal shapes.\",\"resourceUse\":\"\",\"formative\":\"\",\"n\":1},{\"time\":\"5 min\",\"teacher\":\"Guide students to discuss how these designs might inspire manmade objects.\",\"learner\":\"Discuss and provide examples like the kingfisher bird inspiring trains.\",\"resourceUse\":\"\",\"formative\":\"\",\"n\":2}],\"resources\":\"Chalkboard, markers\",\"assessment\":\"Check if students can name and discuss examples of designs in nature.\",\"activities\":\"(5 min) Teacher: Ask students to share examples of designs they see in nature. Learners: Respond with examples such as leaves, flowers, and animal shapes.\\n(5 min) Teacher: Guide students to discuss how these designs might inspire manmade objects. Learners: Discuss and provide examples like the kingfisher bird inspiring trains.\\nShare PI: Learners can research and discuss the meaning and role of design in nature and the manmade environment.\\nWarm-up (qa): What do you think design means in nature? Can you name any examples of designs in our environment?\"},\"phase2\":{\"duration\":\"30 minutes\",\"coreConcept\":\"Today, we will research and discuss the meaning and role of design in nature and how it influences manmade designs.\",\"steps\":[{\"time\":\"10 min\",\"teacher\":\"Divide students into pairs and provide them with materials to research the meaning of design.\",\"learner\":\"Work together to define design and its importance in nature and manmade environments.\",\"resourceUse\":\"\",\"formative\":\"\",\"n\":1,\"exemplarN\":1},{\"time\":\"10 min\",\"teacher\":\"Instruct students to find examples of natural designs that have influenced manmade designs.\",\"learner\":\"Identify and record examples such as the palm tree design in architecture.\",\"resourceUse\":\"\",\"formative\":\"\",\"n\":2,\"exemplarN\":2},{\"time\":\"10 min\",\"teacher\":\"Ask each pair to present their findings to the class, highlighting the influence of nature on design.\",\"learner\":\"Present their research and discuss their findings with the class.\",\"resourceUse\":\"\",\"formative\":\"\",\"n\":3,\"exemplarN\":2}],\"tables\":[],\"imageNeeds\":[],\"differentiation\":{\"support\":\"Pair struggling learners with more capable peers.\",\"core\":\"All students participate in research and presentation.\",\"challenge\":\"Encourage advanced learners to explore additional examples.\"},\"misconceptions\":[],\"resources\":\"Research materials (books, internet access), paper, pens\",\"assessment\":\"Monitor group discussions and presentations for understanding.\",\"activities\":\"(10 min) Teacher: Divide students into pairs and provide them with materials to research the meaning of design. Learners: Work together to define design and its importance in nature and manmade environments.\\n(10 min) Teacher: Instruct students to find examples of natural designs that have influenced manmade designs. Learners: Identify and record examples such as the palm tree design in architecture.\\n(10 min) Teacher: Ask each pair to present their findings to the class, highlighting the influence of nature on design. Learners: Present their research and discuss their findings with the class.\\nCore concept: Today, we will research and discuss the meaning and role of design in nature and how it influences manmade designs.\"},\"phase3\":{\"duration\":\"10 minutes\",\"qa\":[{\"question\":\"What is one way nature influences manmade design?\",\"expected\":\"Students might say the beak of the kingfisher inspired train design.\"},{\"question\":\"Why is it important to study design in nature?\",\"expected\":\"Students may respond that it helps us create better designs.\"}],\"summaryPoints\":[\"Design in nature can inspire innovative manmade designs.\",\"Understanding design helps us appreciate our environment.\",\"Researching design enhances our creativity.\"],\"realLife\":\"In Ghana, traditional architecture often reflects natural elements.\",\"feedbackPrompt\":\"Raise your hand if you can explain how nature influences design.\",\"steps\":[{\"time\":\"5 min\",\"teacher\":\"Summarize the key points discussed in class.\",\"learner\":\"Listen and reflect on the summary.\",\"resourceUse\":\"\",\"formative\":\"\",\"n\":1},{\"time\":\"5 min\",\"teacher\":\"Ask students to share one new thing they learned today.\",\"learner\":\"Share their thoughts with the class.\",\"resourceUse\":\"\",\"formative\":\"\",\"n\":2}],\"resources\":\"Chalkboard, markers\",\"assessment\":\"Check for understanding through student responses.\",\"activities\":\"(5 min) Teacher: Summarize the key points discussed in class. Learners: Listen and reflect on the summary.\\n(5 min) Teacher: Ask students to share one new thing they learned today. Learners: Share their thoughts with the class.\\nReal life: In Ghana, traditional architecture often reflects natural elements.\\nFeedback: Raise your hand if you can explain how nature influences design.\"},\"homework\":\"Write a short paragraph about a design in nature that inspires you.\",\"teacherNotes\":\"Ensure all students participate in discussions and presentations.\",\"safetyNotes\":\"\",\"exemplars\":[{\"n\":1,\"text\":\"Research to determine and record the meaning, importance and role of design in nature and the manmade environment for reflection and discussion.\",\"visual\":\"none\"},{\"n\":2,\"text\":\"Identify and reflect on selected natural and manmade designs to appreciate and determine how design in nature has influenced manmade designs to benefit society for appreciation and discussion. Source: Pinterest.com Beak of kingfisher bird inspired Shinkansen Bullet Train – Japan Design inspired by the palm Colourful bird -- 45 of 136 -- 3© NaCCA, Ministry of Education 2021 CONTENT STANDARD INDICATORS AND EXEMPLARS CORE COMPETENCIES\",\"visual\":\"none\"}],\"exemplarContinuation\":false},\"teachingMethods\":[\"demonstration\",\"collaborative\"],\"dayLabel\":\"Monday\",\"weekEndingDate\":\"\",\"classSize\":0,\"teacherName\":\"Forensic Researcher\",\"schoolName\":\"Forensic Research Basic School\",\"academicYear\":\"2026/2027\",\"bulkJobId\":null,\"exemplarContinuation\":false,\"printTemplateId\":\"jhs-daily\",\"period\":\"\",\"createdAt\":\"2026-10-06T23:09:47.256Z\",\"updatedAt\":\"2026-10-06T23:09:47.256Z\"}}"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/lesson-planner/plans?schoolId=forensic-research-basic-school"
+  },
+  {
+    "phase": "response",
+    "status": 402,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/lesson-planner/plans?schoolId=forensic-research-basic-school",
+    "response": "{\"error\":\"credits_required\",\"message\":\"You have no credits remaining. Please purchase credits to continue.\",\"credits\":0}"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/auth/me"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/lesson-planner/plans"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/auth/me",
+    "response": "{\"id\":\"user:forensic-research-basic-school:skforensic42188\",\"name\":\"Forensic Researcher\",\"username\":\"\",\"email\":\"\",\"role\":\"teacher\",\"schoolId\":\"forensic-research-basic-school\",\"isIndependent\":false,\"authProvider\":\"password\",\"photoUrl\":\"\",\"joinStatus\":\"none\",\"pendingSchoolId\":null,\"pendingSchoolName\":null,\"isHeadTeacher\":false,\"isSiso\":false,\"circuitIds\":[],\"pinEnabled\":false,\"hasPassword\":true,\"staff\":null,\"accountActive\":false,\"credits\":0,\"onboardingCompleted\":true,\"gamePoints\":0,\"referralCode\":\"52dcb3a3\",\"hasPhoto\":false}"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/lesson-planner/curriculum?subject=Creative%20Arts%20and%20Design&level=JHS&className=B9"
+  },
+  {
+    "phase": "response",
+    "status": 402,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/lesson-planner/plans",
+    "response": "{\"error\":\"credits_required\",\"message\":\"You have no credits remaining. Please purchase credits to continue.\",\"credits\":0}"
+  }
+]

@@ -1,0 +1,132 @@
+{
+  "url": "/school/lesson-planner",
+  "text": "BACK TO SCHOOL\nDouble AI credits until 11th November 2026. · Open the store\nDouble AI credits until 11th November 2026. · Open the store\n20\nCredit Store\nGhanaEd\nDashboard\nMy Classroom\nSchool Management\nGuides\n$\n20 credits\nF\nForensic\nTeacher\nF\nForensic\nTeacher\nAsk Akua\n$\n20 credits\nDashboard\nProfile\nLesson Planner\n6 tools\nLessons\nSelf-Tutor\nAssignments\nAssessment\nTermly Exams\nPracticals\nStudent Progress\nDiscussions\nSchool Management\nStudent Manual\nTeacher Guide\nSchool Manual\nTutorials\n$\nBuy Credits\nDark Mode\nSign out\n\nTEACHING TOOLS\n\nLesson Planner\n\nGES weekly learner plans, schemes of work, and AI-assisted planning on the NaCCA curriculum.\n\nGenerate Plan\nGenerate Plan\nSchemes of Work\nScheme Analyzer\nTermly Exams\nBSTEM Library\nMy Lesson Plans\nGenerate Lesson Plan\n\nGES weekly learner plans from your scheme or curriculum alignment\n\n10 credits\nFrom scheme of work\nMY SCHEMES OR A DISTRICT DEO PACK\nMy schemes\nChoose from District\nScheme\nSelect a scheme…\nTeaching days\nCHOOSE THE DAYS YOU ACTUALLY TEACH\nAll week\nClear\n✓\nMonday\nTuesday\nWednesday\nThursday\nFriday\nClass context\nLevel *\nSelect…\nKindergarten\nLower Primary\nUpper Primary\nJunior High School\nClass *\nSelect…\nSubject *\nSelect…\nTerm\nTerm 1\nTerm 2\nTerm 3\nWeek\nTopic\nLesson table\nBASIC 7 TO BASIC 9\n\nChoose the paper form you will print. KG and Basic 1–6 default to the GES primary table; Basic 7–9 keep the JHS daily table. You can switch any time.\n\n✓\nWeek Ending\tDAY\tSubject\nDuration\tStrand\nClass\tClass Size\tSub Strand\nContent Standard\tIndicator\tLesson\nPerformance Indicator\tCore Competencies\nReferences\tKeywords\nPhase/Duration\tTeacher/Learner Activity\tResources\nPhase 1\t\t\nPhase 2\t\t\nPhase 3\t\t\n\nJHS daily table\n\nBASIC 7 TO BASIC 9\n\nPhase/duration, teacher/learner activity, and resources as columns. One A4 sheet per day.\n\nPreview table\nDay:\tWEEK ENDING:\tDate:\tPeriod:\tCLASS SIZE:\n\tStrand:\tSub-Strand:\n\tIndicator (code):\tContent standard (code):\n\tPerformance indicator:\n\tCore competencies:\tKey Words:\n\tT.L.R(s):\tRef:\nDAY\tPhase 1: Starter\tPhase 2: Main\tPhase 3: Plenary / Reflections\nMon\t\t\t\nTue\t\t\t\n\nPrimary GES form\n\nKG, BASIC 1 TO BASIC 6\n\nOfficial printed table: Strand | Sub-Strand, Indicator (code) | Content standard (code), then Starter / Main / Plenary by day.\n\nPreview table\nWeek Ending\tDAY\tSubject\nDuration\tStrand\nClass\tClass Size\tSub Strand\nContent Standard\tIndicator\tLesson\nPerformance Indicator\tCore Competencies\nTeaching/ Learning Resources:\nNew words:\nReferences\nDAYS\tPHASE 1: STARTER\tPHASE 2: MAIN\tPHASE 3: REFLECTION\nMonday\t\t\t\n\nPrimary week grid\n\nKG, BASIC 1 TO BASIC 6\n\nTyped weekly sheet: 3-column header, Teaching/Learning Resources and New words as full-width rows, days as rows.\n\nPreview table\nHow you will teach\n1–3 METHODS · NOTHING GENERIC\n\nThe plan is written in this delivery style so a colleague can teach from the note. Defaults follow the subject and class; change them if you teach differently.\n\n✓\nScaffolding\nI do / we do / you do, with support faded\nDifferentiated instruction\nSupport, core, and challenge on the same indicator\nInquiry / discovery\nPredict, investigate, conclude\nPlay-based\nSong, game, story, TPR\n✓\nCollaborative / group work\nPairs or groups with named roles\nDirect instruction\nClear model, then practice\nDemonstration\nTeacher shows, learners notice then try\nThink–pair–share\nThink alone, talk with a partner, share\nStation rotation\nTimed stations around the room\nProject-based\nA product by the end of the lesson\nInclusive / SEN support\nAccess for mixed ability and additional needs\nDialogic / talk for learning\nTalk moves that build understanding\nPhonics / language experience\nSounds, blending, language from experience\nLesson stance\nFirst time this topic\nContinuation / recap\nLearner needs (optional)\nInclude diagrams when the topic needs them(+2 credits each, max 2 per plan)\nSchedule & logistics\nSchool name\nTeacher name\nWeek ending\nDuration\nClass size\nGenerate lesson plan · 10 credits\nRun in background",
+  "inputs": [
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "label": "",
+      "options": [
+        "|Select a scheme…"
+      ]
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "label": "",
+      "options": [
+        "|Select…",
+        "KG|Kindergarten",
+        "LP|Lower Primary",
+        "UP|Upper Primary",
+        "JHS|Junior High School"
+      ]
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "label": "",
+      "options": [
+        "|Select…"
+      ]
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "label": "",
+      "options": [
+        "|Select…"
+      ]
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "label": "",
+      "options": [
+        "1|Term 1",
+        "2|Term 2",
+        "3|Term 3"
+      ]
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "ph": "Lesson topic",
+      "label": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "ph": "e.g. mixed ability, 48 in class, 3 struggling readers",
+      "label": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "ph": "",
+      "label": "Include diagrams when the topic needs them(+2 credits each, max 2 per plan)"
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "ph": "e.g. Bakpe D/A Basic School",
+      "label": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "ph": "Teacher full name",
+      "label": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "ph": "50 minutes",
+      "label": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "number",
+      "ph": "e.g. 30",
+      "label": ""
+    }
+  ],
+  "buttons": [
+    "My Classroom",
+    "School Management",
+    "Guides",
+    "Lesson Planner 6 tools",
+    "Dark Mode",
+    "Sign out",
+    "Generate Plan",
+    "Schemes of Work",
+    "Scheme Analyzer",
+    "Termly Exams",
+    "BSTEM Library",
+    "My Lesson Plans",
+    "My schemes",
+    "Choose from District",
+    "All week",
+    "Clear",
+    "✓ Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Preview table",
+    "Preview table",
+    "Preview table",
+    "✓ Scaffolding I do / we do / you do, with support faded",
+    "Inquiry / discovery Predict, investigate, conclude",
+    "Play-based Song, game, story, TPR",
+    "Direct instruction Clear model, then practice",
+    "Demonstration Teacher shows, learners notice then try",
+    "Think–pair–share Think alone, talk with a partner, share",
+    "Station rotation Timed stations around the room",
+    "Project-based A product by the end of the lesson",
+    "First time this topic",
+    "Continuation / recap",
+    "Generate lesson plan · 10 credits",
+    "Run in background"
+  ]
+}

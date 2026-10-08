@@ -1,0 +1,33 @@
+{
+  "url": "/akua",
+  "text": "BACK TO SCHOOL\nDouble AI credits until 11th November 2026. · Open the store\nDouble AI credits until 11th November 2026. · Open the store\nGhanaEd\nDashboard\nMy Classroom\nSchool Management\nGuides\n$\n20 credits\nF\nForensic\nTeacher\nF\nForensic\nTeacher\nAsk Akua\n$\n20 credits\nDashboard\nProfile\nLesson Planner\n6 tools\nLessons\nSelf-Tutor\nAssignments\nAssessment\nTermly Exams\nPracticals\nStudent Progress\nDiscussions\nSchool Management\nStudent Manual\nTeacher Guide\nSchool Manual\nTutorials\n$\nBuy Credits\nDark Mode\nSign out\nChats\nNo chats yet. Start one — Akua is always on.\nA\nAkua\n\nOnline\n\nA\nHi Forensic — I am Akua.\n\nAsk anything about GhanaEd, a NaCCA topic, a scheme, or a lesson. I will answer in text or tables, and I can write teaching documents you can save.\n\nClass 4 Term 1 pack\nB7 English full year\nLesson for week 5\nClass pack · 8 cr/subject\nOne subject · year\nLesson plan · 10 cr\nExplain a lesson\n\n1 credit a message\n\nEnter to send · Shift+Enter for a new line",
+  "inputs": [
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "ph": "Search",
+      "label": ""
+    },
+    {
+      "tag": "TEXTAREA",
+      "type": "textarea",
+      "ph": "Message Akua…",
+      "label": ""
+    }
+  ],
+  "buttons": [
+    "My Classroom",
+    "School Management",
+    "Guides",
+    "Lesson Planner 6 tools",
+    "Dark Mode",
+    "Sign out",
+    "Class 4 Term 1 pack",
+    "B7 English full year",
+    "Lesson for week 5",
+    "Class pack · 8 cr/subject",
+    "One subject · year",
+    "Lesson plan · 10 cr",
+    "Explain a lesson"
+  ]
+}

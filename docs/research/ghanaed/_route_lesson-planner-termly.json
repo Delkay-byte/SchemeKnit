@@ -1,0 +1,32 @@
+{
+  "url": "/school/lesson-planner?tab=termly",
+  "text": "BACK TO SCHOOL\nDouble AI credits until 11th November 2026. · Open the store\nDouble AI credits until 11th November 2026. · Open the store\n20\nCredit Store\nGhanaEd\nDashboard\nMy Classroom\nSchool Management\nGuides\n$\n20 credits\nF\nForensic\nTeacher\nF\nForensic\nTeacher\nAsk Akua\n$\n20 credits\nDashboard\nProfile\nLesson Planner\n6 tools\nLessons\nSelf-Tutor\nAssignments\nAssessment\nTermly Exams\nPracticals\nStudent Progress\nDiscussions\nSchool Management\nStudent Manual\nTeacher Guide\nSchool Manual\nTutorials\n$\nBuy Credits\nDark Mode\nSign out\n\nTEACHING TOOLS\n\nLesson Planner\n\nGES weekly learner plans, schemes of work, and AI-assisted planning on the NaCCA curriculum.\n\nTermly Exams\nGenerate Plan\nSchemes of Work\nScheme Analyzer\nTermly Exams\nBSTEM Library\nMy Lesson Plans\nTermly Exams\n\nEnd-of-term papers and marking schemes · 10 credits per subject generation\n\n+ New termly exam\nAll terms\nTerm 1\nTerm 2\nTerm 3\nRefresh\nNo termly exams yet\n\nCreate a GES-style end-of-term paper from your scheme, curriculum, or custom topics.\n\nCreate your first paper",
+  "inputs": [
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "label": "",
+      "options": [
+        "|All terms",
+        "1|Term 1",
+        "2|Term 2",
+        "3|Term 3"
+      ]
+    }
+  ],
+  "buttons": [
+    "My Classroom",
+    "School Management",
+    "Guides",
+    "Lesson Planner 6 tools",
+    "Dark Mode",
+    "Sign out",
+    "Generate Plan",
+    "Schemes of Work",
+    "Scheme Analyzer",
+    "Termly Exams",
+    "BSTEM Library",
+    "My Lesson Plans",
+    "Refresh"
+  ]
+}

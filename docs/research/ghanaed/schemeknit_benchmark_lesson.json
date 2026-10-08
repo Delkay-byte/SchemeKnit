@@ -1,0 +1,192 @@
+{
+  "id": "d1f55629-c8b5-4ffb-a1cb-b87882afbfd9",
+  "scheme_id": "16c6bd6d-29f3-48bd-b365-d26b8afff24e",
+  "job_id": "2fd78ea5-6f85-42b5-9de0-84f6905388b9",
+  "week_number": 1,
+  "source_week": 1,
+  "week_ending": "2026-10-09",
+  "week_ending_derived": false,
+  "teaching_week": 1,
+  "carry_forward": false,
+  "lesson_sequence": 1,
+  "lesson_date": "2026-10-09",
+  "lesson_number": 1,
+  "period": "",
+  "special_period_label": "",
+  "special_period_type": "",
+  "class_level": "Basic 9",
+  "subject": "Creative Arts and Design",
+  "class_size": 30,
+  "duration_minutes": 50,
+  "school_name": "",
+  "teacher_name": "SK Benchmark Teacher",
+  "strand": "DESIGN",
+  "sub_strand": "CREATIVE AND DESIGN PROCESSES",
+  "content_standard": "B9.1.3.1 Apply the creative process to manage design projects.",
+  "content_standard_code": "B9.1.3.1",
+  "indicators": [
+    "B9.1.3.1.1 Plan and execute design projects using the creative process"
+  ],
+  "indicator_codes": [
+    "B9.1.3.1.1"
+  ],
+  "lesson_topic": "DESIGN - CREATIVE AND DESIGN PROCESSES",
+  "previous_knowledge": "Previous lesson: CREATIVE AND DESIGN PROCESSES",
+  "wapef_deep_hope": "",
+  "wapef_storyline": "",
+  "wapef_through_lines": [],
+  "wapef_gods_story": "",
+  "remarks": "",
+  "learning_objectives": [
+    {
+      "id": "1b6bcffd-2e63-49bf-bcf5-875a443cc3a8",
+      "description": "Learners can Plan and execute design projects using the creative process.",
+      "indicator_code": "B9.1.3.1.1",
+      "source": "deterministic"
+    }
+  ],
+  "core_competencies": [
+    "Creativity and Innovation",
+    "Communication and Collaboration"
+  ],
+  "source_tlrs": [
+    "Manila paper",
+    "Markers",
+    "Chart paper"
+  ],
+  "other_tlrs": [],
+  "teaching_learning_resources": [
+    "Manila paper",
+    "Markers",
+    "Chart paper",
+    "art materials",
+    "locally available materials",
+    "colours",
+    "paper",
+    "clay",
+    "instruments",
+    "locally available materials for making",
+    "display space"
+  ],
+  "introduction": "This lesson builds on 'CREATIVE AND DESIGN PROCESSES' and moves the class on to Plan and execute design projects using the creative process..",
+  "main_activities": [
+    {
+      "id": "51c6972f-b450-433b-9911-5e4306a2fac3",
+      "phase": "CREATIVE DEMONSTRATION",
+      "description": "Teacher demonstrates the technique for Plan and execute design projects using the creative process with locally available materials, naming each step and the tools used.",
+      "duration_minutes": 11,
+      "resources": [],
+      "source": "deterministic"
+    },
+    {
+      "id": "a0edd2fd-f3e4-4d7b-9857-93ffe4bb1383",
+      "phase": "GUIDED CREATION",
+      "description": "Learners create their own work applying Plan and execute design projects using the creative process, using ; the teacher supports individuals.",
+      "duration_minutes": 14,
+      "resources": [],
+      "source": "deterministic"
+    },
+    {
+      "id": "0c064be9-72bf-4677-82c2-a2b3cf95ac70",
+      "phase": "SHARE AND CRITIQUE",
+      "description": "Learners create their own work on Plan and execute design projects using the creative process using the technique and locally available materials; the teacher supports individuals.",
+      "duration_minutes": 7,
+      "resources": [],
+      "source": "deterministic"
+    }
+  ],
+  "learner_activities": [
+    {
+      "id": "508b3a2f-db35-4368-917e-6aaa5dbdcf19",
+      "phase": "LEARNER",
+      "description": "Examine the sample connected to Plan and execute design projects using the creative process and notice how it was made or performed.",
+      "duration_minutes": 11,
+      "resources": [],
+      "source": "deterministic"
+    },
+    {
+      "id": "cf6aba82-ef11-4c7e-bf27-85425f7308e0",
+      "phase": "LEARNER",
+      "description": "Create your own work applying Plan and execute design projects using the creative process, using .",
+      "duration_minutes": 14,
+      "resources": [],
+      "source": "deterministic"
+    },
+    {
+      "id": "26a06c61-dca4-462e-9ec0-a7d7aa155066",
+      "phase": "LEARNER",
+      "description": "Display or perform your work, give kind specific feedback on Plan and execute design projects using the creative process, then revise.",
+      "duration_minutes": 7,
+      "resources": [],
+      "source": "deterministic"
+    }
+  ],
+  "teacher_activities": [
+    {
+      "id": "48ddc0c9-3b0b-4abe-a4c8-55fee3ccfda2",
+      "phase": "TEACHER",
+      "description": "Model Plan and execute design projects using the creative process slowly, think aloud, and check that all learners can see and hear.",
+      "duration_minutes": 11,
+      "resources": [],
+      "source": "deterministic"
+    },
+    {
+      "id": "67f3f3d9-c9aa-4ba7-9e86-7a9f27869c7b",
+      "phase": "TEACHER",
+      "description": "Circulate, give brief individual feedback, and note learners who need re-teaching of Plan and execute design projects using the creative process.",
+      "duration_minutes": 14,
+      "resources": [],
+      "source": "deterministic"
+    },
+    {
+      "id": "a3a0110d-db57-43ac-9d0a-48c98c903c65",
+      "phase": "TEACHER",
+      "description": "Lead a short, kind critique and highlight good examples relating to Plan and execute design projects using the creative process.",
+      "duration_minutes": 7,
+      "resources": [],
+      "source": "deterministic"
+    }
+  ],
+  "assessment": "Assess the created work or performance on Plan and execute design projects using the creative process against a simple rubric (technique, effort, expression). Success = Learner can produce original work applying the concept. Assessment mode: Product or performance assessment with rubric.",
+  "conclusion": "Three learners display or perform their work on Plan and execute design projects using the creative process; the class gives one kind, specific point of feedback each.",
+  "references": [],
+  "structured_references": [],
+  "keywords": [
+    "Manila paper",
+    "Markers",
+    "Chart paper",
+    "projects",
+    "creative",
+    "invent"
+  ],
+  "homework": "Finish or improve the work you started today on Plan and execute design projects using the creative process and bring it to the next lesson.",
+  "class_assignment": "Learners create their own work applying Plan and execute design projects using the creative process, using locally available materials. The teacher observes technique and gives short feedback while they work.",
+  "home_assignment": "Finish or improve the work you started today on Plan and execute design projects using the creative process and bring it to the next lesson.",
+  "starter_activity": "Build on the previous lesson ('CREATIVE AND DESIGN PROCESSES'). Perform the first step of Plan and execute design projects using the creative process without explaining it and ask learners to predict what you will do next and why.",
+  "differentiation": "Support: Provide partially prepared materials or a simple pattern so learners can succeed at Plan and execute design projects using the creative process. while still doing the creative work themselves.\nExtension: Invite confident learners to add a personal variation or a more complex piece demonstrating Plan and execute design projects using the creative process..\nGrouping: Whole-class demonstration, individual creation, peer critique in small groups.",
+  "essential_questions": [],
+  "template_id": null,
+  "status": "generated",
+  "ai_generated": false,
+  "teacher_edited": false,
+  "provenance": {
+    "scheme": "sk_b9_creative_arts_scheme.docx",
+    "curriculum_source": "Teacher scheme",
+    "source_week": 1,
+    "teaching_week": 1,
+    "strand": "DESIGN",
+    "sub_strand": "CREATIVE AND DESIGN PROCESSES",
+    "content_standard": "B9.1.3.1 Apply the creative process to manage design projects.",
+    "content_standard_code": "B9.1.3.1",
+    "indicator": "B9.1.3.1.1",
+    "indicator_text": "Plan and execute design projects using the creative process.",
+    "period": "",
+    "carry_forward": false,
+    "generation": "Curriculum-first (deterministic)",
+    "ai_provider": null,
+    "source_week_type": "instruction",
+    "source_review_status": "ok",
+    "source_review_reasons": [],
+    "exemplar": null
+  }
+}

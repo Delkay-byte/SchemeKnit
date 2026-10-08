@@ -1,0 +1,20 @@
+{
+  "scheme": "sk_b9_creative_arts_scheme.docx",
+  "curriculum_source": "Teacher scheme",
+  "source_week": 1,
+  "teaching_week": 1,
+  "strand": "DESIGN",
+  "sub_strand": "CREATIVE AND DESIGN PROCESSES",
+  "content_standard": "B9.1.3.1 Apply the creative process to manage design projects.",
+  "content_standard_code": "B9.1.3.1",
+  "indicator": "B9.1.3.1.1",
+  "indicator_text": "Plan and execute design projects using the creative process.",
+  "period": "",
+  "carry_forward": false,
+  "generation": "Curriculum-first (deterministic)",
+  "ai_provider": null,
+  "source_week_type": "instruction",
+  "source_review_status": "ok",
+  "source_review_reasons": [],
+  "exemplar": null
+}

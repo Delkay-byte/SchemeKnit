@@ -1,0 +1,47 @@
+{
+  "url": "/register",
+  "text": "Create your account\n\nJoin GhanaEd — free starter credits included\n\n✓\nSCHOOL\n✓\nROLE\n3\nACCOUNT\nCreate your account\n\nAlmost done — choose a username and password.\n\nFull name\nUsername\nPassword\nConfirm password\nBack\nGet started free\n\nBy creating an account you agree to our Terms and Privacy Policy.\n\nAlready have an account? Sign in",
+  "fields": [
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "id": "",
+      "name": "",
+      "placeholder": "e.g. Kwame Asante",
+      "value": "Forensic Researcher",
+      "label": "Full name"
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "id": "",
+      "name": "",
+      "placeholder": "At least 3 characters",
+      "value": "skforensic42188",
+      "label": "Username"
+    },
+    {
+      "tag": "INPUT",
+      "type": "password",
+      "id": "",
+      "name": "",
+      "placeholder": "At least 6 characters",
+      "value": "[hidden]",
+      "label": "Password"
+    },
+    {
+      "tag": "INPUT",
+      "type": "password",
+      "id": "",
+      "name": "",
+      "placeholder": "Repeat your password",
+      "value": "[hidden]",
+      "label": "Confirm password"
+    }
+  ],
+  "buttons": [
+    "Back",
+    "Get started free"
+  ],
+  "cards": []
+}

@@ -1,0 +1,485 @@
+[
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/dashboard",
+    "resourceType": "document"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/dashboard"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/index-CR7UdDlA.js",
+    "resourceType": "script"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/vendor-react-CLVQub2T.js",
+    "resourceType": "script"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/vendor-icons-C5TH_qft.js",
+    "resourceType": "script"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/index-DnZaqmQ3.css",
+    "resourceType": "stylesheet"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/registerSW.js",
+    "resourceType": "script"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/icon-160.webp",
+    "resourceType": "image"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/vendor-icons-C5TH_qft.js"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/index-DnZaqmQ3.css"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/registerSW.js"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/icon-160.webp"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/vendor-react-CLVQub2T.js"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/index-CR7UdDlA.js"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/styles-BE3EjIxi.css",
+    "resourceType": "stylesheet"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/bstem-pitch-DnqIxFtN.css",
+    "resourceType": "stylesheet"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/subscription/promo",
+    "resourceType": "fetch"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/auth/me",
+    "resourceType": "fetch"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/styles-BE3EjIxi.css"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/bstem-pitch-DnqIxFtN.css"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/subscription/promo",
+    "response": "{\"promo\":{\"active\":true,\"name\":\"back-to-school\",\"multiplier\":2,\"endsAt\":\"2026-11-11T23:59:59.000Z\",\"headline\":\"Double AI credits until 11th November 2026.\"}}"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/DashboardPage-Bggd1Xee.js",
+    "resourceType": "script"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/TopBar-upagbeKz.js",
+    "resourceType": "script"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/logo-B0PjXsU0.js",
+    "resourceType": "script"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/StudentRewardsPanel-Biohebid.js",
+    "resourceType": "script"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/vendor-utils-B5CD4DQe.js",
+    "resourceType": "script"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/StudentRewardsPanel-yVn_U9qR.css",
+    "resourceType": "stylesheet"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/auth/me",
+    "response": "{\"id\":\"user:forensic-research-basic-school:skforensic42188\",\"name\":\"Forensic Researcher\",\"username\":\"\",\"email\":\"\",\"role\":\"teacher\",\"schoolId\":\"forensic-research-basic-school\",\"isIndependent\":false,\"authProvider\":\"password\",\"photoUrl\":\"\",\"joinStatus\":\"none\",\"pendingSchoolId\":null,\"pendingSchoolName\":null,\"isHeadTeacher\":false,\"isSiso\":false,\"circuitIds\":[],\"pinEnabled\":false,\"hasPassword\":true,\"staff\":null,\"accountActive\":true,\"credits\":20,\"onboardingCompleted\":true,\"gamePoints\":0,\"referralCode\":\"52dcb3a3\",\"hasPhoto\":false}"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/subscription/status",
+    "resourceType": "fetch"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/ads/status",
+    "resourceType": "fetch"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/logo-B0PjXsU0.js"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/StudentRewardsPanel-Biohebid.js"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/TopBar-upagbeKz.js"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/StudentRewardsPanel-yVn_U9qR.css"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/subscription/status",
+    "response": "{\"accountActive\":true,\"credits\":20,\"history\":[{\"ref\":\"starter\",\"credits\":20,\"amount\":0,\"package\":\"Starter\",\"paidAt\":\"2026-10-06T22:53:05.250Z\"}],\"promo\":{\"active\":true,\"name\":\"back-to-school\",\"multiplier\":2,\"endsAt\":\"2026-11-11T23:59:59.000Z\",\"headline\":\"Double AI credits until 11th November 2026.\"}}"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/ads/status",
+    "response": "{\"adsEnabled\":false,\"rewardsRemainingToday\":5,\"cooldownMs\":0,\"dailyCap\":5,\"pointsPerAd\":5}"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/DashboardPage-Bggd1Xee.js"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/vendor-charts-DvowBx4X.js",
+    "resourceType": "script"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/vendor-utils-B5CD4DQe.js"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/vendor-charts-DvowBx4X.js"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/logo-DouibdfA.png",
+    "resourceType": "image"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/subscription/status",
+    "resourceType": "fetch"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/curriculum/levels",
+    "resourceType": "fetch"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/logo-DouibdfA.png"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/curriculum/levels",
+    "response": "[\"jhs\",\"kg\",\"lower-primary\",\"shs\",\"upper-primary\"]"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/subscription/status",
+    "response": "{\"accountActive\":true,\"credits\":20,\"history\":[{\"ref\":\"starter\",\"credits\":20,\"amount\":0,\"package\":\"Starter\",\"paidAt\":\"2026-10-06T22:53:05.250Z\"}],\"promo\":{\"active\":true,\"name\":\"back-to-school\",\"multiplier\":2,\"endsAt\":\"2026-11-11T23:59:59.000Z\",\"headline\":\"Double AI credits until 11th November 2026.\"}}"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/auth/me",
+    "resourceType": "fetch"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/auth/me",
+    "response": "{\"id\":\"user:forensic-research-basic-school:skforensic42188\",\"name\":\"Forensic Researcher\",\"username\":\"\",\"email\":\"\",\"role\":\"teacher\",\"schoolId\":\"forensic-research-basic-school\",\"isIndependent\":false,\"authProvider\":\"password\",\"photoUrl\":\"\",\"joinStatus\":\"none\",\"pendingSchoolId\":null,\"pendingSchoolName\":null,\"isHeadTeacher\":false,\"isSiso\":false,\"circuitIds\":[],\"pinEnabled\":false,\"hasPassword\":true,\"staff\":null,\"accountActive\":true,\"credits\":20,\"onboardingCompleted\":true,\"gamePoints\":0,\"referralCode\":\"52dcb3a3\",\"hasPhoto\":false}"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/LessonsPage-BgpD3J13.js",
+    "resourceType": "script"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/PageShell-DKiRKcJN.js",
+    "resourceType": "script"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/TeacherEditor-BvSkGBxn.js",
+    "resourceType": "script"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/TeacherEditor-Ccckcm2n.css",
+    "resourceType": "stylesheet"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/vendor-katex-CIHdCL6t.css",
+    "resourceType": "stylesheet"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/LessonsPage-rUJqLVTz.css",
+    "resourceType": "stylesheet"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/vendor-katex-CIHdCL6t.css"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/PageShell-DKiRKcJN.js"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/TeacherEditor-BvSkGBxn.js"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/TeacherEditor-Ccckcm2n.css"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/LessonsPage-rUJqLVTz.css"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/LessonsPage-BgpD3J13.js"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/vendor-katex-CKvi5y7c.js",
+    "resourceType": "script"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/vendor-katex-CKvi5y7c.js"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/subscription/status",
+    "resourceType": "fetch"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/curriculum/levels",
+    "resourceType": "fetch"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/lessons",
+    "resourceType": "fetch"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/curriculum/subjects?level=jhs",
+    "resourceType": "fetch"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/subscription/status",
+    "response": "{\"accountActive\":true,\"credits\":20,\"history\":[{\"ref\":\"starter\",\"credits\":20,\"amount\":0,\"package\":\"Starter\",\"paidAt\":\"2026-10-06T22:53:05.250Z\"}],\"promo\":{\"active\":true,\"name\":\"back-to-school\",\"multiplier\":2,\"endsAt\":\"2026-11-11T23:59:59.000Z\",\"headline\":\"Double AI credits until 11th November 2026.\"}}"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/curriculum/levels",
+    "response": "[\"jhs\",\"kg\",\"lower-primary\",\"shs\",\"upper-primary\"]"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/lessons",
+    "response": "[]"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/curriculum/subjects?level=kg",
+    "resourceType": "fetch"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/curriculum/subjects?level=jhs",
+    "response": "[{\"type\":\"subject\",\"name\":\"Arabic\",\"level\":\"jhs\",\"pdfUrl\":\"https://nacca.gov.gh/wp-content/uploads/2023/06/ARABIC.pdf\",\"strands\":[\"strand:jhs:arabic:0\",\"strand:jhs:arabic:1\",\"strand:jhs:arabic:2\",\"strand:jhs:arabic:3\",\"strand:jhs:arabic:4\",\"strand:jhs:arabic:5\",\"strand:jhs:arabic:6\",\"strand:jhs:arabic:7\",\"strand:jhs:arabic:8\",\"strand:jhs:arabic:9\",\"strand:jhs:arabic:10\",\"strand:jhs:arabic:11\"],\"_id\":\"subject:jhs:arabic\",\"_rev\":\"1-b24c4c0610d22be6b4986c674126785a\"},{\"type\":\"subject\",\"name\":\"Career Technology\",\"level\":\"jhs\",\"pdfUrl\":\"https://nacca.gov.gh/wp-content/uploads/2023/06/Career-Technology-k-9-3rd-Aug.08.2021.pdf\",\"strands\":[\"strand:jhs:career-technology:0\",\"strand:jhs:career-technology:1\",\"strand:jhs:career-technology:2\",\"strand:jhs:career-technology:3\",\"strand:jhs:career-technology:4\",\"strand:jhs:career-technology:5\",\"strand:jhs:career-technology:6\",\"strand:jhs:career-technology:7\",\"strand:jhs:career-technology:8\",\"strand:jhs:career-technology:9\",\"strand:jhs:career-technology:10\",\"strand:jhs:career-technology:11\",\"strand:jhs:career-technology:12\",\"strand:jhs:career-technology:13\",\"strand:jhs:career-technology:14\",\"strand:jhs:career-technology:15\",\"strand:jhs:career-technology:16\",\"strand:jhs:career-technology:17\"],\"_id\":\"subject:jhs:career-technology\",\"_rev\":\"1-acf2b0b38dd529a760771c16b8aa1194\"},{\"type\":\"subject\",\"name\":\"Computing\",\"level\":\"jhs\",\"pdfUrl\":\"https://nacca.gov.gh/wp-content/uploads/2023/06/COMPUTING.pdf\",\"strands\":[\"strand:jhs:computing:0\",\"strand:jhs:computing:1\",\"strand:jhs:computing:2\",\"strand:jhs:computing:3\"],\"_id\":\"subject:jhs:computing\",\"_rev\":\"1-e1b8b9e2748c07de792b62a8f82aabe1\"},{\"type\":\"subject\",\"name\":\"Creative Arts and Design\",\"level\":\"jhs\",\"pdfUrl\":\"https://nacca.gov.gh/wp-content/uploads/2023/06/CREATIVE-ARTS-AND-DESIGN.pdf\",\"strands\":[\"strand:jhs:creative-arts-and-design:0\",\"strand:jhs:creative-arts-and-design:1\",\"strand:jhs:creative-arts-and-design:2\",\"strand:jhs:creative-arts-and-design:3\",\"strand:jhs:creative-arts-and-design:4\",\"strand:jhs:creative-arts-and-design:5\",\"strand:jhs:creative-arts-and-design:6\",\"strand:jhs:creative-arts-and-design:7\",\"strand:jhs:creative-arts-and-design:8\",\"strand:jhs:creative-arts-and-design:9\",\"strand:jhs:creative-arts-and-design:10\",\"strand:jhs:creative-arts-and-design:11\"],\"_id\":\"subject:jhs:creative-arts-and-design\",\"_rev\":\"1-7afb7c3b188a654cc29a7c95173413c1\"},{\"type\":\"subject\",\"name\":\"English Language\",\"level\":\"jhs\",\"pdfUrl\":\"https://nacca.gov.gh/wp-content/uploads/2023/06/ENGLISH-LANGUAGE.pdf\",\"strands\":[\"strand:jhs:english-language:0\",\"strand:jhs:english-language:1\",\"strand:jhs:english-language:2\",\"strand:jhs:english-language:3\",\"strand:jhs:english-language:4\",\"strand:jhs:english-language:5\",\"strand:jhs:english-language:6\",\"strand:jhs:english-language:7\",\"strand:jhs:english-language:8\",\"strand:jhs:english-language:9\",\"strand:jhs:english-language:10\",\"strand:jhs:english-language:11\",\"strand:jhs:english-language:12\",\"strand:jhs:english-language:13\",\"strand:jhs:english-language:14\"],\"_id\":\"subject:jhs:english-language\",\"_rev\":\"1-c4976b6e12547b3e21888d298717ba36\"},{\"type\":\"subject\",\"name\":\"French Language\",\"level\":\"jhs\",\"pdfUrl\":\"https://nacca.gov.gh/wp-content/uploads/2023/06/FRENCH-LANGUAGE.pdf\",\"strands\":[\"strand:jhs:french-language:0\",\"strand:jhs:french-language:1\",\"strand:jhs:french-language:2\",\"strand:jhs:french-language:3\",\"strand:jhs:french-language:4\",\"strand:jhs:french-language:5\",\"strand:jhs:french-language:6\",\"strand:jhs:french-language:7\",\"strand:jhs:french-language:8\"],\"_id\":\"subject:jhs:french-language\",\"_rev\":\"1-af9ff710343f9fbc13e15120d4f8997c\"},{\"type\":\"subject\",\"name\":\"Ghanaian Language\",\"level\":\"jhs\",\"pdfUrl\":\"https://nacca.gov.gh/wp-content/uploads/2023/06/GHANAIAN-LANGUAGE.pdf\",\"strands\":[\"strand:jhs:ghanaian-language:0\",\"strand:jhs:ghanaian-language:1\",\"strand:jhs:ghanaian-language:2\",\"strand:jhs:ghanaian-language:3\",\"strand:jhs:ghanaian-language:4\",\"strand:jhs:ghanaian-language:5\",\"strand:jhs:ghanaian-language:6\",\"strand:jhs:ghanaian-language:7\",\"strand:jhs:ghanaian-language:8\",\"strand:jhs:ghanaian-language:9\",\"strand:jhs:ghanaian-language:10\",\"strand:jhs:ghanaian-language:11\",\"strand:jhs:ghanaian-language:12\",\"strand:jhs:ghanaian-language:13\",\"strand:jhs:ghanaian-language:14\"],\"_id\":\"subject:jhs:ghanaian-language\",\"_rev\":\"1-5a104091756ccf8faae70c84226e610a\"},{\"type\":\"subject\",\"name\":\"Mathematics\",\"level\":\"jhs\",\"pdfUrl\":\"https://nacca.gov.gh/wp-content/uploads/2023/06/MATHEMATICS.pdf\",\"strands\":[\"strand:jhs:mathematics:0\",\"strand:jhs:mathematics:1\",\"strand:jhs:mathematics:2\",\"strand:jhs:mathematics:3\",\"strand:jhs:mathematics:4\",\"strand:jhs:mathematics:5\",\"strand:jhs:mathematics:6\",\"strand:jhs:mathematics:7\",\"strand:jhs:mathematics:8\",\"strand:jhs:mathematics:9\",\"strand:jhs:mathematics:10\",\"strand:jhs:mathematics:11\"],\"_id\":\"subject:jhs:mathematics\",\"_rev\":\"1-8c3c5c51d2b89d480d6d2e3c6861b960\"},{\"type\":\"subject\",\"name\":\"Religious and Moral Education\",\"level\":\"jhs\",\"pdfUrl\":\"https://nacca.gov.gh/wp-content/uploads/2023/06/Religious-and-Moral-Education.pdf\",\"strands\":[\"strand:jhs:religious-and-moral-education:0\",\"strand:jhs:religious-and-moral-education:1\",\"strand:jhs:religious-and-moral-education:2\",\"strand:jhs:religious-and-moral-education:3\",\"strand:jhs:religious-and-moral-education:4\",\"strand:jhs:religious-and-moral-education:5\",\"strand:jhs:religious-and-moral-education:6\",\"strand:jhs:religious-and-moral-education:7\",\"strand:jhs:religious-and-moral-education:8\",\"strand:jhs:religious-and-moral-education:9\",\"strand:jhs:religious-and-moral-education:10\",\"strand:jhs:religious-and-moral-education:11\",\"strand:jhs:religious-and-moral-education:12\",\"strand:jhs:religious-and-moral-education:13\",\"strand:jhs:religious-and-moral-education:14\",\"strand:jhs:religious-and-moral-education:15\",\"strand:jhs:religious-and-moral-education:16\",\"strand:jhs:religious-and-moral-education:17\"],\"_id\":\"subject:jhs:religious-and-moral-education\",\"_rev\":\"1-671d61f9849b72ea9d5de4b7283b688b\"},{\"type\":\"subject\",\"name\":\"Science"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/curriculum/subjects?level=lower-primary",
+    "resourceType": "fetch"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/curriculum/subjects?level=kg",
+    "response": "[{\"type\":\"subject\",\"name\":\"Kindergarten Curriculum\",\"level\":\"kg\",\"pdfUrl\":\"http://nacca.gov.gh/wp-content/uploads/2019/06/KG-Curriculum.pdf\",\"strands\":[\"strand:kg:kindergarten-curriculum:0\",\"strand:kg:kindergarten-curriculum:1\",\"strand:kg:kindergarten-curriculum:2\",\"strand:kg:kindergarten-curriculum:3\",\"strand:kg:kindergarten-curriculum:4\",\"strand:kg:kindergarten-curriculum:5\",\"strand:kg:kindergarten-curriculum:6\",\"strand:kg:kindergarten-curriculum:7\",\"strand:kg:kindergarten-curriculum:8\",\"strand:kg:kindergarten-curriculum:9\",\"strand:kg:kindergarten-curriculum:10\",\"strand:kg:kindergarten-curriculum:11\"],\"_id\":\"subject:kg:kindergarten-curriculum\",\"_rev\":\"1-06b82abcca216b38dfceafc9be9a35cc\"}]"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/curriculum/subjects?level=shs",
+    "resourceType": "fetch"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/curriculum/subjects?level=lower-primary",
+    "response": "[{\"type\":\"subject\",\"name\":\"Creative Arts\",\"level\":\"lower-primary\",\"pdfUrl\":\"https://nacca.gov.gh/wp-content/uploads/2019/06/CREATIVE-ARTS-B1-B3.pdf\",\"strands\":[\"strand:lower-primary:creative-arts:0\",\"strand:lower-primary:creative-arts:1\",\"strand:lower-primary:creative-arts:2\",\"strand:lower-primary:creative-arts:3\",\"strand:lower-primary:creative-arts:4\",\"strand:lower-primary:creative-arts:5\"],\"_id\":\"subject:lower-primary:creative-arts\",\"_rev\":\"1-ba714dbbf26ef9aaea94f8574b8199d2\"},{\"type\":\"subject\",\"name\":\"English Language\",\"level\":\"lower-primary\",\"pdfUrl\":\"http://nacca.gov.gh/wp-content/uploads/2019/04/ENGLISH-LOWER-PRIMARY-B1-B3.pdf\",\"strands\":[\"strand:lower-primary:english-language:0\",\"strand:lower-primary:english-language:1\",\"strand:lower-primary:english-language:2\",\"strand:lower-primary:english-language:3\",\"strand:lower-primary:english-language:4\",\"strand:lower-primary:english-language:5\",\"strand:lower-primary:english-language:6\",\"strand:lower-primary:english-language:7\",\"strand:lower-primary:english-language:8\",\"strand:lower-primary:english-language:9\",\"strand:lower-primary:english-language:10\",\"strand:lower-primary:english-language:11\"],\"_id\":\"subject:lower-primary:english-language\",\"_rev\":\"1-245314ca71ff0f0bef3d0c496ba146cf\"},{\"type\":\"subject\",\"name\":\"Ghanaian Language\",\"level\":\"lower-primary\",\"pdfUrl\":\"local://GHANAIAN-LANGUAGE-B1-B3.pdf\",\"strands\":[\"strand:lower-primary:ghanaian-language:0\",\"strand:lower-primary:ghanaian-language:1\",\"strand:lower-primary:ghanaian-language:2\",\"strand:lower-primary:ghanaian-language:3\",\"strand:lower-primary:ghanaian-language:4\",\"strand:lower-primary:ghanaian-language:5\",\"strand:lower-primary:ghanaian-language:6\",\"strand:lower-primary:ghanaian-language:7\",\"strand:lower-primary:ghanaian-language:8\",\"strand:lower-primary:ghanaian-language:9\",\"strand:lower-primary:ghanaian-language:10\",\"strand:lower-primary:ghanaian-language:11\"],\"_id\":\"subject:lower-primary:ghanaian-language\",\"_rev\":\"1-59bdf3cbcb4e5044bd32cb48125b3268\"},{\"type\":\"subject\",\"name\":\"History\",\"level\":\"lower-primary\",\"pdfUrl\":\"http://nacca.gov.gh/wp-content/uploads/2019/04/HISTORY-B1-B6.pdf\",\"strands\":[\"strand:lower-primary:history:0\",\"strand:lower-primary:history:1\",\"strand:lower-primary:history:2\",\"strand:lower-primary:history:3\",\"strand:lower-primary:history:4\",\"strand:lower-primary:history:5\",\"strand:lower-primary:history:6\",\"strand:lower-primary:history:7\"],\"_id\":\"subject:lower-primary:history\",\"_rev\":\"1-19b93cded1c08a360962e0887de133cd\"},{\"type\":\"subject\",\"name\":\"Mathematics\",\"level\":\"lower-primary\",\"pdfUrl\":\"http://nacca.gov.gh/wp-content/uploads/2019/04/MATHS-LOWER-PRIMARY-B1-B3.pdf\",\"strands\":[\"strand:lower-primary:mathematics:0\",\"strand:lower-primary:mathematics:1\",\"strand:lower-primary:mathematics:2\",\"strand:lower-primary:mathematics:3\",\"strand:lower-primary:mathematics:4\",\"strand:lower-primary:mathematics:5\",\"strand:lower-primary:mathematics:6\",\"strand:lower-primary:mathematics:7\",\"strand:lower-primary:mathematics:8\",\"strand:lower-primary:mathematics:9\",\"strand:lower-primary:mathematics:10\",\"strand:lower-primary:mathematics:11\"],\"_id\":\"subject:lower-primary:mathematics\",\"_rev\":\"1-5ff3e330268901e6029ac2500f9cf412\"},{\"type\":\"subject\",\"name\":\"Physical Education\",\"level\":\"lower-primary\",\"pdfUrl\":\"local://PHYSICAL-EDUCATION-B1-B6.pdf\",\"strands\":[\"strand:lower-primary:physical-education:0\",\"strand:lower-primary:physical-education:1\",\"strand:lower-primary:physical-education:2\",\"strand:lower-primary:physical-education:3\",\"strand:lower-primary:physical-education:4\",\"strand:lower-primary:physical-education:5\",\"strand:lower-primary:physical-education:6\",\"strand:lower-primary:physical-education:7\",\"strand:lower-primary:physical-education:8\",\"strand:lower-primary:physical-education:9\",\"strand:lower-primary:physical-education:10\",\"strand:lower-primary:physical-education:11\",\"strand:lower-primary:physical-education:12\",\"strand:lower-primary:physical-education:13\",\"strand:lower-primary:physical-education:14\"],\"_id\":\"subject:lower-primary:physical-education\",\"_rev\":\"1-c04ba4d2a0fdbe21f1e8baff5b89e1ad\"},{\"type\":\"subject\",\"name\":\"Religious and Moral Education\",\"level\":\"lower-primary\",\"pdfUrl\":\"http://nacca.gov.gh/wp-content/uploads/2019/04/RELIGIOUS-AND-MORAL-EDUCATION-B1-B6.pdf\",\"strands\":[\"strand:lower-primary:religious-and-moral-education:0\",\"strand:lower-primary:religious-and-moral-education:1\",\"strand:lower-primary:religious-and-moral-education:2\",\"strand:lower-primary:religious-and-moral-education:3\",\"strand:lower-primary:religious-and-moral-education:4\",\"strand:lower-primary:religious-and-moral-education:5\",\"strand:lower-primary:religious-and-moral-education:6\",\"strand:lower-primary:religious-and-moral-education:7\",\"strand:lower-primary:religious-and-moral-education:8\",\"strand:lower-primary:religious-and-moral-education:9\",\"strand:lower-primary:religious-and-moral-education:10\",\"strand:lower-primary:religious-and-moral-education:11\",\"strand:lower-primary:religious-and-moral-education:12\",\"strand:lower-primary:religious-and-moral-education:13\",\"strand:lower-primary:religious-and-moral-education:14\",\"strand:lower-primary:religious-and-moral-education:15\",\"strand:lower-primary:religious-and-moral-education:16\",\"strand:lower-primary:religious-and-moral-education:17\"],\"_id\":\"subject:lower-primary:religious-and-moral-education\",\"_rev\":\"1-76f6c8b089d082b86cd36dde53e03043\"},{\"type\":\"subject\",\"name\":\"Science\",\"level\":\"lower-primary\",\"pdfUrl\":\"http://nacca.gov.gh/wp-content/uploads/2019/04/SCIENCE-LOWER-PRIMARY-B1-B3.pdf\",\"strands\":[\"strand:lower-primary:science:0\",\"strand:lower-primary:science:1\",\"strand:lower-primary:science:2\",\"strand:lower-primary:science:3\",\"strand:lower-primary:science:4\",\"strand:lower-primary:science:5\",\"strand:lower-primary:science:6\",\"strand:lower-primary:science:7\",\"strand:lower-primary:science:8\",\"strand:lower-primary:science:9\",\"strand:lower-primary:science:10\",\"strand:lower-primary:science:11\",\"strand:lower-primary:science:12\",\"strand:lower-primary:science:13\",\"strand:lo"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/curriculum/subjects?level=upper-primary",
+    "resourceType": "fetch"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/curriculum/subjects?level=shs",
+    "response": "[{\"type\":\"subject\",\"name\":\"Additional Mathematics\",\"level\":\"shs\",\"pdfUrl\":\"https://nacca.gov.gh/wp-content/uploads/2025/04/Additional-Mathematics-Curriculum.pdf\",\"strands\":[\"strand:shs:additional-mathematics:0\",\"strand:shs:additional-mathematics:1\",\"strand:shs:additional-mathematics:2\",\"strand:shs:additional-mathematics:3\",\"strand:shs:additional-mathematics:4\",\"strand:shs:additional-mathematics:5\",\"strand:shs:additional-mathematics:6\",\"strand:shs:additional-mathematics:7\",\"strand:shs:additional-mathematics:8\",\"strand:shs:additional-mathematics:9\",\"strand:shs:additional-mathematics:10\",\"strand:shs:additional-mathematics:11\"],\"_id\":\"subject:shs:additional-mathematics\",\"_rev\":\"1-05040442d3808be00188984775583769\"},{\"type\":\"subject\",\"name\":\"Agricultural Science\",\"level\":\"shs\",\"pdfUrl\":\"https://nacca.gov.gh/wp-content/uploads/2025/04/Agricultural-Science-Curriculum.pdf\",\"strands\":[\"strand:shs:agricultural-science:0\",\"strand:shs:agricultural-science:1\",\"strand:shs:agricultural-science:2\",\"strand:shs:agricultural-science:3\",\"strand:shs:agricultural-science:4\",\"strand:shs:agricultural-science:5\",\"strand:shs:agricultural-science:6\",\"strand:shs:agricultural-science:7\",\"strand:shs:agricultural-science:8\",\"strand:shs:agricultural-science:9\",\"strand:shs:agricultural-science:10\",\"strand:shs:agricultural-science:11\"],\"_id\":\"subject:shs:agricultural-science\",\"_rev\":\"1-62aff5ae741f7a328ec4ffe6ca550b17\"},{\"type\":\"subject\",\"name\":\"Agriculture\",\"level\":\"shs\",\"pdfUrl\":\"https://nacca.gov.gh/wp-content/uploads/2025/04/Agriculture-Curriculum.pdf\",\"strands\":[\"strand:shs:agriculture:0\",\"strand:shs:agriculture:1\",\"strand:shs:agriculture:2\",\"strand:shs:agriculture:3\",\"strand:shs:agriculture:4\",\"strand:shs:agriculture:5\",\"strand:shs:agriculture:6\",\"strand:shs:agriculture:7\",\"strand:shs:agriculture:8\",\"strand:shs:agriculture:9\",\"strand:shs:agriculture:10\",\"strand:shs:agriculture:11\",\"strand:shs:agriculture:12\"],\"_id\":\"subject:shs:agriculture\",\"_rev\":\"1-f468244b0e4c9d0eeb66a99e7bd3cd72\"},{\"type\":\"subject\",\"name\":\"Applied Technology\",\"level\":\"shs\",\"pdfUrl\":\"https://nacca.gov.gh/wp-content/uploads/2025/04/Applied-Technology-Curriculum.pdf\",\"strands\":[\"strand:shs:applied-technology:0\",\"strand:shs:applied-technology:1\",\"strand:shs:applied-technology:2\",\"strand:shs:applied-technology:3\",\"strand:shs:applied-technology:4\",\"strand:shs:applied-technology:5\",\"strand:shs:applied-technology:6\",\"strand:shs:applied-technology:7\",\"strand:shs:applied-technology:8\",\"strand:shs:applied-technology:9\",\"strand:shs:applied-technology:10\",\"strand:shs:applied-technology:11\",\"strand:shs:applied-technology:12\",\"strand:shs:applied-technology:13\",\"strand:shs:applied-technology:14\"],\"_id\":\"subject:shs:applied-technology\",\"_rev\":\"1-a4ffeb2b99b7240db351d2607fe6e391\"},{\"type\":\"subject\",\"name\":\"Arabic\",\"level\":\"shs\",\"pdfUrl\":\"https://nacca.gov.gh/wp-content/uploads/2025/04/Arabic-Curriculum.pdf\",\"strands\":[\"strand:shs:arabic:0\",\"strand:shs:arabic:1\",\"strand:shs:arabic:2\",\"strand:shs:arabic:3\",\"strand:shs:arabic:4\",\"strand:shs:arabic:5\",\"strand:shs:arabic:6\",\"strand:shs:arabic:7\",\"strand:shs:arabic:8\",\"strand:shs:arabic:9\"],\"_id\":\"subject:shs:arabic\",\"_rev\":\"1-6b2b31e5144a82b052ddaab88885f256\"},{\"type\":\"subject\",\"name\":\"Art and Design Foundation\",\"level\":\"shs\",\"pdfUrl\":\"https://nacca.gov.gh/wp-content/uploads/2025/04/Art-and-Design-Foundation-Curriculum.pdf\",\"strands\":[\"strand:shs:art-and-design-foundation:0\",\"strand:shs:art-and-design-foundation:1\",\"strand:shs:art-and-design-foundation:2\",\"strand:shs:art-and-design-foundation:3\",\"strand:shs:art-and-design-foundation:4\",\"strand:shs:art-and-design-foundation:5\"],\"_id\":\"subject:shs:art-and-design-foundation\",\"_rev\":\"1-6e631c429454d75f7bcf246b5bfc15f6\"},{\"type\":\"subject\",\"name\":\"Art and Design Studio\",\"level\":\"shs\",\"pdfUrl\":\"https://nacca.gov.gh/wp-content/uploads/2025/04/Art-and-Design-Studio-Curriculum.pdf\",\"strands\":[\"strand:shs:art-and-design-studio:0\",\"strand:shs:art-and-design-studio:1\",\"strand:shs:art-and-design-studio:2\",\"strand:shs:art-and-design-studio:3\",\"strand:shs:art-and-design-studio:4\",\"strand:shs:art-and-design-studio:5\",\"strand:shs:art-and-design-studio:6\",\"strand:shs:art-and-design-studio:7\",\"strand:shs:art-and-design-studio:8\"],\"_id\":\"subject:shs:art-and-design-studio\",\"_rev\":\"1-62afc8382e70862b99d4257b84da77b2\"},{\"type\":\"subject\",\"name\":\"Aviation and Aerospace Engineering\",\"level\":\"shs\",\"pdfUrl\":\"https://nacca.gov.gh/wp-content/uploads/2025/04/Aviation-and-Aerospace-Engineering-Curriculum.pdf\",\"strands\":[\"strand:shs:aviation-and-aerospace-engineering:0\",\"strand:shs:aviation-and-aerospace-engineering:1\",\"strand:shs:aviation-and-aerospace-engineering:2\",\"strand:shs:aviation-and-aerospace-engineering:3\",\"strand:shs:aviation-and-aerospace-engineering:4\",\"strand:shs:aviation-and-aerospace-engineering:5\",\"strand:shs:aviation-and-aerospace-engineering:6\",\"strand:shs:aviation-and-aerospace-engineering:7\",\"strand:shs:aviation-and-aerospace-engineering:8\",\"strand:shs:aviation-and-aerospace-engineering:9\",\"strand:shs:aviation-and-aerospace-engineering:10\",\"strand:shs:aviation-and-aerospace-engineering:11\"],\"_id\":\"subject:shs:aviation-and-aerospace-engineering\",\"_rev\":\"1-7e4f81875d2c221fe5b29313263dc23f\"},{\"type\":\"subject\",\"name\":\"Biology\",\"level\":\"shs\",\"pdfUrl\":\"https://nacca.gov.gh/wp-content/uploads/2025/04/Biology-Curriculum.pdf\",\"strands\":[\"strand:shs:biology:0\",\"strand:shs:biology:1\",\"strand:shs:biology:2\",\"strand:shs:biology:3\",\"strand:shs:biology:4\",\"strand:shs:biology:5\",\"strand:shs:biology:6\",\"strand:shs:biology:7\",\"strand:shs:biology:8\",\"strand:shs:biology:9\",\"strand:shs:biology:10\",\"strand:shs:biology:11\"],\"_id\":\"subject:shs:biology\",\"_rev\":\"1-a14357924d7be03b1d77d8801b4515bf\"},{\"type\":\"subject\",\"name\":\"BIOMEDICAL SCIENCE\",\"level\":\"shs\",\"pdfUrl\":\"https://nacca.gov.gh/wp-content/uploads/2025/04/BIOMEDICAL-SCIENCE-Curriculum.pdf\",\"strands\":[\"strand:shs:biomedical-science:0\",\"strand:shs:biomedical-science:1\",\"strand:shs:biomedical-science:2\",\"strand:shs:biomedical-science:3\",\"strand:shs:"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/curriculum/subjects?level=upper-primary",
+    "response": "[{\"type\":\"subject\",\"name\":\"Computing\",\"level\":\"upper-primary\",\"pdfUrl\":\"http://nacca.gov.gh/wp-content/uploads/2019/04/COMPUTING-B4-B6.pdf\",\"strands\":[\"strand:upper-primary:computing:0\",\"strand:upper-primary:computing:1\",\"strand:upper-primary:computing:2\",\"strand:upper-primary:computing:3\",\"strand:upper-primary:computing:4\",\"strand:upper-primary:computing:5\",\"strand:upper-primary:computing:6\",\"strand:upper-primary:computing:7\",\"strand:upper-primary:computing:8\",\"strand:upper-primary:computing:9\",\"strand:upper-primary:computing:10\",\"strand:upper-primary:computing:11\",\"strand:upper-primary:computing:12\",\"strand:upper-primary:computing:13\",\"strand:upper-primary:computing:14\"],\"_id\":\"subject:upper-primary:computing\",\"_rev\":\"1-9dadca0a5535c2dc42f780b19217411b\"},{\"type\":\"subject\",\"name\":\"Creative Arts\",\"level\":\"upper-primary\",\"pdfUrl\":\"http://nacca.gov.gh/wp-content/uploads/2019/06/CREATIVE-ARTS-B4-B6-.pdf\",\"strands\":[\"strand:upper-primary:creative-arts:0\",\"strand:upper-primary:creative-arts:1\",\"strand:upper-primary:creative-arts:2\",\"strand:upper-primary:creative-arts:3\",\"strand:upper-primary:creative-arts:4\",\"strand:upper-primary:creative-arts:5\"],\"_id\":\"subject:upper-primary:creative-arts\",\"_rev\":\"1-4b94f58a88eebfd62984864c397e093a\"},{\"type\":\"subject\",\"name\":\"English Language\",\"level\":\"upper-primary\",\"pdfUrl\":\"http://nacca.gov.gh/wp-content/uploads/2019/06/ENGLISH-B4-B6.pdf\",\"strands\":[\"strand:upper-primary:english-language:0\",\"strand:upper-primary:english-language:1\",\"strand:upper-primary:english-language:2\",\"strand:upper-primary:english-language:3\",\"strand:upper-primary:english-language:4\",\"strand:upper-primary:english-language:5\",\"strand:upper-primary:english-language:6\",\"strand:upper-primary:english-language:7\",\"strand:upper-primary:english-language:8\",\"strand:upper-primary:english-language:9\",\"strand:upper-primary:english-language:10\",\"strand:upper-primary:english-language:11\"],\"_id\":\"subject:upper-primary:english-language\",\"_rev\":\"1-f6ce7b02db1199cd4858ae6f4bb7d429\"},{\"type\":\"subject\",\"name\":\"French Language\",\"level\":\"upper-primary\",\"pdfUrl\":null,\"strands\":[\"strand:upper-primary:french-language:0\",\"strand:upper-primary:french-language:1\",\"strand:upper-primary:french-language:2\",\"strand:upper-primary:french-language:3\",\"strand:upper-primary:french-language:4\",\"strand:upper-primary:french-language:5\",\"strand:upper-primary:french-language:6\",\"strand:upper-primary:french-language:7\",\"strand:upper-primary:french-language:8\",\"strand:upper-primary:french-language:9\",\"strand:upper-primary:french-language:10\",\"strand:upper-primary:french-language:11\"],\"_id\":\"subject:upper-primary:french-language\",\"_rev\":\"1-21112efbbd22cf504507e21cd205883c\"},{\"type\":\"subject\",\"name\":\"Ghanaian Language\",\"level\":\"upper-primary\",\"pdfUrl\":\"local://GHANAIAN-LANGUAGE-B4-B6.pdf\",\"strands\":[\"strand:upper-primary:ghanaian-language:0\",\"strand:upper-primary:ghanaian-language:1\",\"strand:upper-primary:ghanaian-language:2\",\"strand:upper-primary:ghanaian-language:3\",\"strand:upper-primary:ghanaian-language:4\",\"strand:upper-primary:ghanaian-language:5\",\"strand:upper-primary:ghanaian-language:6\",\"strand:upper-primary:ghanaian-language:7\",\"strand:upper-primary:ghanaian-language:8\",\"strand:upper-primary:ghanaian-language:9\",\"strand:upper-primary:ghanaian-language:10\",\"strand:upper-primary:ghanaian-language:11\",\"strand:upper-primary:ghanaian-language:12\",\"strand:upper-primary:ghanaian-language:13\",\"strand:upper-primary:ghanaian-language:14\",\"strand:upper-primary:ghanaian-language:15\",\"strand:upper-primary:ghanaian-language:16\",\"strand:upper-primary:ghanaian-language:17\"],\"_id\":\"subject:upper-primary:ghanaian-language\",\"_rev\":\"1-bf80090b1815a677165941654a94a04d\"},{\"type\":\"subject\",\"name\":\"History\",\"level\":\"upper-primary\",\"pdfUrl\":\"http://nacca.gov.gh/wp-content/uploads/2019/04/HISTORY-B1-B6.pdf\",\"strands\":[\"strand:upper-primary:history:0\",\"strand:upper-primary:history:1\",\"strand:upper-primary:history:2\",\"strand:upper-primary:history:3\",\"strand:upper-primary:history:4\",\"strand:upper-primary:history:5\",\"strand:upper-primary:history:6\",\"strand:upper-primary:history:7\",\"strand:upper-primary:history:8\",\"strand:upper-primary:history:9\",\"strand:upper-primary:history:10\",\"strand:upper-primary:history:11\",\"strand:upper-primary:history:12\"],\"_id\":\"subject:upper-primary:history\",\"_rev\":\"1-b858afcf50fefc4b76a14f914050bfb7\"},{\"type\":\"subject\",\"name\":\"Mathematics\",\"level\":\"upper-primary\",\"pdfUrl\":\"http://nacca.gov.gh/wp-content/uploads/2019/04/MATHS-UPPER-PRIMARY-B4-B6.pdf\",\"strands\":[\"strand:upper-primary:mathematics:0\",\"strand:upper-primary:mathematics:1\",\"strand:upper-primary:mathematics:2\",\"strand:upper-primary:mathematics:3\",\"strand:upper-primary:mathematics:4\",\"strand:upper-primary:mathematics:5\",\"strand:upper-primary:mathematics:6\",\"strand:upper-primary:mathematics:7\",\"strand:upper-primary:mathematics:8\",\"strand:upper-primary:mathematics:9\",\"strand:upper-primary:mathematics:10\",\"strand:upper-primary:mathematics:11\"],\"_id\":\"subject:upper-primary:mathematics\",\"_rev\":\"1-e7c091433dccca1d9ea7d09db9aff2c6\"},{\"type\":\"subject\",\"name\":\"Physical Education\",\"level\":\"upper-primary\",\"pdfUrl\":\"local://PHYSICAL-EDUCATION-B1-B6.pdf\",\"strands\":[\"strand:upper-primary:physical-education:0\",\"strand:upper-primary:physical-education:1\",\"strand:upper-primary:physical-education:2\",\"strand:upper-primary:physical-education:3\",\"strand:upper-primary:physical-education:4\",\"strand:upper-primary:physical-education:5\",\"strand:upper-primary:physical-education:6\",\"strand:upper-primary:physical-education:7\",\"strand:upper-primary:physical-education:8\",\"strand:upper-primary:physical-education:9\",\"strand:upper-primary:physical-education:10\",\"strand:upper-primary:physical-education:11\",\"strand:upper-primary:physical-education:12\",\"strand:upper-primary:physical-education:13\",\"strand:upper-primary:physical-education:14\"],\"_id\":\"subject:upper-primary:physical-education\",\"_rev\":\"1-1152ed0a3ce18e882820d6a5a45f2b92\"},{\"type\":\"subject\",\"name\":\"Religious and Moral Education\",\"level\":\"up"
+  }
+]

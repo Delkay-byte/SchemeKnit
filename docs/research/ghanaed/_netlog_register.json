@@ -1,0 +1,343 @@
+[
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/register",
+    "resourceType": "document"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/register"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/index-CR7UdDlA.js",
+    "resourceType": "script"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/vendor-react-CLVQub2T.js",
+    "resourceType": "script"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/vendor-icons-C5TH_qft.js",
+    "resourceType": "script"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/index-DnZaqmQ3.css",
+    "resourceType": "stylesheet"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/registerSW.js",
+    "resourceType": "script"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/icon-160.webp",
+    "resourceType": "image"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/index-DnZaqmQ3.css"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/registerSW.js"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/vendor-icons-C5TH_qft.js"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/index-CR7UdDlA.js"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/icon-160.webp"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/vendor-react-CLVQub2T.js"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/subscription/promo",
+    "resourceType": "fetch"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/styles-BE3EjIxi.css",
+    "resourceType": "stylesheet"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/bstem-pitch-DnqIxFtN.css",
+    "resourceType": "stylesheet"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/styles-BE3EjIxi.css"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/bstem-pitch-DnqIxFtN.css"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/subscription/promo",
+    "response": "{\"promo\":{\"active\":true,\"name\":\"back-to-school\",\"multiplier\":2,\"endsAt\":\"2026-11-11T23:59:59.000Z\",\"headline\":\"Double AI credits until 11th November 2026.\"}}"
+  },
+  {
+    "phase": "request",
+    "method": "POST",
+    "url": "https://ghanaed.com/api/auth/signup",
+    "resourceType": "fetch",
+    "body": "{\"name\":\"Forensic Researcher\",\"username\":\"skforensic42188\",\"schoolId\":\"forensic-research-basic-school\",\"role\":\"teacher\",\"password\":\"GhanaEdResearch2026!\",\"schoolName\":\"Forensic Research Basic School\",\"region\":\"Greater Accra\",\"district\":\"Accra\",\"level\":\"jhs\"}"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/DashboardPage-Bggd1Xee.js",
+    "resourceType": "script"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/TopBar-upagbeKz.js",
+    "resourceType": "script"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/logo-B0PjXsU0.js",
+    "resourceType": "script"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/StudentRewardsPanel-Biohebid.js",
+    "resourceType": "script"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/vendor-utils-B5CD4DQe.js",
+    "resourceType": "script"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/StudentRewardsPanel-yVn_U9qR.css",
+    "resourceType": "stylesheet"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/StudentRewardsPanel-yVn_U9qR.css"
+  },
+  {
+    "phase": "response",
+    "status": 201,
+    "method": "POST",
+    "url": "https://ghanaed.com/api/auth/signup",
+    "response": "{\"token\":\"[REDACTED-JWT].XC8Bg3D2SHP3ujqY2fHwI1i-RM4FNha1Ll0R4vW1K_Q\",\"user\":{\"id\":\"user:forensic-research-basic-school:skforensic42188\",\"name\":\"Forensic Researcher\",\"role\":\"teacher\",\"schoolId\":\"forensic-research-basic-school\",\"isHeadTeacher\":false,\"accountActive\":true,\"credits\":20,\"onboardingCompleted\":false,\"gamePoints\":0,\"referralCode\":\"52dcb3a3\"}}"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/logo-B0PjXsU0.js"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/TopBar-upagbeKz.js"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/StudentRewardsPanel-Biohebid.js"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/vendor-utils-B5CD4DQe.js"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/subscription/status",
+    "resourceType": "fetch"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/ads/status",
+    "resourceType": "fetch"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/auth/me",
+    "resourceType": "fetch"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/DashboardPage-Bggd1Xee.js"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/vendor-charts-DvowBx4X.js",
+    "resourceType": "script"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/subscription/status",
+    "resourceType": "fetch"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/ads/status",
+    "resourceType": "fetch"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/ads/status",
+    "response": "{\"adsEnabled\":false,\"rewardsRemainingToday\":5,\"cooldownMs\":0,\"dailyCap\":5,\"pointsPerAd\":5}"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/auth/me",
+    "response": "{\"id\":\"user:forensic-research-basic-school:skforensic42188\",\"name\":\"Forensic Researcher\",\"username\":\"\",\"email\":\"\",\"role\":\"teacher\",\"schoolId\":\"forensic-research-basic-school\",\"isIndependent\":false,\"authProvider\":\"password\",\"photoUrl\":\"\",\"joinStatus\":\"none\",\"pendingSchoolId\":null,\"pendingSchoolName\":null,\"isHeadTeacher\":false,\"isSiso\":false,\"circuitIds\":[],\"pinEnabled\":false,\"hasPassword\":true,\"staff\":null,\"accountActive\":true,\"credits\":20,\"onboardingCompleted\":false,\"gamePoints\":0,\"referralCode\":\"52dcb3a3\",\"hasPhoto\":false}"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/subscription/status",
+    "response": "{\"accountActive\":true,\"credits\":20,\"history\":[{\"ref\":\"starter\",\"credits\":20,\"amount\":0,\"package\":\"Starter\",\"paidAt\":\"2026-10-06T22:53:05.250Z\"}],\"promo\":{\"active\":true,\"name\":\"back-to-school\",\"multiplier\":2,\"endsAt\":\"2026-11-11T23:59:59.000Z\",\"headline\":\"Double AI credits until 11th November 2026.\"}}"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/vendor-charts-DvowBx4X.js"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/logo-DouibdfA.png",
+    "resourceType": "image"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/assets/logo-DouibdfA.png"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/ads/status",
+    "response": "{\"adsEnabled\":false,\"rewardsRemainingToday\":5,\"cooldownMs\":0,\"dailyCap\":5,\"pointsPerAd\":5}"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/subscription/status",
+    "response": "{\"accountActive\":true,\"credits\":20,\"history\":[{\"ref\":\"starter\",\"credits\":20,\"amount\":0,\"package\":\"Starter\",\"paidAt\":\"2026-10-06T22:53:05.250Z\"}],\"promo\":{\"active\":true,\"name\":\"back-to-school\",\"multiplier\":2,\"endsAt\":\"2026-11-11T23:59:59.000Z\",\"headline\":\"Double AI credits until 11th November 2026.\"}}"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/subscription/status",
+    "resourceType": "fetch"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/curriculum/levels",
+    "resourceType": "fetch"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/subscription/status",
+    "response": "{\"accountActive\":true,\"credits\":20,\"history\":[{\"ref\":\"starter\",\"credits\":20,\"amount\":0,\"package\":\"Starter\",\"paidAt\":\"2026-10-06T22:53:05.250Z\"}],\"promo\":{\"active\":true,\"name\":\"back-to-school\",\"multiplier\":2,\"endsAt\":\"2026-11-11T23:59:59.000Z\",\"headline\":\"Double AI credits until 11th November 2026.\"}}"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/curriculum/levels",
+    "response": "[\"jhs\",\"kg\",\"lower-primary\",\"shs\",\"upper-primary\"]"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/auth/me",
+    "resourceType": "fetch"
+  },
+  {
+    "phase": "request",
+    "method": "GET",
+    "url": "https://ghanaed.com/api/curriculum/levels",
+    "resourceType": "fetch"
+  },
+  {
+    "phase": "response",
+    "status": 200,
+    "method": "GET",
+    "url": "https://ghanaed.com/api/auth/me",
+    "response": "{\"id\":\"user:forensic-research-basic-school:skforensic42188\",\"name\":\"Forensic Researcher\",\"username\":\"\",\"email\":\"\",\"role\":\"teacher\",\"schoolId\":\"forensic-research-basic-school\",\"isIndependent\":false,\"authProvider\":\"password\",\"photoUrl\":\"\",\"joinStatus\":\"none\",\"pendingSchoolId\":null,\"pendingSchoolName\":null,\"isHeadTeacher\":false,\"isSiso\":false,\"circuitIds\":[],\"pinEnabled\":false,\"hasPassword\":true,\"staff\":null,\"accountActive\":true,\"credits\":20,\"onboardingCompleted\":false,\"gamePoints\":0,\"referralCode\":\"52dcb3a3\",\"hasPhoto\":false}"
+  }
+]
