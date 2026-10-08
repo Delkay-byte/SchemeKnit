@@ -1,0 +1,77 @@
+{
+  "url": "/register",
+  "text": "Create your account\n\nJoin GhanaEd — free starter credits included\n\n1\nSCHOOL\n2\nROLE\n3\nACCOUNT\n← Back\nFind your organisation\n\nSearch by name or ID — schools, offices, private institutions\n\n← Back to search\nOrganisation name\nRegion\nSelect region…\nAhafo\nAshanti\nBono\nBono East\nCentral\nEastern\nGreater Accra\nNorth East\nNorthern\nOti\nSavannah\nUpper East\nUpper West\nVolta\nWestern\nWestern North\nDistrict\nAccra\nType / level\nSelect type…\nBasic School (KG–JHS)\nKindergarten\nPrimary School\nJunior High School (JHS)\nSenior High School (SHS)\nPrivate school\nOffice / Department\nGrade-based / international system\nOther organisation\nContinue\nAlready have an account? Sign in",
+  "fields": [
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "id": "",
+      "name": "",
+      "placeholder": "e.g. Achimota Basic · Ho District Education Office",
+      "value": "Forensic Research Basic School",
+      "label": "Organisation name"
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "id": "",
+      "name": "",
+      "value": "Greater Accra",
+      "label": "Region\nSelect region…\nAhafo\nAshanti\nBono\nBono East\nCentral\nEastern\nGreater Accra\nNorth East\nNorthern\nOti\nSavannah\nUpper East\nUpper West\nVolta\nWestern\nWestern No",
+      "options": [
+        "|Select region…",
+        "Ahafo|Ahafo",
+        "Ashanti|Ashanti",
+        "Bono|Bono",
+        "Bono East|Bono East",
+        "Central|Central",
+        "Eastern|Eastern",
+        "Greater Accra|Greater Accra",
+        "North East|North East",
+        "Northern|Northern",
+        "Oti|Oti",
+        "Savannah|Savannah",
+        "Upper East|Upper East",
+        "Upper West|Upper West",
+        "Volta|Volta",
+        "Western|Western",
+        "Western North|Western North"
+      ]
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "id": "",
+      "name": "",
+      "placeholder": "Search district…",
+      "value": "Accra",
+      "label": "District\nAccra"
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "id": "",
+      "name": "",
+      "value": "jhs",
+      "label": "Type / level\nSelect type…\nBasic School (KG–JHS)\nKindergarten\nPrimary School\nJunior High School (JHS)\nSenior High School (SHS)\nPrivate school\nOffice / Department",
+      "options": [
+        "|Select type…",
+        "basic_kg_jhs|Basic School (KG–JHS)",
+        "kg|Kindergarten",
+        "primary|Primary School",
+        "jhs|Junior High School (JHS)",
+        "shs|Senior High School (SHS)",
+        "private_school|Private school",
+        "office_department|Office / Department",
+        "grade_system|Grade-based / international system",
+        "other|Other organisation"
+      ]
+    }
+  ],
+  "buttons": [
+    "← Back",
+    "← Back to search",
+    "Continue"
+  ],
+  "cards": []
+}

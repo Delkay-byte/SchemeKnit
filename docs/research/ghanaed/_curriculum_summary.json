@@ -1,0 +1,42 @@
+{
+  "jhs:Arabic": {
+    "strands": 12,
+    "strandsRaw": 12,
+    "substrands": 25,
+    "standards": 25,
+    "indicators": 38,
+    "sample": "{\"type\":\"strand\",\"name\":\"Basic 7 – ORAL LANGUAGE (LISTENING AND SPEAKING)\",\"subjectId\":\"subject:jhs:arabic\",\"subStrands\":[\"substrand:jhs:arabic:0:0\",\"substrand:jhs:arabic:0:1\",\"substrand:jhs:arabic:0:2\"],\"_id\":\"strand:jhs:arabic:0\",\"_rev\":\"1-e04f7a407f9e015f67c687da2f1454f8\"}"
+  },
+  "jhs:Ghanaian Language": {
+    "strands": 15,
+    "strandsRaw": 15,
+    "substrands": 57,
+    "standards": 57,
+    "indicators": 75,
+    "sample": "{\"type\":\"strand\",\"name\":\"Basic 7 – ORAL LANGUAGE (LISTENING AND SPEAKING)\",\"subjectId\":\"subject:jhs:ghanaian-language\",\"subStrands\":[\"substrand:jhs:ghanaian-language:0:0\",\"substrand:jhs:ghanaian-language:0:1\",\"substrand:jhs:ghanaian-language:0:2\",\"substrand:jhs:ghanaian-language:0:3\",\"substrand:jhs:"
+  },
+  "upper-primary:Computing": {
+    "strands": 15,
+    "strandsRaw": 15,
+    "substrands": 44,
+    "standards": 44,
+    "indicators": 206,
+    "sample": "{\"type\":\"strand\",\"name\":\"Basic 4 – Introduction To Computing\",\"subjectId\":\"subject:upper-primary:computing\",\"subStrands\":[\"substrand:upper-primary:computing:0:0\",\"substrand:upper-primary:computing:0:1\",\"substrand:upper-primary:computing:0:2\",\"substrand:upper-primary:computing:0:3\"],\"_id\":\"strand:upp"
+  },
+  "lower-primary:Creative Arts": {
+    "strands": 6,
+    "strandsRaw": 6,
+    "substrands": 24,
+    "standards": 42,
+    "indicators": 124,
+    "sample": "{\"type\":\"strand\",\"name\":\"Basic 1 – VISUAL ARTS\",\"subjectId\":\"subject:lower-primary:creative-arts\",\"subStrands\":[\"substrand:lower-primary:creative-arts:0:0\",\"substrand:lower-primary:creative-arts:0:1\",\"substrand:lower-primary:creative-arts:0:2\",\"substrand:lower-primary:creative-arts:0:3\"],\"_id\":\"stra"
+  },
+  "kg:Kindergarten Curriculum": {
+    "strands": 12,
+    "strandsRaw": 12,
+    "substrands": 36,
+    "standards": 36,
+    "indicators": 144,
+    "sample": "{\"type\":\"strand\",\"name\":\"KG1: ALL ABOUT ME\",\"subjectId\":\"subject:kg:kindergarten-curriculum\",\"subStrands\":[\"substrand:kg:kindergarten-curriculum:0:0\",\"substrand:kg:kindergarten-curriculum:0:1\",\"substrand:kg:kindergarten-curriculum:0:2\",\"substrand:kg:kindergarten-curriculum:0:3\"],\"_id\":\"strand:kg:kin"
+  }
+}

@@ -1,0 +1,989 @@
+{
+  "11-lesson": {
+    "summary": {
+      "lessons": 11,
+      "accepted": 11,
+      "rejected": 0,
+      "first_pass": 11,
+      "repaired": 0,
+      "rebuilt": 0,
+      "hard_rejections": {},
+      "soft_rejections": {},
+      "repairs": {},
+      "first_pass_rate": 1.0,
+      "teacher_ready_rate": 1.0,
+      "mean_score": 73.7,
+      "mean_rebuilds": 0.0
+    },
+    "lessons": [
+      {
+        "lesson_sequence": 1,
+        "indicator_code": "B7.1.1.1.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 74,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 2,
+        "indicator_code": "B7.1.1.1.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 75,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 3,
+        "indicator_code": "B7.1.1.1.3",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 75,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 1,
+        "indicator_code": "B7.1.1.1.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 74,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 2,
+        "indicator_code": "B7.2.1.1.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 74,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 1,
+        "indicator_code": "B7.1.1.1.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 72,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 2,
+        "indicator_code": "B7.1.1.1.2",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 73,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 1,
+        "indicator_code": "B7.1.1.1.2",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 74,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 2,
+        "indicator_code": "B7.1.1.2.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 72,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 1,
+        "indicator_code": "B7.5.1.1.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 75,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 1,
+        "indicator_code": "B7.1.1.2.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 73,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      }
+    ]
+  },
+  "expanded-40": {
+    "summary": {
+      "lessons": 40,
+      "accepted": 31,
+      "rejected": 9,
+      "first_pass": 31,
+      "repaired": 0,
+      "rebuilt": 0,
+      "hard_rejections": {
+        "generic_objective": 7
+      },
+      "soft_rejections": {
+        "objective_specificity<4": 9
+      },
+      "repairs": {},
+      "first_pass_rate": 0.775,
+      "teacher_ready_rate": 0.775,
+      "mean_score": 71.7,
+      "mean_rebuilds": 0.0
+    },
+    "lessons": [
+      {
+        "lesson_sequence": 1,
+        "indicator_code": "B7.1.1.1.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 74,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 2,
+        "indicator_code": "B7.1.1.1.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 75,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 3,
+        "indicator_code": "B7.1.1.1.3",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 75,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 4,
+        "indicator_code": "B7.1.1.1.1",
+        "status": "rejected",
+        "attempts": 0,
+        "total": 70,
+        "hard_failures": [
+          "generic_objective"
+        ],
+        "floors_failed": [
+          "objective_specificity<4"
+        ],
+        "repairs": [
+          "text:differentiation"
+        ],
+        "rebuild_pattern_ids": [
+          "retrieval_concept_practice_check",
+          "demonstrate_practice_apply"
+        ]
+      },
+      {
+        "lesson_sequence": 5,
+        "indicator_code": "B7.1.1.2.1",
+        "status": "rejected",
+        "attempts": 0,
+        "total": 71,
+        "hard_failures": [
+          "generic_objective"
+        ],
+        "floors_failed": [
+          "objective_specificity<4"
+        ],
+        "repairs": [
+          "text:differentiation"
+        ],
+        "rebuild_pattern_ids": [
+          "retrieval_concept_practice_check",
+          "retrieve_challenge_rebuild"
+        ]
+      },
+      {
+        "lesson_sequence": 6,
+        "indicator_code": "B7.1.2.1.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 71,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 7,
+        "indicator_code": "B7.1.3.1.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 71,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 8,
+        "indicator_code": "B7.1.4.1.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 74,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 9,
+        "indicator_code": "B7.1.5.1.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 75,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 1,
+        "indicator_code": "B7.1.1.1.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 74,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 2,
+        "indicator_code": "B7.2.1.1.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 74,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 3,
+        "indicator_code": "B7.2.1.1.2",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 75,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 4,
+        "indicator_code": "B7.2.2.1.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 72,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 1,
+        "indicator_code": "B7.1.1.1.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 72,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 2,
+        "indicator_code": "B7.1.1.1.2",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 73,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 3,
+        "indicator_code": "B7.3.1.1.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 72,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 1,
+        "indicator_code": "B7.1.1.1.2",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 74,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 2,
+        "indicator_code": "B7.1.1.2.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 72,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 3,
+        "indicator_code": "B7.1.1.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 70,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 4,
+        "indicator_code": "B7.1.1.2",
+        "status": "rejected",
+        "attempts": 0,
+        "total": 66,
+        "hard_failures": [
+          "generic_objective"
+        ],
+        "floors_failed": [
+          "objective_specificity<4"
+        ],
+        "repairs": [
+          "text:differentiation"
+        ],
+        "rebuild_pattern_ids": [
+          "scenario_investigate_solve",
+          "compare_justify_apply"
+        ]
+      },
+      {
+        "lesson_sequence": 5,
+        "indicator_code": "B7.1.1.2.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 69,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 1,
+        "indicator_code": "B7.5.1.1.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 75,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 2,
+        "indicator_code": "1.1.1.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 75,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 1,
+        "indicator_code": "B7.1.1.2.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 73,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 2,
+        "indicator_code": "B7.4.1.1.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 72,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 1,
+        "indicator_code": "B7.1.1.1.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 73,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 1,
+        "indicator_code": "1.1.1.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 72,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 2,
+        "indicator_code": "1.1.1.2",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 71,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 1,
+        "indicator_code": "1.1.1.1.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 73,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 1,
+        "indicator_code": "B6.1.1.1.1",
+        "status": "rejected",
+        "attempts": 0,
+        "total": 68,
+        "hard_failures": [],
+        "floors_failed": [
+          "objective_specificity<4"
+        ],
+        "repairs": [
+          "text:introduction",
+          "text:assessment",
+          "text:differentiation"
+        ],
+        "rebuild_pattern_ids": [
+          "story_discussion_apply",
+          "retrieve_challenge_rebuild"
+        ]
+      },
+      {
+        "lesson_sequence": 2,
+        "indicator_code": "B6.1.1.1.2",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 72,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 3,
+        "indicator_code": "B6.1.4.1.1",
+        "status": "rejected",
+        "attempts": 0,
+        "total": 68,
+        "hard_failures": [
+          "generic_objective"
+        ],
+        "floors_failed": [
+          "objective_specificity<4"
+        ],
+        "repairs": [
+          "text:introduction",
+          "text:assessment",
+          "text:differentiation"
+        ],
+        "rebuild_pattern_ids": [
+          "story_discussion_apply",
+          "observe_classify_explain"
+        ]
+      },
+      {
+        "lesson_sequence": 1,
+        "indicator_code": "B6.1.3.3.1",
+        "status": "rejected",
+        "attempts": 0,
+        "total": 67,
+        "hard_failures": [],
+        "floors_failed": [
+          "objective_specificity<4"
+        ],
+        "repairs": [
+          "text:differentiation"
+        ],
+        "rebuild_pattern_ids": [
+          "observe_classify_explain",
+          "demonstrate_practice_apply"
+        ]
+      },
+      {
+        "lesson_sequence": 2,
+        "indicator_code": "B6.1.4.3.1",
+        "status": "rejected",
+        "attempts": 0,
+        "total": 69,
+        "hard_failures": [
+          "generic_objective"
+        ],
+        "floors_failed": [
+          "objective_specificity<4"
+        ],
+        "repairs": [
+          "text:differentiation"
+        ],
+        "rebuild_pattern_ids": [
+          "model_pair_individual",
+          "observe_classify_explain"
+        ]
+      },
+      {
+        "lesson_sequence": 1,
+        "indicator_code": "B6.3.4.1.1",
+        "status": "rejected",
+        "attempts": 0,
+        "total": 64,
+        "hard_failures": [
+          "generic_objective"
+        ],
+        "floors_failed": [
+          "objective_specificity<4"
+        ],
+        "repairs": [
+          "text:differentiation"
+        ],
+        "rebuild_pattern_ids": [
+          "case_study_group_present",
+          "retrieve_challenge_rebuild"
+        ]
+      },
+      {
+        "lesson_sequence": 1,
+        "indicator_code": "B6.1.2.1.2",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 71,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 1,
+        "indicator_code": "B6.1.1.3.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 75,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 1,
+        "indicator_code": "B6.2.1.4.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 74,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 1,
+        "indicator_code": "B6.1.1.1.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 68,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 1,
+        "indicator_code": "B6.1.3.1.1",
+        "status": "rejected",
+        "attempts": 0,
+        "total": 69,
+        "hard_failures": [
+          "generic_objective"
+        ],
+        "floors_failed": [
+          "objective_specificity<4"
+        ],
+        "repairs": [
+          "text:introduction",
+          "text:assessment",
+          "text:differentiation"
+        ],
+        "rebuild_pattern_ids": [
+          "story_discussion_apply",
+          "observe_classify_explain"
+        ]
+      }
+    ]
+  },
+  "messy-19": {
+    "summary": {
+      "lessons": 19,
+      "accepted": 12,
+      "rejected": 7,
+      "first_pass": 12,
+      "repaired": 0,
+      "rebuilt": 0,
+      "hard_rejections": {
+        "generic_objective": 7
+      },
+      "soft_rejections": {
+        "objective_specificity<4": 7
+      },
+      "repairs": {},
+      "first_pass_rate": 0.632,
+      "teacher_ready_rate": 0.632,
+      "mean_score": 69.6,
+      "mean_rebuilds": 0.0
+    },
+    "lessons": [
+      {
+        "lesson_sequence": 1,
+        "indicator_code": "B6.1.1.1.1",
+        "status": "rejected",
+        "attempts": 0,
+        "total": 69,
+        "hard_failures": [
+          "generic_objective"
+        ],
+        "floors_failed": [
+          "objective_specificity<4"
+        ],
+        "repairs": [
+          "text:differentiation"
+        ],
+        "rebuild_pattern_ids": [
+          "observe_classify_explain",
+          "demonstrate_practice_apply"
+        ]
+      },
+      {
+        "lesson_sequence": 2,
+        "indicator_code": "B6.1.1.2.1",
+        "status": "rejected",
+        "attempts": 0,
+        "total": 70,
+        "hard_failures": [
+          "generic_objective"
+        ],
+        "floors_failed": [
+          "objective_specificity<4"
+        ],
+        "repairs": [
+          "text:differentiation"
+        ],
+        "rebuild_pattern_ids": [
+          "model_pair_individual",
+          "observe_classify_explain"
+        ]
+      },
+      {
+        "lesson_sequence": 1,
+        "indicator_code": "B6.1.1.1.3",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 68,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 2,
+        "indicator_code": "B6.1.1.1.4",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 70,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 1,
+        "indicator_code": "B6.1.1.1.4",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 68,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 2,
+        "indicator_code": "B6.1.1.1.5",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 67,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 1,
+        "indicator_code": "B6.1.3.1.1",
+        "status": "rejected",
+        "attempts": 0,
+        "total": 69,
+        "hard_failures": [
+          "generic_objective"
+        ],
+        "floors_failed": [
+          "objective_specificity<4"
+        ],
+        "repairs": [
+          "text:introduction",
+          "text:assessment",
+          "text:differentiation"
+        ],
+        "rebuild_pattern_ids": [
+          "story_discussion_apply",
+          "demonstrate_practice_apply"
+        ]
+      },
+      {
+        "lesson_sequence": 2,
+        "indicator_code": "B6.3.1.1.2",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 71,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 3,
+        "indicator_code": "B6.6.1.1.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 70,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 1,
+        "indicator_code": "B6.2.4.1.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 70,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 2,
+        "indicator_code": "B6.3.1.1.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 73,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 3,
+        "indicator_code": "B6.5.1.1.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 72,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 4,
+        "indicator_code": "B6.6.1.1.1",
+        "status": "rejected",
+        "attempts": 0,
+        "total": 69,
+        "hard_failures": [
+          "generic_objective"
+        ],
+        "floors_failed": [
+          "objective_specificity<4"
+        ],
+        "repairs": [
+          "text:introduction",
+          "text:assessment",
+          "text:differentiation"
+        ],
+        "rebuild_pattern_ids": [
+          "observe_classify_explain",
+          "demonstrate_practice_apply"
+        ]
+      },
+      {
+        "lesson_sequence": 1,
+        "indicator_code": "B6.1.1.1.5",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 74,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 2,
+        "indicator_code": "B6.1.1.1.6",
+        "status": "rejected",
+        "attempts": 0,
+        "total": 70,
+        "hard_failures": [
+          "generic_objective"
+        ],
+        "floors_failed": [
+          "objective_specificity<4"
+        ],
+        "repairs": [
+          "text:introduction",
+          "text:assessment",
+          "text:differentiation"
+        ],
+        "rebuild_pattern_ids": [
+          "demonstrate_practice_apply",
+          "observe_classify_explain"
+        ]
+      },
+      {
+        "lesson_sequence": 1,
+        "indicator_code": "B6.3.4.1.1",
+        "status": "rejected",
+        "attempts": 0,
+        "total": 64,
+        "hard_failures": [
+          "generic_objective"
+        ],
+        "floors_failed": [
+          "objective_specificity<4"
+        ],
+        "repairs": [
+          "text:differentiation"
+        ],
+        "rebuild_pattern_ids": [
+          "case_study_group_present",
+          "retrieve_challenge_rebuild"
+        ]
+      },
+      {
+        "lesson_sequence": 2,
+        "indicator_code": "B6.3.4.1.1",
+        "status": "rejected",
+        "attempts": 0,
+        "total": 64,
+        "hard_failures": [
+          "generic_objective"
+        ],
+        "floors_failed": [
+          "objective_specificity<4"
+        ],
+        "repairs": [
+          "text:differentiation"
+        ],
+        "rebuild_pattern_ids": [
+          "case_study_group_present",
+          "retrieve_challenge_rebuild"
+        ]
+      },
+      {
+        "lesson_sequence": 1,
+        "indicator_code": "B6.1.2.1.2",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 71,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      },
+      {
+        "lesson_sequence": 1,
+        "indicator_code": "B6.2.1.4.1",
+        "status": "accepted_first_pass",
+        "attempts": 0,
+        "total": 74,
+        "hard_failures": [],
+        "floors_failed": [],
+        "repairs": [],
+        "rebuild_pattern_ids": []
+      }
+    ]
+  }
+}

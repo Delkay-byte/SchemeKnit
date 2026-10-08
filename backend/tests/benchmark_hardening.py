@@ -4,7 +4,8 @@ Frozen BEFORE the hardening edits: the corpora below are the fixture set the
 hardening pass is measured against, so the numbers cannot be tuned after the
 fact.
 
-Two corpora, ONE rubric (imported unchanged from
+Two corpora, ONE rubric (the canonical
+``src/curriculum/lesson_rubric.py``, re-exported by
 ``benchmark_deterministic_lessons`` — no criterion, threshold or weight is
 redefined here):
 
@@ -54,28 +55,11 @@ from src.models import (  # noqa: E402
 B7 = ClassLevel.BASIC_7
 B6 = ClassLevel.BASIC_6
 
-#: Marker coverage for the subjects the hardening benchmark adds. This only
-#: teaches the SHARED rubric which vocabulary belongs to which subject — no
-#: criterion, threshold or weight changes (c13 still needs >= 5 distinct
-#: markers for a 5, exactly as before).
-_MARKERS_TO_ADD = {
-    "phe": r"\b(warm[- ]?up|safety|fitness|technique|drill|game|ball|"
-           r"posture|exercise|pace|team|movement|skill)\b",
-    "career": r"\b(material|materials|tool|tools|procedure|product|"
-              r"measure|assemble|safety|process|design|quality|cost)\b",
-}
-for _k, _pat in _MARKERS_TO_ADD.items():
-    base._SUBJECT_MARKERS.setdefault(_k, re.compile(_pat, re.I))
-
-# Subject enum → the marker vocabulary c13 scores against.
-base.SUBJECT_STRAND_KEY.update({
-    Subject.RME: "rme",
-    Subject.PHE: "phe",
-    Subject.CAREER_TECHNOLOGY: "career",
-    Subject.FRENCH: "english",
-    Subject.GHANAIAN_LANGUAGE: "english",
-    Subject.HISTORY: "social studies",
-})
+# Marker/subject coverage for the subjects this benchmark adds (PHE, Career
+# Technology, RME, French, Ghanaian Language, History) is canonical in
+# src/curriculum/lesson_rubric.py — defined there so the RUNTIME quality gate
+# (Priority 4) scores these subjects identically to this benchmark. Nothing
+# here redefines it (single rubric, no fork).
 
 
 def E(subject, cls, week, code, indicator, strand, sub_strand, cs_code,

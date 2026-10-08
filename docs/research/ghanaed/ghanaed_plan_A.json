@@ -1,0 +1,204 @@
+{
+  "_id": "lplan:user:forensic-research-basic-school:skforensic42188:muxagnbf",
+  "type": "lplan",
+  "userId": "user:forensic-research-basic-school:skforensic42188",
+  "schoolId": "forensic-research-basic-school",
+  "schemeId": "",
+  "sourceHub": "",
+  "subject": "Creative Arts and Design",
+  "level": "JHS",
+  "className": "B7",
+  "term": 1,
+  "week": 1,
+  "duration": "50 minutes",
+  "status": "draft",
+  "plan": {
+    "topic": "Plan and execute design projects using the creative process",
+    "objectives": [
+      "Identify the steps in the creative process.",
+      "Demonstrate how to brainstorm ideas for a design project.",
+      "Collaboratively create a simple design project plan."
+    ],
+    "strand": "Creative Arts and Design",
+    "subStrand": "Design and Technology",
+    "contentStandard": "B7.1.1: Demonstrate understanding of the creative process in design.",
+    "indicators": [],
+    "performanceIndicator": "Learners can plan and execute a design project using the creative process.",
+    "rpk": "Last week, we learned about different forms of art and design.",
+    "coreCompetencies": [
+      "Creativity and Innovation",
+      "Communication and Collaboration",
+      "Critical Thinking and Problem Solving"
+    ],
+    "keywords": [
+      "creative process",
+      "brainstorming",
+      "design project",
+      "collaboration"
+    ],
+    "references": "NaCCA / GES curriculum for Creative Arts and Design, JHS 1",
+    "teachingMethods": [
+      "demonstration",
+      "collaborative"
+    ],
+    "phase1": {
+      "duration": "10 minutes",
+      "firstTime": true,
+      "piShare": "Today, we will learn how to plan and execute a design project using the creative process.",
+      "warmupType": "game",
+      "warmupScript": "Let's play a quick game! I will say a word, and you will shout out any design-related word that comes to your mind. For example, if I say 'color', you might say 'blue' or 'red'.",
+      "steps": [
+        {
+          "time": "4 min",
+          "teacher": "Lead the game with design-related words.",
+          "learner": "Shout out their responses.",
+          "resourceUse": "",
+          "formative": "",
+          "n": 1
+        },
+        {
+          "time": "3 min",
+          "teacher": "Ask students to list steps they think are involved in designing something.",
+          "learner": "Share their ideas with the class.",
+          "resourceUse": "",
+          "formative": "",
+          "n": 2
+        },
+        {
+          "time": "3 min",
+          "teacher": "Write down the students' ideas on the board.",
+          "learner": "Look at the board and discuss the listed steps.",
+          "resourceUse": "",
+          "formative": "",
+          "n": 3
+        }
+      ],
+      "resources": "Chalkboard, chalk",
+      "assessment": "Check if students can recall steps of the creative process.",
+      "activities": "(4 min) Teacher: Lead the game with design-related words. Learners: Shout out their responses.\n(3 min) Teacher: Ask students to list steps they think are involved in designing something. Learners: Share their ideas with the class.\n(3 min) Teacher: Write down the students' ideas on the board. Learners: Look at the board and discuss the listed steps.\nShare PI: Today, we will learn how to plan and execute a design project using the creative process.\nWarm-up (game): Let's play a quick game! I will say a word, and you will shout out any design-related word that comes to your mind. For example, if I say 'color', you might say 'blue' or 'red'."
+    },
+    "phase2": {
+      "duration": "30 minutes",
+      "coreConcept": "The creative process involves steps like brainstorming, planning, creating, and evaluating.",
+      "steps": [
+        {
+          "time": "5 min",
+          "teacher": "Demonstrate brainstorming by using a local theme, like 'African fabric design'.",
+          "learner": "Participate in the brainstorming session and suggest ideas.",
+          "resourceUse": "",
+          "formative": "",
+          "n": 1,
+          "exemplarN": 1
+        },
+        {
+          "time": "5 min",
+          "teacher": "Show how to organize ideas into a simple project plan on the board.",
+          "learner": "Copy the project plan format into their notebooks.",
+          "resourceUse": "",
+          "formative": "",
+          "n": 2,
+          "exemplarN": 1
+        },
+        {
+          "time": "10 min",
+          "teacher": "Form groups of 4 and assign roles: speaker, writer, checker, reporter.",
+          "learner": "Work collaboratively to create a project plan based on their brainstormed ideas.",
+          "resourceUse": "",
+          "formative": "",
+          "n": 3,
+          "exemplarN": 1
+        },
+        {
+          "time": "10 min",
+          "teacher": "Guide groups as they finalize their project plans, offering feedback.",
+          "learner": "Present their project plans to the class.",
+          "resourceUse": "",
+          "formative": "",
+          "n": 4,
+          "exemplarN": 1
+        }
+      ],
+      "tables": [],
+      "imageNeeds": [],
+      "differentiation": {
+        "support": "Provide extra guidance for struggling groups.",
+        "core": "Encourage all groups to express their ideas.",
+        "challenge": "Ask advanced groups to add details to their plans."
+      },
+      "misconceptions": [],
+      "resources": "Chalkboard, paper, pens",
+      "assessment": "Observe group collaboration and the completeness of their project plans.",
+      "activities": "(5 min) Teacher: Demonstrate brainstorming by using a local theme, like 'African fabric design'. Learners: Participate in the brainstorming session and suggest ideas.\n(5 min) Teacher: Show how to organize ideas into a simple project plan on the board. Learners: Copy the project plan format into their notebooks.\n(10 min) Teacher: Form groups of 4 and assign roles: speaker, writer, checker, reporter. Learners: Work collaboratively to create a project plan based on their brainstormed ideas.\n(10 min) Teacher: Guide groups as they finalize their project plans, offering feedback. Learners: Present their project plans to the class.\nCore concept: The creative process involves steps like brainstorming, planning, creating, and evaluating."
+    },
+    "phase3": {
+      "duration": "10 minutes",
+      "qa": [
+        {
+          "question": "What is the first step in the creative process?",
+          "expected": "Brainstorming ideas."
+        },
+        {
+          "question": "Why is collaboration important in planning a design project?",
+          "expected": "It helps gather diverse ideas and perspectives."
+        }
+      ],
+      "summaryPoints": [
+        "The creative process includes brainstorming, planning, creating, and evaluating.",
+        "Collaboration enhances the quality of design projects.",
+        "Every design project starts with a good plan."
+      ],
+      "realLife": "In Ghana, many artisans use the creative process to design unique crafts.",
+      "feedbackPrompt": "Raise your hand if you feel confident about planning a design project.",
+      "steps": [
+        {
+          "time": "3 min",
+          "teacher": "Ask the oral questions to the class.",
+          "learner": "Respond to the questions.",
+          "resourceUse": "",
+          "formative": "",
+          "n": 1
+        },
+        {
+          "time": "3 min",
+          "teacher": "Summarize the lesson by highlighting the key points.",
+          "learner": "Listen and reflect on the lesson.",
+          "resourceUse": "",
+          "formative": "",
+          "n": 2
+        },
+        {
+          "time": "4 min",
+          "teacher": "Encourage students to think about their design project ideas for next week.",
+          "learner": "Consider what they might want to create.",
+          "resourceUse": "",
+          "formative": "",
+          "n": 3
+        }
+      ],
+      "resources": "Chalkboard",
+      "assessment": "Check for understanding through the oral questions.",
+      "activities": "(3 min) Teacher: Ask the oral questions to the class. Learners: Respond to the questions.\n(3 min) Teacher: Summarize the lesson by highlighting the key points. Learners: Listen and reflect on the lesson.\n(4 min) Teacher: Encourage students to think about their design project ideas for next week. Learners: Consider what they might want to create.\nReal life: In Ghana, many artisans use the creative process to design unique crafts.\nFeedback: Raise your hand if you feel confident about planning a design project."
+    },
+    "homework": "Write a short paragraph about a design project you would like to create.",
+    "teacherNotes": "Group students with varied skills for better collaboration. Ensure all materials are ready for the next class.",
+    "safetyNotes": "",
+    "exemplars": [],
+    "exemplarContinuation": false
+  },
+  "teachingMethods": [
+    "demonstration",
+    "collaborative"
+  ],
+  "dayLabel": "Monday",
+  "weekEndingDate": "",
+  "classSize": 0,
+  "teacherName": "Forensic Researcher",
+  "schoolName": "Forensic Research Basic School",
+  "academicYear": "2026/2027",
+  "bulkJobId": null,
+  "exemplarContinuation": false,
+  "printTemplateId": "jhs-daily",
+  "period": "",
+  "createdAt": "2026-10-06T23:07:16.875Z",
+  "updatedAt": "2026-10-06T23:07:16.875Z"
+}

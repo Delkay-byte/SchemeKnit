@@ -1,0 +1,70 @@
+{
+  "me": {
+    "status": 200,
+    "body": "{\"id\":\"user:forensic-research-basic-school:skforensic42188\",\"name\":\"Forensic Researcher\",\"username\":\"\",\"email\":\"\",\"role\":\"teacher\",\"schoolId\":\"forensic-research-basic-school\",\"isIndependent\":false,\"authProvider\":\"password\",\"photoUrl\":\"\",\"joinStatus\":\"none\",\"pendingSchoolId\":null,\"pendingSchoolName\":null,\"isHeadTeacher\":false,\"isSiso\":false,\"circuitIds\":[],\"pinEnabled\":false,\"hasPassword\":true,\"staff\":null,\"accountActive\":false,\"credits\":0,\"onboardingCompleted\":true,\"gamePoints\":0,\"referralCode\":"
+  },
+  "subStatus": {
+    "status": 200,
+    "body": "{\"accountActive\":false,\"credits\":0,\"history\":[{\"ref\":\"starter\",\"credits\":20,\"amount\":0,\"package\":\"Starter\",\"paidAt\":\"2026-10-06T22:53:05.250Z\"}],\"promo\":{\"active\":true,\"name\":\"back-to-school\",\"multiplier\":2,\"endsAt\":\"2026-11-11T23:59:59.000Z\",\"headline\":\"Double AI credits until 11th November 2026.\"}}"
+  },
+  "adsStatus": {
+    "status": 200,
+    "body": "{\"adsEnabled\":true,\"rewardsRemainingToday\":5,\"cooldownMs\":0,\"dailyCap\":5,\"pointsPerAd\":5}"
+  },
+  "promo": {
+    "status": 200,
+    "body": "{\"promo\":{\"active\":true,\"name\":\"back-to-school\",\"multiplier\":2,\"endsAt\":\"2026-11-11T23:59:59.000Z\",\"headline\":\"Double AI credits until 11th November 2026.\"}}"
+  },
+  "lp_plans": {
+    "status": 402,
+    "body": "{\"error\":\"credits_required\",\"message\":\"You have no credits remaining. Please purchase credits to continue.\",\"credits\":0}"
+  },
+  "lp_planA": {
+    "status": 402,
+    "body": "{\"error\":\"credits_required\",\"message\":\"You have no credits remaining. Please purchase credits to continue.\",\"credits\":0}"
+  },
+  "lp_planB": {
+    "status": 402,
+    "body": "{\"error\":\"credits_required\",\"message\":\"You have no credits remaining. Please purchase credits to continue.\",\"credits\":0}"
+  },
+  "lp_jobs": {
+    "status": 402,
+    "body": "{\"error\":\"credits_required\",\"message\":\"You have no credits remaining. Please purchase credits to continue.\",\"credits\":0}"
+  },
+  "lp_schemes": {
+    "status": 402,
+    "body": "{\"error\":\"credits_required\",\"message\":\"You have no credits remaining. Please purchase credits to continue.\",\"credits\":0}"
+  },
+  "lp_curriculum": {
+    "status": 402,
+    "body": "{\"error\":\"credits_required\",\"message\":\"You have no credits remaining. Please purchase credits to continue.\",\"credits\":0}"
+  },
+  "lp_sow_districts": {
+    "status": 402,
+    "body": "{\"error\":\"credits_required\",\"message\":\"You have no credits remaining. Please purchase credits to continue.\",\"credits\":0}"
+  },
+  "curriculum_levels": {
+    "status": 402,
+    "body": "{\"error\":\"credits_required\",\"message\":\"You have no credits remaining. Please purchase credits to continue.\",\"credits\":0}"
+  },
+  "assignments": {
+    "status": 402,
+    "body": "{\"error\":\"credits_required\",\"message\":\"You have no credits remaining. Please purchase credits to continue.\",\"credits\":0}"
+  },
+  "lessons": {
+    "status": 402,
+    "body": "{\"error\":\"credits_required\",\"message\":\"You have no credits remaining. Please purchase credits to continue.\",\"credits\":0}"
+  },
+  "packs": {
+    "status": 404,
+    "body": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /api/subscription/packs</pre>\n</body>\n</html>\n"
+  },
+  "store": {
+    "status": 404,
+    "body": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /api/subscription/store</pre>\n</body>\n</html>\n"
+  },
+  "plans_school": {
+    "status": 404,
+    "body": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /api/subscription/plans</pre>\n</body>\n</html>\n"
+  }
+}

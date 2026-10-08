@@ -10,7 +10,7 @@ from datetime import date
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import FileResponse
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, List, Optional
 from urllib.parse import quote
 import re
 from sqlalchemy.orm import Session
@@ -883,6 +883,12 @@ async def generate_lesson_plans(
             len(job._lesson_plans) if hasattr(job, '_lesson_plans') else job.completed_lessons
         )
 
+        # Priority 4: the lessons the quality gate ACCEPTED (set by the gate
+        # below; until then, every built lesson is a candidate). Only accepted
+        # lessons are persisted, counted and quota-charged.
+        accepted: List[Any] = list(getattr(job, '_lesson_plans', None) or [])
+        gate_metrics: Optional[Dict[str, Any]] = None
+
         if hasattr(job, '_lesson_plans'):
             # ── Occurrence-scoped replacement + job merge (Priority 3) ─────
             # The run succeeded — NOW it is safe to touch the teacher's
@@ -905,19 +911,6 @@ async def generate_lesson_plans(
             existing = data_service.get_lesson_plans_for_scheme(
                 db, scheme_id, user.id
             )
-            if replace_mode == "all":
-                # Full regeneration: the run's output is the new set.
-                replaced_ids = [lp.id for lp in existing]
-            elif replace_mode == "occurrence":
-                replaced_ids = _replacement_ids_for_occurrences(
-                    existing, set(config.selected_occurrence_ids), chosen_allocs
-                )
-            else:  # codes: every occurrence of the selected codes is replaced
-                code_set = set(config.selected_indicator_codes)
-                replaced_ids = [
-                    lp.id for lp in existing
-                    if code_set & set(lp.indicator_codes or [])
-                ]
 
             # READ-AFTER-WRITE (WAPEF save boundary): the browser issues PUT
             # /lesson-review and POST /generate as two separate requests, and
@@ -928,6 +921,85 @@ async def generate_lesson_plans(
             drafts = data_service.get_lesson_review_drafts(db, scheme_id, user.id) or {}
             for lp in job._lesson_plans:
                 _apply_lesson_review_draft(lp, drafts)
+
+            # ── Priority 4: the deterministic quality gate ────────────────
+            # Every lesson is validated in memory BEFORE any row is written.
+            # A hard failure is mechanically repaired, then the lesson is
+            # rebuilt with a different teaching pattern (bounded, deterministic)
+            # and only the best PASSING candidate is persisted. A lesson the
+            # gate cannot fix is dropped: it is never written, its reserved
+            # quota unit is released below, and its existing row survives. If
+            # the gate rejects the whole run the request fails, the job is
+            # marked failed and the reservation is returned in full — a failed
+            # generation consumes no quota and leaves no corrupted row.
+            gate_report = _run_quality_gate(job, config, scheme_id, drafts)
+            accepted = gate_report["accepted"]
+            gate_metrics = gate_report["metrics"]
+            if not accepted:
+                log_event(
+                    "quality_gate_run_rejected", user_id=user.id,
+                    scheme_id=scheme_id, job_id=job_db.id,
+                    lessons=len(job._lesson_plans),
+                    hard_rejections=gate_metrics["hard_rejections"],
+                )
+                raise HTTPException(
+                    status_code=500,
+                    detail=(
+                        "Generation failed: the lesson quality gate rejected "
+                        "every lesson in this run, so nothing was saved and no "
+                        "lesson-plan quota was consumed. Re-run generation or "
+                        "adjust the source scheme. Rejections: "
+                        f"{gate_metrics['hard_rejections'] or gate_metrics['soft_rejections']}."
+                    ),
+                )
+            log_event(
+                "quality_gate_run", user_id=user.id, scheme_id=scheme_id,
+                job_id=job_db.id, **gate_metrics,
+            )
+
+            # Replacement is keyed to what the run actually ACCEPTED: a lesson
+            # the gate refused keeps its existing row (never zero lessons,
+            # never a weak replacement displacing a good one). In the normal
+            # case — every lesson accepted — this is exactly the previous
+            # behaviour; it only diverges when the gate drops a lesson.
+            accepted_occs = {
+                lp.source_occurrence_id for lp in accepted
+                if lp.source_occurrence_id
+            }
+            accepted_codes = {
+                code for lp in accepted for code in (lp.indicator_codes or [])
+            }
+            accepted_weeks = {lp.week_number for lp in accepted}
+            if replace_mode == "all":
+                # Full regeneration: the run's accepted output is the new set.
+                # Legacy rows without an occurrence id fall back to the same
+                # week + code match (mirrors _replacement_ids_for_occurrences).
+                replaced_ids = []
+                for lp in existing:
+                    occ = lp.source_occurrence_id or ""
+                    if occ:
+                        if occ in accepted_occs:
+                            replaced_ids.append(lp.id)
+                        continue
+                    if accepted_codes & set(lp.indicator_codes or []):
+                        replaced_ids.append(lp.id)
+                    elif not (lp.indicator_codes or []) and lp.week_number in accepted_weeks:
+                        replaced_ids.append(lp.id)
+            elif replace_mode == "occurrence":
+                replaced_ids = _replacement_ids_for_occurrences(
+                    existing,
+                    accepted_occs & set(config.selected_occurrence_ids),
+                    [a for a in chosen_allocs
+                     if a.source_occurrence_id in accepted_occs],
+                )
+            else:  # codes: every occurrence of the accepted selected codes
+                code_set = set(config.selected_indicator_codes) & accepted_codes
+                replaced_ids = [
+                    lp.id for lp in existing
+                    if code_set & set(lp.indicator_codes or [])
+                ]
+
+            for lp in accepted:
                 data_service.create_lesson_plan(db, user.id, job_db.id, scheme_id, lp)
 
             data_service.delete_lesson_plans_by_ids(db, user.id, replaced_ids)
@@ -949,11 +1021,17 @@ async def generate_lesson_plans(
         else:
             scheme_total = actual_lesson_count
 
+        # Only accepted lessons are billed (Priority 4: a gate-rejected lesson
+        # consumes nothing).
+        actual_lesson_count = len(accepted)
+
         # Release any reserved unit that did not become a lesson (defensive: a
         # selected indicator that had no allocation must not consume quota).
+        # Priority 4: a unit is only "produced" by an ACCEPTED lesson — one the
+        # quality gate refused releases its unit (gate failure = 0 consumed).
         if reservation and reservation.consumed:
             produced = set()
-            for lp in (getattr(job, '_lesson_plans', None) or []):
+            for lp in accepted:
                 for c in (lp.indicator_codes or []):
                     produced.add(f"{scheme_id}:{c}")
             unused = [k for k in reservation.reserved_keys if k not in produced]
@@ -1037,6 +1115,9 @@ async def generate_lesson_plans(
             "quota": quota_after,
             "ai_credits_remaining": ai_credit_remaining,
             "ai": ai_info,
+            # Priority 4: the deterministic quality gate's run metrics
+            # (first-pass rate, rebuilds, rejections, teacher-ready rate).
+            "quality": gate_metrics,
         }
 
     except HTTPException:
@@ -1958,6 +2039,202 @@ def _apply_lesson_review_draft(lp, drafts: dict) -> None:
                 labels.append(label)
         if labels:
             lp.references = labels
+
+
+#: Lesson fields the allocation loop (not the builder) assigns, which a rebuilt
+#: candidate must inherit from the original so drafts, replacement keys,
+#: exports and provenance stay byte-for-byte aligned (Priority 4).
+_REBUILD_METADATA_FIELDS = (
+    "lesson_sequence", "lesson_number", "period", "week_number", "teaching_week",
+    "source_occurrence_id", "week_ending", "week_ending_derived",
+    "special_period_label", "special_period_type",
+    "educational_level", "subject", "class_level", "template_id",
+)
+
+
+def _run_quality_gate(job, config, scheme_id, drafts):
+    """Priority 4 — validate every built lesson BEFORE any row is written.
+
+    Returns ``{"accepted", "reports", "metrics"}``:
+
+    * ``accepted`` — the candidates that passed the gate, in batch order. Only
+      these may be persisted. A rebuilt candidate REPLACES its original.
+    * ``reports`` — per-lesson findings (hard failures, unmet floors, repairs,
+      rebuild patterns) for the run's gate metrics.
+    * ``metrics`` — first-pass rate, hard/soft rejections, rebuild counts,
+      teacher-ready rate and mean score (logged and surfaced in the response).
+
+    A lesson is never padded with generic prose to clear the gate: it is
+    mechanically repaired, then rebuilt with a different teaching pattern, and
+    refused when no candidate passes. The rebuild is bounded
+    (``MAX_REBUILD_ATTEMPTS``) and deterministic — same inputs, same candidates,
+    same winner (tie-breakers in ``lesson_quality_gate.pick_best``).
+    """
+    from ..curriculum.lesson_builder import build_lesson
+    from ..engines.lesson_quality_gate import (
+        MAX_REBUILD_ATTEMPTS,
+        LessonReport,
+        Scored,
+        build_entry,
+        count_collisions,
+        evaluate,
+        lesson_fingerprint,
+        mechanical_repair,
+        pick_alternate_pattern,
+        pick_best,
+        summarize,
+    )
+    from ..engines.wapef_fields import normalize_wapef_payload
+
+    def _wapef_canonical_for(lp) -> Optional[Dict[str, Any]]:
+        """The teacher's saved WAPEF selection for this lesson, canonicalized.
+
+        Loss check T compares the lesson against exactly what the review draft
+        stored (the same normalization ``_apply_lesson_review_draft`` used), so
+        a value that survived generation→save is byte-identical and a lost one
+        is caught. No saved selection → ``None`` (the legitimate empty state).
+        """
+        if not drafts:
+            return None
+        seq = getattr(lp, "lesson_sequence", None)
+        draft = drafts.get(str(seq)) if seq is not None else None
+        if not isinstance(draft, dict):
+            return None
+        if not any(k in draft for k in (
+                "wapef_deep_hope", "wapef_storyline",
+                "wapef_through_lines", "wapef_gods_story")):
+            return None
+        return normalize_wapef_payload(draft)
+
+    lessons = list(getattr(job, "_lesson_plans", None) or [])
+    ledger = getattr(job, "_build_ledger", None)
+    contexts = getattr(ledger, "contexts", {}) if ledger is not None else {}
+    history = getattr(ledger, "history", None) if ledger is not None else None
+
+    reports = []
+    accepted: list = []
+    prior_fingerprints: list = []
+
+    for lp in lessons:
+        ctx = contexts.get(lp.id)
+        alloc = getattr(ctx, "alloc", None)
+        entry = build_entry(alloc, lp)
+        report = LessonReport(
+            lesson_id=lp.id,
+            lesson_sequence=getattr(lp, "lesson_sequence", 0),
+            indicator_code=(lp.indicator_codes[0] if lp.indicator_codes else ""),
+            accepted=False,
+        )
+
+        # ── Candidate 0: the built lesson (mechanical repair only on failure)
+        # A lesson that passes the gate is persisted byte-for-byte as built —
+        # the gate never rewrites good output.
+        wapef_canonical = _wapef_canonical_for(lp)
+        outcome = evaluate(lp, entry, wapef_canonical=wapef_canonical)
+        repairs: list = []
+        if outcome.needs_work:
+            repairs = mechanical_repair(lp)
+            if repairs:
+                outcome = evaluate(lp, entry)
+        candidates = [{
+            "lp": lp, "outcome": outcome, "repairs": repairs,
+            "pattern_id": getattr(ctx, "pattern_id", "") or "", "order": 0,
+        }]
+
+        # ── Candidates 1..N: rebuild with an untried teaching pattern ─────
+        # Only pattern-shaped lessons have an alternative (early years and
+        # pre-pattern paths compose their own pedagogy — nothing to swap).
+        if outcome.needs_work and ctx is not None and (ctx.pattern_id or ""):
+            tried = [ctx.pattern_id]
+            for attempt in range(MAX_REBUILD_ATTEMPTS):
+                pattern = pick_alternate_pattern(
+                    ctx.alloc, config, history,
+                    ctx.previous_indicator, tried,
+                )
+                if pattern is None:
+                    break
+                tried.append(pattern.id)
+                rebuilt = build_lesson(
+                    ctx.alloc, config, scheme_id,
+                    previous_indicator=ctx.previous_indicator,
+                    next_indicator=ctx.next_indicator,
+                    pattern=pattern,
+                )
+                # The rebuilt candidate keeps the original's batch identity so
+                # draft keys, replacement and provenance are unchanged, then
+                # re-applies the teacher's saved review/WAPEF selections.
+                for field_name in _REBUILD_METADATA_FIELDS:
+                    setattr(rebuilt, field_name, getattr(lp, field_name))
+                _apply_lesson_review_draft(rebuilt, drafts)
+                rebuilt_outcome = evaluate(
+                    rebuilt, build_entry(ctx.alloc, rebuilt),
+                    wapef_canonical=_wapef_canonical_for(rebuilt))
+                rebuilt_repairs: list = []
+                if rebuilt_outcome.needs_work:
+                    rebuilt_repairs = mechanical_repair(rebuilt)
+                    if rebuilt_repairs:
+                        rebuilt_outcome = evaluate(
+                            rebuilt, build_entry(ctx.alloc, rebuilt))
+                candidates.append({
+                    "lp": rebuilt, "outcome": rebuilt_outcome,
+                    "repairs": rebuilt_repairs, "pattern_id": pattern.id,
+                    "order": attempt + 1,
+                })
+                report.rebuild_pattern_ids.append(pattern.id)
+                if rebuilt_outcome.accepted:
+                    break
+
+        # ── Best-candidate selection (only among PASSING candidates) ──────
+        passing = [c for c in candidates if c["outcome"].accepted]
+        if passing:
+            scored = []
+            for cand in passing:
+                fingerprint = lesson_fingerprint(cand["lp"])
+                scored.append(Scored(
+                    lp=cand["lp"],
+                    outcome=cand["outcome"],
+                    fingerprint=fingerprint,
+                    collisions=count_collisions(fingerprint, prior_fingerprints),
+                    order=cand["order"],
+                ))
+            best = pick_best(scored)
+            best_candidate = next(
+                c for c in passing if c["order"] == best.order)
+            current = best.lp
+            outcome = best.outcome
+            repairs = best_candidate["repairs"]
+            prior_fingerprints.append(best.fingerprint)
+        else:
+            current = lp
+
+        report.accepted = outcome.accepted
+        report.hard_failures = outcome.hard
+        report.floors_failed = outcome.floors
+        report.scores = outcome.scores
+        report.total = outcome.total
+        report.attempts = (
+            next((c["order"] for c in candidates if c["lp"] is current), 0)
+        )
+        report.repairs = repairs
+        report.status = (
+            "accepted_first_pass"
+            if outcome.accepted and not repairs and report.attempts == 0
+            else "accepted_after_repair"
+            if outcome.accepted and report.attempts == 0
+            else "accepted_after_rebuild"
+            if outcome.accepted
+            else "rejected"
+        )
+        report.final_lesson = current if outcome.accepted else None
+        reports.append(report)
+        if outcome.accepted:
+            accepted.append(current)
+
+    return {
+        "accepted": accepted,
+        "reports": reports,
+        "metrics": summarize(reports),
+    }
 
 
 def _reference_entry(entry):

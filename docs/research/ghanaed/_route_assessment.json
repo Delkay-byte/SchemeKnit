@@ -1,0 +1,24 @@
+{
+  "url": "/assessment",
+  "text": "BACK TO SCHOOL\nDouble AI credits until 11th November 2026. · Open the store\nDouble AI credits until 11th November 2026. · Open the store\n20\nCredit Store\nGhanaEd\nDashboard\nMy Classroom\nSchool Management\nGuides\n$\n20 credits\nF\nForensic\nTeacher\nF\nForensic\nTeacher\nAsk Akua\n$\n20 credits\nDashboard\nProfile\nLesson Planner\n6 tools\nLessons\nSelf-Tutor\nAssignments\nAssessment\nTermly Exams\nPracticals\nStudent Progress\nDiscussions\nSchool Management\nStudent Manual\nTeacher Guide\nSchool Manual\nTutorials\n$\nBuy Credits\nDark Mode\nSign out\nHome\nSchool\nAssessment\nAssessment hub\nPRE / POST\n\nCreate class units, generate paired pre/post papers, publish to students, and track learning growth.\n\nDashboard\nClasses\nImpact\nDark\n\nUnits are limited to your school. Students only see papers after you publish. · 8 credits per AI generation\n\n1\n\nCreate a unit\n\nPick a class, subject, and topic for this teaching cycle.\n\n2\n\nUpload lessons\n\nPDF or Word materials for this unit.\n\n3\n\nGenerate & publish\n\nAI builds parallel pre and post papers you can edit.\n\n4\n\nMeasure growth\n\nCompare pre and post scores online or enter paper marks.\n\n0\n\nUnits\n\n0\n\nWith sources\n\n0\n\nWith papers\n\n0\n\nLive for students\n\nAssessment units\n\nEach unit is bound to a class. Students in that class see published papers under Classroom.\n\n+ New unit\nRefresh\nNo assessment units yet\n\nCreate a unit for a grade and subject, then upload lesson PDFs or Word docs.\n\nCreate first unit",
+  "inputs": [
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "ph": "Search title, subject, grade…",
+      "label": ""
+    }
+  ],
+  "buttons": [
+    "My Classroom",
+    "School Management",
+    "Guides",
+    "Lesson Planner 6 tools",
+    "Dark Mode",
+    "Sign out",
+    "Dark",
+    "+ New unit",
+    "Refresh",
+    "Create first unit"
+  ]
+}

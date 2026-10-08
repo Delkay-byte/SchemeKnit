@@ -1,0 +1,55 @@
+{
+  "url": "/register",
+  "text": "Create your account\n\nJoin GhanaEd — free starter credits included\n\n✓\nSCHOOL\n2\nROLE\n3\nACCOUNT\nI am a…\n\nThis sets your permissions on GhanaEd.\n\nTeacher\nPlan & manage\nStudent\nLearn & practice\nCoupon code\n(optional)\nReferral code\n(optional)\n\nInvite links fill this automatically when you open them.\n\nBack\nContinue\nAlready have an account? Sign in",
+  "fields": [
+    {
+      "tag": "INPUT",
+      "type": "radio",
+      "id": "",
+      "name": "role",
+      "placeholder": "",
+      "value": "teacher",
+      "label": "Teacher\nPlan & manage"
+    },
+    {
+      "tag": "INPUT",
+      "type": "radio",
+      "id": "",
+      "name": "role",
+      "placeholder": "",
+      "value": "student",
+      "label": "Student\nLearn & practice"
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "id": "",
+      "name": "",
+      "placeholder": "Bonus credits code",
+      "value": "",
+      "label": "Coupon code\n(optional)"
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "id": "",
+      "name": "",
+      "placeholder": "Invite code from a friend",
+      "value": "",
+      "label": "Referral code\n(optional)\n\nInvite links fill this automatically when you open them."
+    }
+  ],
+  "buttons": [
+    "Back",
+    "Continue"
+  ],
+  "cards": [
+    "Teacher Plan & manage Student Learn & practice",
+    "Teacher Plan & manage",
+    "Teacher",
+    "Plan & manage",
+    "Student Learn & practice",
+    "Student",
+    "Learn & practice"
+  ]
+}

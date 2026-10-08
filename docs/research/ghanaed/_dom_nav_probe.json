@@ -1,0 +1,305 @@
+{
+  "anchors": [
+    {
+      "href": "/subscribe",
+      "text": "BACK TO SCHOOL Double AI credits until 11th November 2026. · Open the store Doub",
+      "visible": true
+    },
+    {
+      "href": "/subscribe",
+      "text": "20 Credit Store",
+      "visible": true
+    },
+    {
+      "href": "https://chat.whatsapp.com/DGEXCxbAWSNKtlDEDiggal",
+      "text": "",
+      "visible": true
+    },
+    {
+      "href": "/dashboard",
+      "text": "GhanaEd",
+      "visible": true
+    },
+    {
+      "href": "/dashboard",
+      "text": "Dashboard",
+      "visible": true
+    },
+    {
+      "href": "/subscribe",
+      "text": "",
+      "visible": true
+    },
+    {
+      "href": "/akua",
+      "text": "",
+      "visible": true
+    },
+    {
+      "href": "/subscribe",
+      "text": "$ 20 credits",
+      "visible": true
+    },
+    {
+      "href": "/profile",
+      "text": "F Forensic Teacher",
+      "visible": true
+    },
+    {
+      "href": "/profile",
+      "text": "F",
+      "visible": true
+    },
+    {
+      "href": "/akua",
+      "text": "Ask Akua",
+      "visible": true
+    },
+    {
+      "href": "/subscribe",
+      "text": "$ 20 credits",
+      "visible": true
+    },
+    {
+      "href": "/dashboard",
+      "text": "Dashboard",
+      "visible": true
+    },
+    {
+      "href": "/profile",
+      "text": "Profile",
+      "visible": true
+    },
+    {
+      "href": "/lessons",
+      "text": "Lessons",
+      "visible": true
+    },
+    {
+      "href": "/self-tutor?view=practice",
+      "text": "Self-Tutor",
+      "visible": true
+    },
+    {
+      "href": "/assignments",
+      "text": "Assignments",
+      "visible": true
+    },
+    {
+      "href": "/assessment",
+      "text": "Assessment",
+      "visible": true
+    },
+    {
+      "href": "/school/lesson-planner?tab=termly",
+      "text": "Termly Exams",
+      "visible": true
+    },
+    {
+      "href": "/practicals",
+      "text": "Practicals",
+      "visible": true
+    },
+    {
+      "href": "/progress",
+      "text": "Student Progress",
+      "visible": true
+    },
+    {
+      "href": "/discussions",
+      "text": "Discussions",
+      "visible": true
+    },
+    {
+      "href": "/school",
+      "text": "School Management",
+      "visible": true
+    },
+    {
+      "href": "/student-manual",
+      "text": "Student Manual",
+      "visible": true
+    },
+    {
+      "href": "/teacher-guide",
+      "text": "Teacher Guide",
+      "visible": true
+    },
+    {
+      "href": "/school-manual",
+      "text": "School Manual",
+      "visible": true
+    },
+    {
+      "href": "/tutorials",
+      "text": "Tutorials",
+      "visible": true
+    },
+    {
+      "href": "/subscribe",
+      "text": "$ Buy Credits",
+      "visible": true
+    },
+    {
+      "href": "/akua",
+      "text": "Ask Akua",
+      "visible": true
+    },
+    {
+      "href": "/school/lesson-planner",
+      "text": "Lesson Planner Generate structured lesson plans",
+      "visible": true
+    },
+    {
+      "href": "/lessons",
+      "text": "Lessons Create & manage content",
+      "visible": true
+    },
+    {
+      "href": "/assignments",
+      "text": "Assignments Create & review work",
+      "visible": true
+    },
+    {
+      "href": "/assessment",
+      "text": "Assessments Generate pre/post tests & impact analytics",
+      "visible": true
+    },
+    {
+      "href": "/progress",
+      "text": "Student Progress Monitor student learning",
+      "visible": true
+    },
+    {
+      "href": "/messages",
+      "text": "Messages Chat with your head teacher",
+      "visible": true
+    },
+    {
+      "href": "/discussions",
+      "text": "Peer Discussions Moderate student discussions",
+      "visible": true
+    },
+    {
+      "href": "/bece-prep",
+      "text": "BECE Prep Prepare students for BECE",
+      "visible": true
+    },
+    {
+      "href": "/wassce-prep",
+      "text": "WASSCE Prep Prepare students for WASSCE",
+      "visible": true
+    },
+    {
+      "href": "/school/lesson-planner?tab=termly",
+      "text": "Termly Exams Generate end-of-term papers & marking schemes",
+      "visible": true
+    },
+    {
+      "href": "/classroom",
+      "text": "🔬 Interactive Classroom Games & virtual labs",
+      "visible": true
+    },
+    {
+      "href": "/my/performance",
+      "text": "My Performance View your performance & school ranking",
+      "visible": true
+    },
+    {
+      "href": "/my/letters",
+      "text": "My Letters Submit letters to your head teacher",
+      "visible": true
+    },
+    {
+      "href": "/blog-editor",
+      "text": "Blog & News Publish features & professional journeys",
+      "visible": true
+    },
+    {
+      "href": "/curriculum/jhs",
+      "text": "Junior High School B7–B9",
+      "visible": true
+    },
+    {
+      "href": "/curriculum/kg",
+      "text": "Kindergarten KG1–KG2",
+      "visible": true
+    },
+    {
+      "href": "/curriculum/lower-primary",
+      "text": "Lower Primary B1–B3",
+      "visible": true
+    },
+    {
+      "href": "/curriculum/shs",
+      "text": "Senior High School SHS1–SHS3",
+      "visible": true
+    },
+    {
+      "href": "/curriculum/upper-primary",
+      "text": "Upper Primary B4–B6",
+      "visible": true
+    }
+  ],
+  "buttons": [
+    {
+      "text": "My Classroom",
+      "cls": "topbar-nav-link topbar-dropdown-trigger"
+    },
+    {
+      "text": "School Management",
+      "cls": "topbar-nav-link topbar-dropdown-trigger"
+    },
+    {
+      "text": "Guides",
+      "cls": "topbar-nav-link topbar-dropdown-trigger"
+    },
+    {
+      "text": "Lesson Planner 6 tools",
+      "cls": "mobile-menu-collapsible-header"
+    },
+    {
+      "text": "Dark Mode",
+      "cls": "theme-toggle-pill"
+    },
+    {
+      "text": "Sign out",
+      "cls": "mobile-menu-logout"
+    },
+    {
+      "text": "Customise with AI",
+      "cls": ""
+    }
+  ],
+  "hits": [
+    {
+      "text": "\n    {\n      \"@context\": \"https://schema.org\",\n      \"@graph",
+      "chain": [
+        "SCRIPT.",
+        "HEAD.",
+        "HTML."
+      ]
+    },
+    {
+      "text": "Lesson Planner",
+      "chain": [
+        "SPAN.",
+        "SPAN.mobile-menu-collapsible-label",
+        "BUTTON.mobile-menu-collapsible-header",
+        "DIV.mobile-menu-collapsible",
+        "NAV.mobile-menu-nav"
+      ]
+    },
+    {
+      "text": "Lesson Planner",
+      "chain": [
+        "H3.",
+        "DIV.nav-card-body",
+        "A.nav-card nav-card--teal",
+        "DIV.nav-card-grid",
+        "MAIN.dash-main"
+      ]
+    }
+  ],
+  "url": "/dashboard"
+}
