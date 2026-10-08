@@ -459,6 +459,168 @@ async def get_lesson_quota(
     return lesson_quota_status(db, user, resolve_entitlement(db, user))
 
 
+@router.post("/{scheme_id}/autopilot-selection")
+async def autopilot_selection(
+    scheme_id: str,
+    config: TermConfig,
+    user: User = Depends(require_teacher_workflow),
+    db=Depends(get_db),
+):
+    """What ONE "Generate my lesson plans" click would generate (Priority 3.1).
+
+    Server-authoritative Autopilot plan: the instructional occurrences that
+    are pending, safe (never needs_review), special-week-free and within the
+    teacher's real monthly allowance — in source order — plus the smallest
+    genuine interruptions (subject ambiguity, an unstated class, one-time
+    WAPEF values, an exhausted allowance). The browser never counts, never
+    ranks, and never invents the remaining allowance.
+    """
+    from ..engines.allocation_engine import scheme_has_indicators
+    from ..engines.autopilot import (
+        selection_blockers, select_autopilot_rows, wapef_autopilot_state,
+    )
+    from ..entitlements import (
+        free_tier_lesson_quota_message, lesson_quota_status, resolve_entitlement,
+    )
+    from ..models import WeekType
+
+    scheme_db = data_service.get_scheme(db, scheme_id, user.id)
+    if not scheme_db:
+        raise HTTPException(status_code=404, detail="Scheme not found")
+
+    detection_status = getattr(scheme_db, "detection_status", "") or ""
+    confirmed_class = getattr(config, "class_level", None)
+    is_known = _is_known_class_level
+
+    resolved = resolve_entitlement(db, user)
+    quota = lesson_quota_status(db, user, resolved)
+
+    scheme = data_service.scheme_to_model(scheme_db)
+    resolve_term_window(config, scheme.weeks)
+    # A teacher-confirmed class on a scheme that never stated one is persisted
+    # exactly as the preview does it; a scheme that states its class is never
+    # overridden.
+    _persist_confirmed_class(db, user, scheme_db, config)
+
+    include_special = bool(config.include_special_weeks)
+    indicatorless = not scheme_has_indicators(
+        [w for w in scheme.weeks
+         if include_special or w.week_type in (WeekType.INSTRUCTION, WeekType.MIXED)]
+    )
+
+    # Allocation rows in source order — the same deterministic machinery the
+    # week surface and the generate endpoint use; Autopilot never re-derives
+    # coverage on the client.
+    ae = pipeline.allocation_engine
+    calendar = pipeline.calendar_engine.build_calendar(
+        config, scheme.weeks, config.holidays
+    )
+    coverage = ae.allocate(scheme.weeks, calendar, config, include_special)
+
+    rows = []
+    for _order, a in enumerate(coverage.allocations):
+        rows.append({
+            "source_occurrence_id": getattr(a, "source_occurrence_id", "") or "",
+            "indicator_code": getattr(a, "indicator_code", "") or "",
+            "indicator_description": getattr(a, "indicator_description", "") or "",
+            "strand": getattr(a, "strand", "") or "",
+            "sub_strand": getattr(a, "sub_strand", "") or "",
+            "week_number": int(getattr(a, "week_number", 0) or 0),
+            "needs_review": bool(getattr(a, "needs_review", False)),
+            "is_special_period": bool(getattr(a, "is_special_period", False)),
+            "_order": _order,
+        })
+    # Earliest source week first, source occurrence order within the week.
+    rows.sort(key=lambda r: (r["week_number"], r["_order"]))
+
+    generated_ids = {
+        (getattr(lp, "source_occurrence_id", "") or "")
+        for lp in data_service.get_lesson_plans_for_scheme(db, scheme_id, user.id)
+    }
+
+    selection = select_autopilot_rows(
+        rows,
+        generated_ids=generated_ids,
+        quota_remaining=quota.get("remaining"),
+        quota_unlimited=bool(quota.get("unlimited")),
+        quota_enforced=bool(quota.get("enforced")),
+        indicatorless=indicatorless,
+    )
+
+    wapef = wapef_autopilot_state(config.template_id, scheme_db.lesson_review_drafts or {})
+    blockers = selection_blockers(
+        detection_status=detection_status,
+        subject=scheme_db.subject,
+        class_level=scheme_db.class_level,
+        confirmed_class=confirmed_class,
+        is_known_class_level=is_known,
+        quota_selected_count=selection["selected_count"],
+        safe_pending_count=selection["safe_pending_count"],
+        pending_count=selection["pending_count"],
+        needs_review_count=selection["needs_review_count"],
+        wapef=wapef,
+        quota_remaining=quota.get("remaining"),
+        quota_message_for_empty=lambda: (
+            free_tier_lesson_quota_message(0)
+            if (quota.get("enforced") and not quota.get("unlimited"))
+            else "No lesson plans can be generated right now."
+        ),
+    )
+
+    needs_review_items = [
+        {
+            "source_occurrence_id": r["source_occurrence_id"],
+            "indicator_code": r["indicator_code"],
+            "week_number": r["week_number"],
+            "indicator": r["indicator_description"],
+            "review_reasons": [],
+        }
+        for r in selection["needs_review_items"]
+    ]
+    review_message = None
+    if selection["needs_review_count"] > 0 and selection["safe_pending_count"] > 0:
+        _s = selection["safe_pending_count"]
+        _n = selection["needs_review_count"]
+        review_message = (
+            f"{_s} lesson plan{'s' if _s != 1 else ''} "
+            f"{'is' if _s == 1 else 'are'} ready to generate. "
+            f"{_n} source item{'s' if _n != 1 else ''} "
+            f"{'needs' if _n == 1 else 'need'} review."
+        )
+
+    ready = bool(not blockers and selection["selected_count"] > 0)
+    return {
+        "ready": ready,
+        "blockers": blockers,
+        "review_message": review_message,
+        "needs_review_items": needs_review_items[:25],
+        "counts": {
+            "pending_count": selection["pending_count"],
+            "safe_pending_count": selection["safe_pending_count"],
+            "needs_review_count": selection["needs_review_count"],
+            "selected_count": selection["selected_count"],
+            "generated_count": len(generated_ids - {""}),
+            "quota_skipped_count": len(selection["quota_skipped"]),
+        },
+        "selected_occurrence_ids": selection["selected_occurrence_ids"],
+        "selected_indicator_codes": selection["selected_indicator_codes"],
+        "selected_rows": [
+            {
+                "source_occurrence_id": r["source_occurrence_id"],
+                "indicator_code": r["indicator_code"],
+                "week_number": r["week_number"],
+                "topic": (r["sub_strand"] or r["strand"] or r["indicator_description"])[:120],
+                "indicator": r["indicator_description"],
+            }
+            for r in selection["selected"]
+        ],
+        "quota": quota,
+        "wapef": wapef,
+        "template_id": config.template_id or None,
+        "scheme_id": scheme_id,
+    }
+
+
 @router.post("/{scheme_id}/generate")
 async def generate_lesson_plans(
     scheme_id: str,

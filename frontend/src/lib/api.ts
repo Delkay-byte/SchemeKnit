@@ -430,6 +430,19 @@ class ApiService {
   }
 
   // Generation API
+  /**
+   * Autopilot plan (Priority 3.1): what ONE "Generate my lesson plans" click
+   * would generate — server-selected pending/safe occurrences inside the real
+   * monthly allowance, plus the smallest genuine interruptions. The browser
+   * never counts, ranks or invents the remaining allowance.
+   */
+  async autopilotSelection(schemeId: string, config: any): Promise<any> {
+    return this.request(`/api/generation/${schemeId}/autopilot-selection`, {
+      method: 'POST',
+      body: JSON.stringify(sanitizeTermConfig(config)),
+    })
+  }
+
   async generateLessonPlans(schemeId: string, config: any): Promise<any> {
     return this.request(`/api/generation/${schemeId}/generate`, {
       method: 'POST',
@@ -792,6 +805,11 @@ class ApiService {
 
   async listAIModes(): Promise<{ ai_modes: any[] }> {
     return this.request('/api/settings/ai-modes')
+  }
+
+  /** Saved teacher/school defaults (Autopilot infers from these first). */
+  async getPreferences(): Promise<any> {
+    return this.request('/api/settings/preferences')
   }
 
   /** Actual AI mode/provider resolution for a requested mode (secret-free). */

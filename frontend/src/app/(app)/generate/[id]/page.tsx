@@ -98,6 +98,25 @@ export default function GeneratePage() {
     lessons_ai: number; lessons_deterministic: number; reason: string | null;
   } | null>(null)
 
+  // ── Autopilot (Priority 3.1 — zero-decision generation) ─────────────────
+  // The server's plan for ONE "Generate my lesson plans" click: pending,
+  // safe, quota-fitting occurrences in source order + the smallest genuine
+  // interruptions. The browser never counts or ranks anything itself.
+  const [autopilot, setAutopilot] = useState<any | null>(null)
+  const [autopilotChecking, setAutopilotChecking] = useState(false)
+  // Intent recorded by the upload page's single action — consumed exactly once.
+  const autopilotIntent = useRef(false)
+  const autopilotFired = useRef(false)
+  // The ordered work list shown while a run is in flight (never a fake
+  // per-item completion — the POST is one synchronous run).
+  const [progressRows, setProgressRows] = useState<
+    Array<{ source_occurrence_id?: string; week_number?: number; topic?: string }>
+  >([])
+  // Post-Autopilot handoff (§18): "N lesson plans ready" with week/topic/Open.
+  const [autopilotResult, setAutopilotResult] = useState<
+    { rows: Array<{ source_occurrence_id?: string; week_number?: number; topic?: string }> } | null
+  >(null)
+
   const levelForClass = (classLevel: string): string | undefined => {
     const c = (classLevel || '').toLowerCase()
     if (/(nursery|kg|kindergarten|early)/.test(c)) return 'Early Childhood'
@@ -154,6 +173,13 @@ export default function GeneratePage() {
       if (saved) setConfig(prev => ({ ...prev, ai_mode: saved as any }))
       const savedGenMode = window.localStorage.getItem('schemeknit.gen_mode')
       if (savedGenMode === 'guided' || savedGenMode === 'quick') setGenMode(savedGenMode)
+      // Autopilot intent (§17): the upload page's ONE explicit action records
+      // it here; a plain visit never auto-generates, so quota is never spent
+      // without a teacher click.
+      if (window.sessionStorage.getItem('schemeknit.autopilot_intent') === '1') {
+        autopilotIntent.current = true
+        window.sessionStorage.removeItem('schemeknit.autopilot_intent')
+      }
     } catch { /* storage unavailable */ }
     loadData()
     // WAPEF dropdown options are canonical; a failure just means the WAPEF
@@ -215,6 +241,9 @@ export default function GeneratePage() {
           teacher_name: me.full_name || prev.teacher_name,
         }))
       }
+      // Saved teacher/school defaults (§8): duration and lessons/week come
+      // from the teacher's preferences, never from a fresh guess.
+      const prefs = await api.getPreferences().catch(() => null)
 
       // If this scheme was already generated, restore that job so exports stay reachable after reload
       if (statusData?.id && statusData?.status === 'completed') {
@@ -230,6 +259,12 @@ export default function GeneratePage() {
         })
       }
       const defaultTemplate = templatesData.templates?.find((t: Template) => t.is_default)
+      // Term window inferred from the SCHEME's own week dates (§8): the
+      // teacher is never asked to retype dates the source already states.
+      const weekStarts = ((schemeData as any).weeks || [])
+        .map((w: any) => w.start_date).filter(Boolean).sort()
+      const weekEnds = ((schemeData as any).weeks || [])
+        .map((w: any) => w.end_date).filter(Boolean).sort()
       // Prefer the template the lessons were actually generated with (from the
       // job snapshot): exporting a reloaded WAPEF job must use the WAPEF form,
       // not silently fall back to the level default.
@@ -259,6 +294,12 @@ export default function GeneratePage() {
           schemeData.subject && schemeData.subject !== 'Unknown'
             ? schemeData.subject
             : '',
+        term_start_date: weekStarts[0] || prev.term_start_date,
+        term_end_date: weekEnds[weekEnds.length - 1] || prev.term_end_date,
+        lesson_duration_minutes:
+          (prefs && Number(prefs.default_lesson_duration)) || prev.lesson_duration_minutes,
+        lessons_per_week:
+          (prefs && Number(prefs.default_lessons_per_week)) || prev.lessons_per_week,
       }))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load data')
@@ -369,6 +410,36 @@ export default function GeneratePage() {
     config.class_level,
   ])
 
+  // Autopilot plan (Priority 3.1): one plan per visit, re-planned whenever an
+  // input that can change it changes (class / subject / template — the three
+  // things that change blockers), so the card never shows a stale plan.
+  // When the upload page's ONE explicit action recorded intent, this page
+  // STARTS the run with no further teacher input; a plain visit only loads
+  // the plan for the card — quota is never spent without that click.
+  useEffect(() => {
+    if (loading || !scheme || jobId) return
+    let cancelled = false
+    ;(async () => {
+      const plan = await refreshAutopilot()
+      if (!plan || cancelled) return
+      if (autopilotIntent.current) {
+        autopilotIntent.current = false
+        if (plan.ready && !autopilotFired.current) {
+          autopilotFired.current = true
+          await runGeneration(
+            {
+              codes: plan.selected_indicator_codes || [],
+              occurrences: plan.selected_occurrence_ids || [],
+            },
+            plan.selected_rows || [],
+          )
+        }
+      }
+    })()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, scheme, jobId, config.class_level, config.subject, config.template_id])
+
   // ── Generate actions (Priority 3) ─────────────────────────────────────
   // The teacher acts on WHAT they can see — a week, a single lesson, or the
   // whole scheme. The payload names the exact source occurrences (and their
@@ -377,11 +448,15 @@ export default function GeneratePage() {
   // CURRENT review selections must be persisted before POST /generate reads
   // the draft store, and a save failure cancels generation (a fire-and-forget
   // save is exactly the race that dropped WAPEF values).
-  const runGeneration = async (selection: { codes: string[]; occurrences: string[] }) => {
+  const runGeneration = async (
+    selection: { codes: string[]; occurrences: string[] },
+    progress: Array<{ source_occurrence_id?: string; week_number?: number; topic?: string }> = [],
+  ) => {
     try {
       setGenerating(true)
       setError(null)
       setGenProgress('Generating your lesson plans…')
+      setProgressRows(progress)
       if (lessonReview.length > 0) {
         try {
           await saveLessonReviewDrafts(lessonReview)
@@ -405,11 +480,15 @@ export default function GeneratePage() {
       setCoverage(coverageData)
       // Statuses on the week surface must reflect the just-generated set.
       await refreshSchemeLessons()
+      // Autopilot handoff (§18): a multi-lesson run gets the simple results
+      // view; ONE generated lesson opens directly in the workspace below.
+      setAutopilotResult(progress.length > 1 ? { rows: progress } : null)
     } catch (err) {
       setError(normalizeError(err).message)
       setGenProgress('')
     } finally {
       setGenerating(false)
+      setProgressRows([])
     }
   }
 
@@ -420,27 +499,97 @@ export default function GeneratePage() {
   const handleGenerateAll = () => {
     const pending = weekPlans.flatMap((w) => w.rows.filter((r) => !r.generated))
     const selection = fullSelection(pending, allocationPreview?.lesson_quota)
-    return runGeneration({ codes: selection.codes, occurrences: [] })
+    const rows = pending
+      .filter((r) => selection.codes.includes((r.indicator_code || '').trim()))
+      .map((r) => ({
+        source_occurrence_id: r.source_occurrence_id,
+        week_number: r.source_week,
+        topic: (r.sub_strand || r.strand || r.indicator_description || '').slice(0, 120),
+      }))
+    return runGeneration({ codes: selection.codes, occurrences: [] }, rows)
   }
 
   // One whole week: exactly that week's timetable occurrences.
   const handleGenerateWeek = (week: WeekPlan) => {
     const rows = generatableRowsForWeek(week, allocationPreview?.lesson_quota)
     if (!rows.length) return Promise.resolve()
-    return runGeneration({
-      codes: distinctInOrder(rows.map((r) => (r.indicator_code || '').trim())),
-      occurrences: rows.map((r) => r.source_occurrence_id).filter(Boolean),
-    })
+    return runGeneration(
+      {
+        codes: distinctInOrder(rows.map((r) => (r.indicator_code || '').trim())),
+        occurrences: rows.map((r) => r.source_occurrence_id).filter(Boolean),
+      },
+      rows.map((r) => ({
+        source_occurrence_id: r.source_occurrence_id,
+        week_number: r.source_week,
+        topic: (r.sub_strand || r.strand || r.indicator_description || '').slice(0, 120),
+      })),
+    )
   }
 
   // One single lesson occurrence — even when its indicator code repeats in
   // other weeks (codes alone cannot say "only week 5's copy").
   const handleGenerateRow = (row: WeekRow) => {
     if (!row.source_occurrence_id) return Promise.resolve()
-    return runGeneration({
-      codes: row.indicator_code ? [row.indicator_code] : [],
-      occurrences: [row.source_occurrence_id],
-    })
+    return runGeneration(
+      { codes: row.indicator_code ? [row.indicator_code] : [], occurrences: [row.source_occurrence_id] },
+      [{
+        source_occurrence_id: row.source_occurrence_id,
+        week_number: row.source_week,
+        topic: (row.sub_strand || row.strand || row.indicator_description || '').slice(0, 120),
+      }],
+    )
+  }
+
+  // ── Autopilot (Priority 3.1) ─────────────────────────────────────────────
+  // Fetch the server's plan for one click: pending + safe + quota-fitting
+  // occurrences, in source order, with the smallest genuine interruptions.
+  const refreshAutopilot = async (cfg = config) => {
+    setAutopilotChecking(true)
+    try {
+      const plan = await api.autopilotSelection(
+        schemeId,
+        sanitizeTermConfig(cfg, configFallback()),
+      )
+      setAutopilot(plan)
+      return plan
+    } catch {
+      setAutopilot(null)
+      return null
+    } finally {
+      setAutopilotChecking(false)
+    }
+  }
+
+  // The ONE explicit action: fresh plan, then generate exactly what it says.
+  const handleAutopilot = async () => {
+    const plan = await refreshAutopilot()
+    if (!plan?.ready) return
+    await runGeneration(
+      {
+        codes: plan.selected_indicator_codes || [],
+        occurrences: plan.selected_occurrence_ids || [],
+      },
+      plan.selected_rows || [],
+    )
+  }
+
+  const scrollTo = (selector: string) => {
+    document.querySelector(selector)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  const chooseManually = async () => {
+    if (!allocationPreview) {
+      await handlePreviewAllocation()
+    }
+    setTimeout(() => scrollTo('[data-allocation-preview]'), 120)
+  }
+
+  // Smallest WAPEF interruption (§9 case C): show ONLY the WAPEF inputs.
+  const focusWapef = async () => {
+    if (!allocationPreview) {
+      await handlePreviewAllocation()
+    }
+    setTimeout(() => scrollTo('[data-lesson-review]'), 120)
   }
 
   // Canonical WAPEF draft shape for ONE review row: built from the CURRENT
@@ -670,6 +819,58 @@ export default function GeneratePage() {
               generated lesson (never an empty editor or a bare success toast).
               The configuration surfaces remain below for regeneration. */}
           <div className="space-y-6 lg:col-span-2">
+          {/* Autopilot handoff (§18): multi-lesson runs lead with the simple
+              results view (week/topic/status/Open lesson); a single generated
+              lesson opens directly in the workspace below. */}
+          {jobId && autopilotResult && (
+            <SurfaceCard
+              data-autopilot-results
+              accent="bg-gradient-to-r from-[#102A43] to-[#04A9CE]"
+              className="px-5 py-5 sm:px-6"
+            >
+              <div className="flex items-center">
+                <CheckCircle className="mr-2 h-5 w-5 text-[#0C8A50]" aria-hidden="true" />
+                <div>
+                  <h2 className="text-lg font-semibold text-[#102A43]">
+                    {autopilotResult.rows.length} lesson plans ready
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    Open a lesson below, or start a new generation from the right.
+                  </p>
+                </div>
+              </div>
+              <ul className="mt-4 divide-y divide-slate-100">
+                {autopilotResult.rows.map((r, i) => {
+                  const lesson = r.source_occurrence_id
+                    ? schemeLessons.find((l: any) => l.source_occurrence_id === r.source_occurrence_id)
+                    : undefined
+                  return (
+                    <li
+                      key={r.source_occurrence_id || i}
+                      className="flex items-center justify-between gap-3 py-2 text-sm"
+                    >
+                      <span className="text-slate-700">
+                        {i + 1} · Week {r.week_number ?? '—'} — {r.topic || 'Lesson plan'}
+                      </span>
+                      <span className="flex shrink-0 items-center gap-3">
+                        <span className="text-xs font-medium text-[#0C8A50]">Generated</span>
+                        {lesson?.id ? (
+                          <Link
+                            href={`/lessons/${lesson.id}`}
+                            className="text-xs font-medium text-[#04769B] hover:underline"
+                          >
+                            Open lesson
+                          </Link>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Opening…</span>
+                        )}
+                      </span>
+                    </li>
+                  )
+                })}
+              </ul>
+            </SurfaceCard>
+          )}
           {jobId && (
             <LessonWorkspace
               jobId={jobId}
@@ -755,6 +956,139 @@ export default function GeneratePage() {
                 </div>
               </dl>
             </SurfaceCard>
+
+            {/* Autopilot (Priority 3.1): ONE explicit action + the smallest
+                genuine interruptions. Everything here (counts, weeks, order,
+                remaining allowance) is the server's plan — the browser never
+                computes what fits this month. The config and week surfaces
+                stay below so the advanced/manual flow is untouched. */}
+            {!jobId && (autopilot || autopilotChecking) && (
+              <SurfaceCard
+                data-autopilot
+                accent="bg-gradient-to-r from-[#102A43] to-[#04769B]"
+                className="px-5 py-5 sm:px-6"
+              >
+                <div className="flex items-center">
+                  <Play className="mr-2 h-5 w-5 text-[#04769B]" aria-hidden="true" />
+                  <div>
+                    <h2 className="text-lg font-semibold text-[#102A43]">Generate my lesson plans</h2>
+                    <p className="text-sm text-muted-foreground">
+                      One action generates what is ready this month, in your scheme&apos;s own order.
+                    </p>
+                  </div>
+                </div>
+
+                {autopilotChecking || !autopilot ? (
+                  <p className="mt-4 text-sm text-muted-foreground" data-autopilot-counts role="status">
+                    Checking what is ready…
+                  </p>
+                ) : (
+                  <>
+                    <p className="mt-4 text-sm text-slate-700" data-autopilot-counts>
+                      {autopilot.counts?.pending_count ?? 0} lesson plan
+                      {(autopilot.counts?.pending_count ?? 0) === 1 ? '' : 's'} found
+                      {autopilot.counts?.generated_count
+                        ? ` · ${autopilot.counts.generated_count} already generated`
+                        : ''}
+                      {' · '}
+                      {(autopilot.counts?.selected_count ?? 0) === 0 && autopilot.counts?.quota_skipped_count
+                        ? 'none can be generated this month'
+                        : `${autopilot.counts?.selected_count ?? 0} can be generated this month`}
+                      {autopilot.counts?.quota_skipped_count
+                        ? ` · ${autopilot.counts.quota_skipped_count} wait for next month`
+                        : ''}
+                    </p>
+
+                    {autopilot.review_message && (
+                      <div
+                        className="mt-3 rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900"
+                        data-autopilot-review
+                      >
+                        {autopilot.review_message}
+                      </div>
+                    )}
+
+                    {(autopilot.blockers || []).map((b: any) => (
+                      <div
+                        key={b.code}
+                        className="mt-3 flex flex-col gap-3 rounded-lg border border-orange-200 bg-orange-50 p-3 sm:flex-row sm:items-center sm:justify-between"
+                        data-autopilot-blocker
+                        data-blocker-code={b.code}
+                      >
+                        <p className="text-sm text-orange-900">{b.message}</p>
+                        {b.code === 'wapef_required' && (
+                          <Button size="sm" onClick={focusWapef} className="shrink-0">
+                            Add missing WAPEF fields
+                          </Button>
+                        )}
+                        {b.code === 'class_confirmation' && (
+                          <Button size="sm" onClick={() => scrollTo('#cfg-class-level')} className="shrink-0">
+                            Confirm class level
+                          </Button>
+                        )}
+                        {(b.code === 'subject_confirmation' || b.code === 'extraction_failed') && (
+                          <Button size="sm" asChild className="shrink-0">
+                            <Link href={`/review/${schemeId}`}>
+                              {b.code === 'subject_confirmation' ? 'Confirm subject' : 'Fix extraction'}
+                            </Link>
+                          </Button>
+                        )}
+                        {b.code === 'needs_review' && (
+                          <Button size="sm" onClick={() => scrollTo('[data-lesson-review]')} className="shrink-0">
+                            Review flagged lessons
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+
+                    <div className="mt-4">
+                      <Button
+                        data-autopilot-action
+                        size="lg"
+                        className="w-full bg-gradient-to-r from-[#102A43] to-[#04769B] text-white hover:from-[#0d2136] hover:to-[#04698a]"
+                        disabled={!autopilot.ready || generating || autopilotChecking}
+                        onClick={handleAutopilot}
+                      >
+                        {generating ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Generating…
+                          </>
+                        ) : (
+                          <>
+                            <Play className="mr-2 h-4 w-4" aria-hidden="true" />
+                            {autopilot.counts?.quota_skipped_count > 0 &&
+                            (autopilot.counts?.selected_count ?? 0) > 0
+                              ? `Generate ${autopilot.counts?.selected_count ?? 0} lesson plans`
+                              : 'Generate my lesson plans'}
+                          </>
+                        )}
+                      </Button>
+                      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                        <Button
+                          data-autopilot-manual
+                          variant="outline"
+                          className="flex-1"
+                          disabled={generating}
+                          onClick={chooseManually}
+                        >
+                          Choose manually
+                        </Button>
+                        <Button
+                          data-autopilot-settings
+                          variant="outline"
+                          className="flex-1"
+                          disabled={generating}
+                          onClick={() => scrollTo('[data-generate-config]')}
+                        >
+                          Change settings
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </SurfaceCard>
+            )}
 
             {/* B. Configuration — grouped sections inside one surface. Hidden
                 once a job exists (§15): the workspace takes over and "Start
@@ -1169,7 +1503,7 @@ export default function GeneratePage() {
                                       {row.indicator_code || '—'}
                                     </span>
                                     <span
-                                      className="min-w-0 flex-1 truncate text-muted-foreground"
+                                      className="min-w-0 flex-1 line-clamp-1 text-muted-foreground"
                                       title={row.indicator_description}
                                     >
                                       {row.indicator_description}
@@ -1235,7 +1569,7 @@ export default function GeneratePage() {
                                           {Object.entries(row.source_provenance).map(([k, v]) => (
                                             <div key={k} className="flex gap-1">
                                               <dt className="capitalize">{k.replace(/_/g, ' ')}:</dt>
-                                              <dd className="truncate">
+                                              <dd className="line-clamp-1 min-w-0">
                                                 {typeof v === 'object' && v !== null
                                                   ? JSON.stringify(v)
                                                   : String(v ?? '—')}
@@ -1763,6 +2097,23 @@ export default function GeneratePage() {
                       {genProgress}
                     </p>
                   )}
+                  {/* Autopilot run (§25): the honest ordered work list — what
+                      this click is generating, never a fake per-item tick. */}
+                  {generating && progressRows.length > 0 && (
+                    <div
+                      className="mt-3 rounded-lg border border-[#04769B]/30 bg-[#f0f9fc] p-3 text-left"
+                      data-autopilot-progress
+                    >
+                      <ol className="space-y-1 text-xs text-slate-700">
+                        {progressRows.map((r, i) => (
+                          <li key={r.source_occurrence_id || i} data-progress-row={i}>
+                            {i + 1} of {progressRows.length} · Week {r.week_number ?? '—'} —{' '}
+                            {r.topic || 'Lesson plan'}
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="mt-3 space-y-3">
@@ -1809,6 +2160,9 @@ export default function GeneratePage() {
                       // auto-preview effect rebuilds the weeks for editing.
                       setJobId(null); setCoverage(null); setGenProgress('');
                       setAllocationPreview(null);
+                      // Autopilot results belong to the run that just ended.
+                      setAutopilotResult(null);
+                      autopilotFired.current = false;
                     }}
                     className="w-full"
                     variant="outline"

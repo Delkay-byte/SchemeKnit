@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { SurfaceCard } from '@/components/ui/surface-card'
 import { Banner } from '@/components/ui/banner'
 import { PageHeader } from '@/components/ui/page-header'
-import { Upload, FileText, CheckCircle, AlertTriangle } from 'lucide-react'
+import { Upload, FileText, CheckCircle, AlertTriangle, Play } from 'lucide-react'
 import { Select } from '@/components/ui/select'
 import { Field } from '@/components/ui/field'
 import { api } from '@/lib/api'
@@ -435,14 +435,35 @@ export default function UploadPage() {
                     )}
                   </div>
                 </Banner>
-                <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-                  <Button size="lg" className="flex-1" onClick={() => router.push(`/review/${result.scheme_id}`)}>
-                    Review Curriculum
-                    <span className="ml-2">→</span>
+                {/* Autopilot (Priority 3.1): after a successful analysis the
+                    ONE explicit teacher action is generation itself. The click
+                    records the intent and hands straight to the Generate page,
+                    which plans and starts the run — no configuration screen
+                    in between. Review stays a secondary path (§19). */}
+                <div className="mt-6 space-y-3">
+                  <Button
+                    size="lg"
+                    className="w-full bg-gradient-to-r from-[#102A43] to-[#04769B] text-white hover:from-[#0d2136] hover:to-[#04698a]"
+                    data-autopilot-upload
+                    onClick={() => {
+                      try {
+                        window.sessionStorage.setItem('schemeknit.autopilot_intent', '1')
+                      } catch { /* storage unavailable */ }
+                      router.push(`/generate/${result.scheme_id}`)
+                    }}
+                  >
+                    <Play className="mr-2 h-4 w-4" aria-hidden="true" />
+                    Generate my lesson plans
                   </Button>
-                  <Button variant="outline" className="flex-1" asChild>
-                    <Link href="/dashboard">Back to Dashboard</Link>
-                  </Button>
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <Button variant="outline" className="flex-1" onClick={() => router.push(`/review/${result.scheme_id}`)}>
+                      Review Curriculum
+                      <span className="ml-2">→</span>
+                    </Button>
+                    <Button variant="outline" className="flex-1" asChild>
+                      <Link href="/dashboard">Back to Dashboard</Link>
+                    </Button>
+                  </div>
                 </div>
               </SurfaceCard>
             )
