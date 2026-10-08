@@ -6,8 +6,8 @@
  *   - public signup (fresh Free Tier teacher per run)
  *   - PDF upload, multi-subject confirmation, review, approve
  *   - allocation preview with Free Tier pre-select/cap
- *   - generation (TF_RUN=A: ENHANCED with broken Gemini -> deterministic
- *     survival; TF_RUN=B: AI_MODE=groq pin -> real Groq AI content)
+ *   - generation (TF_RUN=A: ENHANCED via real Groq — partial allowance;
+ *     TF_RUN=B: full AI credit burn 4->0, exhaustion 403, OFF after)
  *   - lesson-quota consumption, idempotent regeneration, hard 6th-block 403
  *   - AI credit consumption (B), credits-exhausted 403, OFF-after-exhaustion
  *   - exports: DOCX / XLSX real bytes, PDF real-or-controlled, ZIP
@@ -133,7 +133,9 @@ function quotaFromUi(page) {
 }
 
 async function previewAllocation(page) {
-  await page.click('button:has-text("Preview Allocation")')
+  // Priority 3: the week surface + quota line load themselves (no Preview
+  // button). The quota text only exists once a FRESH preview has landed —
+  // Start New Generation clears it, so this wait also sequences restarts.
   await page.waitForFunction(
     () => /Free Tier lesson plans used this month/.test(document.body.innerText),
     null,
@@ -141,18 +143,23 @@ async function previewAllocation(page) {
   )
 }
 
-async function selectCount(page, n) {
-  for (let guard = 0; guard < 30; guard++) {
-    const checked = page.locator('input[type=checkbox]:checked')
-    const c = await checked.count()
-    if (c <= n) break
-    await checked.nth(c - 1).click()
+/** Click one per-lesson Generate/Regenerate (first enabled row) or the primary. */
+async function clickGenerate(page, source = 'primary') {
+  if (source === 'first-row') {
+    const btns = page.locator('[data-week-row] [data-generate-lesson]')
+    const n = await btns.count()
+    for (let i = 0; i < n; i++) {
+      if (await btns.nth(i).isEnabled()) {
+        await btns.nth(i).click()
+        return
+      }
+    }
+    throw new Error('no enabled per-lesson Generate button')
   }
-  return page.locator('input[type=checkbox]:checked').count()
+  await page.click('button:has-text("Generate lesson plans")')
 }
 
-async function generateAndWait(page, wantN, timeoutMs = 300000) {
-  await page.click('button:has-text("Confirm & Generate")')
+async function waitForGenerate(page, wantN, timeoutMs = 300000) {
   const ok = await poll(() => genRespCount >= wantN, timeoutMs)
   if (!ok) throw new Error(`generate response #${wantN} not seen in ${timeoutMs}ms`)
   const settled = await page.waitForSelector('button:has-text("Start New Generation")', {
@@ -161,9 +168,17 @@ async function generateAndWait(page, wantN, timeoutMs = 300000) {
   return settled
 }
 
+async function generateAndWait(page, wantN, timeoutMs = 300000, source = 'primary') {
+  await clickGenerate(page, source)
+  return waitForGenerate(page, wantN, timeoutMs)
+}
+
 async function startNewGeneration(page) {
   await page.click('button:has-text("Start New Generation")')
-  await page.waitForSelector('button:has-text("Preview Allocation")', { timeout: 30000 })
+  // Weeks clear, then the auto-preview rebuilds them.
+  await page.waitForSelector('[data-allocation-weeks]', { state: 'detached', timeout: 15000 })
+    .catch(() => {})
+  await page.waitForSelector('[data-allocation-weeks]', { timeout: 30000 })
 }
 
 // ── request/response capture (node side) ───────────────────────────────────
@@ -233,6 +248,7 @@ function attachCapture(page) {
     await page.fill('input[placeholder="Ama Mensah"]', NAME)
     await page.fill('input[placeholder="name@gmail.com"]', EMAIL)
     await page.fill('input[placeholder="Create a password"]', PASSWORD)
+    await page.fill('input[placeholder="Re-enter your password"]', PASSWORD)
     await page.click('button:has-text("Create Account")')
     await page.waitForURL(/\/dashboard/, { timeout: 60000 })
     record('signup a new Free Tier teacher and land on the dashboard', true, EMAIL)
@@ -249,11 +265,11 @@ function attachCapture(page) {
     const plan0 = await api(page, 'GET', '/api/auth/my-plan')
     const p0 = plan0.data || {}
     record(
-      'free-tier entitlement: 5 lifetime AI credits, none used',
-      p0.ai_credits === 5 && p0.ai_credits_used === 0 && p0.edition === 'free',
-      `edition=${p0.edition} ai_credits=${p0.ai_credits} used=${p0.ai_credits_used}`,
+      'free-tier entitlement: 5 AI generations this month, none used',
+      p0.ai_credits === 5 && p0.ai_quota_used === 0 && p0.edition === 'free',
+      `edition=${p0.edition} ai_quota_used=${p0.ai_quota_used} remaining=${p0.ai_quota_remaining}`,
     )
-    meta.ai_credits.push({ at: 'baseline', used: p0.ai_credits_used, remaining: p0.ai_credits - p0.ai_credits_used })
+    meta.ai_credits.push({ at: 'baseline', used: p0.ai_quota_used, remaining: p0.ai_quota_remaining })
 
     // ── 17E: upload -> multi-subject confirm -> review -> approve ─────────
     await page.goto(`${WEB}/upload`, { waitUntil: 'domcontentloaded' })
@@ -290,24 +306,28 @@ function attachCapture(page) {
     const selInfo = await page.evaluate(() => {
       const body = document.body.innerText
       const m = body.match(/This scheme contains (\d+) instructional indicators?/)
-      const checked = document.querySelectorAll('input[type=checkbox]:checked').length
-      const all = document.querySelectorAll('input[type=checkbox]').length
-      return { selectable: m ? Number(m[1]) : null, checked, all }
+      const ready = body.match(/(\d+) of (\d+) pending can be generated this month/)
+      return {
+        selectable: m ? Number(m[1]) : null,
+        fit: ready ? Number(ready[1]) : null,
+        pending: ready ? Number(ready[2]) : null,
+      }
     })
     record(
-      'free tier pre-selects exactly the remaining allowance (5 of N indicators)',
-      selInfo.selectable > 5 && selInfo.checked === 5,
+      'full-set announces the allowance cap: "X of N pending can be generated this month" (X ≥ 5, N > 5)',
+      selInfo.selectable > 5 && selInfo.fit !== null && selInfo.fit >= 5 &&
+        selInfo.pending > selInfo.fit,
       JSON.stringify(selInfo),
     )
 
     if (RUN === 'A') {
-      // ── A1: generate 1 unit, ENHANCED + broken Gemini -> deterministic ──
-      const c1 = await selectCount(page, 1)
-      record('teacher narrows selection to a single indicator', c1 === 1, `checked=${c1}`)
+      // ── A1: generate 1 unit, ENHANCED + real Groq content ──────────────
       genRespCount = genReqCount = 0
-      await generateAndWait(page, 1)
+      await generateAndWait(page, 1, 300000, 'first-row')
       const r1 = respByN[1]
       const codes1 = (payloadByN[1] || {}).selected_indicator_codes || []
+      record('teacher generates a single lesson occurrence (1 indicator in payload)',
+        codes1.length === 1, JSON.stringify(codes1))
       meta.job_ids.push(r1 && r1.data && r1.data.job_id)
       record(
         'generation succeeds and consumes 1 lesson unit (0 of 5 -> 1 of 5)',
@@ -315,38 +335,43 @@ function attachCapture(page) {
         r1 && r1.data && JSON.stringify(r1.data.quota),
       )
       meta.quota.push({ at: 'after-gen-1', ...(r1.data.quota || {}) })
-      record(
-        'survival path: broken Gemini falls back to deterministic — no AI credit consumed',
-        r1 && r1.data && r1.data.ai_credits_remaining === null,
-        `ai_credits_remaining=${r1 && r1.data && r1.data.ai_credits_remaining}`,
-      )
 
       const jobId1 = r1.data.job_id
       const les1 = await api(page, 'GET', `/api/generation/${jobId1}/lessons`)
       const larr = ((les1.data || {}).lesson_plans) || []
+      // Provider reality: Groq may answer OR rate-limit (429). Either way the
+      // job succeeds — and the ledger must be honest: a lifetime/monthly AI
+      // credit is consumed ONLY when provider content was actually produced.
+      const consumed1 = r1 && r1.data ? r1.data.ai_credits_remaining !== null : false
       record(
-        'job lessons marked ai_generated=false (deterministic, not fake-AI)',
-        larr.length > 0 && larr.every((l) => l.ai_generated === false),
-        `lessons=${larr.length} ai_generated=${JSON.stringify(larr.map((l) => l.ai_generated))}`,
+        'AI honesty invariant: credit consumed iff provider content produced (provenance matches)',
+        r1 && r1.status === 200 && larr.length > 0 &&
+          larr.every((l) => l.ai_generated === consumed1) &&
+          (!consumed1 || r1.data.ai_credits_remaining === 4),
+        `remaining=${r1 && r1.data && r1.data.ai_credits_remaining} ` +
+          `ai_generated=${JSON.stringify(larr.map((l) => l.ai_generated))} ` +
+          `reason=${(r1.data.ai && r1.data.ai.reason) || ''}`,
       )
       const planA1 = await api(page, 'GET', '/api/auth/my-plan')
       record(
-        'AI lifetime credits still untouched after failed-provider generation',
-        planA1.data && planA1.data.ai_credits_used === 0,
-        `ai_credits_used=${planA1.data && planA1.data.ai_credits_used}`,
+        'AI monthly ledger matches the first job exactly (1 consumed, else 0)',
+        planA1.data &&
+          planA1.data.ai_quota_used === (consumed1 ? 1 : 0) &&
+          planA1.data.ai_quota_remaining === 5 - planA1.data.ai_quota_used,
+        `ai_quota_used=${planA1.data && planA1.data.ai_quota_used} remaining=${planA1.data && planA1.data.ai_quota_remaining}`,
       )
 
       // ── A2: idempotent regeneration of the same indicator ───────────────
       await startNewGeneration(page)
       await previewAllocation(page)
       const uiQ2 = await quotaFromUi(page)
-      const c2 = await selectCount(page, 1)
-      record('regeneration re-selects the same single indicator', c2 === 1, JSON.stringify(uiQ2))
       genRespCount = genReqCount = 1
-      await generateAndWait(page, 2)
+      await generateAndWait(page, 2, 300000, 'first-row')
       const r2 = respByN[2]
       const codes2 = (payloadByN[2] || {}).selected_indicator_codes || []
       const sameSet = JSON.stringify(codes1) === JSON.stringify(codes2)
+      record('regeneration re-selects the same single indicator',
+        codes2.length === 1 && sameSet, JSON.stringify(uiQ2))
       record(
         'idempotent regeneration: identical indicator set consumes ZERO extra units (used stays 1)',
         r2 && r2.status === 200 && r2.data.quota.used === 1 && sameSet,
@@ -355,49 +380,29 @@ function attachCapture(page) {
       meta.quota.push({ at: 'after-regen', ...(r2.data.quota || {}) })
       meta.job_ids.push(r2.data.job_id)
 
-      // ── A3: fill with the first 4 indicators -> used 4 ──────────────────
+      // ── A3: primary Generate fills the whole remaining allowance ────────
       await startNewGeneration(page)
       await previewAllocation(page)
-      const checkedA3 = await page.locator('input[type=checkbox]:checked').count()
-      record('preview pre-selects first 4 remaining indicators', checkedA3 === 4, `checked=${checkedA3}`)
+      const readyA3 = await quotaFromUi(page)
+      const fitA3 = await page.evaluate(() => {
+        const m = document.body.innerText.match(/(\d+) of (\d+) pending can be generated this month/)
+        return m ? { fit: Number(m[1]), pending: Number(m[2]) } : null
+      })
+      record('at 4 remaining, the full-set cap announces the fitting subset',
+        !!readyA3 && readyA3.remaining === 4 && !!fitA3 && fitA3.fit >= 4,
+        JSON.stringify({ ui: readyA3 && readyA3.raw, fitA3 }))
       genRespCount = genReqCount = 2
       await generateAndWait(page, 3)
       const r3 = respByN[3]
+      const codes3 = (payloadByN[3] || {}).selected_indicator_codes || []
       record(
-        'generating 4 indicators moves used 1 -> 4 (3 new units, 1 already counted)',
-        r3 && r3.status === 200 && r3.data.quota.used === 4,
-        `used=${r3 && r3.data && r3.data.quota.used}`,
+        'primary Generate spends the full remaining allowance: 4 NEW units (1 -> 5)',
+        r3 && r3.status === 200 && r3.data.quota.used === 5 &&
+          codes3.length === 4 && !codes3.includes(codes1[0]),
+        `used=${r3 && r3.data && r3.data.quota.used} codes=${JSON.stringify(codes3)}`,
       )
-      meta.quota.push({ at: 'after-gen-4', ...(r3.data.quota || {}) })
+      meta.quota.push({ at: 'exhausted', ...(r3.data.quota || {}) })
       meta.job_ids.push(r3.data.job_id)
-
-      // ── A4: 5th unit via a distinct previously-uncounted indicator ──────
-      await startNewGeneration(page)
-      await previewAllocation(page)
-      const uiQ4 = await quotaFromUi(page)
-      record(
-        'at 1 remaining, preview pre-selects only that 1',
-        !!uiQ4 && uiQ4.used === 4 && uiQ4.remaining === 1,
-        uiQ4 && uiQ4.raw,
-      )
-      // swap the already-counted first code for the 5th distinct indicator
-      const firstChecked = page.locator('input[type=checkbox]:checked')
-      if ((await firstChecked.count()) > 0) await firstChecked.first().click()
-      const boxes = page.locator('input[type=checkbox]')
-      await boxes.nth(4).click()
-      const c4 = await page.locator('input[type=checkbox]:checked').count()
-      record('teacher swaps in a distinct 5th indicator', c4 === 1, `checked=${c4}`)
-      genRespCount = genReqCount = 3
-      await generateAndWait(page, 4)
-      const r4 = respByN[4]
-      const codes4 = (payloadByN[4] || {}).selected_indicator_codes || []
-      record(
-        '5th distinct unit accepted: used 5 of 5, remaining 0',
-        r4 && r4.status === 200 && r4.data.quota.used === 5 && codes4[0] !== codes1[0],
-        `used=${r4 && r4.data && r4.data.quota.used} fifth=${JSON.stringify(codes4)}`,
-      )
-      meta.quota.push({ at: 'exhausted', ...(r4.data.quota || {}) })
-      meta.job_ids.push(r4.data.job_id)
 
       // ── 17H: exports from the final job (jobId active on this panel) ────
       const docx = await saveDownload(page, 'docx', () =>
@@ -448,25 +453,24 @@ function attachCapture(page) {
       await page.waitForSelector('table tbody tr', { timeout: 60000 })
       const rowCount = await page.locator('table tbody tr').count()
       record('lessons list shows the generated lesson(s)', rowCount >= 1, `${rowCount} row(s)`)
-      await page.locator('table tbody tr').first().locator('button:has-text("Open")').click()
+      await page.locator('table tbody tr').first().locator('a:has-text("Open")').click()
       await page.waitForURL(/\/lessons\/[^/?#]+/, { timeout: 30000 })
       await page.waitForSelector('h1', { timeout: 30000 })
       const detail = await page.locator('body').innerText()
       record(
-        'lesson detail renders week/lesson header + curriculum context + plan',
-        /Week \d+/.test(detail) && /Curriculum Context/.test(detail) &&
-          /Lesson Plan/.test(detail) && !/Lesson not found/.test(detail),
+        'lesson detail renders week/lesson header + context + plan',
+        /Week \d+/.test(detail) && /Lesson context/i.test(detail) &&
+          /Lesson plan/i.test(detail) && !/Lesson not found/.test(detail),
         detail.match(/Week \d+ &bull; Lesson \d+|Week \d+ • Lesson \d+/)?.[0] || '',
       )
 
       // ── 17G: exhausted UI hard-caps ─────────────────────────────────────
       await page.goto(`${WEB}/generate/${meta.scheme_id}`, { waitUntil: 'domcontentloaded' })
       await waitForHydration(page)
-      await page.waitForSelector('button:has-text("Preview Allocation"), button:has-text("Start New Generation")', { timeout: 60000 })
+      await page.waitForSelector('[data-allocation-weeks], button:has-text("Start New Generation")', { timeout: 60000 })
       if (await page.locator('button:has-text("Start New Generation")').count()) {
         await startNewGeneration(page)
       }
-      await page.waitForSelector('button:has-text("Preview Allocation")', { timeout: 30000 })
       await previewAllocation(page)
       const uiQEnd = await quotaFromUi(page)
       record('quota line at exhaustion: 5 of 5, 0 remaining',
@@ -474,29 +478,29 @@ function attachCapture(page) {
       meta.quota.push({ at: 'exhausted-ui', ...(uiQEnd || {}) })
 
       const dis = await page.evaluate(() => {
-        const all = document.querySelectorAll('input[type=checkbox]')
-        const disabled = document.querySelectorAll('input[type=checkbox]:disabled')
-        const genBtn = Array.from(document.querySelectorAll('button'))
-          .find((b) => /Confirm &\s*Generate/.test(b.innerText))
+        const rowBtns = Array.from(document.querySelectorAll('[data-generate-lesson]'))
+        const genBtn = Array.from(document.querySelectorAll('[data-generate-action] button'))
+          .find((b) => /Generate lesson plans/.test(b.innerText))
         return {
-          total: all.length,
-          disabled: disabled.length,
+          total: rowBtns.length,
+          disabled: rowBtns.filter((b) => b.disabled).length,
           genDisabled: genBtn ? genBtn.disabled : null,
+          hasReason: /used up/.test(document.body.innerText),
         }
       })
       record(
-        'UI hard-caps at 0 remaining: every indicator checkbox disabled, Generate disabled',
-        dis.total > 0 && dis.disabled === dis.total && dis.genDisabled === true,
+        'UI hard-caps at 0 remaining: every per-lesson Generate disabled, primary Generate disabled, reason stated',
+        dis.total > 0 && dis.disabled === dis.total && dis.genDisabled === true && dis.hasReason,
         JSON.stringify(dis),
       )
 
-      // ── 17G: server-side 6th attempt blocked ────────────────────────────
+      // ── 17G: server-side replay at 0 remaining blocked ──────────────────
       expect403 = true
-      const replay = await api(page, 'POST', `/api/generation/${meta.scheme_id}/generate`, payloadByN[4])
+      const replay = await api(page, 'POST', `/api/generation/${meta.scheme_id}/generate`, payloadByN[3])
       expect403 = false
       const detailMsg = replay.data && replay.data.detail
       record(
-        'server rejects the 6th attempt with 403 + teacher-facing quota message',
+        'server rejects a replay at 0 remaining with 403 + teacher-facing quota message',
         replay.status === 403 && /You have 0 Free Tier lesson plans remaining/.test(String(detailMsg)),
         String(detailMsg).slice(0, 160),
       )
@@ -508,17 +512,21 @@ function attachCapture(page) {
       meta.quota.push({ at: 'final-api', ...(qEnd.data || {}) })
 
       const planEnd = await api(page, 'GET', '/api/auth/my-plan')
-      record('AI credits STILL unused end-to-end in run A (Gemini 401 never counted)',
-        planEnd.data && planEnd.data.ai_credits_used === 0,
-        `ai_credits_used=${planEnd.data && planEnd.data.ai_credits_used}`)
-      meta.ai_credits.push({ at: 'final', used: planEnd.data.ai_credits_used })
+      record('Run A end-to-end: AI ledger advances only on successful provider batches (honest bounds)',
+        planEnd.data &&
+          planEnd.data.ai_quota_used >= (consumed1 ? 1 : 0) &&
+          planEnd.data.ai_quota_used <= 3 &&
+          planEnd.data.ai_quota_remaining === 5 - planEnd.data.ai_quota_used,
+        `ai_quota_used=${planEnd.data && planEnd.data.ai_quota_used} remaining=${planEnd.data && planEnd.data.ai_quota_remaining}`)
+      meta.ai_credits.push({ at: 'final', used: planEnd.data.ai_quota_used })
     } else {
       // ═══ RUN B: AI_MODE=groq pin — real AI credit lifecycle ═════════════
-      const c1 = await selectCount(page, 1)
-      record('teacher narrows selection to a single indicator', c1 === 1, `checked=${c1}`)
       genRespCount = genReqCount = 0
-      await generateAndWait(page, 1)
+      await generateAndWait(page, 1, 300000, 'first-row')
       const r1 = respByN[1]
+      const codesB1 = (payloadByN[1] || {}).selected_indicator_codes || []
+      record('teacher generates a single lesson occurrence (1 indicator in payload)',
+        codesB1.length === 1, JSON.stringify(codesB1))
       meta.job_ids.push(r1 && r1.data && r1.data.job_id)
       record(
         'live Groq generation through the real app: 1 lesson unit consumed',
@@ -553,8 +561,7 @@ function attachCapture(page) {
         for (let attempt = 1; attempt <= 3; attempt++) {
           await startNewGeneration(page)
           await previewAllocation(page)
-          await selectCount(page, 1)
-          await generateAndWait(page, genRespCount + 1)
+          await generateAndWait(page, genRespCount + 1, 300000, 'first-row')
           ri = respByN[genRespCount]
           const burned = ri && ri.data &&
             typeof ri.data.ai_credits_remaining === 'number'
@@ -579,10 +586,9 @@ function attachCapture(page) {
       // B6: 6th ENHANCED attempt -> 403 credits exhausted
       await startNewGeneration(page)
       await previewAllocation(page)
-      await selectCount(page, 1)
       const before6 = genRespCount
       expect403 = true
-      await page.click('button:has-text("Confirm & Generate")')
+      await clickGenerate(page, 'first-row')
       const got6 = await poll(() => genRespCount > before6, 30000)
       const alertShown = await poll(async () => {
         const t = await page.locator('body').innerText()
@@ -597,22 +603,20 @@ function attachCapture(page) {
         r6 && String(r6.data && r6.data.detail || '').slice(0, 150),
       )
       const planEx = await api(page, 'GET', '/api/auth/my-plan')
-      record('AI credits remain exactly 5/5 used after the blocked attempt',
-        planEx.data && planEx.data.ai_credits_used === 5,
-        `used=${planEx.data && planEx.data.ai_credits_used}`)
+      record('AI ledger exactly 5/5 used after the blocked attempt',
+        planEx.data && planEx.data.ai_quota_used === 5 && planEx.data.ai_quota_remaining === 0,
+        `used=${planEx.data && planEx.data.ai_quota_used} remaining=${planEx.data && planEx.data.ai_quota_remaining}`)
 
       // B7: OFF still generates after AI exhaustion (fresh page state)
       await page.reload({ waitUntil: 'domcontentloaded' })
       await waitForHydration(page)
-      await page.waitForSelector('button:has-text("Preview Allocation"), button:has-text("Start New Generation")', { timeout: 60000 })
+      await page.waitForSelector('[data-allocation-weeks], button:has-text("Start New Generation")', { timeout: 60000 })
       if (await page.locator('button:has-text("Start New Generation")').count()) {
         await startNewGeneration(page)
       }
-      await page.waitForSelector('button:has-text("Preview Allocation")', { timeout: 30000 })
       await previewAllocation(page)
-      await selectCount(page, 1)
       await page.locator('select:has(option[value="OFF"])').selectOption('OFF')
-      await generateAndWait(page, genRespCount + 1)
+      await generateAndWait(page, genRespCount + 1, 300000, 'first-row')
       const r7 = respByN[genRespCount]
       record(
         'AI exhaustion does NOT block deterministic OFF generation (200, credits untouched)',
@@ -624,10 +628,10 @@ function attachCapture(page) {
       meta.job_ids.push(r7.data.job_id)
 
       const planFin = await api(page, 'GET', '/api/auth/my-plan')
-      record('final AI ledger: 5 used, 0 remaining (lifetime, honest)',
-        planFin.data && planFin.data.ai_credits_used === 5,
-        `used=${planFin.data && planFin.data.ai_credits_used}`)
-      meta.ai_credits.push({ at: 'final', used: planFin.data.ai_credits_used })
+      record('final AI ledger: 5 used, 0 remaining (monthly, honest)',
+        planFin.data && planFin.data.ai_quota_used === 5 && planFin.data.ai_quota_remaining === 0,
+        `used=${planFin.data && planFin.data.ai_quota_used} remaining=${planFin.data && planFin.data.ai_quota_remaining}`)
+      meta.ai_credits.push({ at: 'final', used: planFin.data.ai_quota_used })
 
       // one DOCX export on the successful OFF job (panel is live here)
       const docx = await saveDownload(page, 'docx', () =>

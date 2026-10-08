@@ -562,6 +562,15 @@ class TermConfig(BaseModel):
     #: source week, teaching week, indicator code/text, sequence and
     #: carry-forward state; only the chosen indicators are generated.
     selected_indicator_codes: List[str] = []
+    #: Occurrence-level selection (Priority 3): the EXACT source occurrences the
+    #: teacher chose — one occurrence of an indicator in ONE source week. Codes
+    #: alone cannot express "generate only week 5's copy of P1.1" when the same
+    #: indicator repeats across weeks, and "[Generate lesson]" must target a
+    #: single timetable occurrence. When non-empty the occurrence list is the
+    #: authority for WHICH lessons are generated (the router resolves their
+    #: codes for quota reservation); empty keeps the code-based behaviour
+    #: above. Never reorders or renames the curriculum.
+    selected_occurrence_ids: List[str] = []
     # Teacher-supplied lesson metadata (PART 11-24). Each is optional and blanks
     # are preserved as blank — the generator never invents values for them.
     period: str = ""
@@ -624,6 +633,12 @@ class AllocatedIndicator(BaseModel):
     #: indicator code in two different source weeks is TWO distinct
     #: occurrences, never a duplicate allocation.
     source_occurrence_id: str = ""
+    #: Stable full-scheme lesson number (Priority 3). The pipeline stamps this
+    #: over ALL allocations in curriculum order BEFORE any subset filter, so a
+    #: lesson generated from a subset keeps the number the preview showed it
+    #: and per-lesson drafts keyed by lesson_sequence never drift. 0 = not
+    #: stamped (direct engine calls fall back to the dense 1-based counter).
+    lesson_ordinal: int = 0
     content_standard_code: str
     content_standard_description: str
     strand: str

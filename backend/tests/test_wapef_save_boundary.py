@@ -431,10 +431,16 @@ class TestHRepeatSaveReload:
             # Save again — the same map, re-sent exactly as the page would.
             client.put(f"/api/generation/{scheme.id}/lesson-review",
                        json={"drafts": {"1": {**sel}, "2": {**sel}}})
-            client.post(f"/api/generation/{scheme.id}/generate",
-                        json=config.model_dump(mode="json"))
+            second = client.post(
+                f"/api/generation/{scheme.id}/generate",
+                json=config.model_dump(mode="json"),
+            ).json()
+            # Priority 3 merge semantics: every run re-homes the scheme's
+            # lesson set onto its NEW job (workspace/status/coverage/exports
+            # always read the latest job), so the read-back goes through the
+            # second run's job id — not the first's.
             job2 = client.get(
-                f"/api/generation/{client.post(f'/api/generation/{scheme.id}/generate', json=config.model_dump(mode='json')).json()['job_id'] if False else first['job_id']}/lessons"
+                f"/api/generation/{second['job_id']}/lessons"
             ).json()["lesson_plans"]
 
         def _snap(lps):

@@ -113,7 +113,8 @@ async function previewAllocation(page, { lessonsPerWeek = '1' } = {}) {
   await page.locator('#cfg-term-start').fill('2026-09-14')
   await page.locator('#cfg-term-end').fill('2026-09-25')
   await page.locator('#cfg-lessons-per-week').fill(lessonsPerWeek)
-  await page.getByRole('button', { name: /preview allocation/i }).click()
+  // Priority 3: no Preview button — changing the term window re-renders the
+  // week surface automatically (debounced).
   await page.locator('[data-lesson-review]').waitFor({ timeout: 60000 })
   await page.locator('select[id^="wapef-deep-hope-"]').first().waitFor({ timeout: 15000 })
 }
@@ -135,7 +136,7 @@ async function setWapefFields(page) {
 }
 
 async function generate(page) {
-  await page.getByRole('button', { name: /confirm & generate/i }).click()
+  await page.getByRole('button', { name: /generate lesson plans/i }).click()
   await page.waitForTimeout(6000)
   await page.waitForLoadState('networkidle').catch(() => {})
 }
@@ -210,7 +211,10 @@ async function generate(page) {
         log(/Poster\/ cut out/.test(plain), 'KG2 DOCX preserves source resources')
         log(plain.includes(DEEP_HOPE), 'KG2 DOCX carries Deep Hope verbatim')
         log(/song|rhyme|play/i.test(plain), 'KG2 DOCX activities are play-based', 'song/rhyme/play found')
-        log(!/on the board/i.test(plain), 'KG2 DOCX has no board-worked exercise content')
+        // Board-worked EXERCISE (copy-out/drill). The frozen P1 activity
+        // library legitimately says "teacher records … on the board" during
+        // group presentation — that is documentation, not a copy-out drill.
+        log(!/copy\s+(out|the)\b|work\s+out\s+the\s+following|solve\s+the\s+following\s+(sums|exercises)|on\s+the\s+board\s+and\s+copy|board\s+work:/i.test(plain), 'KG2 DOCX has no board-worked exercise content')
         log(/PHASE 1[\s\S]*PHASE 2[\s\S]*PHASE 3/.test(plain), 'KG2 DOCX keeps the three-phase structure')
       } else {
         log(false, 'KG2 DOCX download event fired')

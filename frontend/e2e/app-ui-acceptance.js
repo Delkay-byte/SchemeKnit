@@ -237,6 +237,15 @@ function staticChecks() {
       const href = await dashGen.getAttribute('href')
       await page.goto(BASE + href, { waitUntil: 'domcontentloaded' })
       await page.waitForLoadState('networkidle').catch(() => {})
+      // Priority 3 state split: a scheme that already has a completed job
+      // restores into the post-generation view. Start New Generation surfaces
+      // the configuration card the e2e contract measures (≥2 selects / ≥8 inputs).
+      const startNew = page.locator('button:has-text("Start New Generation")')
+      if ((await startNew.count()) > 0) {
+        await startNew.first().click()
+        await page.waitForSelector('[data-generate-config]', { timeout: 30000 }).catch(() => {})
+        await page.waitForTimeout(300)
+      }
       const aiSel = page.locator('main select')
       log((await aiSel.count()) >= 2, 'generate: native Select controls render', `count=${await aiSel.count()}`)
       const aiMode = page.locator('main select').filter({ has: page.locator('option[value="ENHANCED"]') })

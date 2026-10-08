@@ -808,7 +808,18 @@ class AllocationEngine:
             )
             # Curriculum order and period label are assigned here so the
             # builder stays position-independent (and deterministic).
-            lp.lesson_sequence = lesson_counter
+            # Stable numbering (Priority 3): when the pipeline stamped a
+            # full-scheme ordinal on this allocation BEFORE the subset filter,
+            # the lesson keeps that number — so a lesson previewed as #12 of 30
+            # is still #12 when only week 5 was generated, and per-lesson
+            # drafts keyed by lesson_sequence cannot drift onto the wrong
+            # lesson. Without a stamp (direct engine callers, full runs) the
+            # dense 1-based counter over the filtered list is unchanged.
+            ordinal = getattr(alloc, "lesson_ordinal", None)
+            if isinstance(ordinal, int) and ordinal > 0:
+                lp.lesson_sequence = ordinal
+            else:
+                lp.lesson_sequence = lesson_counter
             lp.period = self._period_label(alloc.period_index, config)
             # Special-period metadata flows onto the lesson row (PART O/R) so
             # review/export can present it as a period, not a lesson.

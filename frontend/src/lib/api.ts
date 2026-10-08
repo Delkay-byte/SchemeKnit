@@ -441,6 +441,12 @@ class ApiService {
     return this.request('/api/generation/lessons')
   }
 
+  // All persisted lessons for a scheme (across jobs) — used by the Generate
+  // weeks surface to mark which timetable occurrences are already generated.
+  async getSchemeLessons(schemeId: string): Promise<{ lesson_plans: any[]; total: number }> {
+    return this.request(`/api/generation/schemes/${schemeId}/lessons`)
+  }
+
   async getGenerationStatus(jobId: string): Promise<any> {
     return this.request(`/api/generation/${jobId}/status`)
   }
@@ -1200,7 +1206,7 @@ export function sanitizeTermConfig(
 
   // List fields must be arrays of strings.
   for (const key of ['keywords', 'teaching_learning_resources', 'core_competencies',
-                     'references', 'selected_indicator_codes'] as const) {
+                     'references', 'selected_indicator_codes', 'selected_occurrence_ids'] as const) {
     if (cfg[key] !== undefined && !Array.isArray(cfg[key])) delete cfg[key]
   }
   if (Array.isArray(cfg.holidays)) {

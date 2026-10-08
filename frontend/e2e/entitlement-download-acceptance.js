@@ -92,17 +92,17 @@ async function saveDownload(page, label, action, timeout = 60000) {
 
 async function ensureExportPanel(page) {
   // The page loads an existing completed job on mount. If none exists, run the
-  // documented generate flow (Preview Allocation -> Confirm & Generate).
+  // documented generate flow (week surface auto-loads → Generate lesson plans).
   try {
     await page.waitForSelector('button:has-text("Download DOCX")', { timeout: 8000 })
     return 'existing'
   } catch { /* fall through to generate */ }
 
-  const preview = page.locator('button:has-text("Preview Allocation")')
-  if (!(await preview.count())) return 'unavailable'
-  await preview.first().click()
-  await page.waitForTimeout(1500)
-  const gen = page.locator('button:has-text("Confirm & Generate")')
+  // Priority 3: no Preview Allocation button — the week surface renders itself.
+  const weeks = page.locator('[data-allocation-weeks]')
+  if (!(await weeks.count())) return 'unavailable'
+  await weeks.first().waitFor({ timeout: 30000 }).catch(() => {})
+  const gen = page.locator('[data-generate-action] button:has-text("Generate lesson plans")')
   if (!(await gen.count())) return 'unavailable'
   await gen.first().click()
   await page.waitForSelector('button:has-text("Download DOCX")', { timeout: 180000 })

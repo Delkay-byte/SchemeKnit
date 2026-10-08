@@ -154,18 +154,45 @@ class GenerationPipeline:
                 weeks_to_use, calendar, config, include_special_weeks
             )
 
+            # Stable lesson numbering (Priority 3): stamp each allocation with
+            # its 1-based ordinal over the FULL scheme (curriculum order,
+            # special-period rows excluded) BEFORE any subset filter. A lesson
+            # generated from a subset keeps the number the preview showed it,
+            # so per-lesson review drafts keyed by lesson_sequence can never
+            # drift onto the wrong lesson when only one week/occurrence is
+            # generated. Full-scheme runs are unaffected (ordinal == the dense
+            # counter the generator would have assigned anyway).
+            _ordinal = 0
+            for _alloc in sorted(coverage.allocations, key=lambda a: a.lesson_sequence):
+                if getattr(_alloc, "is_special_period", False):
+                    continue
+                _ordinal += 1
+                _alloc.lesson_ordinal = _ordinal
+
             # ── Free Tier indicator selection ─────────────────────────────
             # When the teacher selected a subset of indicators, generate ONLY
             # those. The allocation itself is unchanged, so source week,
             # teaching week, indicator code/text, lesson sequence and
             # carry-forward state are all preserved — the curriculum is never
             # reordered or dropped. Unselected indicators simply remain in the
-            # scheme for the next generation.
+            # scheme for the next generation. Occurrence-level selection (a
+            # single timetable occurrence of a code, e.g. "[Generate lesson]"
+            # on week 5's copy of a repeating indicator) takes precedence over
+            # the code list; the router resolves codes from the occurrences it
+            # reserved quota for, so the two can never disagree.
             selected = list(getattr(config, "selected_indicator_codes", []) or [])
-            selection_applied = bool(selected)
+            selected_occ = list(getattr(config, "selected_occurrence_ids", []) or [])
+            selection_applied = bool(selected) or bool(selected_occ)
             if selection_applied:
-                sel_set = set(selected)
-                kept = [a for a in coverage.allocations if a.indicator_code in sel_set]
+                if selected_occ:
+                    occ_set = set(selected_occ)
+                    kept = [
+                        a for a in coverage.allocations
+                        if a.source_occurrence_id and a.source_occurrence_id in occ_set
+                    ]
+                else:
+                    sel_set = set(selected)
+                    kept = [a for a in coverage.allocations if a.indicator_code in sel_set]
                 coverage.allocations = kept
                 coverage.total_generated_lessons = len(kept)
                 coverage.total_periods_allocated = len(kept)

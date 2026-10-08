@@ -399,8 +399,16 @@ async function runDesktop(browser, state) {
     }
 
     // ── 5. Allocation: review + adjust the period, then generate ───────────
+    // Capture the allocation preview the UI itself requests (Priority 3 the
+    // week surface loads itself, so the listener must precede navigation).
+    let preview = null
+    const onPreview = async (r) => {
+      if (!r.url().includes('/allocation-preview')) return
+      try { preview = { status: r.status(), body: await r.json() } } catch { /* not json */ }
+    }
+    page.on('response', onPreview)
     await page.goto(`${WEB}/generate/${schemeId}`, { waitUntil: 'domcontentloaded' })
-    await page.getByRole('button', { name: /preview allocation/i }).waitFor({ timeout: 30000 })
+    await page.locator('[data-allocation-weeks]').waitFor({ timeout: 30000 })
     record('generation mode defaults to Quick Generate',
       (await page.getByRole('radio', { name: /quick generate/i }).getAttribute('aria-checked')) === 'true')
     record('Build with me is offered as the secondary path',
@@ -428,15 +436,8 @@ async function runDesktop(browser, state) {
       }
     }
 
-    // Capture the allocation preview the UI itself requests, so the check is on
-    // the real payload the teacher's screen is built from.
-    let preview = null
-    const onPreview = async (r) => {
-      if (!r.url().includes('/allocation-preview')) return
-      try { preview = { status: r.status(), body: await r.json() } } catch { /* not json */ }
-    }
-    page.on('response', onPreview)
-    await page.getByRole('button', { name: /preview allocation/i }).click()
+    // The preview request already fired on load; give the payload a moment
+    // to land in the listener before reading it.
     await page.waitForTimeout(2500)
 
     const periodInputs = page.locator('input[id^="period-"]')
@@ -467,14 +468,13 @@ async function runDesktop(browser, state) {
     if (await termStart.count()) {
       await termStart.fill('')
       await termEnd.fill('')
-      await page.waitForTimeout(200)
       let clearedPreview = null
       const onCleared = async (r) => {
         if (!r.url().includes('/allocation-preview')) return
         try { clearedPreview = { status: r.status(), body: await r.json() } } catch { /* not json */ }
       }
       page.on('response', onCleared)
-      await page.getByRole('button', { name: /preview allocation/i }).click()
+      // Priority 3: the debounced auto-refresh re-requests on its own.
       await page.waitForTimeout(2500)
       page.off('response', onCleared)
       record('emptied term dates do not produce a validation failure',
@@ -483,24 +483,19 @@ async function runDesktop(browser, state) {
       record('emptied term dates never surface "Validation failed"',
         !/validation failed/i.test(clearedBody) && !/action failed/i.test(clearedBody),
         (clearedBody.match(/[^\n]*validation failed[^\n]*/i) || ['no validation-failed text'])[0].slice(0, 90))
+      // Put real dates back so the rest of the journey previews cleanly.
+      await termStart.fill('2026-09-14')
+      await termEnd.fill('2026-09-25')
+      await page.waitForTimeout(1500)
     }
 
-    // ── Defect 14: Build with me → Preview Allocation succeeds ────────────
+    // ── Defect 14: Build with me keeps the week surface healthy ────────────
     const buildRadio = page.getByRole('radio', { name: /build with me/i })
     if (await buildRadio.count()) {
       await buildRadio.click()
       await page.waitForTimeout(300)
-      let buildPreview = null
-      const onBuild = async (r) => {
-        if (!r.url().includes('/allocation-preview')) return
-        try { buildPreview = { status: r.status(), body: await r.json() } } catch { /* not json */ }
-      }
-      page.on('response', onBuild)
-      await page.getByRole('button', { name: /preview allocation/i }).click()
-      await page.waitForTimeout(2500)
-      page.off('response', onBuild)
-      record('Build with me → Preview Allocation succeeds', buildPreview?.status === 200,
-        `HTTP ${buildPreview?.status ?? 'no response'}`)
+      record('Build with me keeps the week surface rendered',
+        (await page.locator('[data-allocation-weeks]').count()) > 0)
       const buildBody = await page.locator('body').innerText()
       record('no "Validation failed" on the Build with me path',
         !/validation failed/i.test(buildBody))
@@ -525,7 +520,7 @@ async function runDesktop(browser, state) {
       try { generate = { status: r.status(), body: await r.json() } } catch { /* not json */ }
     }
     page.on('response', onGenerate)
-    await page.getByRole('button', { name: /confirm & generate/i }).first().click()
+    await page.getByRole('button', { name: /generate lesson plans/i }).first().click()
     try {
       await page.waitForSelector('[data-lesson-workspace]', { timeout: 300000 })
       record('generation completes and opens the workspace', true,

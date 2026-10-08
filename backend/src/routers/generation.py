@@ -581,19 +581,61 @@ async def generate_lesson_plans(
 
     supplied_selection = list(config.selected_indicator_codes or [])
     selected_set = set(supplied_selection)
-    if supplied_selection and not indicatorless and not (selected_set & set(available_codes)):
+    selected_occ = [str(o) for o in (getattr(config, "selected_occurrence_ids", None) or []) if o]
+    selected_occ = list(dict.fromkeys(selected_occ))
+
+    # ── Occurrence-level selection (Priority 3) ─────────────────────────────
+    # "[Generate lesson]" targets EXACTLY one source occurrence — one row of
+    # one source week. Indicator codes alone cannot express that when the same
+    # code repeats across weeks, so when occurrence ids are supplied they are
+    # the AUTHORITY: each is resolved to its allocation with the same
+    # deterministic machinery the preview uses, and quota is reserved for
+    # exactly the codes those occurrences carry.
+    resolved_by_occ: dict = {}
+    if selected_occ:
+        _cal = pipeline.calendar_engine.build_calendar(
+            config, scheme.weeks, config.holidays
+        )
+        _cov = ae.allocate(scheme.weeks, _cal, config, include_special)
+        resolved_by_occ = {
+            a.source_occurrence_id: a
+            for a in _cov.allocations
+            if a.source_occurrence_id
+        }
+        missing = [o for o in selected_occ if o not in resolved_by_occ]
+        if missing:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "None of the selected lessons could be found in this scheme."
+                    if len(missing) == len(selected_occ)
+                    else "Some of the selected lessons could not be found in this scheme."
+                ),
+            )
+
+    if (supplied_selection and not selected_occ and not indicatorless
+            and not (selected_set & set(available_codes))):
         raise HTTPException(
             status_code=400,
             detail="None of the selected indicators could be found in this scheme.",
         )
 
     # Preserve curriculum order regardless of the teacher's click order.
-    if selected_set and not indicatorless:
+    if selected_occ:
+        chosen_allocs = [resolved_by_occ[o] for o in selected_occ]
+        _chosen_codes = {
+            a.indicator_code for a in chosen_allocs
+            if (a.indicator_code or "").strip()
+        }
+        requested_codes = [c for c in available_codes if c in _chosen_codes]
+    elif selected_set and not indicatorless:
         requested_codes = [c for c in available_codes if c in selected_set]
+        chosen_allocs = []
     else:
         requested_codes = list(available_codes)
+        chosen_allocs = []
 
-    if not requested_codes and not indicatorless:
+    if not requested_codes and not indicatorless and not selected_occ:
         raise HTTPException(
             status_code=422,
             detail="This scheme contains no instructional indicators to generate.",
@@ -627,24 +669,46 @@ async def generate_lesson_plans(
                 detail=free_tier_lesson_quota_message(0),
             )
 
-    existing_job = data_service.get_term_config(db, scheme_id, user.id)
-    if existing_job:
-        # Previous generation for this scheme exists: replace its lessons
-        # (regeneration must not duplicate). Regenerating already-counted
-        # indicators consumes zero additional units (idempotent reservation).
-        data_service.delete_lesson_plans_for_scheme(db, scheme_id, user.id)
+    # ── What this run replaces (Priority 3) ────────────────────────────────
+    # No selection at all = full regeneration: the run's output becomes the
+    # scheme's lesson set. Any selection replaces exactly the lessons the run
+    # regenerates (its occurrences, or every occurrence of its codes); every
+    # other week — including teacher edits — survives. The old code asked a
+    # term-config row for "existing job" before deleting, but nothing ever
+    # created that row: the branch was dead, so a second generation silently
+    # DUPLICATED every lesson while the UI (job-scoped) showed only the latest
+    # run. Replacement now happens AFTER a successful run (below), keyed by
+    # what the run actually generated.
+    replace_mode = (
+        "occurrence" if selected_occ
+        else "codes" if (supplied_selection and not indicatorless)
+        else "all"
+    )
 
     job_db = data_service.create_job(db, user.id, scheme_id, config)
     config.scheme_of_work_id = scheme_id
     # Generate exactly the requested indicators (all of them when no explicit
     # selection was made). The allocation engine keeps every original field.
+    # The occurrence ids stay on the config as the pipeline's subset authority.
     config.selected_indicator_codes = requested_codes
+    config.selected_occurrence_ids = list(selected_occ)
 
     try:
         job = pipeline.generate_all(
             scheme, config,
             template_id=config.template_id,
         )
+
+        # generate_all() records engine errors on the job instead of raising
+        # (its historical contract). A swallowed failure must NEVER reach the
+        # teacher as a 200 with zero lessons: fail the request through the
+        # handlers below, which return the reservation and mark the job.
+        if job.status.value != "completed":
+            raise HTTPException(
+                status_code=500,
+                detail="Generation failed: "
+                f"{getattr(job, 'error_message', None) or 'the lesson engine could not complete this run.'}",
+            )
 
         data_service.update_job(db, job_db.id,
             status=job.status.value,
@@ -653,7 +717,46 @@ async def generate_lesson_plans(
             progress=100,
         )
 
+        actual_lesson_count = (
+            len(job._lesson_plans) if hasattr(job, '_lesson_plans') else job.completed_lessons
+        )
+
         if hasattr(job, '_lesson_plans'):
+            # ── Occurrence-scoped replacement + job merge (Priority 3) ─────
+            # The run succeeded — NOW it is safe to touch the teacher's
+            # existing lessons (a failure above leaves them intact). Every run
+            # creates a NEW job (the AI credit is keyed by job id, so re-using
+            # one would lose per-run idempotency) while the lesson set is
+            # scheme-scoped: the lessons this run regenerated are removed, the
+            # SURVIVORS are re-homed onto this job, and the new lessons are
+            # inserted — so workspace, status, coverage and exports all read
+            # the scheme's complete, deduplicated set. This replaces the dead
+            # whole-scheme delete that never fired (and would have destroyed
+            # teacher edits even if it had).
+            #
+            # Order matters: the replaced ids are snapshotted from the
+            # EXISTING rows, the new lessons are inserted FIRST, and only then
+            # are the old ids deleted. A failure at any point therefore leaves
+            # the teacher with lessons (never zero), and a rerun of the same
+            # selection heals any partial state by replacing the same ids
+            # again — never by duplicating them.
+            existing = data_service.get_lesson_plans_for_scheme(
+                db, scheme_id, user.id
+            )
+            if replace_mode == "all":
+                # Full regeneration: the run's output is the new set.
+                replaced_ids = [lp.id for lp in existing]
+            elif replace_mode == "occurrence":
+                replaced_ids = _replacement_ids_for_occurrences(
+                    existing, set(config.selected_occurrence_ids), chosen_allocs
+                )
+            else:  # codes: every occurrence of the selected codes is replaced
+                code_set = set(config.selected_indicator_codes)
+                replaced_ids = [
+                    lp.id for lp in existing
+                    if code_set & set(lp.indicator_codes or [])
+                ]
+
             # READ-AFTER-WRITE (WAPEF save boundary): the browser issues PUT
             # /lesson-review and POST /generate as two separate requests, and
             # on production they can land on different workers. get_lesson_review_drafts
@@ -665,9 +768,24 @@ async def generate_lesson_plans(
                 _apply_lesson_review_draft(lp, drafts)
                 data_service.create_lesson_plan(db, user.id, job_db.id, scheme_id, lp)
 
-        actual_lesson_count = (
-            len(job._lesson_plans) if hasattr(job, '_lesson_plans') else job.completed_lessons
-        )
+            data_service.delete_lesson_plans_by_ids(db, user.id, replaced_ids)
+            data_service.rehome_lesson_plans_for_scheme(
+                db, scheme_id, user.id, job_db.id
+            )
+
+            # Cumulative totals: after any partial run this job represents the
+            # scheme's complete lesson set — which is exactly what
+            # get_lesson_plans_for_job (workspace/status/coverage/exports)
+            # returns, so the numbers the teacher sees match the lessons.
+            scheme_total = data_service.count_lessons_for_scheme(
+                db, scheme_id, user.id
+            )
+            data_service.update_job(db, job_db.id,
+                total_lessons=scheme_total,
+                completed_lessons=scheme_total,
+            )
+        else:
+            scheme_total = actual_lesson_count
 
         # Release any reserved unit that did not become a lesson (defensive: a
         # selected indicator that had no allocation must not consume quota).
@@ -751,8 +869,8 @@ async def generate_lesson_plans(
         return {
             "job_id": job_db.id,
             "status": job.status.value,
-            "total_lessons": job.total_lessons,
-            "completed_lessons": job.completed_lessons,
+            "total_lessons": scheme_total,
+            "completed_lessons": scheme_total,
             "generated_indicator_codes": requested_codes,
             "quota": quota_after,
             "ai_credits_remaining": ai_credit_remaining,
@@ -762,6 +880,9 @@ async def generate_lesson_plans(
     except HTTPException:
         if reservation and reservation.consumed:
             release_lesson_units(db, user.id, reservation.reserved_keys, reservation.period_key)
+        # The job row exists (it is created before the run); never leave it
+        # "pending" forever when the run was refused after creation.
+        data_service.update_job(db, job_db.id, status="failed")
         raise
     except Exception as e:
         # A failed generation must not consume quota.
@@ -1555,6 +1676,44 @@ def _resolve_teacher_name(db: Session, user: User) -> Optional[str]:
     email = getattr(user, "email", None) or ""
     local = email.split("@", 1)[0]
     return local.strip().title() or None
+
+
+def _replacement_ids_for_occurrences(existing, occurrence_ids, chosen_allocs) -> list:
+    """Existing lessons replaced by an occurrence-selected generation run.
+
+    Priority 3: "[Generate lesson]" on one week's copy of a repeating
+    indicator must regenerate ONLY that occurrence. Lessons carrying an
+    occurrence id are matched directly; legacy rows from before occurrence
+    ids existed (empty ``source_occurrence_id``) fall back to the same source
+    week + indicator code, so one week's regeneration can never touch another
+    week's copy of the same code. A codeless legacy row (Nursery-style)
+    matches only on its source week when the run chose one of that week's
+    codeless occurrences.
+    """
+    if not occurrence_ids:
+        return []
+    week_codes: dict = {}
+    codeless_weeks: set = set()
+    for a in chosen_allocs:
+        code = ((getattr(a, "indicator_code", "") or "")).strip()
+        if code:
+            week_codes.setdefault(getattr(a, "week_number", None), set()).add(code)
+        else:
+            codeless_weeks.add(getattr(a, "week_number", None))
+    ids = []
+    for lp in existing:
+        oid = getattr(lp, "source_occurrence_id", "") or ""
+        if oid:
+            if oid in occurrence_ids:
+                ids.append(lp.id)
+            continue
+        codes = set(lp.indicator_codes or [])
+        if codes:
+            if codes & week_codes.get(lp.week_number, set()):
+                ids.append(lp.id)
+        elif lp.week_number in codeless_weeks:
+            ids.append(lp.id)
+    return ids
 
 
 def _apply_lesson_review_draft(lp, drafts: dict) -> None:

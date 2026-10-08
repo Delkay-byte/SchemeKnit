@@ -198,43 +198,41 @@ function staticChecks() {
       await page.waitForURL(/\/generate\//, { timeout: 15000 }).catch(() => {})
       await page.waitForLoadState('networkidle').catch(() => {})
       log((await waitCount(page, '[data-generate-summary]')) >= 1, 'generate: summary surface present', '')
-      log((await waitCount(page, '[data-generate-config]')) >= 1, 'generate: config surface present', '')
       log((await waitCount(page, '[data-generate-action]')) >= 1, 'generate: action rail with primary CTA present', '')
-      const selCount = await waitCount(page, 'main select')
-      log(selCount >= 2, 'generate: at least 2 shared Select controls', `count=${selCount}`)
-      const inputCount = await page.locator(
-        'main input[type="text"], main input[type="number"], main input[type="date"]').count()
-      log(inputCount >= 8, 'generate: configuration inputs present', `count=${inputCount}`)
-      const enh = page.locator('main select:has(option[value="ENHANCED"])').first()
-      if ((await enh.count()) > 0) {
-        try {
-          await enh.selectOption('ENHANCED')
-          const v = await enh.inputValue()
-          log(v === 'ENHANCED', 'generate: ENHANCED option selectable (native selectOption)', `value=${v}`)
-        } catch (e) {
-          log(false, 'generate: ENHANCED option selectable (native selectOption)', e.message)
-        }
-      } else {
-        log(false, 'generate: ENHANCED option present', 'no select offers ENHANCED')
-      }
-      // Allocation surfaces render after Preview Allocation (fetch-driven).
-      // A previously generated scheme shows the export rail instead.
-      const previewBtn = page.locator('main button:has-text("Preview Allocation")').first()
+      // A previously generated scheme loads with its job (workspace leads);
+      // a fresh one shows config + the self-loading week surface (Priority 3).
       const exportBtn = page.locator('[data-generate-action] button:has-text("Download DOCX")').first()
-      if ((await previewBtn.count()) > 0) {
-        await previewBtn.click({ timeout: 8000 }).catch((e) => results.push(`INFO  preview click: ${e.message}`))
+      const startNew = page.locator('[data-generate-action] button:has-text("Start New Generation")').first()
+      if ((await exportBtn.count()) > 0) {
+        log((await page.locator('[data-generate-config]').count()) === 0,
+          'generate: config hidden after generation (returns via Start New Generation)', '')
+        log((await startNew.count()) >= 1, 'generate: Start New Generation present', '')
+        log((await waitCount(page, '[data-coverage]')) >= 1,
+          'generate: coverage summary renders', '')
+      } else {
+        log((await waitCount(page, '[data-generate-config]')) >= 1, 'generate: config surface present', '')
+        const selCount = await waitCount(page, 'main select')
+        log(selCount >= 2, 'generate: at least 2 shared Select controls', `count=${selCount}`)
+        const inputCount = await page.locator(
+          'main input[type="text"], main input[type="number"], main input[type="date"]').count()
+        log(inputCount >= 8, 'generate: configuration inputs present', `count=${inputCount}`)
+        const enh = page.locator('main select:has(option[value="ENHANCED"])').first()
+        if ((await enh.count()) > 0) {
+          try {
+            await enh.selectOption('ENHANCED')
+            const v = await enh.inputValue()
+            log(v === 'ENHANCED', 'generate: ENHANCED option selectable (native selectOption)', `value=${v}`)
+          } catch (e) {
+            log(false, 'generate: ENHANCED option selectable (native selectOption)', e.message)
+          }
+        } else {
+          log(false, 'generate: ENHANCED option present', 'no select offers ENHANCED')
+        }
+        // Priority 3: the week surface loads itself — no Preview button gate.
         log((await waitCount(page, '[data-allocation-preview]')) >= 1,
-          'generate: allocation preview renders after Preview Allocation', '')
+          'generate: allocation preview renders automatically', '')
         log((await waitCount(page, '[data-lesson-review]')) >= 1,
           'generate: lesson review surface renders', '')
-        log((await waitCount(page, '[data-coverage]')) >= 1,
-          'generate: coverage summary renders', '')
-      } else if ((await exportBtn.count()) > 0) {
-        log(true, 'generate: scheme already generated — export rail present (preview not applicable)', '')
-        log((await waitCount(page, '[data-coverage]')) >= 1,
-          'generate: coverage summary renders', '')
-      } else {
-        log(false, 'generate: Preview Allocation button present', 'not found and no export rail')
       }
       await checkOverflow(page, 'generate')
       // Reload to discard local selection state.

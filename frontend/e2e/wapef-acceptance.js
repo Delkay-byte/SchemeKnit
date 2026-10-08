@@ -128,7 +128,7 @@ async function previewAllocation(page, { lessonsPerWeek = '3' } = {}) {
   await page.locator('#cfg-term-start').fill('2026-09-14')
   await page.locator('#cfg-term-end').fill('2026-09-25')
   await page.locator('#cfg-lessons-per-week').fill(lessonsPerWeek)
-  await page.getByRole('button', { name: /preview allocation/i }).click()
+  // Priority 3: the week surface refreshes itself after config changes.
   await page.locator('[data-lesson-review]').waitFor({ timeout: 60000 })
   await page.locator('select[id^="wapef-deep-hope-"]').first().waitFor({ timeout: 15000 })
 }
@@ -164,7 +164,7 @@ async function readWapefRow(page, i) {
 }
 
 async function generate(page) {
-  await page.getByRole('button', { name: /confirm & generate/i }).click()
+  await page.getByRole('button', { name: /generate lesson plans/i }).click()
   await page.waitForTimeout(6000)
   await page.waitForLoadState('networkidle').catch(() => {})
 }
