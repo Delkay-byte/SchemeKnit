@@ -1,14 +1,12 @@
-# Production Version Check (Post-Redeployment)
+# Production Version Check (Final Smoke Attempt)
 
-Date: 2026-10-08 23:43 UTC
+Date: 2026-10-08 (retry)
+Source (HEAD==origin/main): 9d7e401
+Intended deployment: 50bd887 (docs-only diff to 9d7e401)
+Deployed commit: UNKNOWN (no public deploy metadata). API healthy v1.0.5.
 
-SOURCE (HEAD==origin/main): 50bd8872e2fe73c5e4b459b37ab94bf233434e88
-INTENDED DEPLOYMENT: 50bd887 (current)
+Registration: Public /signup reachable (200). Direct API self-registration attempted with synthetic email returned 500 (internal server error). Cannot establish authenticated session without credentials.
 
-ACTUAL DEPLOYED COMMIT: UNKNOWN (no public deploy metadata)
-- API: https://schemeknit-api.onrender.com/api/health -> 200 {"status":"healthy","service":"SchemeKnit","version":"1.0.5"}
-- Frontend: https://schemeknit-frontend.onrender.com -> 200 (Render origin)
+Marker expectation (current impl): topic/objective style per docs/benchmark/after.json (deterministic P2 form). Runtime marker comparison not executed (no auth).
 
-BUILD EQUIVALENCE: CANNOT BE PROVEN from public endpoints. Redeployment reported complete; no commit SHA exposed. Deterministic marker is the only runtime evidence of build equivalence.
-
-RUNTIME EVIDENCE REQUIRED: Production smoke (auth/upload/detection/Autopilot AI-OFF/generate) must demonstrate current deterministic behavior (P2/P4). Without executing that journey, equivalence remains unconfirmed.
+Conclusion: Production build equivalence unconfirmed; P4 execution in production NOT EVIDENCED. Auth path blocked for automated smoke (requires valid registration/approval or existing credentials).
