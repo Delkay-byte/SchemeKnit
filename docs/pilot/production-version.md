@@ -1,25 +1,21 @@
 # Production Version Check
 
-Date: 2026-10-08 (session)
-Time (execution): ~completion time
+Date: 2026-10-08
+Time: ~23:12 UTC (execution)
 
-SOURCE COMMIT (HEAD==origin/main): ae84f19
-ORIGIN COMMIT: ae84f19140d35af06e274e592d1023ba71345477
-ACTUAL DEPLOYED PRODUCTION COMMIT: UNKNOWN (not exposed via public endpoints)
+SOURCE COMMIT (HEAD==origin/main): 3ac4480c1aca9bbbe3bfe9e988287ea7cf24e295
+ORIGIN COMMIT: 3ac4480c1aca9bbbe3bfe9e988287ea7cf24e295
+INTENDED DEPLOYMENT SHA: 3ac4480
 
-API HEALTH: https://schemeknit-api.onrender.com/api/health -> {"status":"healthy","service":"SchemeKnit","version":"1.0.5"}
-API DOCS: 404 (no /docs, /openapi.json, /api/docs exposed)
-FRONTEND: https://schemeknit-frontend.onrender.com -> CDN/Next.js live (x-render-origin-server: Render, x-nextjs-cache: HIT)
+ACTUAL DEPLOYED PRODUCTION COMMIT: UNKNOWN
+- Public endpoints do not expose deployed commit SHA (no /api/version, /api/health metadata limited to service/version)
+- API: https://schemeknit-api.onrender.com/api/health -> 200 {"status":"healthy","service":"SchemeKnit","version":"1.0.5"}
+- Render headers: rndr-id, x-render-origin-server (uvicorn), Server (cloudflare)
 
-EVIDENCE:
-- P4 code present locally at ae84f19 (lesson_quality_gate.py, ledger wiring in routers/generation.py + allocation_engine.py + generation_pipeline.py)
-- Marker driver previously confirmed production stale vs local (2026-10-08). No post-deploy verification possible without Render logs/owner access.
+BUILD EQUIVALENCE: CANNOT CONFIRM (production build commit unknown). Push to origin/main succeeded (3ac4480); Render auto-deploy may not have completed/new build not yet serving ae84f19/3ac4480 P4 behavior.
 
-BLOCKER: Owner-side Render deployment verification required. Cannot confirm production serves ae84f19 / P4.
+DEPLOYMENT MECHANISM: Render auto-deploy from main (standard). No authenticated Render CLI/tooling used in this session; cannot trigger/inspect deploy logs. Deployment access not confirmed available to this session.
 
-DEPLOYMENT HANDOFF (for owner):
-- Required commit: ae84f19 (origin/main)
-- Current deployed commit: UNKNOWN
-- Action: Confirm Render deploy completed (push to main triggered) and smoke-test production after deploy.
-- Verification: GET /api/health (200), run minimal production smoke (auth/upload/extraction/generate Autopilot AI-OFF, DOCX/PDF, reload). Also verify quality gate behavior with a normal scheme.
-- Expected: production behavior consistent with local (P4 gate active; no quota bypass; accept-only persist).
+BLOCKER: Owner-side Render deployment verification required. Need: confirm latest Render deploy completed for main@3ac4480, confirm deployed commit SHA, and run post-deploy smoke. Until then, production P4 enforcement cannot be verified.
+
+NON-DESTRUCTIVE CHECKS ONLY: No DB tampering, no quota bypass, no auth changes.
