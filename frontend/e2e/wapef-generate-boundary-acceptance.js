@@ -4,10 +4,10 @@
  *
  * Real browser, real stack, no mocks and no direct database writes:
  *   1. signup → school → upload a real WAPEF scheme through the UI
- *   2. Generate page → Approved WAPEF Plan → Preview Allocation
+ *   2. Generate page → Approved WAPEF Plan → week surface (auto-loads)
  *   3. select DISTINCTIVE non-default values for all four WAPEF fields
  *      on every preview row
- *   4. Confirm & Generate (the exact two-request sequence under test)
+ *   4. Generate lesson plans (the exact two-request sequence under test)
  *   5. read the persisted lesson through the real API boundary
  *   6. leave → return → reload → all four values still exact
  *   7. one real Zeli section rewrite → all four values unchanged
@@ -169,7 +169,7 @@ async function configureWapef(page) {
     const el = document.querySelector('#cfg-template')
     return el && el.value === 'tpl-wapef-approved-plan'
   }, { timeout: 30000 })
-  await page.getByRole('button', { name: /preview allocation/i }).click()
+  // Priority 3: the week surface + review rows load themselves.
   await page.locator('[data-lesson-review]').waitFor({ timeout: 90000 })
   await page.locator('select[id^="wapef-deep-hope-"]').first().waitFor({ timeout: 30000 })
   return { wapefLabel, optionLabels }
@@ -203,7 +203,9 @@ async function setDistinctWapefOnAllRows(page, opts) {
 }
 
 async function generate(page) {
-  await page.getByRole('button', { name: /confirm & generate/i }).click()
+  // The save boundary runs inside this click: PUT lesson-review first,
+  // then POST generate (a fire-and-forget save is the race under test).
+  await page.getByRole('button', { name: /generate lesson plans/i }).click()
   await page.locator('[data-lesson-workspace]').waitFor({ timeout: 180000 })
   await page.waitForTimeout(1500)
 }
@@ -283,7 +285,7 @@ async function quotaUsed(page) {
       `${selections.length} row(s): ${selections.map((s) => s.gods).join(' | ')}`)
     await shot(page, '02-selections.png')
 
-    // ── 4. Confirm & Generate — the exact boundary under test ───────────
+    // ── 4. Generate lesson plans — the exact boundary under test ──────────
     await generate(page)
     await shot(page, '03-workspace.png')
 

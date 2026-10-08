@@ -199,8 +199,8 @@ function staticChecks() {
   log(/data-quota-banner[\s\S]{0,120}tone="info"/.test(generate) ||
     /<Banner tone="info" data-quota-banner/.test(generate),
     'static: quota notice rendered via shared Banner (tone="info")', 'ok')
-  log(/>Scheduled<\/StatusPill>/.test(generate) && />Needs review<\/StatusPill>/.test(generate),
-    'static: allocation statuses use StatusPill', 'Scheduled + Needs review pills')
+  log(/>Generated<\/StatusPill>/.test(generate) && />Needs review<\/StatusPill>/.test(generate),
+    'static: allocation statuses use StatusPill', 'Generated + Needs review pills')
 
   // O. Licence → License microcopy.
   const platform = src('src/app/(platform-admin)/platform-admin/page.tsx')

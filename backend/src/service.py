@@ -591,6 +591,39 @@ class DataService:
         ).delete()
         db.commit()
 
+    def delete_lesson_plans_by_ids(self, db: Session, owner_id: str, lesson_ids: List[str]) -> int:
+        """Remove specific lessons (owner-checked). Priority 3 replacement.
+
+        Occurrence-scoped regeneration replaces ONLY the lessons the run
+        regenerated; every other week's lesson — including teacher edits —
+        must survive untouched.
+        """
+        if not lesson_ids:
+            return 0
+        deleted = db.query(LessonPlanDB).filter(
+            and_(LessonPlanDB.owner_id == owner_id,
+                 LessonPlanDB.id.in_(list(lesson_ids)))
+        ).delete(synchronize_session=False)
+        db.commit()
+        return int(deleted or 0)
+
+    def rehome_lesson_plans_for_scheme(self, db: Session, scheme_id: str, owner_id: str, job_id: str) -> int:
+        """Re-point every surviving lesson of a scheme at the current job.
+
+        Each generation run creates a new job (the AI credit is keyed by the
+        job id, so re-using a job would lose per-run idempotency). The lesson
+        set, however, is scheme-scoped: after an occurrence-level replacement
+        the untouched weeks still belong in the workspace, status, coverage
+        and exports of THIS run, so their job pointer follows the new job
+        before the newly generated lessons are inserted.
+        """
+        moved = db.query(LessonPlanDB).filter(
+            and_(LessonPlanDB.scheme_id == scheme_id,
+                 LessonPlanDB.owner_id == owner_id)
+        ).update({"job_id": job_id}, synchronize_session=False)
+        db.commit()
+        return int(moved or 0)
+
     # ── Holidays ──────────────────────────────────────────────────────────────
 
     def list_holidays(self, db: Session, owner_id: Optional[str] = None) -> List[HolidayDB]:

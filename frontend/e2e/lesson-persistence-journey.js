@@ -194,7 +194,7 @@ async function configureWapef(page, { perWeek }) {
   await page.locator('#cfg-term-start').fill('2026-09-14')
   await page.locator('#cfg-term-end').fill('2026-09-25')
   await page.locator('#cfg-lessons-per-week').fill(perWeek)
-  await page.getByRole('button', { name: /preview allocation/i }).click()
+  // Priority 3: the week surface refreshes itself after config changes.
   await page.locator('[data-lesson-review]').waitFor({ timeout: 90000 })
   await page.locator('select[id^="wapef-deep-hope-"]').first().waitFor({ timeout: 30000 })
   return { wapefLabel, optionLabels }
@@ -229,7 +229,7 @@ async function setWapefOnRow(page, opts, picks) {
 }
 
 async function generate(page) {
-  await page.getByRole('button', { name: /confirm & generate/i }).click()
+  await page.getByRole('button', { name: /generate lesson plans/i }).click()
   await page.locator('[data-lesson-workspace]').waitFor({ timeout: 180000 })
   await page.waitForTimeout(1500)
 }

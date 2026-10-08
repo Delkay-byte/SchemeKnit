@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -9,10 +9,22 @@ import { Banner } from '@/components/ui/banner'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Field, TextArea } from '@/components/ui/field'
-import { Download, Settings, Play, CheckCircle, FileText, FileSpreadsheet, FileArchive, Loader2, Eye, Save } from 'lucide-react'
+import { Download, Settings, Play, CheckCircle, FileText, FileSpreadsheet, FileArchive, Loader2, Eye, Save, ChevronDown, ChevronRight } from 'lucide-react'
 import { api, sanitizeTermConfig } from '@/lib/api'
 import { normalizeError } from '@/lib/error-normalizer'
 import { resolveRouteId } from '@/lib/route-params'
+import {
+  buildWeekPlans,
+  distinctInOrder,
+  formatWeekCounts,
+  fullSelection,
+  generatableRowsForWeek,
+  planCountLabel,
+  quotaFitForRows,
+  quotaLine,
+  WeekPlan,
+  WeekRow,
+} from '@/lib/generate-coverage'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatusPill } from '@/components/ui/badge'
 import { LessonWorkspace } from '@/components/lesson-workspace'
@@ -43,8 +55,17 @@ export default function GeneratePage() {
   const [genProgress, setGenProgress] = useState<string>('')
   const [allocationPreview, setAllocationPreview] = useState<any>(null)
   const [previewing, setPreviewing] = useState(false)
-  const [allocationConfirmed, setAllocationConfirmed] = useState(false)
-  const [selectedCodes, setSelectedCodes] = useState<string[]>([])
+  // Occurrence ids the teacher has edited since the last preview. A debounced
+  // preview refresh must never wipe unsaved teacher edits (the WAPEF/Deep
+  // Hope race): edited rows are re-merged on top of the fresh server rows by
+  // their stable occurrence id.
+  const touchedOccurrences = useRef<Set<string>>(new Set())
+  // Every lesson already persisted for this scheme (across jobs) — the weeks
+  // surface marks which timetable occurrences are already generated from it.
+  const [schemeLessons, setSchemeLessons] = useState<any[]>([])
+  // Weeks collapse individually; every week starts expanded so the curriculum
+  // is visible without hunting (a long scheme can be collapsed week by week).
+  const [collapsedWeeks, setCollapsedWeeks] = useState<number[]>([])
   // Generation experience (Pattern 7): Quick Generate is the default; Build
   // with me reveals the generated lesson one section at a time. Persisted so
   // the teacher's choice survives a reload.
@@ -269,7 +290,6 @@ export default function GeneratePage() {
     try {
       setPreviewing(true)
       setError(null)
-      setAllocationConfirmed(false)
       const preview = await api.getAllocationPreview(schemeId, sanitizeTermConfig(config, configFallback()))
       setAllocationPreview(preview)
       // PART T: per-lesson review rows arrive with GENERATED DEFAULTS
@@ -286,27 +306,24 @@ export default function GeneratePage() {
                 : [0, 1, 2].map(() => ({ type: 'Other', title: '', page: '' })),
           }))
         : []
-      setLessonReview(reviewRows)
+      setLessonReview((prev) => {
+        const prevByOcc = new Map<string, any>()
+        for (const r of prev) {
+          if (r.source_occurrence_id) prevByOcc.set(r.source_occurrence_id, r)
+        }
+        return reviewRows.map((rr: any) => {
+          const local =
+            rr.source_occurrence_id &&
+            touchedOccurrences.current.has(rr.source_occurrence_id)
+              ? prevByOcc.get(rr.source_occurrence_id)
+              : null
+          return local ? { ...rr, ...local } : rr
+        })
+      })
       setReviewSaved(false)
-      // Seed the indicator selection: when the Free Tier quota is enforced,
-      // pre-select up to the remaining allowance so the teacher can generate
-      // immediately, while every other indicator stays visible and selectable.
-      const selectable: string[] = (preview.selectable_indicators || [])
-        .map((s: any) => s.indicator_code)
-        .filter(Boolean)
-      const remaining: number | null = preview.lesson_quota?.enforced
-        ? (preview.lesson_quota.remaining ?? 0)
-        : null
-      if (remaining !== null && selectable.length > 0) {
-        setSelectedCodes(selectable.slice(0, Math.max(remaining, 0)))
-        setConfig(prev => ({
-          ...prev,
-          selected_indicator_codes: selectable.slice(0, Math.max(remaining, 0)),
-        }))
-      } else {
-        setSelectedCodes([])
-        setConfig(prev => ({ ...prev, selected_indicator_codes: [] }))
-      }
+      // Which occurrences are ALREADY generated (any previous run) — the
+      // weeks surface reads this, never a client-side count.
+      refreshSchemeLessons()
     } catch (err) {
       // Teacher-facing copy: a validation failure explains WHAT to fix, never
       // the raw "Validation failed" (real-use remediation).
@@ -316,50 +333,114 @@ export default function GeneratePage() {
     }
   }
 
-  const toggleIndicator = (code: string) => {
-    const quotaEnforced = !!allocationPreview?.lesson_quota?.enforced
-    const remaining: number = allocationPreview?.lesson_quota?.remaining ?? 0
-    const selectable: string[] = (allocationPreview?.selectable_indicators || [])
-      .map((s: any) => s.indicator_code)
-      .filter(Boolean)
-    let next: string[]
-    if (selectedCodes.includes(code)) {
-      next = selectedCodes.filter(c => c !== code)
-    } else {
-      if (quotaEnforced && selectedCodes.length >= remaining) {
-        // Hard cap: cannot spend more than this month's remaining allowance.
-        return
-      }
-      next = [...selectedCodes, code]
+  const refreshSchemeLessons = async () => {
+    try {
+      const data = await api.getSchemeLessons(schemeId)
+      setSchemeLessons(data.lesson_plans || [])
+    } catch {
+      // The weeks still render — every row simply shows as not generated.
+      setSchemeLessons([])
     }
-    // Preserve curriculum order regardless of click order.
-    next = selectable.filter(c => next.includes(c))
-    setSelectedCodes(next)
-    setConfig(prev => ({ ...prev, selected_indicator_codes: next }))
   }
 
-  const handleConfirmAndGenerate = async () => {
-    setAllocationConfirmed(true)
-    // SAVE BOUNDARY (WAPEF persistence): the generation request reads the
-    // SAVED draft store, so the PUT carrying the teacher's CURRENT selections
-    // must complete — server-side persisted, response received — before the
-    // generate call is issued. A fire-and-forget save (or one built from a
-    // stale closure) is exactly the race that dropped WAPEF values: the
-    // generate request would then persist lessons from the previous draft
-    // store, silently replacing the teacher's selections with empties.
-    // A save failure is fatal here, not cosmetic: generating now would
-    // persist lessons WITHOUT the selections on screen.
-    if (lessonReview.length > 0) {
-      try {
-        await saveLessonReviewDrafts(lessonReview)
-      } catch {
-        setError('Your lesson review could not be saved, so generation was cancelled. Check your connection and try again — your selections are still on screen.')
-        setAllocationConfirmed(false)
-        setGenerating(false)
-        return
+  // The week surface IS the generate screen (Priority 3): it loads itself
+  // whenever the setup view is ready (first visit and after "Start New
+  // Generation"), so no teacher ever has to discover a preview button first.
+  useEffect(() => {
+    if (loading || !scheme || jobId || allocationPreview || previewing) return
+    handlePreviewAllocation()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, scheme, jobId, allocationPreview, previewing])
+
+  // Allocation inputs changed (term window, teaching days, confirmed class):
+  // refresh the weeks after a short pause so typing a date never spams the
+  // server and the surface always shows the truth for the current inputs.
+  // Runs even when no preview exists yet (an early failure must self-heal
+  // once the teacher supplies the missing inputs).
+  useEffect(() => {
+    if (loading || !scheme || jobId || previewing) return
+    const timer = setTimeout(() => { handlePreviewAllocation() }, 600)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    config.term_start_date,
+    config.term_end_date,
+    config.teaching_days.join(','),
+    config.class_level,
+  ])
+
+  // ── Generate actions (Priority 3) ─────────────────────────────────────
+  // The teacher acts on WHAT they can see — a week, a single lesson, or the
+  // whole scheme. The payload names the exact source occurrences (and their
+  // codes for quota reservation); the backend owns the rest. Every path
+  // crosses the WAPEF save boundary first: the PUT carrying the teacher's
+  // CURRENT review selections must be persisted before POST /generate reads
+  // the draft store, and a save failure cancels generation (a fire-and-forget
+  // save is exactly the race that dropped WAPEF values).
+  const runGeneration = async (selection: { codes: string[]; occurrences: string[] }) => {
+    try {
+      setGenerating(true)
+      setError(null)
+      setGenProgress('Generating your lesson plans…')
+      if (lessonReview.length > 0) {
+        try {
+          await saveLessonReviewDrafts(lessonReview)
+        } catch {
+          setError('Your lesson review could not be saved, so generation was cancelled. Check your connection and try again — your selections are still on screen.')
+          setGenProgress('')
+          return
+        }
       }
+      const body = {
+        ...sanitizeTermConfig(config, configFallback()),
+        selected_indicator_codes: selection.codes,
+        selected_occurrence_ids: selection.occurrences,
+      }
+      const response = await api.generateLessonPlans(schemeId, body)
+      setJobId(response.job_id)
+      setAiResult(response.ai || null)
+      setGenProgress('Lesson plans generated successfully!')
+
+      const coverageData = await api.getCurriculumCoverage(response.job_id)
+      setCoverage(coverageData)
+      // Statuses on the week surface must reflect the just-generated set.
+      await refreshSchemeLessons()
+    } catch (err) {
+      setError(normalizeError(err).message)
+      setGenProgress('')
+    } finally {
+      setGenerating(false)
     }
-    await handleGenerate()
+  }
+
+  // Whole scheme: every distinct PENDING indicator code in curriculum order,
+  // capped at the remaining monthly allowance when the quota is enforced
+  // (honest about what fits — never a silent cap, never a client-side quota
+  // rule). Already-generated rows never re-enter the batch.
+  const handleGenerateAll = () => {
+    const pending = weekPlans.flatMap((w) => w.rows.filter((r) => !r.generated))
+    const selection = fullSelection(pending, allocationPreview?.lesson_quota)
+    return runGeneration({ codes: selection.codes, occurrences: [] })
+  }
+
+  // One whole week: exactly that week's timetable occurrences.
+  const handleGenerateWeek = (week: WeekPlan) => {
+    const rows = generatableRowsForWeek(week, allocationPreview?.lesson_quota)
+    if (!rows.length) return Promise.resolve()
+    return runGeneration({
+      codes: distinctInOrder(rows.map((r) => (r.indicator_code || '').trim())),
+      occurrences: rows.map((r) => r.source_occurrence_id).filter(Boolean),
+    })
+  }
+
+  // One single lesson occurrence — even when its indicator code repeats in
+  // other weeks (codes alone cannot say "only week 5's copy").
+  const handleGenerateRow = (row: WeekRow) => {
+    if (!row.source_occurrence_id) return Promise.resolve()
+    return runGeneration({
+      codes: row.indicator_code ? [row.indicator_code] : [],
+      occurrences: [row.source_occurrence_id],
+    })
   }
 
   // Canonical WAPEF draft shape for ONE review row: built from the CURRENT
@@ -376,7 +457,7 @@ export default function GeneratePage() {
     remarks: row.remarks || '',
   })
 
-  // rows param: the CALLER passes the rows to save. handleConfirmAndGenerate
+  // rows param: the CALLER passes the rows to save. runGeneration
   // passes its own in-scope `lessonReview` (the exact state the teacher sees
   // on screen at click time), so the payload can never be built from a stale
   // render's copy. The Save-review button passes nothing and saves the
@@ -417,86 +498,26 @@ export default function GeneratePage() {
   const updateLessonReviewRow = (seq: number, patch: Partial<any>) => {
     // Functional update: the patch is applied to the LATEST row state, never
     // a closure-captured copy. (A stale closure here was the WAPEF race: two
-    // quick edits — or an edit immediately followed by Confirm & Generate —
+    // quick edits — or an edit immediately followed by Generate lesson plans —
     // built the save payload from a pre-edit row and silently dropped the
     // teacher's latest selections.)
-    setLessonReview(rows => rows.map(r => (r.lesson_sequence === seq ? { ...r, ...patch } : r)))
+    setLessonReview(rows => rows.map(r => {
+      if (r.lesson_sequence !== seq) return r
+      if (r.source_occurrence_id) touchedOccurrences.current.add(r.source_occurrence_id)
+      return { ...r, ...patch }
+    }))
     setReviewSaved(false)
   }
 
   const updateStructuredRef = (seq: number, index: number, patch: Partial<any>) => {
     setLessonReview(rows => rows.map(r => {
       if (r.lesson_sequence !== seq) return r
+      if (r.source_occurrence_id) touchedOccurrences.current.add(r.source_occurrence_id)
       const refs = [...(r.structured_references || [])]
       refs[index] = { ...(refs[index] || { type: 'Other', title: '' }), ...patch }
       return { ...r, structured_references: refs }
     }))
     setReviewSaved(false)
-  }
-
-  // Allocation preview grouped by curriculum week. Weekly coverage follows
-  // SOURCE OCCURRENCES: every occurrence in a source week becomes its own
-  // lesson plan in that same week — the timetable is context, never a cap.
-  // Falls back to curriculum-week grouping when the API response predates
-  // teaching-week grouping.
-  const previewTeachingWeeks: any[] = (() => {
-    if (!allocationPreview) return []
-    const weekMeta: Map<number, any> = new Map<number, any>(
-      (allocationPreview.weeks || []).map((w: any) => [w.week_number, w]),
-    )
-    const toWeek = (tw: any) => {
-      const meta: any = weekMeta.get(tw)
-      return {
-        teaching_week: tw,
-        lesson_count: meta?.lesson_count ?? tw.lessons?.length ?? 0,
-        indicator_count: meta?.indicator_count ?? 0,
-        teaching_period_count: meta?.teaching_period_count ?? 0,
-      }
-    }
-    if (allocationPreview.teaching_weeks?.length) {
-      return allocationPreview.teaching_weeks.map((tw: any) => ({
-        ...toWeek(tw.teaching_week),
-        periods: (tw.lessons || []).map((l: any) => ({
-          period_index: l.period_index,
-          lesson_sequence: l.lesson_sequence,
-          lesson_date: l.lesson_date,
-          indicator_code: l.indicator_code,
-          indicator_description: l.indicator_description,
-          status: l.status || 'scheduled',
-          source_week: l.source_week,
-          source_occurrence_id: l.source_occurrence_id,
-          week_ending: l.week_ending,
-          source_tlrs: l.source_tlrs,
-        })),
-      }))
-    }
-    return (allocationPreview.weeks || []).map((w: any) => ({
-      ...toWeek(w.week_number),
-      periods: (w.periods || []).map((p: any) => ({
-        ...p,
-        status: p.needs_review ? 'needs_review' : 'scheduled',
-      })),
-    }))
-  })()
-
-  const handleGenerate = async () => {
-    try {
-      setGenerating(true)
-      setError(null)
-      setGenProgress('Preparing curriculum allocation...')
-
-      const response = await api.generateLessonPlans(schemeId, sanitizeTermConfig(config, configFallback()))
-      setJobId(response.job_id)
-      setAiResult(response.ai || null)
-      setGenProgress('Lesson plans generated successfully!')
-
-      const coverageData = await api.getCurriculumCoverage(response.job_id)
-      setCoverage(coverageData)
-    } catch (err) {
-      setError(normalizeError(err).message)
-    } finally {
-      setGenerating(false)
-    }
   }
 
   const handleExport = async (format: string) => {
@@ -586,36 +607,51 @@ export default function GeneratePage() {
   // appear in the per-lesson review when that template is the chosen form.
   const isWapefSelected = config.template_id === WAPEF_TEMPLATE_ID
 
+  // ── The week-centric view model (Priority 3) ──────────────────────────
+  const weekPlans: WeekPlan[] = buildWeekPlans(allocationPreview, schemeLessons)
+  const pendingRows = weekPlans.flatMap((w) => w.rows.filter((r) => !r.generated))
+  const totalLessonPlans =
+    allocationPreview?.total_generated_lessons ??
+    weekPlans.reduce((n, w) => n + w.lessonCount, 0)
+  const generatedLessonCount =
+    weekPlans.reduce((n, w) => n + w.generatedCount, 0)
+  const quota = allocationPreview?.lesson_quota || null
+  const quotaText = quotaLine(quota)
+  const fullPlanSelection = fullSelection(pendingRows, quota)
+  // How many of the PENDING rows the capped full-set selection can build.
+  const fullFitRowCount = fullPlanSelection.capped
+    ? pendingRows.filter((r) =>
+        !r.indicator_code || fullPlanSelection.codes.includes(r.indicator_code),
+      ).length
+    : pendingRows.length
+
   // Why the Generate action is unavailable — never a silent disable.
   const generateBlockReasons: string[] = []
-  if (
-    allocationPreview &&
-    allocationPreview.lesson_quota?.enforced &&
-    (allocationPreview.selectable_indicators?.length || 0) > 0 &&
-    selectedCodes.length === 0
-  ) {
-    generateBlockReasons.push('Select at least one indicator to generate.')
-  }
   // PART 3: generating without a confirmed class is blocked, and the reason
   // is stated rather than left to a silent disable.
   if (classNeedsConfirmation) {
     generateBlockReasons.push('Confirm the class for this scheme before generating.')
   }
-  // Quota exhaustion with nothing left to select: state it explicitly.
-  // (Indicatorless Nursery-style schemes never enter this branch: the preview
-  // advertises no selectable indicators for them and the server exempts them
-  // from the selection requirement.)
+  // Quota exhaustion: nothing left this month. (Indicatorless Nursery-style
+  // schemes never enter this branch — their rows carry no indicator codes, so
+  // the server exempts them from the selection requirement entirely.)
   if (
-    allocationPreview &&
-    allocationPreview.lesson_quota?.enforced &&
-    (allocationPreview.lesson_quota.remaining ?? 0) <= 0 &&
-    (allocationPreview.selectable_indicators?.length || 0) === 0 &&
-    selectedCodes.length === 0
+    quota?.enforced &&
+    (quota.remaining ?? 0) <= 0 &&
+    weekPlans.some((w) => w.rows.some((r) => !!r.indicator_code))
   ) {
     generateBlockReasons.push(
       'Your Free Tier lesson plans for this month are used up. Upgrade to Teacher Pro for unlimited generation, or wait for next month.')
   }
   const generateIsBlocked = generateBlockReasons.length > 0
+
+  const toggleWeek = (weekNumber: number) => {
+    setCollapsedWeeks((prev) =>
+      prev.includes(weekNumber)
+        ? prev.filter((n) => n !== weekNumber)
+        : [...prev, weekNumber],
+    )
+  }
 
   return (
     <div className="min-h-screen">
@@ -694,12 +730,18 @@ export default function GeneratePage() {
                     {selectedTemplateName || 'Not selected'}
                   </dd>
                 </div>
-                {/* PART 7: the school this lesson belongs to. */}
+                {/* PART 7: the school this lesson belongs to — asked ONCE,
+                    in one place, from the teacher's profile (never three
+                    different phrasings across the page). */}
                 <div>
                   <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">School</dt>
                   <dd className="text-sm font-semibold text-[#102A43]">
-                    {config.school_name || currentUser?.school_name || (
-                      <span className="text-amber-700">Add your school below</span>
+                    {config.school_name || currentUser?.school_name ? (
+                      config.school_name || currentUser?.school_name
+                    ) : (
+                      <Link href="/settings" className="text-amber-700 underline">
+                        Add your school in Settings
+                      </Link>
                     )}
                   </dd>
                 </div>
@@ -712,23 +754,12 @@ export default function GeneratePage() {
                   </dd>
                 </div>
               </dl>
-              {allocationPreview && (
-                <div className="mt-4 rounded-lg bg-[#102A43]/5 px-4 py-3 text-sm">
-                  <span className="font-semibold text-[#102A43]">
-                    {allocationPreview.total_generated_lessons || 0} lesson plan
-                    {(allocationPreview.total_generated_lessons || 0) === 1 ? '' : 's'}
-                  </span>{' '}
-                  will be generated from{' '}
-                  <span className="font-semibold text-[#102A43]">
-                    {selectedCodes.length} indicator{selectedCodes.length === 1 ? '' : 's'}
-                  </span>{' '}
-                  selected &bull;{' '}
-                  {allocationPreview.coverage_percentage?.toFixed(1) ?? 0}% curriculum coverage
-                </div>
-              )}
             </SurfaceCard>
 
-            {/* B. Configuration — grouped sections inside one surface. */}
+            {/* B. Configuration — grouped sections inside one surface. Hidden
+                once a job exists (§15): the workspace takes over and "Start
+                New Generation" brings setup back. */}
+            {!jobId && (
             <SurfaceCard data-generate-config className="px-5 py-5 sm:px-6">
               <div className="flex items-center">
                 <Settings className="mr-2 h-5 w-5 text-[#04769B]" aria-hidden="true" />
@@ -884,11 +915,10 @@ export default function GeneratePage() {
                       }
                     >
                       {classNeedsConfirmation ? (
-                        <select
+                        <Select
                           id="cfg-class-level"
                           aria-label="Class"
                           data-class-level-select
-                          className="w-full rounded-lg border border-input bg-white px-3 py-2 text-sm"
                           value=""
                           onChange={(e) =>
                             setConfig((prev) => ({ ...prev, class_level: e.target.value }))
@@ -900,7 +930,7 @@ export default function GeneratePage() {
                               {c}
                             </option>
                           ))}
-                        </select>
+                        </Select>
                       ) : (
                         <Input
                           id="cfg-class-level"
@@ -911,33 +941,9 @@ export default function GeneratePage() {
                         />
                       )}
                     </Field>
-                    {/* School and teacher identity are server-derived from the
-                        authenticated user's school relationship and profile, so
-                        they are shown read-only here (PART 13-15): the teacher
-                        never types a school name, and the client value is not
-                        trusted. */}
-                    <Field
-                      label="School Name"
-                      htmlFor="cfg-school-name"
-                      hint={
-                        config.school_name || currentUser?.school_name
-                          ? 'From your profile — change it in Settings'
-                          : 'Add the school you teach at in Settings; it then appears on every lesson'
-                      }
-                    >
-                      {/* School identity is server-authoritative: it is resolved
-                          from the authenticated teacher on every generate call,
-                          so this field reports the stored value and never
-                          pretends to accept a value the server would discard. */}
-                      <Input
-                        id="cfg-school-name"
-                        type="text"
-                        value={config.school_name || currentUser?.school_name || ''}
-                        disabled
-                        placeholder="Set your school in Settings"
-                        className="bg-muted text-muted-foreground"
-                      />
-                    </Field>
+                    {/* School identity is server-derived from the teacher's
+                        profile and asked ONCE (summary strip → Settings) —
+                        never repeated as a field here (§14). */}
                     <Field label="Teacher Name" htmlFor="cfg-teacher-name" hint="From your profile — update it in Settings">
                       <Input
                         id="cfg-teacher-name"
@@ -996,25 +1002,49 @@ export default function GeneratePage() {
                 </section>
               </div>
             </SurfaceCard>
+            )}
 
-            {/* C. Allocation Preview — quotas, indicators, week-by-week periods. */}
+            {/* C. Lesson plans by week — the primary surface (Priority 3). */}
+            {!allocationPreview && previewing && (
+              <SurfaceCard data-allocation-preview className="px-5 py-5 sm:px-6">
+                <p className="flex items-center text-sm text-muted-foreground" role="status" aria-live="polite">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                  Reading your weeks…
+                </p>
+              </SurfaceCard>
+            )}
             {allocationPreview && (
               <SurfaceCard
                 data-allocation-preview
                 accent="bg-gradient-to-r from-[#102A43] to-[#04A9CE]"
                 className="px-5 py-5 sm:px-6"
               >
-                <h2 className="text-lg font-semibold text-[#102A43]">Allocation Preview</h2>
-                <p className="text-sm text-muted-foreground">
-                  Every curriculum occurrence in your scheme becomes its own lesson plan, in its source week
-                </p>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-semibold text-[#102A43]">Lesson plans by week</h2>
+                    <p className="text-sm text-muted-foreground">
+                      Every curriculum indicator in your scheme becomes its own lesson plan, in its source week.
+                      Timetable periods are context, not a limit.
+                    </p>
+                  </div>
+                  <p data-generate-total className="rounded-lg bg-[#102A43]/5 px-3 py-2 text-sm">
+                    <span className="font-semibold text-[#102A43]">{planCountLabel(totalLessonPlans)}</span>
+                    {' · '}
+                    {allocationPreview.coverage_percentage?.toFixed(1) ?? 0}% curriculum coverage
+                    {generatedLessonCount > 0 && (
+                      <span className="block text-xs text-muted-foreground">
+                        {generatedLessonCount} already generated
+                      </span>
+                    )}
+                  </p>
+                </div>
 
                 <div className="mt-4 space-y-4">
                   {/* Conflicts first — teacher must see these before generating */}
                   {(allocationPreview.allocation_conflicts?.length > 0 ||
                     allocationPreview.indicators_unallocated > 0 ||
                     allocationPreview.indicators_duplicated > 0) && (
-                    <Banner tone="warning" title="Allocation conflicts — review before generating">
+                    <Banner tone="warning" title="Check these weeks before generating">
                       <div className="space-y-1">
                         {allocationPreview.allocation_conflicts?.map((c: string, i: number) => (
                           <p key={`c-${i}`}>{c}</p>
@@ -1035,181 +1065,226 @@ export default function GeneratePage() {
                     </Banner>
                   )}
 
-                  {/* Free Tier monthly allowance (PART C): plain, non-technical
-                      language, with the scheme's indicator count and the
-                      remaining allowance so the teacher can choose a subset. */}
-                  {allocationPreview.lesson_quota?.enforced && (
-                    <Banner tone="info" data-quota-banner className="text-xs">
-                      <div className="space-y-1">
-                        <p className="font-semibold">
-                          {allocationPreview.lesson_quota.used} of {allocationPreview.lesson_quota.limit} Free Tier lesson plans used this month ·{' '}
-                          {allocationPreview.lesson_quota.remaining} remaining
-                        </p>
-                        {allocationPreview.selectable_indicators?.length > 0 && (
-                          <p>
-                            This scheme contains {allocationPreview.selectable_indicators.length} instructional indicator
-                            {allocationPreview.selectable_indicators.length === 1 ? '' : 's'}. You can generate up to{' '}
-                            {allocationPreview.lesson_quota.remaining} now; Teacher Pro removes this limit.
-                          </p>
-                        )}
-                      </div>
-                    </Banner>
-                  )}
-
-                  {/* Indicator selection: one indicator = one lesson plan.
-                      When the Free Tier quota is enforced the teacher chooses
-                      which indicators to spend this month; the rest stay in the
-                      scheme for later. Unlimited plans see every indicator
-                      pre-selected with no cap. */}
-                  {allocationPreview.selectable_indicators?.length > 0 && (
-                    <div data-indicator-select className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs font-semibold text-muted-foreground">
-                          Choose indicators to generate
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {selectedCodes.length}
-                          {allocationPreview.lesson_quota?.enforced
-                            ? ` of ${allocationPreview.lesson_quota.remaining} remaining`
-                            : ` selected`}
-                        </p>
-                      </div>
-                      <div className="max-h-56 space-y-1.5 overflow-y-auto rounded-md border p-2">
-                        {allocationPreview.selectable_indicators.map((ind: any) => {
-                          const checked = selectedCodes.includes(ind.indicator_code)
-                          const capped =
-                            allocationPreview.lesson_quota?.enforced &&
-                            !checked &&
-                            selectedCodes.length >= (allocationPreview.lesson_quota.remaining ?? 0)
-                          return (
-                            <label
-                              key={ind.indicator_code}
-                              className={`flex cursor-pointer items-start gap-2 rounded p-1.5 text-xs ${
-                                capped ? 'opacity-50' : 'hover:bg-muted'
-                              }`}
+                  {/* The week surface: what needs generating, week by week.
+                      One card per week; every week starts expanded; each row
+                      says whether its lesson already exists. */}
+                  <div className="space-y-4" data-allocation-weeks>
+                    {weekPlans.length === 0 && (
+                      <p className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">
+                        No curriculum weeks found — check the term dates above.
+                      </p>
+                    )}
+                    {weekPlans.map((week) => {
+                      const collapsed = collapsedWeeks.includes(week.weekNumber)
+                      const fit = quotaFitForRows(week.rows, quota)
+                      const weekRows = generatableRowsForWeek(week, quota)
+                      const weekBlocked =
+                        generating ||
+                        generateIsBlocked ||
+                        (quota?.enforced && weekRows.length === 0)
+                      return (
+                        <div
+                          key={`week-${week.weekNumber}`}
+                          data-week-card
+                          data-week-number={week.weekNumber}
+                          className="overflow-hidden rounded-lg border border-slate-200"
+                        >
+                          <div className="flex flex-wrap items-center gap-2 bg-[#F8FAFC] px-3 py-2">
+                            <button
+                              type="button"
+                              onClick={() => toggleWeek(week.weekNumber)}
+                              aria-expanded={!collapsed}
+                              className="flex items-center gap-1.5 text-sm font-semibold text-[#102A43]"
                             >
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                disabled={capped}
-                                onChange={() => toggleIndicator(ind.indicator_code)}
-                                className="mt-0.5"
-                              />
-                              <span>
-                                <span className="font-mono">{ind.indicator_code}</span>
-                                {' — '}
-                                {ind.indicator_description}
-                                <span className="ml-1 text-muted-foreground">
-                                  (Week {ind.source_week})
-                                </span>
+                              {collapsed ? (
+                                <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4" aria-hidden="true" />
+                              )}
+                              Week {week.weekNumber}
+                            </button>
+                            {week.allGenerated ? (
+                              <StatusPill tone="success">Generated</StatusPill>
+                            ) : week.anyGenerated ? (
+                              <StatusPill tone="info">
+                                {week.generatedCount} of {week.lessonCount} generated
+                              </StatusPill>
+                            ) : week.pendingCount > 0 ? (
+                              <StatusPill tone="neutral">
+                                {planCountLabel(week.pendingCount)} to generate
+                              </StatusPill>
+                            ) : null}
+                            <span className="flex-1" />
+                            {week.pendingCount > 0 && (
+                              <Button
+                                data-generate-week
+                                size="sm"
+                                className="h-7 rounded-md px-2.5 text-xs"
+                                disabled={weekBlocked}
+                                onClick={() => handleGenerateWeek(week)}
+                              >
+                                Generate week
+                              </Button>
+                            )}
+                          </div>
+                          {/* Counts line — the teacher's weekly fit answer, in
+                              plain words (e2e: data-week-coverage). */}
+                          <p
+                            data-week-coverage
+                            className="border-t px-3 py-1.5 text-[11px] text-muted-foreground"
+                          >
+                            {formatWeekCounts(week)}
+                            {fit && fit.capped && (
+                              <span className="block text-amber-700">
+                                {planCountLabel(fit.rowsGeneratable)} of the {planCountLabel(week.pendingCount)} pending
+                                can be generated with your remaining monthly allowance.
                               </span>
-                            </label>
-                          )
-                        })}
-                      </div>
-                      {allocationPreview.lesson_quota?.enforced &&
-                        selectedCodes.length === 0 && (
-                          <p className="text-xs text-yellow-700">
-                            Select at least one indicator to generate.
+                            )}
                           </p>
-                        )}
-                      {allocationPreview.lesson_quota?.enforced &&
-                        selectedCodes.length < (allocationPreview.selectable_indicators?.length ?? 0) && (
-                          <p className="text-xs text-muted-foreground">
-                            Unselected indicators stay in your scheme and can be
-                            generated next month.
-                          </p>
-                        )}
-                    </div>
-                  )}
-
-                  {/* Allocation preview, grouped by curriculum week. Weekly
-                      coverage follows source occurrences: each occurrence in
-                      the source week becomes one lesson plan in that same
-                      week. Timetable periods are shown as context only. */}
-                  <div className="max-h-72 space-y-3 overflow-y-auto" data-allocation-weeks>
-                    {previewTeachingWeeks.map((week: any) => (
-                      <div key={`tw-${week.teaching_week}`}>
-                        <h3 className="mb-1.5 sticky top-0 bg-white text-xs font-semibold text-muted-foreground">
-                          Week {week.teaching_week}
-                          <span className="ml-2 font-normal">
-                            ({week.lesson_count} lesson{week.lesson_count === 1 ? '' : 's'})
-                          </span>
-                        </h3>
-                        <p className="mb-1.5 text-[11px] text-muted-foreground" data-week-coverage>
-                          {week.indicator_count > 0
-                            ? `${week.indicator_count} curriculum indicator${week.indicator_count === 1 ? '' : 's'}`
-                            : `${week.lesson_count} curriculum row${week.lesson_count === 1 ? '' : 's'}`}
-                          {' · '}
-                          {week.teaching_period_count > 0
-                            ? `${week.teaching_period_count} timetable period${week.teaching_period_count === 1 ? '' : 's'}`
-                            : 'teaching periods not specified'}
-                          {' → '}
-                          <span className="font-medium text-foreground">
-                            {week.lesson_count} lesson plan{week.lesson_count === 1 ? '' : 's'} required for this week
-                          </span>
-                        </p>
-                        <div className="overflow-x-auto">
-                          <table className="w-full border-collapse text-xs">
-                            <thead>
-                              <tr className="border-b text-left text-muted-foreground">
-                                <th className="py-1 pr-2 font-medium">Date</th>
-                                <th className="py-1 pr-2 font-medium">Period</th>
-                                <th className="py-1 pr-2 font-medium">Indicator</th>
-                                <th className="py-1 font-medium">Status</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y">
-                              {week.periods?.map((alloc: any) => {
+                          {!collapsed && (
+                            <div className="divide-y">
+                              {week.rows.map((row) => {
+                                const rowFit = quotaFitForRows([row], quota)
+                                const rowDisabled =
+                                  generating ||
+                                  generateIsBlocked ||
+                                  (!!rowFit && rowFit.rowsGeneratable === 0)
+                                const lesson = row.generatedLesson
                                 return (
-                                  <tr key={`${week.teaching_week}-${alloc.period_index}`}>
-                                    <td className="whitespace-nowrap py-1.5 pr-2">
-                                      {alloc.lesson_date
-                                        ? new Date(alloc.lesson_date).toLocaleDateString('en-GB')
-                                        : '—'}
-                                    </td>
-                                    <td className="whitespace-nowrap py-1.5 pr-2 font-mono">
-                                      {alloc.period_index}
-                                    </td>
-                                    <td className="py-1.5 pr-2" title={alloc.indicator_description}>
-                                      <span className="font-mono">{alloc.indicator_code}</span>
-                                    </td>
-                                    <td className="py-1.5">
-                                      {alloc.status === 'needs_review' ? (
-                                        <StatusPill tone="warning">Needs review</StatusPill>
-                                      ) : (
-                                        <StatusPill tone="success">Scheduled</StatusPill>
-                                      )}
-                                    </td>
-                                  </tr>
+                                  <div
+                                    key={row.source_occurrence_id || `row-${row.lesson_sequence}`}
+                                    data-week-row
+                                    data-occurrence-id={row.source_occurrence_id}
+                                    className="flex flex-wrap items-center gap-2 px-3 py-2 text-xs"
+                                  >
+                                    <span className="font-semibold text-[#102A43]">
+                                      Lesson {row.lesson_sequence}
+                                    </span>
+                                    <span className="text-muted-foreground">
+                                      {row.week_ending
+                                        ? `Week ending ${new Date(row.week_ending).toLocaleDateString('en-GB')}`
+                                        : `Week ${row.source_week}`}
+                                    </span>
+                                    <span className="font-mono text-muted-foreground">
+                                      {row.indicator_code || '—'}
+                                    </span>
+                                    <span
+                                      className="min-w-0 flex-1 truncate text-muted-foreground"
+                                      title={row.indicator_description}
+                                    >
+                                      {row.indicator_description}
+                                    </span>
+                                    {row.generated ? (
+                                      <>
+                                        <StatusPill tone={lesson?.teacher_edited ? 'info' : 'success'}>
+                                          {lesson?.teacher_edited ? 'Updated' : 'Generated'}
+                                        </StatusPill>
+                                        <a
+                                          href="#lesson-workspace"
+                                          className="rounded-md border px-1.5 py-0.5 text-[11px] text-[#04769B] hover:bg-slate-50"
+                                          onClick={(e) => {
+                                            e.preventDefault()
+                                            document
+                                              .querySelector('[data-lesson-workspace]')
+                                              ?.scrollIntoView({ behavior: 'smooth' })
+                                          }}
+                                        >
+                                          Open in workspace
+                                        </a>
+                                        {/* An already-generated lesson can still be
+                                            re-run on its own — same occurrence, same
+                                            quota identity (the backend dedupes it). */}
+                                        <Button
+                                          data-generate-lesson
+                                          size="sm"
+                                          variant="outline"
+                                          className="h-6 rounded-md px-2 text-[11px]"
+                                          disabled={rowDisabled || !row.source_occurrence_id}
+                                          onClick={() => handleGenerateRow(row)}
+                                        >
+                                          Regenerate
+                                        </Button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        {row.needs_review ? (
+                                          <StatusPill tone="warning">Needs review</StatusPill>
+                                        ) : (
+                                          <StatusPill tone="neutral">Ready to generate</StatusPill>
+                                        )}
+                                        <Button
+                                          data-generate-lesson
+                                          size="sm"
+                                          className="h-6 rounded-md px-2 text-[11px]"
+                                          disabled={rowDisabled || !row.source_occurrence_id}
+                                          onClick={() => handleGenerateRow(row)}
+                                        >
+                                          Generate
+                                        </Button>
+                                      </>
+                                    )}
+                                    {/* §6: where this row came from, kept in
+                                        secondary disclosure — never an audit
+                                        wall in front of the workflow. */}
+                                    {row.source_provenance && (
+                                      <details className="w-full text-[11px] text-muted-foreground">
+                                        <summary className="cursor-pointer select-none">
+                                          Source &amp; alignment
+                                        </summary>
+                                        <dl className="mt-1 grid gap-x-4 gap-y-0.5 sm:grid-cols-2">
+                                          {Object.entries(row.source_provenance).map(([k, v]) => (
+                                            <div key={k} className="flex gap-1">
+                                              <dt className="capitalize">{k.replace(/_/g, ' ')}:</dt>
+                                              <dd className="truncate">
+                                                {typeof v === 'object' && v !== null
+                                                  ? JSON.stringify(v)
+                                                  : String(v ?? '—')}
+                                              </dd>
+                                            </div>
+                                          ))}
+                                        </dl>
+                                      </details>
+                                    )}
+                                  </div>
                                 )
                               })}
-                              {(!week.periods || week.periods.length === 0) && (
-                                <tr>
-                                  <td colSpan={4} className="py-1.5 italic text-muted-foreground">
-                                    No teaching periods this week
-                                  </td>
-                                </tr>
+                              {week.specialRows.map((row) => (
+                                <div
+                                  key={`special-${row.source_occurrence_id || row.lesson_sequence}`}
+                                  data-week-row
+                                  data-occurrence-id={row.source_occurrence_id}
+                                  className="flex flex-wrap items-center gap-2 bg-amber-50/60 px-3 py-2 text-xs text-amber-900"
+                                >
+                                  <span className="font-semibold">
+                                    {row.special_period_label || 'Special period'}
+                                  </span>
+                                  <span className="text-muted-foreground">
+                                    {row.indicator_description}
+                                  </span>
+                                  <span className="flex-1" />
+                                  <StatusPill tone="caution">Automatic</StatusPill>
+                                </div>
+                              ))}
+                              {week.rows.length === 0 && week.specialRows.length === 0 && (
+                                <p className="px-3 py-2 text-xs italic text-muted-foreground">
+                                  No teaching periods this week
+                                </p>
                               )}
-                            </tbody>
-                          </table>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
-
-                  <p className="border-t pt-3 text-xs text-muted-foreground">
-                    {allocationPreview.total_generated_lessons || 0} lessons will be generated ·{' '}
-                    {allocationPreview.coverage_percentage?.toFixed(1) ?? 0}% curriculum coverage
-                  </p>
                 </div>
               </SurfaceCard>
             )}
 
             {/* D. Per-lesson review data (Section H): source fields are
                 read-only; keywords / Other TLRs / competencies /
-                references are editable and applied on generate. */}
-            {lessonReview.length > 0 && (
+                references are editable and applied on generate. Hidden once a
+                job exists (§15) — the workspace shows the generated lessons. */}
+            {!jobId && lessonReview.length > 0 && (
               <SurfaceCard data-lesson-review className="px-5 py-5 sm:px-6">
                 <div className="flex items-center justify-between gap-2">
                   <div>
@@ -1250,7 +1325,7 @@ export default function GeneratePage() {
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <p className="text-xs font-semibold">
-                            Lesson {row.lesson_sequence + 1} ·{' '}
+                            Lesson {row.lesson_sequence} ·{' '}
                             <span className="font-mono">{row.indicator_code}</span>
                           </p>
                           <p className="text-[11px] text-muted-foreground">
@@ -1563,7 +1638,7 @@ export default function GeneratePage() {
             )}
           </div>
 
-          {/* ACTION RAIL — the one unmistakable place to preview and generate. */}
+          {/* ACTION RAIL — the one unmistakable place to generate. */}
           <div className="space-y-6 lg:col-span-1 lg:sticky lg:top-20 lg:self-start">
             <SurfaceCard
               data-generate-action
@@ -1620,31 +1695,26 @@ export default function GeneratePage() {
                       : 'Quick Generate — one complete draft from your scheme.'}
                   </p>
 
-                  {!allocationPreview && !allocationConfirmed && (
-                    <Banner tone="info" className="mt-3" title="Step 1: preview the allocation">
-                      Preview shows exactly which lessons will be generated — dates, periods and
-                      indicators — before anything is created.
+                  {/* Free Tier allowance (PART C) — the exact line phase17
+                      and teachers parse, plus what the scheme may spend. Lives
+                      here ONCE (§14), not repeated across cards. */}
+                  {quotaText && (
+                    <Banner tone="info" data-quota-banner className="mt-3 text-xs">
+                      <div className="space-y-1">
+                        <p className="font-semibold">{quotaText}</p>
+                        {allocationPreview?.selectable_indicators?.length > 0 && (
+                          <p>
+                            This scheme contains {allocationPreview.selectable_indicators.length} instructional indicator
+                            {allocationPreview.selectable_indicators.length === 1 ? '' : 's'}. You can generate up to{' '}
+                            {quota?.remaining ?? 0} now; Teacher Pro removes this limit.
+                          </p>
+                        )}
+                      </div>
                     </Banner>
                   )}
 
-                  {!allocationConfirmed && (
-                    <Button onClick={handlePreviewAllocation} disabled={previewing} className="mt-3 w-full" size="lg">
-                      {previewing ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Previewing...
-                        </>
-                      ) : (
-                        <>
-                          <Eye className="mr-2 h-4 w-4" />
-                          Preview Allocation
-                        </>
-                      )}
-                    </Button>
-                  )}
-
                   {/* Never a silent disable: state the reason next to the CTA. */}
-                  {allocationPreview && !allocationConfirmed && generateIsBlocked && (
+                  {generateIsBlocked && (
                     <Banner tone="warning" className="mt-3" title="Before you can generate">
                       <ul className="list-disc space-y-1 pl-4">
                         {generateBlockReasons.map((r) => (
@@ -1653,54 +1723,45 @@ export default function GeneratePage() {
                       </ul>
                     </Banner>
                   )}
-                  {allocationPreview && !allocationConfirmed && !generateIsBlocked && (
+                  {!generateIsBlocked && allocationPreview && (
                     <p className="mt-3 text-sm font-medium text-green-700">
-                      Ready to generate {allocationPreview.total_generated_lessons || 0} lesson
-                      plan{(allocationPreview.total_generated_lessons || 0) === 1 ? '' : 's'}.
+                      {pendingRows.length === 0
+                        ? `All ${planCountLabel(totalLessonPlans)} for this scheme are already generated.`
+                        : fullPlanSelection.capped
+                          ? `${fullFitRowCount} of ${pendingRows.length} pending can be generated this month — the rest stay in your scheme for next month.`
+                          : `Ready to generate ${planCountLabel(pendingRows.length)}.`}
                     </p>
                   )}
 
-                  {allocationPreview && !allocationConfirmed && (
-                    <>
-                      <Button
-                        onClick={handleConfirmAndGenerate}
-                        disabled={
-                          generating ||
-                          (allocationPreview.lesson_quota?.enforced &&
-                            (allocationPreview.selectable_indicators?.length || 0) > 0 &&
-                            selectedCodes.length === 0)
-                        }
-                        className="mt-3 w-full bg-gradient-to-r from-[#102A43] to-[#04769B] text-white hover:from-[#0d2136] hover:to-[#04698a]"
-                        size="lg"
-                      >
-                        {generating ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Generating...
-                          </>
-                        ) : (
-                          <>
-                            <Play className="mr-2 h-4 w-4" />
-                            Confirm &amp; Generate
-                          </>
-                        )}
-                      </Button>
-                      {(allocationPreview.allocation_conflicts?.length > 0 ||
-                        allocationPreview.indicators_unallocated > 0) && (
-                        <p className="mt-2 text-center text-xs text-yellow-700">
-                          Every curriculum occurrence stays in its own source
-                          week — none are dropped, merged or moved to a later week.
-                        </p>
-                      )}
-                    </>
-                  )}
-                  {!allocationPreview && !allocationConfirmed && (
-                    <p className="mt-3 text-center text-sm text-muted-foreground">
-                      Preview allocation before generating
+                  <Button
+                    onClick={handleGenerateAll}
+                    disabled={generating || generateIsBlocked || !allocationPreview}
+                    className="mt-3 w-full bg-gradient-to-r from-[#102A43] to-[#04769B] text-white hover:from-[#0d2136] hover:to-[#04698a]"
+                    size="lg"
+                  >
+                    {generating ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Play className="mr-2 h-4 w-4" />
+                        Generate lesson plans
+                      </>
+                    )}
+                  </Button>
+                  {(allocationPreview?.allocation_conflicts?.length > 0 ||
+                    allocationPreview?.indicators_unallocated > 0) && (
+                    <p className="mt-2 text-center text-xs text-yellow-700">
+                      Every curriculum occurrence stays in its own source
+                      week — none are dropped, merged or moved to a later week.
                     </p>
                   )}
                   {generating && genProgress && (
-                    <p className="mt-3 text-center text-sm text-muted-foreground">{genProgress}</p>
+                    <p className="mt-3 text-center text-sm text-muted-foreground" role="status" aria-live="polite">
+                      {genProgress}
+                    </p>
                   )}
                 </>
               ) : (
@@ -1744,10 +1805,10 @@ export default function GeneratePage() {
                   </Button>
                   <Button
                     onClick={() => {
+                      // Back to setup: config + review return (§15); the
+                      // auto-preview effect rebuilds the weeks for editing.
                       setJobId(null); setCoverage(null); setGenProgress('');
-                      setAllocationPreview(null); setAllocationConfirmed(false);
-                      setSelectedCodes([]);
-                      setConfig(prev => ({ ...prev, selected_indicator_codes: [] }))
+                      setAllocationPreview(null);
                     }}
                     className="w-full"
                     variant="outline"

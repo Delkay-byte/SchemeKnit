@@ -97,10 +97,11 @@ async function check(fn, label) {
   await page.goto(BASE + `/generate/${schemeId}`, { waitUntil: 'domcontentloaded' });
   await page.waitForLoadState('networkidle');
   await page.waitForTimeout(1000);
-  const previewBtn = page.getByRole('button', { name: /Preview Allocation/ });
-  if (await previewBtn.count() > 0) {
-    await previewBtn.click();
-    await page.getByRole('heading', { name: /Allocation Preview/i }).waitFor({ timeout: 30000 }).catch(() => {});
+  // Priority 3: the week surface loads itself — no Preview button to click.
+  const weekSurface = page.locator('[data-allocation-weeks]');
+  if (await weekSurface.count() > 0) {
+    await weekSurface.waitFor({ timeout: 30000 }).catch(() => {});
+    await page.getByRole('heading', { name: /Lesson plans by week/i }).waitFor({ timeout: 30000 }).catch(() => {});
     await page.waitForTimeout(2000);
   }
   await check(async () => await page.getByText(/Scheduled|Needs review/).count() >= 0, 'allocation preview uses simple statuses');
