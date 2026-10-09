@@ -1,35 +1,41 @@
-# PILOT VALIDATION REPORT — Final Smoke Retry
+# PILOT VALIDATION REPORT — Final Production Smoke
 
-**Date:** 2026-10-08  
-**Source (HEAD==origin/main):** 9d7e401  
-**Intended baseline:** 50bd887 (diff since: docs-only)  
-**P4 commit:** ae84f19  
-**Production deployed commit:** UNKNOWN  
-**Status:** NO-GO (no runtime production evidence)
+**Date:** 2026-10-09  
+**Source (HEAD==origin/main):** 2121a2c (app code identical to P4 commit ae84f19)  
+**Production deployed commit:** UNKNOWN (behaviour markers provenance → ae84f19-era)  
+**Account:** dedicated synthetic teacher `smoke-eec8aa17@example.com` (created via normal registration flow, earlier same session; token never recorded)  
+**Script/results:** `prod_smoke.py` + `smoke_results.json` (temp, not committed)
 
-## 1) Source/deployment equivalence
-- Commits after 50bd887 are documentation-only (PILOT_VALIDATION_REPORT.md, pilot/production-version.md). Application code unchanged vs 50bd887.
-- Redeployment reported complete; deployed commit not exposed publicly. API healthy (v1.0.5). Cannot confirm build equivalence from public metadata.
+## 1) Runtime journey (API-level, AI OFF) — ALL PASSED
+health 200 (v1.0.5, 1.24 s) → login 200 → upload 200 (2.29 s; 15 weeks, 20 codes) → detection `single` Science/Basic 9 → weeks 200 → Autopilot `ready` (22 pending, selected 5 quota-capped, 17 quota_skipped, 0 blockers) → generate 200 (3.6 s, job `b8dd26a9-…`, `quality` returned) → persistence (structured lesson) → reload 200 same topic → DOCX 200 valid ZIP 38 729 B (all content checks) → PDF 200 valid 2 pages 5 381 B (all content checks). Frontend 200.
 
-## 2) Registration
-- Public `/signup` reachable (200). First API self-registration attempt returned 500 — diagnosed 2026-10-09: **transient Render cold-start blip** (valid payload; local repro 200; single retry after warm-up returned **200**, dedicated synthetic test account created via normal flow). Registration is NOT defective; no code fix required. See docs/pilot/production-version.md.
+## 2) P4 deterministic quality gate — DEMONSTRATED IN PRODUCTION
+- Metrics block on every accepted run (`first_pass_rate`, `teacher_ready_rate`, `mean_score 71.0`, repair/rebuild counters) — keys exist only in ae84f19; score identical to local deterministic run.
+- **Hard rejection executed:** `B9.1.1.2.1` → 500 with exact gate text `… Rejections: {'generic_objective': 1}.`; deterministic repeat; **nothing persisted**, **0 quota consumed** (message + lesson list verified).
+- Accept-only persistence: 6 accepted lessons stored; rejected indicator absent.
+- Marker PASS: current P2 verb-led objective; `has_stale_discuss_objective=false`; `topic_is_strand_concat=false`.
 
-## 3) Deterministic marker
-- Not yet executed. A dedicated synthetic test account now exists (registration diagnosed working), so marker execution is no longer auth-blocked; deferred to the smoke session.
+## 3) Quota — FAILED (RED criterion)
+`used=0/remaining=5` forever (quota endpoint, Autopilot, generate responses, no-store) after **6 accepted distinct lessons against limit 5**; enforcement never bound. Local HEAD identical flow → `used=1` (repo test asserts same); origin/main code cannot produce the observed state with the observed data → deployed quota subsystem or production DB differs from origin/main. Owner-side: Render logs `generation_completed quota_used=`, `usage_periods`/`usage_units` rows, deployed SHA == 2121a2c. Detail: docs/PRODUCTION_READINESS.md §5.
 
-## 4) Production P4 execution / journey
-- Not run (this session was registration-500 diagnosis only). Not yet verified: upload/extraction/detection, Autopilot AI-OFF, generate, P4 gate execution evidence, persistence/reload, DOCX/PDF, quota.
+## 4) Registration
+Works — dedicated account created via `POST /api/auth/register/individual` (200 on warm retry; the earlier 500 was a transient Render cold-start blip, local repro 200). See docs/pilot/production-version.md.
 
-## 5) Answers to final questions
-1. upload→downloadable minimal intervention: AMBER (local validation only)
-2. deterministic lessons usable without Zeli: GREEN (P4 floors verified locally)
-3. production behaves like current main: RED (deployed commit unconfirmed; no runtime evidence)
-4. ready for broader teacher pilot: AMBER/NO-GO
+## 5) Not tested / partial (honest disclosure)
+- Rebuild path (≤2): NOT TESTED (never triggered, `mean_rebuilds=0`).
+- Mixed accept+reject single run: PARTIAL (single-code runs; total-rejection exercised twice).
+- P1 4-indicators/2-periods edge: PARTIAL (not exercised in production; local coverage only).
+- WAPEF scheme flow: NOT TESTED (smoke scheme non-WAPEF; reason: no WAPEF fixture uploaded this stage).
+- Browser UI interaction: PARTIAL (frontend 200; journey verified via API only).
+- Deployed commit: UNKNOWN — provenance only behavioural (P4 gate strings/fields).
 
-**"Was the intended implementation verified in the actual production application, and was P4 execution demonstrated there?"**  
-**NO.** Not yet verified in production; P4 execution not demonstrated (journey not yet run). Local evidence only (58 gate tests pass).
+## 6) Answers to final questions
+1. upload→downloadable minimal intervention: **GREEN** (DOCX+PDF valid with content in production).
+2. deterministic lessons usable without Zeli: **GREEN** (production lessons structured, marker PASS, gate enforced).
+3. production behaves like current main: **AMBER** (generation/gate behaviour matches ae84f19 exactly; quota subsystem does NOT match — defect, deployed SHA unverifiable).
+4. ready for broader teacher pilot: **NO-GO** (quota cap unenforceable = RED; fix + re-smoke first).
 
-## 6) Remaining blocker
-Auth blocker resolved (dedicated test account available). Outstanding: execute the end-to-end smoke (marker, Autopilot AI-OFF generate, P4 execution evidence, persistence/reload, DOCX/PDF validity). If deploy metadata unavailable, marker is required.
+**"Has P4's deterministic quality gate been demonstrated in the actual production application, and does the complete AI-OFF upload-to-export journey work?"**  
+**YES and YES** — the gate's metrics, hard-rejection path (with `generic_objective`), accept-only persistence and deterministic marker were all observed in production, and upload→generate→persist→reload→DOCX/PDF completed end-to-end. Caveat: the Free Tier quota accounting is broken in production (6 accepted on a 5/month limit).
 
-**GO/NO-GO:** **NO-GO** (insufficient production runtime evidence). No code changes made.
+**Overall decision: RED / NO-GO** — GREEN for journey + P4; RED on quota accounting (a RED-class criterion). No code changes made this stage.
