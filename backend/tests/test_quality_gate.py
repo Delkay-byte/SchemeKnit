@@ -677,6 +677,8 @@ class TestEndpointGate:
         import src.engines.lesson_quality_gate as gate
         from tests.conftest import make_user
         from src.service import data_service
+        from src.database import UsageUnitDB
+        from src.usage_quota import current_period_key, get_units_used
 
         def rejecting_evaluate(lp, entry, **kwargs):
             return Outcome(accepted=False, hard=["missing_assessment"])
@@ -694,5 +696,55 @@ class TestEndpointGate:
             )
             assert response.status_code == 500
             assert "quality gate rejected" in response.json()["detail"]
-        rows = data_service.get_lesson_plans_for_scheme(db, scheme.id, user.id)
-        assert rows == []
+            # Incident invariants B + H: a failed run releases every reserved
+            # unit — no lesson rows, no ledger rows, quota endpoint at zero.
+            rows = data_service.get_lesson_plans_for_scheme(db, scheme.id, user.id)
+            assert rows == []
+            assert get_units_used(db, user.id, current_period_key()) == 0
+            assert db.query(UsageUnitDB).filter_by(user_id=user.id).count() == 0
+            q = client.get("/api/generation/quota")
+            assert q.status_code == 200 and q.json()["used"] == 0
+
+    def test_partial_rejection_charges_accepted_only_and_releases_rejected(
+            self, db, monkeypatch):
+        """Invariants B + I: one accepted lesson charges one unit; the
+        rejected lesson is never persisted and its reserved unit is released."""
+        import src.engines.lesson_quality_gate as gate
+        from tests.conftest import make_user
+        from src.service import data_service
+        from src.database import UsageUnitDB
+        from src.usage_quota import current_period_key, get_units_used
+
+        real_evaluate = gate.evaluate
+
+        def partially_rejecting(lp, entry, **kwargs):
+            if "B7.1.1.2.1" in (lp.indicator_codes or []):
+                return Outcome(accepted=False, hard=["generic_objective"])
+            return real_evaluate(lp, entry, **kwargs)
+
+        monkeypatch.setattr(gate, "evaluate", partially_rejecting)
+
+        user = make_user(db)
+        scheme = _db_scheme(db, user)
+        with TestClient(_app(db, user)) as client:
+            response = client.post(
+                f"/api/generation/{scheme.id}/generate",
+                json=_gen_config(scheme).model_dump(mode="json"),
+            )
+            assert response.status_code == 200, response.text
+            body = response.json()
+            assert body["status"] == "completed"
+            assert body["quality"]["accepted"] == 1
+            assert body["quality"]["rejected"] == 1
+
+            rows = data_service.get_lesson_plans_for_scheme(db, scheme.id, user.id)
+            assert len(rows) == 1, "only the accepted lesson persisted"
+            assert rows[0].indicator_codes == ["B7.1.1.1.1"]
+
+            # Exactly one unit: the accepted lesson charged, the rejected
+            # one's reservation was released.
+            assert get_units_used(db, user.id, current_period_key()) == 1
+            assert db.query(UsageUnitDB).filter_by(user_id=user.id).count() == 1
+            assert body["quota"]["used"] == 1
+            q = client.get("/api/generation/quota")
+            assert q.json()["used"] == 1

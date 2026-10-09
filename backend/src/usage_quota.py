@@ -61,17 +61,30 @@ def _dialect(db: Session) -> str:
     return bind.dialect.name if bind is not None else "sqlite"
 
 
-def _insert_ignore(db: Session, model, values: dict):
+def _insert_ignore(db: Session, model, values: dict) -> bool:
     """Dialect-aware ``INSERT ... ON CONFLICT DO NOTHING``.
 
-    Returns the executed result; ``rowcount == 1`` means a row was inserted,
-    ``0`` means the unique key already existed.
+    Returns ``True`` when a row was actually inserted and ``False`` when the
+    unique key already existed.
+
+    Inserted-vs-conflict is detected with ``RETURNING`` — never with
+    ``rowcount``. On the production stack (PostgreSQL + psycopg3)
+    SQLAlchemy Core reports ``rowcount == -1`` for ``ON CONFLICT DO NOTHING``
+    regardless of whether a row was inserted, so the old
+    ``rowcount == 1`` check misread every insert as a conflict and the
+    aggregate counter never incremented (production quota incident, Oct 2026).
+    ``RETURNING`` yields the inserted row only when one was written, which is
+    correct on psycopg3, psycopg2 and SQLite alike.
     """
+    table = model.__table__
     if _dialect(db) == "postgresql":
-        stmt = _pg_insert(model.__table__).values(**values).on_conflict_do_nothing()
+        stmt = _pg_insert(table).values(**values).on_conflict_do_nothing()
     else:
-        stmt = _sqlite_insert(model.__table__).values(**values).on_conflict_do_nothing()
-    return db.execute(stmt)
+        stmt = _sqlite_insert(table).values(**values).on_conflict_do_nothing()
+    result = db.execute(stmt.returning(table.c.id))
+    if result.returns_rows:
+        return result.first() is not None
+    return (result.rowcount or 0) == 1
 
 
 def _unit_key(scheme_id: str, indicator_code: str) -> str:
@@ -164,7 +177,7 @@ def reserve_lesson_units(
 
         new_keys: List[str] = []
         for k in keys:
-            res = _insert_ignore(db, UsageUnitDB, {
+            inserted = _insert_ignore(db, UsageUnitDB, {
                 "id": generate_id(),
                 "user_id": user_id,
                 "period_type": PERIOD_TYPE_CALENDAR_MONTH,
@@ -174,7 +187,7 @@ def reserve_lesson_units(
                 "scheme_id": scheme_id,
                 "created_at": datetime.utcnow(),
             })
-            if (res.rowcount or 0) == 1:
+            if inserted:
                 new_keys.append(k)
 
         new_count = len(new_keys)
