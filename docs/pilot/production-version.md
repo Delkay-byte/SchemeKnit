@@ -1,9 +1,9 @@
-# Production Version Check (Registration 500 Diagnosed)
+# Production Version Check (Registration Diagnosed + Runtime Verified)
 
 Date: 2026-10-09
-Source (HEAD==origin/main): 97a028f (app code unchanged since 50bd887 — docs-only diffs)
-Intended deployment: 50bd887 / ae84f19 (P4)
-Deployed commit: UNKNOWN (no public deploy metadata). API healthy v1.0.5.
+Source (HEAD==origin/main): 2121a2c (app code byte-identical to P4 commit ae84f19 — `git diff --stat ae84f19..2121a2c` docs-only)
+Intended deployment: ae84f19+ (P4)
+Deployed commit: UNKNOWN (no public deploy metadata). API healthy v1.0.5; frontend 200.
 
 ## Registration 500 diagnosis
 - First attempt: `POST /api/auth/register/individual` → 500 `{"error":true,"detail":"Internal server error"}` immediately after a cold start (frontend GET had timed out seconds earlier).
@@ -13,6 +13,10 @@ Deployed commit: UNKNOWN (no public deploy metadata). API healthy v1.0.5.
 - Root cause: **transient environment/infrastructure (Render cold-start auth blip)** — same documented precedent (DETERMINISTIC_LESSON_HARDENING_REPORT.md: "one transient 500 on register during a cold start, resolved on retry"). Confidence: high that registration is not defective; medium-high on exact mechanism (Render logs unavailable).
 - Classification: environment/configuration (transient). NOT application defect, NOT invalid payload, NOT migration issue.
 
-Marker expectation (current impl): topic/objective style per docs/benchmark/after.json (deterministic P2 form). Runtime marker comparison not yet executed.
+## Runtime verification (same session, final smoke)
+- Full journey PASSED (upload → detection → Autopilot → AI-OFF generate → persist → reload → DOCX/PDF): detail in docs/PRODUCTION_READINESS.md §3.
+- **P4 execution EVIDENCED**: `quality` metrics on accepted runs; hard-rejection path fired (`generic_objective`, exact gate message, nothing persisted, 0 quota); accept-only persistence; deterministic marker PASS (no stale Discuss objective, no strand-concat topic).
+- Marker expectation confirmed at runtime: topic/objective follow the current deterministic P2 form (e.g. objective "Learners can Identify by name binary chemical compounds and discuss their use").
+- **Quota DEFECT found**: counter stuck at `used=0/remaining=5` across 6 accepted lessons (limit 5); enforcement never bound. Not reproducible from this source locally (local HEAD → `used=1`). Owner-side verification needed (Render logs `generation_completed quota_used=`, usage tables, deployed SHA). Detail: docs/PRODUCTION_READINESS.md §5.
 
-Conclusion: Registration NOT defective — no code fix required. Production build equivalence still unconfirmed; P4 execution in production still NOT EVIDENCED (end-to-end journey pending — out of scope for this diagnosis session).
+Conclusion: Registration NOT defective (no code fix). Build-equivalence is now behaviourally established for the generation/gate subsystem (P4 markers match ae84f19 exactly); deployed SHA still unexposed. P4 IS evidenced in production; the Free Tier quota accounting is NOT correct → overall RED/NO-GO until the quota defect is resolved owner-side.
