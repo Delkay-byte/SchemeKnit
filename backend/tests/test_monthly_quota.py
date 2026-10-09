@@ -120,6 +120,49 @@ class TestMonthlyQuotaModel:
         assert r.allowed and r.unlimited
         assert get_units_used(db, u.id, "2026-09") == 0
 
+    def test_insert_ignore_reports_insert_then_duplicate(self, db):
+        """Contract regression for the Oct 2026 quota incident.
+
+        ``_insert_ignore`` must report ``True`` for the row it wrote and
+        ``False`` for a unique-key conflict. On PostgreSQL + psycopg3 the old
+        ``rowcount == 1`` check saw ``rowcount == -1`` for every
+        ``INSERT ... ON CONFLICT DO NOTHING``, misread all inserts as
+        conflicts, and the aggregate counter never incremented — production
+        accepted 6 distinct lessons against a limit of 5 while reading
+        ``used=0``.
+        """
+        from src.database import UsageUnitDB, generate_id
+        from src.usage_quota import (
+            PERIOD_TYPE_CALENDAR_MONTH, UNIT_KIND_LESSON_PLAN, _insert_ignore,
+        )
+        u = _free_teacher(db, email="insertflag@t.test")
+
+        def values():
+            return {
+                "id": generate_id(), "user_id": u.id,
+                "period_type": PERIOD_TYPE_CALENDAR_MONTH,
+                "period_key": "2026-10", "unit_kind": UNIT_KIND_LESSON_PLAN,
+                "unit_key": "scheme-s:X1", "scheme_id": "scheme-s",
+                "created_at": datetime.utcnow(),
+            }
+
+        assert _insert_ignore(db, UsageUnitDB, values()) is True
+        assert _insert_ignore(db, UsageUnitDB, values()) is False
+        db.commit()
+        rows = db.query(UsageUnitDB).filter_by(user_id=u.id, unit_key="scheme-s:X1")
+        assert rows.count() == 1, "conflict must not create a second row"
+
+    def test_quota_is_isolated_between_users(self, db):
+        a = _free_teacher(db, email="scope_a@t.test")
+        b = _free_teacher(db, email="scope_b@t.test")
+        r = reserve_lesson_units(db, a.id, "s", ["A"], 5, period_key="2026-10")
+        assert r.consumed == 1
+        # B's ledger is untouched: same period, same scheme, different user.
+        assert get_units_used(db, b.id, "2026-10") == 0
+        rb = reserve_lesson_units(db, b.id, "s", ["A"], 5, period_key="2026-10")
+        assert rb.allowed and rb.consumed == 1 and rb.remaining == 4
+        assert get_units_used(db, a.id, "2026-10") == 1
+
 
 class TestConcurrentQuota:
     """Concurrent reservations must never oversubscribe the allowance."""
