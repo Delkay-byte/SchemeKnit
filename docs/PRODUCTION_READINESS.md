@@ -1,10 +1,10 @@
 # PRODUCTION READINESS — Final Smoke Verification (P4 Runtime Evidence)
 
 **Date:** 2026-10-09  
-**Source commit:** 2121a2c (HEAD == origin/main)  
+**Source commit:** 2121a2c → fix `70738f8` (quota incident — see §5)  
 **App code:** identical to ae84f19 (P4) — `git diff --stat ae84f19..2121a2c` is docs-only (4 doc files)  
 **Production commit (actual):** UNKNOWN (no public deploy/build marker; behaviour markers used)  
-**Status:** JOURNEY GREEN + P4 EVIDENCED — **RED / NO-GO (quota accounting defect)**
+**Status:** JOURNEY GREEN + P4 EVIDENCED — **RED / NO-GO until fix `70738f8` is deployed and verified** (quota accounting defect root-caused; full report: docs/QUOTA_ACCOUNTING_INCIDENT.md)
 
 ## 1) Source baseline
 - HEAD == origin/main == 2121a2c. P4 (quality gate A–X, repair, rebuild ≤2, rubric, WAPEF saved-selection-only, accept-scoped replacement, quota 0/1, calibration) fully included.
@@ -40,12 +40,13 @@ Scheme `backend/real_documents/BASIC 9 SCIENCE SCHEME OF LEARNING.docx`, product
 3. **Nothing persisted on rejection:** lesson list after the rejected run excluded `B9.1.1.2.1` (verified); accept-only persistence — 6 accepted lessons persisted, rejected code absent.
 4. **Deterministic marker PASS:** objective `Learners can Identify by name binary chemical compounds and discuss their use` (verb-led P2 form); `has_stale_discuss_objective=false`, `topic_is_strand_concat=false` (no pre-P2 "Discuss…" / strand-concat behaviour).
 
-## 5) Quota defect — P1, RED criterion (criterion I — FAILED)
-- **Observed:** `used=0, remaining=5, limit=5` on every read (quota endpoint, Autopilot quota, generate responses — all `cache-control: no-store`) after **6 accepted distinct lessons on a limit of 5**. Autopilot kept selecting 5; enforcement never bound (`6 > 5` still accepted). Free Tier cap is unenforceable in production.
-- **Local HEAD, identical flow:** `used=1` after the first generation (also asserted by repo test `tests/test_generate_workflow_priority3.py:238`). Static analysis of origin/main: reserve → guarded `units_used + n <= limit` UPDATE → commit; produced keys `f"{scheme}:{code}"` match reserved keys → release must not fire → counter must increment. The observed production state is **impossible under this source with the observed data**.
-- **Inference:** the deployed build's quota subsystem (or the production DB contents) differs from origin/main; deployed SHA unverifiable, so the discrepancy cannot be closed from public metadata.
-- **Owner-side verification (required):** (1) Render logs — `generation_completed` events carry `quota_used=N`; a logged `0` after accepted runs proves server-side read of 0 (not response shaping), (2) DB rows `usage_periods` / `usage_units` for the test user (email in pilot/production-version.md; user `c11bde4c-…`), (3) confirm deployed commit == `2121a2c`.
-- No source changes made this stage (verification-only); no quota data tampered.
+## 5) Quota defect — P1, RED criterion (criterion I — FAILED; root-caused, fixed pending deploy)
+- **Observed:** `used=0, remaining=5, limit=5` on every read (quota endpoint, Autopilot quota, generate responses) after **6 accepted distinct lessons on a limit of 5**. Autopilot kept selecting 5; enforcement never bound (`6 > 5` still accepted). Free Tier cap is unenforceable in production.
+- **Root cause (evidenced, reproduced locally):** `usage_quota._insert_ignore` decided "inserted" via `rowcount == 1`, but on the production stack (PostgreSQL + psycopg 3.3.5 + SQLAlchemy 2.0.35) the Core `INSERT … ON CONFLICT DO NOTHING` path reports **`rowcount == -1`** for both insert and conflict. Every reservation was misread as `already_counted` → the guarded `units_used + n <= limit` UPDATE never ran → counter stuck at 0 and the limit guard never executed. Reproduced: same reserve call on PG returns `consumed=0, used=0`; quota suite **9/12 failed on PG pre-fix** (SQLite reports a truthful rowcount — hence local green). Direct probe: `rowcount=-1`. Full analysis: docs/QUOTA_ACCOUNTING_INCIDENT.md (§7–§8).
+- **Fix (commit `70738f8`):** `_insert_ignore` detects insertion via `RETURNING` (driver-independent) and returns a bool; no policy/ledger/P4/P1 change. Regression: model contract, endpoint journey (5-permit / 6th-403-no-side-effects / read-after-write / Autopilot exhaustion / per-user scope / cross-week idempotency), gate partial+total rejection zero-charge, and a named PostgreSQL driver gate (`tests/test_postgres_quota_driver.py`, incl. concurrency).
+- **Verification:** full backend suite `2374 passed, 15 skipped, 0 failed` (SQLite); targeted PostgreSQL runs all green (monthly quota, PG driver gate, endpoint journey, quality gate, priority3 workflow, autopilot, AI ledger). Frontend unaffected.
+- **Owner-side still required (§4 of incident doc):** Render `generation_completed quota_used=` logs, read-only `usage_periods`/`usage_units` rows for user `c11bde4c-…`, deployed SHA; deployment of `70738f8`; recommended counter backfill SQL (exact steps in docs/QUOTA_ACCOUNTING_INCIDENT.md §12).
+- Prior smoke stage made no source changes; no quota data tampered.
 
 ## 6) Not tested / partial (production, reported honestly)
 - **Bounded rebuild (≤2):** NOT TRIGGERED — all runs `mean_rebuilds=0` → NOT TESTED.
@@ -55,4 +56,4 @@ Scheme `backend/real_documents/BASIC 9 SCIENCE SCHEME OF LEARNING.docx`, product
 - **Browser UI journey:** not executed; frontend serves 200, journey verified at API level → PARTIAL.
 
 ## 7) GO/NO-GO
-**NO-GO / RED.** The complete AI-OFF upload→export journey works and P4 is demonstrated end-to-end in production (§3, §4) — but quota accounting/enforcement is incorrect (§5), which is a RED criterion by itself: 6 lessons accepted against a monthly limit of 5 with the counter permanently at 0. Remediation is owner-side (deploy/DB verification + quota fix), then re-run this smoke.
+**NO-GO / RED — until fix `70738f8` is deployed to production and the counter is observed incrementing (or the backfilled `used=6` is observed).** The complete AI-OFF upload→export journey works and P4 is demonstrated end-to-end in production (§3, §4); the quota defect (§5) is now root-caused in source and fixed locally with regression coverage, but production still runs the broken build. Owner-side steps: deploy `70738f8`, verify per docs/QUOTA_ACCOUNTING_INCIDENT.md §12, then re-run this smoke's quota checks (read-after-write + sixth-reject). Note: a full re-smoke of journey/P4 is NOT required — those criteria passed and the fix touches only quota accounting.
