@@ -214,7 +214,8 @@ TEACHFLOW_TEST_DATABASE_URL="postgresql+psycopg://…" pytest tests/ -q
 
 ## 12) Deployment and owner-side remediation (exact steps)
 
-No Render access from this side — deployment is owner-side:
+Deployment is an owner decision (read-only Render API status: §13c) — no
+deploy has been triggered from this side:
 
 1. **Deploy** commit `70738f8` (Render auto-deploy on push, or manual
    deploy). Confirm the dashboard SHA contains `70738f8`.
@@ -275,7 +276,94 @@ No Render access from this side — deployment is owner-side:
 - `docs/pilot/production-version.md` — same correction.
 - This file: `docs/QUOTA_ACCOUNTING_INCIDENT.md`.
 
+## 13b) Independent re-verification (2026-10-15)
+
+Source-level and local-stack re-audit of the fix, outside the incident
+session:
+
+- **Source inspection** (`backend/src/usage_quota.py` @ `3ef1a41`):
+  `_insert_ignore` detects insertion via `RETURNING` (driver-independent,
+  `_pg_insert`/`_sqlite_insert` dialect split; `returns_rows` + `first()`
+  guard), reservation counts only newly inserted keys, the guarded
+  `units_used + n <= limit` UPDATE enforces the allowance atomically
+  (`rowcount != 1` → rollback + `quota_exceeded`), release deletes per-unit
+  rows and decrements under a non-negative guard. Failed and P4-rejected
+  candidates consume nothing (release only fires when `consumed > 0`);
+  a reservation whose unit row already exists charges 0
+  (`already_counted`, `consumed == 0`).
+  `ai_quota.py`'s ledger path (guarded-UPDATE rowcount) is untouched.
+- **Local production-stack rerun** (fresh docker `postgres:16-alpine`,
+  SQLAlchemy 2.0.35 + psycopg 3.3.5 = production driver versions):
+  `tests/test_postgres_quota_driver.py` **4 passed** (incl. threading
+  concurrency), `tests/test_monthly_quota.py` **12 passed**,
+  `tests/test_quota_enforcement_journey.py` **6 passed**
+  (5-permit/6th-refuse, read-after-write, Autopilot exhaustion,
+  per-user scope, cross-week distinct codes, zero-charge release);
+  `tests/test_ai_production.py` + `test_quality_gate.py` +
+  `test_generation_quality_v3.py` **101 passed** on the same stack.
+- **Production probe (read-only):** `GET /api/health` → 200
+  `{"status":"healthy","version":"1.0.5"}` — but `APP_VERSION` is a static
+  config string (`backend/src/config.py`), so this does NOT identify the
+  deployed commit. No Render dashboard/log/DB access; the smoke account's
+  token was never recorded, so the §12.3 safe functional check cannot be
+  executed from this side. No production lessons generated (per instruction).
+- **Conclusion:** fix verified in source and on the production driver stack
+  locally; **incident remains OPEN in production** — deployed build still
+  unconfirmed as containing `70738f8`. Owner-side steps step 1–5 unchanged;
+  status remains RED/NO-GO until §12 is executed and verified.
+
+## 13c) Production deployment status — established 2026-10-15 (Render API, read-only)
+
+A Render API key was available in the engineering session, so the deployed
+commit was established directly instead of left "unknown". Only read-only
+API calls were made: no deploy triggered, no production writes, no lessons
+generated.
+
+- **Service:** `schemeknit-api` = `srv-damsbb1ntn7c73d7eg10`
+  (`https://schemeknit-api.onrender.com`, repo `Delkay-byte/SchemeKnit`,
+  branch `main`, `autoDeploy=yes`).
+- **Live deploy:** `dep-db42gvp42hec73fhbu0g` — commit
+  **`50bd8872e2fe73c5e4b459b37ab94bf233434e88`** ("docs: deployment
+  activation …"), created `2026-10-08T23:34:23Z`, live since
+  `2026-10-08T23:36:19Z`.
+- **Verdict:** `50bd887` **predates the quota fix** `70738f8`
+  (`2026-10-09T01:44:57Z`) and the incident report `3ef1a41`
+  (`2026-10-09T01:48:14Z`). The deployed build does **not** contain the
+  fix. It does contain `ae84f19` (P4 gate) and `3ac4480`; it predates
+  `9d7e401`, `97a028f`, `2121a2c`, `51b7987`, `70738f8`, `3ef1a41` and the
+  later Phase 1/Phase 2 engineering commits.
+- **Auto-deploy did not fire:** the deploys list contains **no deploy
+  created after `2026-10-08T23:36`**, yet GitHub reports the repo's last
+  push at `2026-10-09T01:48:17Z` (the quota-fix push). The fix push
+  produced no Render deploy at all — auto-deploy cannot be relied on here;
+  a **manual deploy is required**.
+- **No Render-hosted database:** the API's database listing is empty, so
+  the production database is external to Render and its `usage_periods` /
+  `usage_units` rows are not readable from this side. §12.4 (read-only
+  SQL) and §12.5 (backfill) remain owner-side.
+- **Read-only probe:** `GET https://schemeknit-api.onrender.com/api/health`
+  → `200 {"status":"healthy","service":"SchemeKnit","version":"1.0.5"}`
+  (after a cold start). `APP_VERSION` is a static config string, so this
+  confirms liveness only — not the commit.
+- **Historical evidence preserved:** the six accepted lessons with
+  `used=0` for `c11bde4c-a9bb-4f41-b96a-921570cf856e` are untouched; no
+  production lesson was generated and no row was edited.
+
+**Conclusion — deployed build is stale:** status stays **RED / NO-GO**;
+the incident is **not closed**. Owner-side action, in order:
+
+1. Push current `main` (contains `70738f8` and everything since).
+2. Trigger a **manual** deploy of `schemeknit-api` (dashboard "Manual
+   Deploy", or `POST /v1/services/srv-damsbb1ntn7c73d7eg10/deploys`);
+   do not wait for auto-deploy — it demonstrably did not fire.
+3. Confirm the dashboard deploy SHA contains `70738f8`.
+4. Run the §12.3 safe functional check (free regeneration of an existing
+   occurrence → `used` unchanged).
+5. Run the §12.4 read-only SQL, then the §12.5 backfill if the owner
+   elects exact counter reconciliation.
+
 ## 14) Residual risks / open items
+
 
 - Deployment + owner verification (§12) outstanding — RED/NO-GO stands until
   the fixed build is deployed AND the counter is observed incrementing
