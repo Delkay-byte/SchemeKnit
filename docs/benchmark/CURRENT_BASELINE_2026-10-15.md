@@ -82,3 +82,43 @@ Current state: strong canonical fidelity (74/75) with REA prose quality
 (61/75) dominated by activity detail, DoK levelling and formatting residue —
 exactly the backlog items in Phase 3 (DoK + analytic rubric) and Phase 4
 (differentiation depth, resource realism).
+
+## 4. Benchmark integrity reconciliation (2026-10-15 execution pass)
+
+Question raised: the P2.1-era calibration recorded **31/40 expanded** and
+**12/19 messy**, while this report records **40/40** and **19/19**. Both are
+correct — they measure the same corpora under the same harness at two code
+states. Evidence:
+
+- **Same fixtures:** the indicator-code sequence in
+  `hardening_after.json` (pre-correction) and
+  `current_hardening_2026-10-15.json` (post-correction) is identical for
+  both corpora (verified pairwise, 40/40 and 19/19).
+- **Same harness:** `git diff ae84f19..HEAD -- benchmark_hardening.py
+  benchmark_deterministic_lessons.py gate_metrics.py` is **empty** — the
+  scoring harness is byte-identical across both runs.
+- **Same readiness definition:** `lesson_rubric.teacher_ready` is unchanged
+  (no hard failures + floors: timing 5, objective_specificity ≥ 4, topic ≥ 3,
+  phase usefulness ≥ 3, assessment ≥ 3, resources ≥ 3).
+- **Only rubric delta = the Phase 1 correction:** the sole scoring-relevant
+  diff between `ae84f19` and `c9412b0` is `lesson_rubric.py` (±30/29 lines,
+  verb-inventory rewiring). No threshold, floor or fixture was touched.
+- **Per-lesson attribution (expanded):** the 9 pre-correction not-ready
+  lessons were 7 × `generic_objective` hard failure + **2 with zero hard
+  failures** (`B6.1.1.1.1`, `B6.1.3.3.1`) that failed the
+  `objective_specificity ≥ 4` floor (scored 2). All 9 had verb-led official
+  indicators misread by the stale substring inventory. Post-correction every
+  one scores `objective_specificity = 5` and clears both the hard failure
+  and the floor. Messy corpus: all 7 not-ready lessons were
+  `generic_objective` with `objective_specificity = 2`, same mechanism.
+- **Honest per-criterion movement:** not every criterion moved up — e.g.
+  `B6.1.1.1.1` subject-pedagogy 5→2 and Ghana-context 5→3 post-correction
+  while clearing readiness. The deltas reflect regenerated lesson text under
+  the corrected objective builder, not threshold tuning.
+
+**Conclusion:** the jump 31/40 → 40/40 and 12/19 → 19/19 is fully
+attributable to the documented Phase 1 false-positive correction, executed
+under identical fixtures, harness and thresholds. The pre-correction
+numbers remain the valid baseline for the pre-correction code state; the
+current numbers are the valid baseline for current code. Both are reported
+without adjustment.
