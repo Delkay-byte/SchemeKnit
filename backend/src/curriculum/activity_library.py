@@ -522,6 +522,9 @@ ACTIVITIES: Tuple[ActivityPattern, ...] = (
         challenge=("Draw the diagram from memory and annotate one part the "
                    "lesson did not label."),
         stages=("first", "repeat"),
+        ghana_context=("Label the parts learners can point to in their own "
+                       "community — the school computer corner, the local "
+                       "printing shop's machine, or a clinic's records chart.",),
         adaptation="Draw one large diagram on the board for the whole class.",
     ),
     ActivityPattern(
@@ -658,6 +661,10 @@ ACTIVITIES: Tuple[ActivityPattern, ...] = (
         challenge=("Write the instructions for a classmate so they could "
                    "perform {focus} without help."),
         stages=("first", "repeat"),
+        ghana_context=("Order the steps of a routine they see in their "
+                       "community — booting the school computer corner each "
+                       "morning, or printing a receipt at the local cyber "
+                       "café.",),
         adaptation="Steps can be written as numbered lines on the board.",
     ),
     ActivityPattern(
@@ -686,6 +693,9 @@ ACTIVITIES: Tuple[ActivityPattern, ...] = (
         challenge=("Given two symptoms, identify which single fault could "
                    "cause both and justify the choice."),
         stages=("first", "repeat"),
+        ghana_context=("Diagnose a fault from a local setting: the school "
+                       "computer that will not start, or the neighbourhood "
+                       "shop's printer that prints blank pages.",),
         adaptation=("When devices are scarce, run the same diagnostic "
                     "reasoning on a printed or drawn fault scenario.",),
     ),

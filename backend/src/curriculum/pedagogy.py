@@ -713,17 +713,19 @@ _SUBJECT_MOVES: Dict[str, Dict[str, str]] = {
                       "actually supports."),
     },
     "english": {
-        "demonstration": ("Teacher reads the model text aloud, highlighting the "
-                          "target language feature for {focus_short} so "
-                          "learners both see and hear it in use."),
+        "demonstration": ("Teacher reads one model text aloud to the whole "
+                          "class, highlighting the target language feature "
+                          "for {focus_short}; learners note two examples they "
+                          "hear in their exercise books."),
         "vocabulary": ("Quick oral activation of the key words for "
                        "{focus_short}, with learners saying them in "
                        "sentences."),
         "practice": ("Learners practise {focus_short} aloud or in pairs, using "
                      "sentence frames or substitution, while the teacher gives "
                      "immediate feedback."),
-        "reading": ("Learners read the text and underline the evidence for "
-                    "{focus_short}, pausing to ask and answer questions."),
+        "reading": ("In pairs, learners read the text and underline two "
+                    "pieces of evidence for {focus_short}, then write one "
+                    "sentence explaining each in their exercise books."),
         "synthesis": ("Each learner produces a short piece of speaking or "
                       "writing using {focus_short}; two or three share "
                       "aloud."),
