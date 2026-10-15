@@ -3,7 +3,7 @@
 Date: 2026-10-09
 Source (HEAD==origin/main): 2121a2c (app code byte-identical to P4 commit ae84f19 — `git diff --stat ae84f19..2121a2c` docs-only)
 Intended deployment: ae84f19+ (P4)
-Deployed commit: **`50bd8872e2fe73c5e4b459b37ab94bf233434e88`** — established 2026-10-15 by read-only Render API (live deploy `dep-db42gvp42hec73fhbu0g`, created `2026-10-08T23:34:23Z`, live `2026-10-08T23:36:19Z`). It **predates `70738f8`** → the quota fix is NOT in production; no deploy exists after 2026-10-08 despite the 2026-10-09 push (auto-deploy did not fire — manual deploy required). Detail: docs/QUOTA_ACCOUNTING_INCIDENT.md §13c. API healthy v1.0.5 (static APP_VERSION — not commit evidence); frontend 200.
+Deployed commit: **`3ef1a41a7c8013f1c66ece15ba130495665926e0`** — owner-approved one-time backend deploy `dep-db8aftlg1s2s739kr47g`, live `2026-10-15T10:18:21Z` (pre-deploy PG quota gate 22 passed; deploy record + `git merge-base --is-ancestor 70738f8 3ef1a41` confirm the quota fix is in the deployed tree; `/api/health` 200 liveness-only). Earlier state (historical): live deploy was `50bd887` (2026-10-08, pre-fix). Runtime enforcement check (§12.3) and historical reconciliation (§13e, awaiting owner approval) still outstanding → NO-GO. Detail: docs/QUOTA_ACCOUNTING_INCIDENT.md §13c–§13e.
 
 ## Registration 500 diagnosis
 - First attempt: `POST /api/auth/register/individual` → 500 `{"error":true,"detail":"Internal server error"}` immediately after a cold start (frontend GET had timed out seconds earlier).
