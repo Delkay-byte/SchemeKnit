@@ -1,0 +1,363 @@
+- document:
+  - text: How are you holding AI to your standards?
+  - link "Learn about AI governance":
+    - /url: https://resources.briskteaching.com/ai-governance
+    - text: Learn about AI governance
+    - img
+  - link:
+    - /url: "#"
+    - img
+  - main:
+    - banner:
+      - link "home":
+        - /url: /
+        - img "Brisk Teaching logo"
+      - navigation:
+        - button "Platform":
+          - text: Platform
+          - img
+        - button "Solutions":
+          - text: Solutions
+          - img
+        - button "Resources":
+          - text: Resources
+          - img
+        - link "Pricing":
+          - /url: /plans
+        - link "Login":
+          - /url: /login
+        - link "Book a call":
+          - /url: /demo
+        - link "Get started free":
+          - /url: https://app.briskteaching.com/get-started
+    - text: Trusted in 10,000+ Districts
+    - heading "AI THAT WORKS WHERE EDUCATORS WORK" [level=1]
+    - paragraph: Turn any resource you love and trust into lessons, feedback, and student practice - without leaving your browser.
+    - link "Speak with us":
+      - /url: /demo
+    - link "Get started free":
+      - /url: https://app.briskteaching.com/get-started
+    - img "Lightning bolt icon"
+    - text: ESSA Tier 3
+    - img "Star icon"
+    - text: "#1 AI Platform for teachers"
+    - img "Shield icon"
+    - text: 95% Common Sense Privacy
+    - paragraph: How Brisk Works
+    - heading "Brisk is always by your side" [level=2]
+    - paragraph: Brisk works wherever you teach ΓÇô on any page, in any file, from docs and videos to PDFs, websites, and your own materials.
+    - paragraph: "01"
+    - paragraph: Open anything you teach with
+    - paragraph: "02"
+    - paragraph: Chat with Brisk
+    - paragraph: "03"
+    - paragraph: Create what you need
+    - paragraph: "04"
+    - paragraph: Relax
+    - text: 95% Common Sense Privacy Rating 2.2M+ Hours saved 1 in 3 Teachers in the USA use Brisk 10k+ Districts trust Brisk
+    - paragraph: What Brisk Does
+    - heading "Start every day ready" [level=2]
+    - paragraph: Brisk brings AI into the tools you already teach with. From planning to feedback to student support, it covers the full teaching and learning cycle.
+    - heading "Create Content" [level=2]
+    - text: 30+ tools inside
+    - paragraph: Generate lesson plans, assessments, and creative writing prompts in seconds using our AI-powered educational suite.
+    - link "Explore Create Content":
+      - /url: /create-instructional-materials
+      - text: Explore Create Content
+      - img
+    - heading "Give Feedback" [level=2]
+    - text: 5+ ways to give feedback
+    - paragraph: Leave real, personalized comments on student writing ΓÇö in your voice, at your standard. Essay 100 is just as good as essay 1.
+    - link "Explore Give Feedback":
+      - /url: /give-feedback
+      - text: Explore Give Feedback
+      - img
+    - heading "Inspect Writing" [level=2]
+    - paragraph: Analyze student submissions for depth of thought, structural integrity, and originality with automated insights.
+    - link "Explore Inspect Writing":
+      - /url: /inspect-writing
+      - text: Explore Inspect Writing
+      - img
+    - heading "Change Level" [level=2]
+    - text: 50+ languages
+    - paragraph: Instantly differentiate your materials. Adjust reading levels or translate content to support every learner in your classroom.
+    - link "Explore Change Level":
+      - /url: /change-reading-level
+      - text: Explore Change Level
+      - img
+    - heading "Student Activities" [level=2]
+    - text: 14 activities
+    - paragraph: Turn any text into an interactive experience. Build vocabulary lists, comprehension checks, and collaborative tasks.
+    - link "Explore Student Activities":
+      - /url: /briskboost
+      - text: Explore Student Activities
+      - img
+    - heading "An AI Education Platform for Every Teacher, Student, and Classroom" [level=2]
+    - heading "Built for everyone in the building" [level=3]
+    - heading "Administrators" [level=4]
+    - link "Learn more":
+      - /url: /solutions/school-and-district-administrators
+      - text: Learn more
+      - img
+    - img "Smiling woman with curly hair holding documents, people blurred in background in a hallway."
+    - heading "Teachers" [level=4]
+    - link "Learn more":
+      - /url: /solutions/teachers
+      - text: Learn more
+      - img
+    - img "Smiling man wearing glasses and blue sweater holding a book in a hallway with another person blurred behind."
+    - heading "Students" [level=4]
+    - link "Learn more":
+      - /url: /solutions/students
+      - text: Learn more
+      - img
+    - img "Smiling young man with headphones in front of a tablet, sitting in a bright modern room."
+    - text: From Kindergarten to AP Literature
+    - heading "Why teachers love Brisk" [level=2]
+    - link "Speak with us":
+      - /url: /demo
+    - link "Get started free":
+      - /url: https://app.briskteaching.com/get-started
+    - iframe
+    - iframe
+    - iframe
+    - text: Trust & Safety
+    - heading "Safe and secure AI for education" [level=2]
+    - paragraph: Brisk earned a 95% Common Sense Privacy Rating, one of the highest among AI tools built for education, because we believe the data that lives in classrooms deserves more protection than any other data on the internet.
+    - link "Visit our Privacy Center":
+      - /url: /privacy/privacy-center
+    - link "Request IT approval packet":
+      - /url: /demo
+    - list:
+      - listitem
+      - listitem
+      - listitem
+      - listitem
+      - listitem
+      - listitem
+      - listitem
+      - listitem
+      - listitem
+      - listitem
+    - list:
+      - listitem
+      - listitem
+      - listitem
+      - listitem
+      - listitem
+      - listitem
+      - listitem
+      - listitem
+      - listitem
+      - listitem
+    - heading "ThereΓÇÖs a tool for whatever you need" [level=3]
+    - link "View all tools":
+      - /url: /ai-tools-for-teachers
+    - link "Get started free":
+      - /url: https://app.briskteaching.com/get-started
+    - region "Content Slider":
+      - list:
+        - group "1 / 6":
+          - link "Brisk Boost Turn any online resource into an engaging learning experience for students. Try it":
+            - /url: /briskboost
+            - heading "Brisk Boost" [level=3]
+            - paragraph: Turn any online resource into an engaging learning experience for students.
+            - text: Try it
+            - img
+        - group "2 / 6":
+          - link "Inspect Writing Tool Brisk has reimagined student writing analysis. You can understand how students revised their work in two ways. Try it":
+            - /url: /inspect-writing
+            - heading "Inspect Writing Tool" [level=3]
+            - paragraph: Brisk has reimagined student writing analysis. You can understand how students revised their work in two ways.
+            - text: Try it
+            - img
+        - group "3 / 6":
+          - link "Inquiry Worksheet Generate a dynamic inquiry worksheet that captivates students. Try it":
+            - /url: "#"
+            - heading "Inquiry Worksheet" [level=3]
+            - paragraph: Generate a dynamic inquiry worksheet that captivates students.
+            - text: Try it
+            - img
+        - group "4 / 6":
+          - link "Lesson Plan Generator Create comprehensive lesson plans to guide your teaching. Try it":
+            - /url: /ai-tools/lesson-plan-generator
+            - heading "Lesson Plan Generator" [level=3]
+            - paragraph: Create comprehensive lesson plans to guide your teaching.
+            - text: Try it
+            - img
+        - group "5 / 6":
+          - link "Presentation Maker Craft Google Slides presentations from any idea, article, website, or video. Try it":
+            - /url: /ai-tools/presentation-maker
+            - heading "Presentation Maker" [level=3]
+            - paragraph: Craft Google Slides presentations from any idea, article, website, or video.
+            - text: Try it
+            - img
+        - group "6 / 6":
+          - link "Glow & Grow Feedback Offer 'Glow & Grow' feedback to highlight strengths and areas for growth. Try it":
+            - /url: /give-feedback
+            - heading "Glow & Grow Feedback" [level=3]
+            - paragraph: Offer 'Glow & Grow' feedback to highlight strengths and areas for growth.
+            - text: Try it
+            - img
+    - navigation "Slider Pagination":
+      - button
+      - button
+      - button
+      - button
+    - button "Previous Slide":
+      - img
+    - button "Next Slide":
+      - img
+    - heading "YOUR PREP PERIOD IS WAITING" [level=2]
+    - paragraph: Install in seconds and walk into class with everything you need.
+    - text: For Schools
+    - link "Speak with us":
+      - /url: /demo
+    - text: For Teachers
+    - link "Get started free":
+      - /url: https://app.briskteaching.com/get-started
+    - link "Brisk Teaching logo":
+      - /url: /
+      - img "Brisk Teaching logo"
+    - text: Contact us
+    - link "hello@briskteaching.com":
+      - /url: mailto:hello@briskteaching.com
+    - text: Want to receive Brisk news? Enter your email
+    - textbox "Enter your email":
+      - /placeholder: Email
+    - button "SIGN UP"
+    - alert
+    - emphasis: Not seeing a way to sign up for our newsletter? Make sure you enable your cookies by clicking the CookieYes icon in the bottom left corner.
+    - text: PLATFORM Products
+    - link "Browser extension":
+      - /url: /brisk-extension
+    - link "Brisk on the web":
+      - /url: /brisk-next
+    - link "Curriculum Intelligence":
+      - /url: /curriculum-intelligence
+    - link "Brisk Boost for Students":
+      - /url: /briskboost
+    - text: Tools
+    - link "Quiz maker":
+      - /url: /ai-tools/quiz-generator
+    - link "Presentation maker":
+      - /url: /ai-tools/presentation-maker
+    - link "Give feedback":
+      - /url: /give-feedback
+    - link "Inspect writing":
+      - /url: /inspect-writing
+    - link "Change reading levels":
+      - /url: /change-reading-level
+    - link "Create instructional materials":
+      - /url: /create-instructional-materials
+    - link "See all 30+ tools":
+      - /url: /ai-tools-for-teachers
+    - text: SOLUTIONS Built for
+    - link "Schools & districts":
+      - /url: /solutions/school-and-district-administrators
+    - link "Administrators":
+      - /url: /solutions/school-and-district-administrators
+    - link "Teachers":
+      - /url: /solutions/teachers
+    - link "Students":
+      - /url: /solutions/students
+    - text: By subject
+    - link "English":
+      - /url: /use-cases/english-teachers
+    - link "Math":
+      - /url: /use-cases/math-teachers
+    - link "Science":
+      - /url: /use-cases/science-teachers
+    - link "Special education & ELL":
+      - /url: /use-cases/special-education-and-english-language-learners
+    - link "Elementary":
+      - /url: /use-cases/elementary-teachers
+    - link "First-year teachers":
+      - /url: /use-cases/first-year-teachers
+    - text: By platform
+    - link "Connected tools":
+      - /url: /how-brisk-integrates
+    - link "Brisk for Google":
+      - /url: /use-cases/google-teachers
+    - link "Brisk for Microsoft":
+      - /url: /platforms/microsoft
+    - link "See all use cases":
+      - /url: /use-cases
+    - text: RESOURCES Support
+    - link "Help center":
+      - /url: https://help.briskteaching.com/hc/en-us?_gl=1*1ana73k*_gcl_aw*R0NMLjE3Nzg1NDc4NzIuQ2owS0NRandfSVhRQmhDa0FSSXNBRHFFTGJKeTJBTmV4VTVKQmtkV09WTlA1YVdSU0VSMzBLTWRfMlRBUFpTYUgwbjZhc1pVWVVZM1NFQWFBbWNNRUFMd193Y0I.*_gcl_au*MTM5ODUzNjM1Ny4xNzgyODQ3NDQ1
+    - link "Getting started":
+      - /url: /getting-started-with-brisk-teaching
+    - link "Tutorials":
+      - /url: https://www.youtube.com/playlist?list=PLsseFe7zRvWxxP5PuCgPOWN_jLYERvZAP
+    - link "Status page":
+      - /url: https://statuspage.incident.io/brisk-teaching
+    - text: Learn
+    - link "What's new":
+      - /url: /whats-new
+    - link "Blog":
+      - /url: /blog
+    - link "PD & training":
+      - /url: /brisk-professional-development-resources
+    - link "Success stories":
+      - /url: /success-stories
+    - link "Prompt library":
+      - /url: /prompt-library
+    - link "Webinars":
+      - /url: /webinars
+    - link "Resource library":
+      - /url: /resource-library
+    - link "AI Literacy":
+      - /url: /ai-literacy
+    - text: COMPANY
+    - link "About":
+      - /url: /about
+    - link "Plans":
+      - /url: /plans
+    - link "Newsroom":
+      - /url: /press
+    - link "Careers":
+      - /url: /careers
+    - link "Press kit":
+      - /url: https://drive.google.com/drive/folders/1mD3NwQ9hlsC5S7mKlCOy2o-P7piX1hPl
+    - link "Privacy center":
+      - /url: /privacy/privacy-center
+    - link "FAQs":
+      - /url: /faq
+    - text: Connect
+    - link "Community":
+      - /url: /community
+    - link "Wall of love":
+      - /url: /testimonials
+    - link "Rewards program":
+      - /url: /rewards-program
+    - link "Conferences & events":
+      - /url: /conferences-and-events
+    - link:
+      - /url: https://www.facebook.com/groups/briskeducators
+      - img
+    - link:
+      - /url: https://x.com/briskteaching
+      - img
+    - link:
+      - /url: https://www.linkedin.com/company/brisk-teaching
+      - img
+    - link:
+      - /url: https://www.instagram.com/briskteaching/
+      - img
+    - link:
+      - /url: https://www.youtube.com/@Briskteaching
+      - img
+    - link:
+      - /url: https://www.tiktok.com/@briskteaching
+      - img
+    - searchbox "Search website"
+    - button "EN":
+      - text: EN
+      - img
+    - text: ┬⌐ 2026 BRISK | Brisk Labs Co. ALL RIGHTS RESERVED
+    - link "User Agreement":
+      - /url: /privacy/terms
+    - link "Privacy Center":
+      - /url: /privacy/privacy-center
+  - iframe

@@ -1,0 +1,904 @@
+{
+  "log": {
+    "version": "1.2",
+    "creator": {
+      "name": "REA-derived sanitized summary",
+      "version": "1.0"
+    },
+    "note": "Derived from REA capture_browser_scenario Evidence; URL query values, headers values, cookies and bodies were never retained by REA.",
+    "entries": [
+      {
+        "_id": 1,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/solutions/lesson-plan-generator",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "document"
+      },
+      {
+        "_id": 2,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/media/fba5a26ea33df6a3-s.p.08ssgmy_tb90r.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 3,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/media/83afe278b6a6bb3c-s.p.45535valc9rzk.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 4,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/media/99e609270109b47d-s.p.1dgcou5jor5q_.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 5,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/media/effe91970fc4db64-s.p.28xcb7557rbh2.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 6,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/media/23b7a97ae3b5c134-s.p.0fcfx2a-jndc5.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 7,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/media/a7e15459c1805da0-s.p.05ymlrkv94iec.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 8,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/2wucbrf-583o-.css",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "stylesheet"
+      },
+      {
+        "_id": 9,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/2nga11wb6n73h.css",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "stylesheet"
+      },
+      {
+        "_id": 10,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/image?url=%2Fimages%2Fui%2Fpreviews%2Flesson-plans-fanned.webp&w=640&q=75&dpl=dpl_6hHFpXvXxQwtGQNvcti1vqK6fg3x",
+          "queryParamNames": [
+            "url",
+            "w",
+            "q",
+            "dpl"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 11,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/3wwukw-mqj4_3.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 12,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/2wgnnb0bkr22t.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 13,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/056_6lqpfu6ay.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 14,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/079shcefh7foh.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 15,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/2sz_b-_jxr5ql.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 16,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/1b0sq78jjv-gd.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 17,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/0f6e_zu156v9z.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 18,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/0dn66kwi2v9zf.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 19,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/turbopack-3q3bpr7oqrzg0.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 20,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/44n5sarm60ygz.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 21,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/34xr24wvu1tzu.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 22,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/42etvckv8oghi.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 23,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/2fe3de01az6bk.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 24,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/1mhzgijyhjg5n.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 25,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/1l-4-xiawiivs.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 26,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/25s02fe2i_gcg.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 27,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/2gk-4v9w4dzhw.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 28,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/3ymorty6nmfsw.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 29,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/2q62wze_6u-q8.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 30,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/22n74e5zng-f7.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 31,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/turbopack-160wszluef3lp.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 32,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/build-TfctsWXpff2fKS/_buildManifest.js?dpl=dpl_6hHFpXvXxQwtGQNvcti1vqK6fg3x",
+          "queryParamNames": [
+            "dpl"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 33,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/build-TfctsWXpff2fKS/_ssgManifest.js?dpl=dpl_6hHFpXvXxQwtGQNvcti1vqK6fg3x",
+          "queryParamNames": [
+            "dpl"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 34,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/build-TfctsWXpff2fKS/_clientMiddlewareManifest.js?dpl=dpl_6hHFpXvXxQwtGQNvcti1vqK6fg3x",
+          "queryParamNames": [
+            "dpl"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 35,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/site.webmanifest",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "manifest"
+      },
+      {
+        "_id": 36,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/images/ui/backgrounds/cta-background.webp",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 37,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/image?url=%2Fimages%2Fbrand%2Feduaide-logo.webp&w=256&q=75&dpl=dpl_6hHFpXvXxQwtGQNvcti1vqK6fg3x",
+          "queryParamNames": [
+            "url",
+            "w",
+            "q",
+            "dpl"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 38,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/media/cloud-hero.2vjpqs7ltbwq7.webp",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 39,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/images/ui/icons/lesson-planning/lesson-plan-5e.svg?dpl=dpl_6hHFpXvXxQwtGQNvcti1vqK6fg3x",
+          "queryParamNames": [
+            "dpl"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 40,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/images/ui/icons/lesson-planning/unit-plan.svg?dpl=dpl_6hHFpXvXxQwtGQNvcti1vqK6fg3x",
+          "queryParamNames": [
+            "dpl"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 41,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/images/ui/icons/lesson-planning/backward-design-ubd.svg?dpl=dpl_6hHFpXvXxQwtGQNvcti1vqK6fg3x",
+          "queryParamNames": [
+            "dpl"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 42,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/images/ui/icons/lesson-planning/hunter-model.svg?dpl=dpl_6hHFpXvXxQwtGQNvcti1vqK6fg3x",
+          "queryParamNames": [
+            "dpl"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 43,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/images/ui/icons/lesson-planning/gagnes-nine-events.svg?dpl=dpl_6hHFpXvXxQwtGQNvcti1vqK6fg3x",
+          "queryParamNames": [
+            "dpl"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 44,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/images/ui/icons/lesson-planning/universal-design-learning.svg?dpl=dpl_6hHFpXvXxQwtGQNvcti1vqK6fg3x",
+          "queryParamNames": [
+            "dpl"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 45,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/images/ui/icons/lesson-planning/project-based-learning.svg?dpl=dpl_6hHFpXvXxQwtGQNvcti1vqK6fg3x",
+          "queryParamNames": [
+            "dpl"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 46,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/images/ui/icons/lesson-planning/montessori-lesson-planner.svg?dpl=dpl_6hHFpXvXxQwtGQNvcti1vqK6fg3x",
+          "queryParamNames": [
+            "dpl"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 47,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/images/ui/icons/lesson-planning/student-centered-approach.svg?dpl=dpl_6hHFpXvXxQwtGQNvcti1vqK6fg3x",
+          "queryParamNames": [
+            "dpl"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 48,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/images/ui/icons/lesson-planning/spark-lesson.svg?dpl=dpl_6hHFpXvXxQwtGQNvcti1vqK6fg3x",
+          "queryParamNames": [
+            "dpl"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 49,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/images/ui/icons/lesson-planning/lesson-seed.svg?dpl=dpl_6hHFpXvXxQwtGQNvcti1vqK6fg3x",
+          "queryParamNames": [
+            "dpl"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 50,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/2q41v96aj5cla.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "other"
+      },
+      {
+        "_id": 51,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/2q41v96aj5cla.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 52,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/41tg_ypm63xnk.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 53,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/2e9dpmusnlhfi.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 54,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/30nplzn01qc3a.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 55,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/1m40uwriw90e6.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 56,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/00p3o5-kdpaa4.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 57,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/1rmjscf1j94k6.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 58,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/0dc22pifvg7ec.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 59,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/2tld_mhqunnis.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 60,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/354onp6fj8koa.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 61,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/06_k96m_bgj8q.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 62,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/2-igdq0pr_qns.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 63,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/35z3xa07tb0_t.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 64,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/0piw8vku11r8x.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 65,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/3hiz5sjmajtch.css",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "stylesheet"
+      },
+      {
+        "_id": 66,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/turbopack-0jucf-36q1fhf.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 67,
+        "request": {
+          "method": "GET",
+          "url": "https://www.eduaide.ai/_next/static/immutable/chunks/1rz_t4uq2hgj_.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 68,
+        "request": {
+          "method": "GET",
+          "url": "https://edge.eduaide.ai/static/1.428.7/web-vitals-with-attribution.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 69,
+        "request": {
+          "method": "GET",
+          "url": "https://edge.eduaide.ai/static/1.428.7/exception-autocapture.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 70,
+        "request": {
+          "method": "GET",
+          "url": "https://edge.eduaide.ai/array/phc_xKuWwRD43sbLtDPa9ynFtpQU5r9eDzMg7jE9tSe7Tjf8/config.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 71,
+        "request": {
+          "method": "POST",
+          "url": "https://edge.eduaide.ai/flags/?v=2",
+          "queryParamNames": [
+            "v"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      }
+    ]
+  }
+}

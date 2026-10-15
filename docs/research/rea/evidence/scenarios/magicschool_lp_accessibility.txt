@@ -1,0 +1,293 @@
+- document:
+  - alert: Press Alt+1 for screen-reader mode, Alt+0 to cancel
+  - button "Use Website In a Screen-Reader Mode"
+  - link "Accessibility Screen-Reader Guide, Feedback, and Issue Reporting | New window":
+    - /url: https://accessibe.com/blog/knowledgebase/screen-reader-guide
+  - region "Skip Links":
+    - link "Skip to Content":
+      - /url: "#acsbContent"
+  - 'button "Open accessiBe: accessibility options, statement and help"':
+    - img
+  - region "We value your privacy":
+    - heading "We value your privacy" [level=2]
+    - paragraph: We use cookies to enhance your browsing experience, serve personalized ads or content, and analyze our traffic. By clicking "Accept All", you consent to our use of cookies.
+    - group:
+      - button "Customize"
+      - button "Reject All"
+      - button "Accept All"
+  - img "Purple arrow icon pointing up and to the right."
+  - text: "Just re-launched: Meet your new favorite Presentation Generator."
+  - link "Create classroom-ready slides now":
+    - /url: https://app.magicschool.ai/tools/teacher/presentation-generator
+  - banner:
+    - link "home":
+      - /url: /
+      - img "MagicSchool Logo"
+    - navigation:
+      - button "AI Solutions":
+        - text: AI Solutions
+        - img
+      - button "Outcomes":
+        - text: Outcomes
+        - img
+      - button "Resources":
+        - text: Resources
+        - img
+      - link "Pricing":
+        - /url: /pricing
+    - link "Login":
+      - /url: https://app.magicschool.ai/auth/signin
+    - link "Free for teachers":
+      - /url: https://app.magicschool.ai/auth/signup
+      - text: Free for teachers
+      - img
+    - link "Get in touch":
+      - /url: /quote-request
+      - text: Get in touch
+      - img
+  - banner:
+    - heading "AI lesson plan generator" [level=1]
+    - paragraph: Generate full, standards-aligned lesson plans in minutes and spend more time focused on your students.
+    - link "Free for teachers":
+      - /url: https://app.magicschool.ai/auth/signup
+      - strong: Free for teachers
+      - img
+    - 'img "Illustration of the AI Lesson Plan Generator tool, set for 5th grade, aligned to NGSS standards and topic set to: How do food webs describe the ways in which animals in an ecosystem are related?"'
+  - heading "More time for teachers. More possibilities for students." [level=2]
+  - text: Support deeper learning
+  - paragraph: 4 in 5 teachers report improved student engagement and learning behaviors.
+  - 'img "Illustration of an alarm clock with text: 7+ hours a week"'
+  - text: Save teachers time
+  - paragraph: 94% of teachers who use MagicSchool report gaining 7+ hours per week.
+  - 'img "Illustration of a computer with fire on the screen and text: This is fine."'
+  - text: Fight burnout
+  - paragraph: 77% of teachers report MagicSchool has significantly improved their quality of life.
+  - heading "Better teaching, stronger learning outcomes" [level=2]
+  - paragraph: See how MagicSchool helps educators move through everyday tasks with more time to focus on their students.
+  - link "Try it free":
+    - /url: https://app.magicschool.ai/auth/signin
+    - text: Try it free
+    - img
+  - tablist:
+    - tab "\"I know my lessons are aligned with the standards.\" Purple up icon Build standards alignment and learning objectives into every lesson from the start, without searching through curriculum maps or piecing everything together yourself." [selected]:
+      - heading "\"I know my lessons are aligned with the standards.\"" [level=3]
+      - img "Purple up icon"
+      - paragraph: Build standards alignment and learning objectives into every lesson from the start, without searching through curriculum maps or piecing everything together yourself.
+    - tab "\"My lesson is ready before my planning period ends.\" Purple down icon Create a complete, ready-to-teach lesson in minutes, with time left to refine it for your students and classroom.":
+      - heading "\"My lesson is ready before my planning period ends.\"" [level=3]
+      - img "Purple down icon"
+      - paragraph: Create a complete, ready-to-teach lesson in minutes, with time left to refine it for your students and classroom.
+    - tab "\"I have a strong starting point every time.\" Purple down icon Turn a few details into a clear, structured lesson plan that helps new and experienced teachers approach the classroom with confidence.":
+      - heading "\"I have a strong starting point every time.\"" [level=3]
+      - img "Purple down icon"
+      - paragraph: Turn a few details into a clear, structured lesson plan that helps new and experienced teachers approach the classroom with confidence.
+  - tabpanel "\"I know my lessons are aligned with the standards.\" Purple up icon Build standards alignment and learning objectives into every lesson from the start, without searching through curriculum maps or piecing everything together yourself.":
+    - img "Illustration of attaching standards to align lesson plans to. Shows NGSS State Standards"
+  - heading "Why classrooms love our AI for students" [level=2]
+  - paragraph: Hear from the educators who inspire everything we build.
+  - 'img "Quote from Heather Brown: Its #techtshirttuesday with the #eduguardian crew! Today''s shout out goes to @magicschoolai! I love tying learning to student interests and then gamifying using the custom chatbots! @EduGuardian5"'
+  - 'img "Quote from Susan U., Director of Educational Technology at Rockford Public Schools: \"MagicSchool was responsive to what teachers needed, not just in features but in how easy it was to use. We''re not in awe of the speed of AI anymore. We''re focused on its utility and impact."'
+  - img "Image of a female teacher with blonde hair smiling and wearing a black Teachers Are Magic t-shirt."
+  - 'img "Quote from Miss Jami Shields: Tonight was Magical ≡ƒ¬ä@magicschoolai thank you for a fantastic night!! It''s amazing to see the Huge billboard honoring teachers!! #Magic #TeachersAreMagic Great to hang out @jcampos2018"'
+  - 'img "Quote from Teneika B., Founding Principal at NYC Department of Education: \"Teachers brought the platform to us and demonstrated a willingness to share their learning with their colleagues. We used MagicSchool and MagicStudent because they''re built for education. They''re safe, relevant, and adaptable."'
+  - img "Image of a smiling male teacher sitting at a desk in front a desktop computer with the MagicSchool platform displayed on screen."
+  - 'img "Quote from Caitlin Cloyd: Had the best time presenting to ELA teachers today in Klein ISD! We became best friends with #Raina and learned some amazing prompting strategies in @magicschoolai"'
+  - 'img "Quote from Kelly B, Instructional Technology Coordinator, Twin Rivers USD: \" MagicSchool has sparked new conversations about instructional strategies and created a sense of shared innovation among our teachers.\""'
+  - img "Image of a smiling female teacher with brown hair giving the peace sign and wearing a Black Teachers are Magic T-shirt and standing in front of a computer monitor with a MagicSchool presentation on the screen."
+  - 'img "Quote from Heather Brown: Its #techtshirttuesday with the #eduguardian crew! Today''s shout out goes to @magicschoolai! I love tying learning to student interests and then gamifying using the custom chatbots! @EduGuardian5"'
+  - 'img "Quote from Susan U., Director of Educational Technology at Rockford Public Schools: \"MagicSchool was responsive to what teachers needed, not just in features but in how easy it was to use. We''re not in awe of the speed of AI anymore. We''re focused on its utility and impact."'
+  - img "Image of a female teacher with blonde hair smiling and wearing a black Teachers Are Magic t-shirt."
+  - 'img "Quote from Miss Jami Shields: Tonight was Magical ≡ƒ¬ä@magicschoolai thank you for a fantastic night!! It''s amazing to see the Huge billboard honoring teachers!! #Magic #TeachersAreMagic Great to hang out @jcampos2018"'
+  - 'img "Quote from Teneika B., Founding Principal at NYC Department of Education: \"Teachers brought the platform to us and demonstrated a willingness to share their learning with their colleagues. We used MagicSchool and MagicStudent because they''re built for education. They''re safe, relevant, and adaptable."'
+  - img "Image of a smiling male teacher sitting at a desk in front a desktop computer with the MagicSchool platform displayed on screen."
+  - 'img "Quote from Caitlin Cloyd: Had the best time presenting to ELA teachers today in Klein ISD! We became best friends with #Raina and learned some amazing prompting strategies in @magicschoolai"'
+  - 'img "Quote from Kelly B, Instructional Technology Coordinator, Twin Rivers USD: \" MagicSchool has sparked new conversations about instructional strategies and created a sense of shared innovation among our teachers.\""'
+  - img "Image of a smiling female teacher with brown hair giving the peace sign and wearing a Black Teachers are Magic T-shirt and standing in front of a computer monitor with a MagicSchool presentation on the screen."
+  - 'img "Quote from Heather Brown: Its #techtshirttuesday with the #eduguardian crew! Today''s shout out goes to @magicschoolai! I love tying learning to student interests and then gamifying using the custom chatbots! @EduGuardian5"'
+  - 'img "Quote from Susan U., Director of Educational Technology at Rockford Public Schools: \"MagicSchool was responsive to what teachers needed, not just in features but in how easy it was to use. We''re not in awe of the speed of AI anymore. We''re focused on its utility and impact."'
+  - img "Image of a female teacher with blonde hair smiling and wearing a black Teachers Are Magic t-shirt."
+  - 'img "Quote from Miss Jami Shields: Tonight was Magical ≡ƒ¬ä@magicschoolai thank you for a fantastic night!! It''s amazing to see the Huge billboard honoring teachers!! #Magic #TeachersAreMagic Great to hang out @jcampos2018"'
+  - 'img "Quote from Teneika B., Founding Principal at NYC Department of Education: \"Teachers brought the platform to us and demonstrated a willingness to share their learning with their colleagues. We used MagicSchool and MagicStudent because they''re built for education. They''re safe, relevant, and adaptable."'
+  - img "Image of a smiling male teacher sitting at a desk in front a desktop computer with the MagicSchool platform displayed on screen."
+  - 'img "Quote from Caitlin Cloyd: Had the best time presenting to ELA teachers today in Klein ISD! We became best friends with #Raina and learned some amazing prompting strategies in @magicschoolai"'
+  - 'img "Quote from Kelly B, Instructional Technology Coordinator, Twin Rivers USD: \" MagicSchool has sparked new conversations about instructional strategies and created a sense of shared innovation among our teachers.\""'
+  - img "Image of a smiling female teacher with brown hair giving the peace sign and wearing a Black Teachers are Magic T-shirt and standing in front of a computer monitor with a MagicSchool presentation on the screen."
+  - 'img "Quote from Heather Brown: Its #techtshirttuesday with the #eduguardian crew! Today''s shout out goes to @magicschoolai! I love tying learning to student interests and then gamifying using the custom chatbots! @EduGuardian5"'
+  - 'img "Quote from Susan U., Director of Educational Technology at Rockford Public Schools: \"MagicSchool was responsive to what teachers needed, not just in features but in how easy it was to use. We''re not in awe of the speed of AI anymore. We''re focused on its utility and impact."'
+  - img "Image of a female teacher with blonde hair smiling and wearing a black Teachers Are Magic t-shirt."
+  - 'img "Quote from Miss Jami Shields: Tonight was Magical ≡ƒ¬ä@magicschoolai thank you for a fantastic night!! It''s amazing to see the Huge billboard honoring teachers!! #Magic #TeachersAreMagic Great to hang out @jcampos2018"'
+  - 'img "Quote from Teneika B., Founding Principal at NYC Department of Education: \"Teachers brought the platform to us and demonstrated a willingness to share their learning with their colleagues. We used MagicSchool and MagicStudent because they''re built for education. They''re safe, relevant, and adaptable."'
+  - img "Image of a smiling male teacher sitting at a desk in front a desktop computer with the MagicSchool platform displayed on screen."
+  - 'img "Quote from Caitlin Cloyd: Had the best time presenting to ELA teachers today in Klein ISD! We became best friends with #Raina and learned some amazing prompting strategies in @magicschoolai"'
+  - 'img "Quote from Kelly B, Instructional Technology Coordinator, Twin Rivers USD: \" MagicSchool has sparked new conversations about instructional strategies and created a sense of shared innovation among our teachers.\""'
+  - img "Image of a smiling female teacher with brown hair giving the peace sign and wearing a Black Teachers are Magic T-shirt and standing in front of a computer monitor with a MagicSchool presentation on the screen."
+  - link "See the Wall of Love":
+    - /url: https://testimonial.to/magicschool/all
+    - text: See the Wall of Love
+    - img
+  - heading "Everything you need, in one place" [level=2]
+  - paragraph: Move from lesson planning to assessment, feedback, and differentiation with everything connected in one safe, educator-led platform.
+  - list:
+    - listitem:
+      - link "Illustration of a laptop displaying a friendly AI robot and coding-style symbols, with text content on screen and a paper airplane graphic, representing AI-powered tools for creating and sharing educational content. AI rubric generator Create clear, customizable rubrics so you can focus on feedback that helps students grow. Learn more":
+        - /url: /tools/rubric-generator
+        - img "Illustration of a laptop displaying a friendly AI robot and coding-style symbols, with text content on screen and a paper airplane graphic, representing AI-powered tools for creating and sharing educational content."
+        - text: AI rubric generator
+        - paragraph: Create clear, customizable rubrics so you can focus on feedback that helps students grow.
+        - text: Learn more
+        - img
+    - listitem:
+      - link "Illustration of a laptop displaying a friendly AI robot and coding-style symbols, with text content on screen and a paper airplane graphic, representing AI-powered tools for creating and sharing educational content. AI presentation generator Turn any topic, text, or video into a ready-to-use presentation, with no extra prep required. Learn more":
+        - /url: /tools/presentation-generator
+        - img "Illustration of a laptop displaying a friendly AI robot and coding-style symbols, with text content on screen and a paper airplane graphic, representing AI-powered tools for creating and sharing educational content."
+        - text: AI presentation generator
+        - paragraph: Turn any topic, text, or video into a ready-to-use presentation, with no extra prep required.
+        - text: Learn more
+        - img
+    - listitem:
+      - link "Illustration of a laptop displaying a friendly AI robot and coding-style symbols, with text content on screen and a paper airplane graphic, representing AI-powered tools for creating and sharing educational content. Academic content generator Generate original academic content customized to the criteria of your choice. Learn more":
+        - /url: /tools/academic-content
+        - img "Illustration of a laptop displaying a friendly AI robot and coding-style symbols, with text content on screen and a paper airplane graphic, representing AI-powered tools for creating and sharing educational content."
+        - text: Academic content generator
+        - paragraph: Generate original academic content customized to the criteria of your choice.
+        - text: Learn more
+        - img
+  - heading "Your questions, answered" [level=2]
+  - list:
+    - listitem:
+      - heading "How can teachers save time creating lesson plans with AI?" [level=3]
+      - paragraph: A blank page is a real time thief! MagicSchool gives you a structured lesson plan in minutes, so you can spend less time starting from a blank page or piecing together activities. YouΓÇÖll have more time to review the plan, make it your own, and adapt it for the students in front of you.
+    - listitem:
+      - heading "Can AI differentiate lesson plans for different grade levels and student needs?" [level=3]
+      - paragraph: Yes. Start with one core lesson, then adapt it for different grade levels, reading levels, or student needs. MagicSchool helps you create variations while preserving the central learning objective.
+    - listitem:
+      - heading "Can AI generate lesson plans aligned to state standards or Common Core?" [level=3]
+      - paragraph: Yes. MagicSchoolΓÇÖs Lesson Plan Generator can incorporate state standards, Common Core, and other curriculum frameworks into your lesson. Select or enter the standards youΓÇÖre teaching to build them into the learning objectives, activities, and assessment.
+    - listitem:
+      - heading "What is an AI lesson plan generator?" [level=3]
+      - paragraph: An AI lesson plan generator helps teachers turn a learning objective into a structured lesson plan. Add details such as your subject, grade level, standards, and available time, and MagicSchool creates a strong starting point you can adjust for your students and classroom.
+    - listitem:
+      - heading "How do teachers create lesson plans with AI?" [level=3]
+      - paragraph: MagicSchool generates lesson plans based on your grade level, subject, standards, and instructional goals. You can also add time constraints and differentiation needs, then review and refine the plan to fit your classroom. ItΓÇÖs a faster way to get started while keeping you in control of every instructional decision.
+  - heading "Get started with MagicSchool" [level=2]
+  - paragraph: LetΓÇÖs make teaching more joyful and learning more fun for every classroom in every district.
+  - link "Free for teachers":
+    - /url: https://app.magicschool.ai/auth/signup
+    - strong: Free for teachers
+    - img
+  - img "MagicSchool logo"
+  - text: THE AI OPERATING SYSTEM FOR SCHOOLS, TEACHERS ARE MAGIC and MAGICSCHOOL are trademarks of Magic School, Inc.
+  - link "Book a demo":
+    - /url: /quote-request
+    - text: Book a demo
+    - img
+  - link "Free for teachers":
+    - /url: https://app.magicschool.ai/auth/signup
+    - text: Free for teachers
+    - img
+  - text: AI Solutions
+  - link "AI for Schools":
+    - /url: /magicschool-for-districts
+  - link "For Superintendents":
+    - /url: /magicschool-for-districts/superintendents
+  - link "For Chief Academic Officers":
+    - /url: /magicschool-for-districts/chief-academic-officers
+  - link "For Chief Technology Officers":
+    - /url: /magicschool-for-districts/chief-technology-officers
+  - link "For Principals":
+    - /url: /magicschool-for-districts/principals
+  - link "AI for Teachers":
+    - /url: /magicschool
+  - link "Lesson Plan Generator":
+    - /url: /tools/lesson-plan
+  - link "Rubric Generator":
+    - /url: /tools/rubric-generator
+  - link "Presentation Generator":
+    - /url: /tools/presentation-generator
+  - link "Multiple Choice Quiz Maker":
+    - /url: /tools/multiple-choice-quiz-assessment
+  - link "Worksheet Generator":
+    - /url: /tools/worksheet-generator
+  - link "AI for Students":
+    - /url: /magicstudent
+  - text: Outcomes
+  - link "One AI Platform":
+    - /url: /ai-operating-system-for-schools
+  - link "Protect Privacy & Security":
+    - /url: /privacy
+  - link "Drive Student Outcomes":
+    - /url: /magicstudent
+  - link "Build AI Literacy":
+    - /url: /ai-literacy
+  - link "Save Time":
+    - /url: /magicschool
+  - link "Integrate Quickly":
+    - /url: /integrations
+  - link "Write AI Policy":
+    - /url: /ai-policy
+  - text: Resources
+  - link "Support":
+    - /url: https://help.magicschool.ai/en/
+  - link "App Status":
+    - /url: https://status.magicschool.ai/
+  - link "Professional Development":
+    - /url: /professional-development
+  - link "Certification Courses":
+    - /url: /certification-courses
+  - link "Blog":
+    - /url: /blog
+  - link "Case Studies":
+    - /url: /case-studies
+  - link "Webinars":
+    - /url: /on-demand-webinars
+  - link "Ready-Made Resources":
+    - /url: /ready-made-resources
+  - link "FAQs":
+    - /url: /faq
+  - link "Parent Resources":
+    - /url: /resources-for-parents
+  - text: Company
+  - link "About Us":
+    - /url: /about-us
+  - link "Pricing":
+    - /url: /pricing
+  - link "Events":
+    - /url: /events
+  - link "AI Pioneers":
+    - /url: /magicschool-ai-pioneers
+  - link "Careers":
+    - /url: /careers
+  - link "MagicSchool Store":
+    - /url: https://shop.magicschool.ai
+  - link "Mission":
+    - /url: /mission
+  - link "Press":
+    - /url: /about-us#press
+  - link "White Facebook logo":
+    - /url: https://www.facebook.com/magicschoolai/
+    - img "White Facebook logo"
+  - link "White Instagram logo":
+    - /url: https://www.instagram.com/magicschoolai/
+    - img "White Instagram logo"
+  - link "White X logo":
+    - /url: https://x.com/magicschoolai
+    - img "White X logo"
+  - link "White YouTube logo":
+    - /url: https://www.youtube.com/@magicschoolai
+    - img "White YouTube logo"
+  - link "White LinkedIn logo":
+    - /url: https://www.linkedin.com/company/magicschool-ai/
+    - img "White LinkedIn logo"
+  - link "White Bluesky logo":
+    - /url: https://bsky.app/profile/magicschoolai.bsky.social
+    - img "White Bluesky logo"
+  - link "Privacy Policy":
+    - /url: /privacy-security/privacy-policy
+  - link "Trust Center":
+    - /url: https://trust.magicschool.ai/
+  - link "Terms":
+    - /url: /privacy-security/terms-of-service
+  - link "Accessibility":
+    - /url: /accessibility
+  - link "Sustainability":
+    - /url: /privacy-security/sustainability

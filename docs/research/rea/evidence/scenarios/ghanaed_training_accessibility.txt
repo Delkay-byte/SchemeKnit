@@ -1,0 +1,631 @@
+- document:
+  - link "GhanaEd GhanaEd LMS ┬╖ Training":
+    - /url: /
+    - img "GhanaEd"
+    - text: GhanaEd LMS ┬╖ Training
+  - button "Γû╢ Present"
+  - button "Γ¼ç Save as PDF"
+  - link "Student Manual":
+    - /url: /student-manual
+  - link "Teacher Guide":
+    - /url: /teacher-guide
+  - link "Sign In":
+    - /url: /login
+  - text: Educator & Student Training
+  - heading "GhanaEd LMS" [level=1]
+  - text: AI-Powered Learning for Ghana's Future ≡ƒôÜ NaCCA Curriculum (KGΓÇôSHS) ≡ƒñû AI Lessons & Tutor ≡ƒº¬ BSTEM Practicals ≡ƒÅ½ School Management ≡ƒô╢ Offline-First Complete Training Slides ┬╖ Version 2.0 ┬╖ 2026 For Students, Teachers & Head Teachers ┬╖ ghanaed.com Overview
+  - heading "What is GhanaEd LMS?" [level=1]
+  - text: "2"
+  - paragraph:
+    - text: GhanaEd LMS is an
+    - strong: AI-powered, offline-first learning platform
+    - text: built for Ghanaian schools and fully aligned to the NaCCA curriculum from KG to SHS.
+  - list:
+    - listitem:
+      - text: Γû╕ Works
+      - strong: online and offline
+      - text: ΓÇö ideal for low-connectivity areas
+    - listitem: Γû╕ Installs like an app on phones, tablets and computers
+    - listitem: Γû╕ AI helps teachers plan and grade; students learn with a personal tutor
+    - listitem:
+      - text: Γû╕ Rich
+      - strong: BSTEM practical activities
+      - text: and exam preparation
+    - listitem:
+      - text: Γû╕ Complete
+      - strong: school administration
+      - text: for Head Teachers
+  - text: 6,991 Curriculum Docs 46 Subjects KGΓÇôSHS All Levels
+  - img "GhanaEd student dashboard"
+  - text: GhanaEd LMS Part A ┬╖ Everyone
+  - heading "Getting Started" [level=1]
+  - text: "3"
+  - heading "Log in & install" [level=2]
+  - list:
+    - listitem:
+      - text: Open a browser and go to
+      - strong: ghanaed.com
+      - text: ", then click"
+      - strong: Sign In
+      - text: .
+    - listitem:
+      - text: Enter the
+      - strong: username & password
+      - text: from your school administrator.
+    - listitem:
+      - text: You land on your
+      - strong: Dashboard
+      - text: ΓÇö your home base.
+    - listitem:
+      - text: "Install the app: tap the"
+      - strong: "\"Install App\""
+      - text: banner (or "Add to Home Screen").
+  - heading "Navigate the portal" [level=3]
+  - list:
+    - listitem:
+      - text: Γû╕ Main pages live under the
+      - strong: My Classroom
+      - text: dropdown
+    - listitem:
+      - text: Γû╕ On phones, tap the
+      - strong: menu (Γÿ░)
+      - text: icon
+    - listitem:
+      - text: Γû╕ Tap
+      - strong: Dashboard
+      - text: to return home anytime
+  - text: ≡ƒÆí
+  - strong: Add an email to your profile
+  - text: ΓÇö it's the only way to recover a forgotten password yourself.
+  - img "Dashboard home"
+  - text: GhanaEd LMS Part B ┬╖ Students
+  - heading "Viewing Lessons" [level=1]
+  - text: "4"
+  - list:
+    - listitem:
+      - text: Tap
+      - strong: Lessons
+      - text: . Use the
+      - strong: search bar
+      - text: or
+      - strong: subject filter
+      - text: to find a lesson.
+    - listitem: Tap a lesson card to open it.
+    - listitem:
+      - text: Switch between
+      - strong: Read
+      - text: (full text),
+      - strong: Cards
+      - text: (swipeable flashcards) and
+      - strong: Listen
+      - text: (audio).
+    - listitem:
+      - text: Tap
+      - strong: Mark as Completed
+      - text: ΓÇö earns
+      - strong: 5 game points
+      - text: and updates progress.
+  - text: ≡ƒº¬
+  - strong: BSTEM practicals
+  - text: are split across days (Part 1/3, 2/3ΓÇª). From Day 2, be ready for a quick
+  - strong: Mini Chalkboard recap
+  - text: .
+  - img "Lesson viewer"
+  - text: GhanaEd LMS Part B ┬╖ Students
+  - heading "Completing Assignments" [level=1]
+  - text: "5"
+  - heading "Written assignments" [level=2]
+  - list:
+    - listitem:
+      - text: Tap
+      - strong: Assignments
+      - text: ", open the card and read the instructions."
+    - listitem: Type your response in the text box.
+    - listitem:
+      - text: Tap
+      - strong: Submit
+      - text: (you can submit only once ΓÇö review first).
+  - heading "Quiz assignments" [level=3]
+  - list:
+    - listitem:
+      - text: Γû╕ Quiz cards show a
+      - strong: Quiz
+      - text: badge ΓÇö select one answer per question
+    - listitem:
+      - text: Γû╕ Tap
+      - strong: Submit Quiz
+      - text: ΓåÆ see
+      - strong: score, answers & explanations
+      - text: instantly
+    - listitem:
+      - text: Γû╕ Earn
+      - strong: 5 game points
+      - text: per submission
+  - text: ≡ƒÆí Overdue assignments show in
+  - strong: red
+  - text: on your Dashboard ΓÇö submit early!
+  - img "Assignments list"
+  - text: GhanaEd LMS Part B ┬╖ Students
+  - heading "Grades & Progress" [level=1]
+  - text: "6"
+  - heading "Check your grades" [level=2]
+  - list:
+    - listitem:
+      - text: Tap
+      - strong: My Grades
+      - text: to see your average and per-subject scores.
+    - listitem:
+      - text: "Use the tabs:"
+      - strong: Graded
+      - text: ","
+      - strong: Pending
+      - text: ","
+      - strong: All
+      - text: .
+    - listitem:
+      - text: Read each
+      - strong: score (/100)
+      - text: and your teacher's
+      - strong: feedback
+      - text: .
+  - heading "Track progress" [level=3]
+  - list:
+    - listitem:
+      - text: Γû╕ Tap
+      - strong: My Progress
+      - text: ΓåÆ progress bar of completed indicators per subject
+    - listitem:
+      - text: Γû╕ Expand a subject to see
+      - strong: strands
+      - text: "&"
+      - strong: indicators
+      - text: (green tick = done)
+  - text: "≡ƒÄ¿ Scores are colour-coded:"
+  - strong: green
+  - text: ΓëÑ70,
+  - strong: yellow
+  - text: 50ΓÇô69,
+  - strong: red
+  - text: below 50.
+  - img "My grades"
+  - text: GhanaEd LMS Part B ┬╖ Students
+  - heading "BECE & WASSCE Prep" [level=1]
+  - text: "7"
+  - list:
+    - listitem:
+      - text: From the Dashboard tap
+      - strong: Practice BECE
+      - text: (JHS) or
+      - strong: Practice WASSCE
+      - text: (SHS).
+    - listitem:
+      - text: Choose a subject ΓÇö see
+      - strong: predicted high-priority topics
+      - text: .
+    - listitem:
+      - text: Tap
+      - strong: Generate paper
+      - text: for a full WAEC-style paper (40 MCQs, ~30 min, 5 credits).
+    - listitem:
+      - text: Answer at your pace, then submit for
+      - strong: instant AI grading
+      - text: with explanations.
+  - text: Γû╢∩╕Å Try the
+  - strong: free demo paper
+  - text: first ΓÇö sample questions, no credits used.
+  - img "Practice BECE ΓÇö choose subject"
+  - img "Generate AI paper"
+  - text: GhanaEd LMS Part B ┬╖ Students
+  - heading "AI Tutor, Points & Rewards" [level=1]
+  - text: "8"
+  - heading "AI Tutor" [level=2]
+  - list:
+    - listitem:
+      - text: Γû╕ Open any lesson ΓåÆ use the
+      - strong: AI Tutor
+      - text: below the content
+    - listitem:
+      - text: "Γû╕ Ask anything:"
+      - emphasis: "\"Explain simply\""
+      - text: ","
+      - emphasis: "\"Give an example\""
+      - text: ","
+      - emphasis: "\"Quiz me\""
+  - heading "Earn game points" [level=3]
+  - list:
+    - listitem:
+      - text: Γû╕
+      - strong: "+5"
+      - text: complete a lesson ┬╖ submit a quiz/assignment ┬╖ finish a practice paper
+    - listitem:
+      - text: Γû╕
+      - strong: "+10"
+      - text: referral bonus when a friend signs up with your link
+    - listitem:
+      - text: Γû╕ Redeem
+      - strong: 50 points ΓåÆ 5 credits
+      - text: for AI features
+  - text: ≡ƒÅå Climb the
+  - strong: Top Learners
+  - text: leaderboard (This Week / Month / All Time) on your Profile.
+  - img "Dashboard XP and streak"
+  - text: GhanaEd LMS Part C ┬╖ Teachers
+  - heading "Your Teacher Home" [level=1]
+  - text: "9"
+  - paragraph:
+    - text: After logging in as a teacher you see your
+    - strong: Teacher Home
+    - text: with quick stats ΓÇö Classes, Pending grading, and Lesson Plans ΓÇö plus a
+    - strong: School Management
+    - text: entry.
+  - heading "Tools & Resources menu" [level=3]
+  - list:
+    - listitem:
+      - text: Γû╕
+      - strong: "Academic:"
+      - text: BECE Analyser, SHS Directory, Report Cards, SBA & Broadsheet
+    - listitem:
+      - text: Γû╕
+      - strong: "School:"
+      - text: Timetable, Attendance, Fee Management, Conduct
+    - listitem:
+      - text: Γû╕
+      - strong: "AI & Planning:"
+      - text: Teacher Portfolio, AI Letter Writer, AI Lesson Planner, Performance Appraisal
+  - text: ≡ƒÆí Open the menu (Γÿ░) anytime to reach every teaching and admin tool in one place.
+  - img "Teacher home"
+  - img "Tools menu"
+  - text: GhanaEd LMS Part C ┬╖ Teachers
+  - heading "Creating Lessons" [level=1]
+  - text: "10"
+  - heading "Option A ΓÇö Manually" [level=2]
+  - list:
+    - listitem:
+      - strong: Lessons ΓåÆ + New Lesson
+      - text: .
+    - listitem:
+      - text: Add a
+      - strong: title
+      - text: ", choose a"
+      - strong: subject
+      - text: ", write content in the editor."
+    - listitem:
+      - text: Click
+      - strong: Save Lesson
+      - text: ΓÇö instantly available to students.
+  - heading "Option B ΓÇö With AI" [level=3]
+  - list:
+    - listitem:
+      - text: Click
+      - strong: Create with AI
+      - text: to open the wizard.
+    - listitem:
+      - text: Enter the
+      - strong: topic
+      - text: ","
+      - strong: subject
+      - text: and a NaCCA
+      - strong: content standard
+      - text: .
+    - listitem:
+      - text: Click
+      - strong: Generate
+      - text: ΓåÆ review ΓåÆ accept or regenerate (fully editable).
+  - img "Lesson content"
+  - text: GhanaEd LMS Part C ┬╖ Teachers
+  - heading "Lesson Planner & BSTEM" [level=1]
+  - text: "11"
+  - heading "Plan a term, attach materials" [level=2]
+  - list:
+    - listitem:
+      - text: Open
+      - strong: Lesson Planner
+      - text: ΓåÆ build a
+      - strong: Daily Series
+      - text: or
+      - strong: Scheme of Work
+      - text: .
+    - listitem:
+      - text: On each day card click
+      - strong: + Note ┬╖ + Quiz ┬╖ + Task
+      - text: (5 credits each).
+    - listitem:
+      - text: Use
+      - strong: ΓÜí Bulk
+      - text: to generate for the whole term ΓÇö confirm the cost, watch live progress.
+    - listitem:
+      - strong: Publish
+      - text: drafts so students can see them.
+  - heading "≡ƒº¬ BSTEM Activity Library" [level=3]
+  - list:
+    - listitem:
+      - text: Γû╕
+      - strong: 49 NaCCA-aligned
+      - text: practical activities (Primary & JHS)
+    - listitem:
+      - text: Γû╕ Multi-session lessons with
+      - strong: Starter / Main / Plenary
+      - text: structure
+    - listitem: Γû╕ Mini Chalkboard recap & grouping-aware framing built in
+  - img "AI Lesson Planner"
+  - text: GhanaEd LMS Part C ┬╖ Teachers
+  - heading "Quizzes & Grading" [level=1]
+  - text: "12"
+  - heading "Generate a quiz" [level=2]
+  - list:
+    - listitem:
+      - text: Open a lesson ΓåÆ tap
+      - strong: Generate Quiz
+      - text: (10 questions).
+    - listitem:
+      - text: Review, toggle
+      - strong: Show Answers
+      - text: ", then"
+      - strong: Send as Assignment
+      - text: (auto-graded).
+  - heading "Grade with AI assistance" [level=3]
+  - list:
+    - listitem:
+      - strong: Assignments ΓåÆ submission ΓåÆ AI Grade
+      - text: .
+    - listitem:
+      - text: Review the suggested
+      - strong: grade, feedback, strengths & improvements
+      - text: .
+    - listitem:
+      - strong: Accept
+      - text: or modify before saving ΓÇö you always have the final say.
+  - text: ≡ƒÆí Quizzes are auto-scored on submit; you can still override any score.
+  - img "Assignments and quizzes"
+  - text: GhanaEd LMS Part C ┬╖ Teachers
+  - heading "Track, Discuss & Communicate" [level=1]
+  - text: "13"
+  - heading "Student Progress" [level=3]
+  - list:
+    - listitem:
+      - text: Γû╕
+      - strong: Student Progress
+      - text: ΓåÆ click a student for a subject-by-subject breakdown
+    - listitem: Γû╕ Identify gaps early ΓÇö review weekly
+  - heading "Discussion Board" [level=3]
+  - list:
+    - listitem:
+      - text: Γû╕
+      - strong: Discussions ΓåÆ New Topic
+      - text: for announcements & homework Q&A
+    - listitem: Γû╕ Pin, Lock, Mark Best Answer; students upvote & react
+  - heading "Letters & Messages to the Head" [level=3]
+  - list:
+    - listitem:
+      - text: Γû╕
+      - strong: My Letters
+      - text: ΓÇö formal, categorised, tracked (Submitted ΓåÆ Responded)
+    - listitem:
+      - text: Γû╕
+      - strong: Messages
+      - text: ΓÇö quick real-time chat with your Head Teacher
+  - img "Teacher home classes and plans"
+  - text: GhanaEd LMS Part D ┬╖ Head Teachers
+  - heading "School Setup & Classes" [level=1]
+  - text: "14"
+  - heading "Get your school running" [level=2]
+  - list:
+    - listitem:
+      - text: Receive your
+      - strong: School ID
+      - text: "& admin credentials, then"
+      - strong: log in to School Management
+      - text: .
+    - listitem:
+      - strong: Edit School Profile
+      - text: ΓÇö set the display name shown on report cards & timetables.
+    - listitem:
+      - text: Click
+      - strong: Create Class
+      - text: ΓÇö curriculum subjects are added automatically by level.
+    - listitem:
+      - text: Open a class card to access
+      - strong: 6 tabs
+      - text: ": Students ┬╖ Subjects ┬╖ Assessment ┬╖ Attendance ┬╖ Master Sheet ┬╖ Report Cards."
+  - text: ΓÜá∩╕Å Deleting a class permanently removes its students, subjects, assessments and report cards.
+  - img "School management"
+  - text: GhanaEd LMS Part D ┬╖ Head Teachers
+  - heading "Assessment, Attendance & Report Cards" [level=1]
+  - text: "15"
+  - heading "Assessment" [level=3]
+  - list:
+    - listitem:
+      - text: Γû╕
+      - strong: Assessment
+      - text: tab ΓåÆ Create Assessment Sheet (set reopening date & GES scheme)
+    - listitem:
+      - text: Γû╕ Click a subject ΓåÆ enter
+      - strong: Class
+      - text: "&"
+      - strong: Exam
+      - text: scores; view the
+      - strong: Master Sheet
+  - heading "Attendance" [level=3]
+  - list:
+    - listitem:
+      - text: Γû╕
+      - strong: Attendance
+      - text: tab ΓåÆ enter Total School Days & Days Present (absences auto-calc)
+  - heading "Report Cards" [level=3]
+  - list:
+    - listitem:
+      - text: Γû╕
+      - strong: Generate Report Cards
+      - text: ΓåÆ edit conduct, attitude, interest & promotion
+    - listitem:
+      - text: Γû╕
+      - strong: Print
+      - text: (A4) or
+      - strong: Generate Print Link
+      - text: to share with parents (no login)
+  - img "Report cards tools"
+  - text: GhanaEd LMS Part D ┬╖ Head Teachers
+  - heading "Leadership Tools" [level=1]
+  - text: "16"
+  - list:
+    - listitem:
+      - text: Γû╕
+      - strong: Teacher Performance
+      - text: ΓÇö full ranking (attendance, lesson-prep, output) by term/year
+    - listitem:
+      - text: Γû╕
+      - strong: Letters Inbox
+      - text: ΓÇö read & respond to teacher letters (New ΓåÆ In Review ΓåÆ Responded ΓåÆ Archived)
+    - listitem:
+      - text: Γû╕
+      - strong: Portfolio Reviews
+      - text: ΓÇö rate each teacher's NTC portfolio (Target / Approaching / Below)
+    - listitem:
+      - text: Γû╕
+      - strong: AI Term Report
+      - text: (10 credits) ΓÇö generate a District-Director report from live school data
+    - listitem:
+      - text: Γû╕
+      - strong: Messages
+      - text: ΓÇö chat with any teacher; fees & timetables managed centrally
+  - text: ≡ƒöÆ
+  - strong: "Privacy:"
+  - text: Heads see school-wide data; teachers see only their own letters, portfolios & chats.
+  - img "School management tools"
+  - text: GhanaEd LMS Part E ┬╖ Everyone
+  - heading "Free Public Tools" [level=1]
+  - text: "17"
+  - heading "BECE Analyser (/bece-analyser)" [level=3]
+  - list:
+    - listitem:
+      - text: Γû╕ Enter grades ΓåÆ automatic
+      - strong: aggregate
+      - text: + rating
+    - listitem:
+      - text: Γû╕ AI ranks
+      - strong: 9 SHS programmes
+      - text: with career paths
+    - listitem:
+      - text: Γû╕ Simulate
+      - strong: CSSPS
+      - text: with real placement rules (7 choices)
+  - heading "SHS Pathways" [level=3]
+  - list:
+    - listitem: Γû╕ Placement band, WASSCE subjects, readiness, university & career paths
+  - heading "SHS Directory (/shs-directory)" [level=3]
+  - list:
+    - listitem: Γû╕ Search/filter every Ghana SHS by region, category, type & gender
+  - img "Public tools in menu"
+  - text: GhanaEd LMS Part F ┬╖ Reference
+  - heading "Credits & Pricing" [level=1]
+  - text: "18"
+  - heading "What costs credits" [level=3]
+  - table:
+    - rowgroup:
+      - row "Feature Credits":
+        - columnheader "Feature"
+        - columnheader "Credits"
+      - row "AI Lesson Plan (full series) 10":
+        - cell "AI Lesson Plan (full series)"
+        - cell "10"
+      - row "Generate AI Lesson (single) 5":
+        - cell "Generate AI Lesson (single)"
+        - cell "5"
+      - row "Note / Quiz / Task on a plan 5 each":
+        - cell "Note / Quiz / Task on a plan"
+        - cell "5 each"
+      - row "Quick Quiz (standalone) 3":
+        - cell "Quick Quiz (standalone)"
+        - cell "3"
+      - row "AI Auto-Grade 2":
+        - cell "AI Auto-Grade"
+        - cell "2"
+      - row "AI Tutor (per message) 1":
+        - cell "AI Tutor (per message)"
+        - cell "1"
+      - row "BECE / WASSCE Paper 5":
+        - cell "BECE / WASSCE Paper"
+        - cell "5"
+      - row "AI Term Report (Head) 10":
+        - cell "AI Term Report (Head)"
+        - cell "10"
+  - heading "Credit packages" [level=3]
+  - table:
+    - rowgroup:
+      - row "Package Credits Price":
+        - columnheader "Package"
+        - columnheader "Credits"
+        - columnheader "Price"
+      - row "Starter 50 GHS 5":
+        - cell "Starter"
+        - cell "50"
+        - cell "GHS 5"
+      - row "Basic 150 GHS 12":
+        - cell "Basic"
+        - cell "150"
+        - cell "GHS 12"
+      - row "Standard 500 GHS 35":
+        - cell "Standard"
+        - cell "500"
+        - cell "GHS 35"
+      - row "Premium 1,200 GHS 60":
+        - cell "Premium"
+        - cell "1,200"
+        - cell "GHS 60"
+      - row "Mega 3,000 GHS 120":
+        - cell "Mega"
+        - cell "3,000"
+        - cell "GHS 120"
+  - text: ≡ƒÄü New accounts get
+  - strong: 20 free credits
+  - text: . Students can convert
+  - strong: 50 points ΓåÆ 5 credits
+  - text: . GhanaEd LMS Reference
+  - heading "Where to Find Everything" [level=1]
+  - text: "19"
+  - table:
+    - rowgroup:
+      - row "I want toΓÇª Go toΓÇª":
+        - columnheader "I want toΓÇª"
+        - columnheader "Go toΓÇª"
+      - row "Read a lesson (student) My Classroom ΓåÆ Lessons":
+        - cell "Read a lesson (student)"
+        - cell "My Classroom ΓåÆ Lessons"
+      - row "Submit homework (student) My Classroom ΓåÆ Assignments":
+        - cell "Submit homework (student)"
+        - cell "My Classroom ΓåÆ Assignments"
+      - row "Practise for BECE/WASSCE Dashboard ΓåÆ Practice BECE / WASSCE":
+        - cell "Practise for BECE/WASSCE"
+        - cell "Dashboard ΓåÆ Practice BECE / WASSCE"
+      - row "Create a lesson (teacher) Lessons ΓåÆ +New / Create with AI":
+        - cell "Create a lesson (teacher)"
+        - cell "Lessons ΓåÆ +New / Create with AI"
+      - row "Build a term plan (teacher) Lesson Planner":
+        - cell "Build a term plan (teacher)"
+        - cell "Lesson Planner"
+      - row "Grade work (teacher) Assignments ΓåÆ submission ΓåÆ AI Grade":
+        - cell "Grade work (teacher)"
+        - cell "Assignments ΓåÆ submission ΓåÆ AI Grade"
+      - row "Create a class (admin) School Management ΓåÆ Create Class":
+        - cell "Create a class (admin)"
+        - cell "School Management ΓåÆ Create Class"
+      - row "Enter scores / attendance (admin) Class ΓåÆ Assessment / Attendance tab":
+        - cell "Enter scores / attendance (admin)"
+        - cell "Class ΓåÆ Assessment / Attendance tab"
+      - row "Generate report cards (admin) Class ΓåÆ Report Cards tab":
+        - cell "Generate report cards (admin)"
+        - cell "Class ΓåÆ Report Cards tab"
+      - row "Teacher rankings / letters (head) Leadership ΓåÆ Performance / Letters":
+        - cell "Teacher rankings / letters (head)"
+        - cell "Leadership ΓåÆ Performance / Letters"
+      - row "Check BECE aggregate (anyone) /bece-analyser":
+        - cell "Check BECE aggregate (anyone)"
+        - cell "/bece-analyser"
+      - row "Find an SHS (anyone) /shs-directory":
+        - cell "Find an SHS (anyone)"
+        - cell "/shs-directory"
+  - text: GhanaEd LMS Thank You
+  - heading "Let's Get Started!" [level=1]
+  - text: Building Ghana's Future, One Lesson at a Time Install the app today Explore the Curriculum Try an AI lesson & BSTEM lab Visit
+  - strong: ghanaed.com
+  - text: "┬╖ Student Manual ┬╖ Teacher Guide ┬╖ Documentation GhanaEd by Somnia Osbrain Foundation ┬╖ Support: info@ghanaed.com"

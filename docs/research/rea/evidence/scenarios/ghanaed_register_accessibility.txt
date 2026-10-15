@@ -1,0 +1,23 @@
+- document:
+  - button "Install GhanaEd app":
+    - img
+  - img "GhanaEd"
+  - heading "Create your account" [level=1]
+  - paragraph: Join GhanaEd ΓÇö free starter credits included
+  - heading "How will you use GhanaEd?" [level=2]
+  - paragraph: Pick what fits you now. Personal accounts can request to join a school later.
+  - button "School or organisation Basic / private school, office, department, or grade-based system":
+    - strong: School or organisation
+    - text: Basic / private school, office, department, or grade-based system
+  - button "Personal account No school yet ΓÇö continue with Google, join a school when ready":
+    - strong: Personal account
+    - text: No school yet ΓÇö continue with Google, join a school when ready
+  - paragraph:
+    - text: Already have an account?
+    - link "Sign in":
+      - /url: /login
+  - paragraph:
+    - text: No card needed ┬╖ 20 free credits ┬╖
+    - link "Back to home":
+      - /url: /
+  - status

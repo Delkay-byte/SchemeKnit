@@ -1,0 +1,747 @@
+{
+  "evidence_id": "ev_c968a77f6fa7b080d9edebd54993c6f472b12440eafd94c7deebb5e0c87dba41",
+  "operation": "capture_browser_scenario",
+  "provider": {
+    "id": "rea-playwright-browser-scenario",
+    "name": "REA Playwright browser scenario capture provider",
+    "version": "1"
+  },
+  "start_origin": "https://shsplanner.com",
+  "browser": {
+    "mode": "launch",
+    "process_ownership": "provider-owned",
+    "cleanup": "terminated-owned-process",
+    "product": "Chromium",
+    "version": "155.0.8059.79"
+  },
+  "duration_ms": 31908,
+  "completeness": {
+    "status": "incomplete",
+    "equality_eligible": false,
+    "missing_sections": [
+      "action",
+      "events"
+    ],
+    "truncated_sections": []
+  },
+  "limitations": [
+    "Event sequence records provider receipt order; simultaneous browser causality is not inferred.",
+    "Network content is retained only when selected; Playwright response-body bytes are API results and are not guaranteed to match wire bytes.",
+    "Request bytes are limited to what Playwright exposes; not_exposed does not establish body absence or multipart file coverage.",
+    "Network content reads settle within 5 seconds each and the observer does not request bodies from unfinished responses.",
+    "Playwright scenario events do not expose request initiator stacks; receipt order does not prove causality.",
+    "Storage values are hashed only after declared-secret redaction.",
+    "Some network requests had not completed when capture ended; later activity is unknown."
+  ],
+  "steps": [
+    {
+      "step_id": "scenario_start",
+      "action": "goto_start",
+      "status": "completed",
+      "before_url": {
+        "url": "about:blank",
+        "origin": null,
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "after_url": {
+        "url": "https://www.shsplanner.com/",
+        "origin": "https://www.shsplanner.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "elapsed_ms": 6396,
+      "artifacts": {
+        "screenshot": {
+          "state": "not_requested"
+        },
+        "dom": {
+          "state": "not_requested"
+        },
+        "accessibility": {
+          "state": "not_requested"
+        },
+        "url": {
+          "url": "https://www.shsplanner.com/",
+          "origin": "https://www.shsplanner.com",
+          "query_parameter_names": [],
+          "redacted": false
+        },
+        "history": {
+          "state": "not_requested"
+        },
+        "storage": {
+          "state": "not_requested"
+        }
+      },
+      "error": null
+    },
+    {
+      "step_id": "settle",
+      "action": "wait_for_timeout",
+      "status": "completed",
+      "before_url": {
+        "url": "https://www.shsplanner.com/",
+        "origin": "https://www.shsplanner.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "after_url": {
+        "url": "https://www.shsplanner.com/",
+        "origin": "https://www.shsplanner.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "elapsed_ms": 4005,
+      "artifacts": {
+        "screenshot": {
+          "state": "not_requested"
+        },
+        "dom": {
+          "state": "not_requested"
+        },
+        "accessibility": {
+          "state": "not_requested"
+        },
+        "url": {
+          "url": "https://www.shsplanner.com/",
+          "origin": "https://www.shsplanner.com",
+          "query_parameter_names": [],
+          "redacted": false
+        },
+        "history": {
+          "state": "not_requested"
+        },
+        "storage": {
+          "state": "not_requested"
+        }
+      },
+      "error": null
+    },
+    {
+      "step_id": "pick_region",
+      "action": "select_option",
+      "status": "completed",
+      "before_url": {
+        "url": "https://www.shsplanner.com/",
+        "origin": "https://www.shsplanner.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "after_url": {
+        "url": "https://www.shsplanner.com/",
+        "origin": "https://www.shsplanner.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "elapsed_ms": 39,
+      "artifacts": {
+        "screenshot": {
+          "state": "not_requested"
+        },
+        "dom": {
+          "state": "not_requested"
+        },
+        "accessibility": {
+          "state": "not_requested"
+        },
+        "url": {
+          "url": "https://www.shsplanner.com/",
+          "origin": "https://www.shsplanner.com",
+          "query_parameter_names": [],
+          "redacted": false
+        },
+        "history": {
+          "state": "not_requested"
+        },
+        "storage": {
+          "state": "not_requested"
+        }
+      },
+      "error": null
+    },
+    {
+      "step_id": "after_region",
+      "action": "wait_for_timeout",
+      "status": "completed",
+      "before_url": {
+        "url": "https://www.shsplanner.com/",
+        "origin": "https://www.shsplanner.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "after_url": {
+        "url": "https://www.shsplanner.com/",
+        "origin": "https://www.shsplanner.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "elapsed_ms": 6011,
+      "artifacts": {
+        "screenshot": {
+          "state": "not_requested"
+        },
+        "dom": {
+          "state": "not_requested"
+        },
+        "accessibility": {
+          "state": "not_requested"
+        },
+        "url": {
+          "url": "https://www.shsplanner.com/",
+          "origin": "https://www.shsplanner.com",
+          "query_parameter_names": [],
+          "redacted": false
+        },
+        "history": {
+          "state": "not_requested"
+        },
+        "storage": {
+          "state": "not_requested"
+        }
+      },
+      "error": null
+    },
+    {
+      "step_id": "pick_schooltype",
+      "action": "click",
+      "status": "failed",
+      "before_url": {
+        "url": "https://www.shsplanner.com/",
+        "origin": "https://www.shsplanner.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "after_url": {
+        "url": "https://www.shsplanner.com/",
+        "origin": "https://www.shsplanner.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "elapsed_ms": 15050,
+      "artifacts": {
+        "screenshot": {
+          "state": "not_requested"
+        },
+        "dom": {
+          "file": "C:\\Users\\SAVIOUR\\AppData\\Local\\Temp\\opencode\\rea\\ex_shs_interact\\dom_pick_schooltype.txt",
+          "bytes": 136289,
+          "text_len": 136289
+        },
+        "accessibility": {
+          "file": "C:\\Users\\SAVIOUR\\AppData\\Local\\Temp\\opencode\\rea\\ex_shs_interact\\accessibility_pick_schooltype.txt",
+          "bytes": 6903,
+          "text_len": 6903
+        },
+        "url": {
+          "url": "https://www.shsplanner.com/",
+          "origin": "https://www.shsplanner.com",
+          "query_parameter_names": [],
+          "redacted": false
+        },
+        "history": {
+          "state": "not_requested"
+        },
+        "storage": {
+          "state": "not_requested"
+        }
+      },
+      "error": "Analysis operation timed out after 15000ms: capture_browser_scenario"
+    }
+  ],
+  "network": [
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://shsplanner.com/",
+        "origin": "https://shsplanner.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 301,
+      "resource_type": "document",
+      "txn": "request-1"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.shsplanner.com/",
+        "origin": "https://www.shsplanner.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "document",
+      "txn": "request-2"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;500;600;700&display=swap",
+        "origin": "https://fonts.googleapis.com",
+        "query_parameter_names": [
+          "family",
+          "family",
+          "display"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "stylesheet",
+      "txn": "request-3"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.shsplanner.com/assets/css/app.css?v=1.0",
+        "origin": "https://www.shsplanner.com",
+        "query_parameter_names": [
+          "v"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "stylesheet",
+      "txn": "request-4"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js",
+        "origin": "https://cdn.onesignal.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-5"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.shsplanner.com/assets/js/diagrams.js?v=1792021843",
+        "origin": "https://www.shsplanner.com",
+        "query_parameter_names": [
+          "v"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-6"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.shsplanner.com/assets/js/app.js?v=10.87",
+        "origin": "https://www.shsplanner.com",
+        "query_parameter_names": [
+          "v"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-7"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.shsplanner.com/manifest.webmanifest",
+        "origin": "https://www.shsplanner.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "manifest",
+      "txn": "request-8"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://fonts.gstatic.com/s/dmsans/v17/rP2Yp2ywxg089UriI5-g4vlH9VoD8Cmcqbu0-K4.woff2",
+        "origin": "https://fonts.gstatic.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "font",
+      "txn": "request-9"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js",
+        "origin": "https://cdn.jsdelivr.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-10"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://accounts.google.com/gsi/client",
+        "origin": "https://accounts.google.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-11"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.shsplanner.com/api/curriculum.php?action=subjects&year=1",
+        "origin": "https://www.shsplanner.com",
+        "query_parameter_names": [
+          "action",
+          "year"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-12"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.shsplanner.com/api/curriculum.php?action=version",
+        "origin": "https://www.shsplanner.com",
+        "query_parameter_names": [
+          "action"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-13"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.shsplanner.com/tracker.php?action=visit&sid=[redacted-session]&page=%2F&ref=",
+        "origin": "https://www.shsplanner.com",
+        "query_parameter_names": [
+          "action",
+          "sid",
+          "page",
+          "ref"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-14"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://fonts.gstatic.com/s/playfairdisplay/v40/nuFiD-vYSZviVYUb_rj3ij__anPXDTzYgA.woff2",
+        "origin": "https://fonts.gstatic.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "font",
+      "txn": "request-15"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.shsplanner.com/icon192.png",
+        "origin": "https://www.shsplanner.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-16"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.es6.js?v=160610",
+        "origin": "https://cdn.onesignal.com",
+        "query_parameter_names": [
+          "v"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-17"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://api.onesignal.com/sync/abd02438-3dd4-4ffb-b2e7-3d8e4d0306a0/web?callback=__jp0",
+        "origin": "https://api.onesignal.com",
+        "query_parameter_names": [
+          "callback"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-18"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.shsplanner.com/api/curriculum.php?action=subjects&year=1",
+        "origin": "https://www.shsplanner.com",
+        "query_parameter_names": [
+          "action",
+          "year"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-19"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://accounts.google.com/gsi/style",
+        "origin": "https://accounts.google.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "stylesheet",
+      "txn": "request-20"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://accounts.google.com/gsi/button?theme=outline&size=large&width=300&text=continue_with&is_fedcm_supported=true&client_id=557905936407-jomeaii3snonst1usfd87ip5qftah7v5.apps.googleusercontent.com&iframe_id=gsi_850861_699397&cas=OnJhvbbkt6KoNBMBRcUAyTggpcOq1BWYKVItqjOXe4c",
+        "origin": "https://accounts.google.com",
+        "query_parameter_names": [
+          "theme",
+          "size",
+          "width",
+          "text",
+          "is_fedcm_supported",
+          "client_id",
+          "iframe_id",
+          "cas"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "document",
+      "txn": "request-21"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.shsplanner.com/favicon.png",
+        "origin": "https://www.shsplanner.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "other",
+      "txn": "request-22"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.shsplanner.com/icon192.png",
+        "origin": "https://www.shsplanner.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "other",
+      "txn": "request-23"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.shsplanner.com/sw.js",
+        "origin": "https://www.shsplanner.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-24"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.shsplanner.com/favicon.png",
+        "origin": "https://www.shsplanner.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "other",
+      "txn": "request-25"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.shsplanner.com/",
+        "origin": "https://www.shsplanner.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-26"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.shsplanner.com/manifest.webmanifest",
+        "origin": "https://www.shsplanner.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-27"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.shsplanner.com/icon192.png",
+        "origin": "https://www.shsplanner.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-28"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.shsplanner.com/api/curriculum.php?action=subjects&year=2",
+        "origin": "https://www.shsplanner.com",
+        "query_parameter_names": [
+          "action",
+          "year"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-29"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.shsplanner.com/api/curriculum.php?action=subjects&year=2",
+        "origin": "https://www.shsplanner.com",
+        "query_parameter_names": [
+          "action",
+          "year"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-30"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://onesignal.com/sdks/web/v16/OneSignalSDK.page.styles.css?v=160610",
+        "origin": "https://onesignal.com",
+        "query_parameter_names": [
+          "v"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "stylesheet",
+      "txn": "request-31"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://api.onesignal.com/apps/abd02438-3dd4-4ffb-b2e7-3d8e4d0306a0/icon",
+        "origin": "https://api.onesignal.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-32"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://play.google.com/log?format=json&hasfast=true&authuser=0",
+        "origin": "https://play.google.com",
+        "query_parameter_names": [
+          "format",
+          "hasfast",
+          "authuser"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-33"
+    }
+  ],
+  "console": [
+    {
+      "level": "info",
+      "text": "Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner."
+    }
+  ],
+  "page_errors": [],
+  "websockets": [],
+  "downloads": [],
+  "screenshots": [],
+  "final_url": {
+    "url": "https://www.shsplanner.com/",
+    "origin": "https://www.shsplanner.com",
+    "query_parameter_names": [],
+    "redacted": false
+  }
+}

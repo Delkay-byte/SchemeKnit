@@ -1,0 +1,783 @@
+{
+  "log": {
+    "version": "1.2",
+    "creator": {
+      "name": "REA-derived sanitized summary",
+      "version": "1.0"
+    },
+    "note": "Derived from REA capture_browser_scenario Evidence; URL query values, headers values, cookies and bodies were never retained by REA.",
+    "entries": [
+      {
+        "_id": 1,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/register",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "document"
+      },
+      {
+        "_id": 2,
+        "request": {
+          "method": "GET",
+          "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap",
+          "queryParamNames": [
+            "family",
+            "display"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "stylesheet"
+      },
+      {
+        "_id": 3,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/index-CR7UdDlA.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 4,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/vendor-react-CLVQub2T.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 5,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/vendor-icons-C5TH_qft.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 6,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/index-DnZaqmQ3.css",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "stylesheet"
+      },
+      {
+        "_id": 7,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/registerSW.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 8,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/icon-160.webp",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 9,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/manifest.webmanifest",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "manifest"
+      },
+      {
+        "_id": 10,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/api/subscription/promo",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 11,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/favicon.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "other"
+      },
+      {
+        "_id": 12,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/styles-BE3EjIxi.css",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "stylesheet"
+      },
+      {
+        "_id": 13,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/bstem-pitch-DnqIxFtN.css",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "stylesheet"
+      },
+      {
+        "_id": 14,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/icon-192.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "other"
+      },
+      {
+        "_id": 15,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/sw.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 16,
+        "request": {
+          "method": "GET",
+          "url": "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 17,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/workbox-ace856c8.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "other"
+      },
+      {
+        "_id": 18,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/training.html",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 19,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/registerSW.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 20,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/index.html",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 21,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/icon-512.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 22,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/icon-192.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 23,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/favicon.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 24,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/apple-touch-icon.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 25,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/training/shots/screenshot-08.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 26,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/training/shots/screenshot-07.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 27,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/training/shots/screenshot-06.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 28,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/training/shots/screenshot-05.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 29,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/training/shots/screenshot-04.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 30,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/training/shots/screenshot-03.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 31,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/training/shots/screenshot-02.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 32,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/training/shots/screenshot-01.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 33,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/og/og-default.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 34,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/og/og-blog.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 35,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/og/og-bece.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 36,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/og/og-about.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 37,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/WebinarPage-CTKMuogV.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 38,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/WebinarPage-BxuYtICD.css",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 39,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/web-pV7OrOzz.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 40,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/web-BZzG5ETE.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 41,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/web--cMlcjkS.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 42,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/WasscePrepPage-DfhAKmQp.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 43,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/vendor-xlsx-CkFp8p6R.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 44,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/vendor-utils-B5CD4DQe.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 45,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/vendor-react-CLVQub2T.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 46,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/vendor-katex-CKvi5y7c.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 47,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/vendor-katex-CIHdCL6t.css",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 48,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/vendor-icons-C5TH_qft.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 49,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/vendor-charts-DvowBx4X.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 50,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/useMobileShell-CzdxAtFh.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 51,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/TutorialsPage-yNj8LdRz.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 52,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/TopBar-upagbeKz.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 53,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/tokens-BdqAd7aA.css",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 54,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/TimetableViewPage-Div2EAR2.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 55,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/TimetablePage-CDAuYphr.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 56,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/TermsOfServicePage-BUbOT-Af.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 57,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/TermlyExamWizardPage-BfW6MFHn.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 58,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/TermlyExams-DNbH0VD-.css",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 59,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/TermlyExams-dF_EPw3s.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 60,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/TermlyExamDetailPage-B7--nRd6.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 61,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/TeacherPortfolioPage-DGveiPOD.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 62,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/TeacherGuidePage-B1k3tDAA.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 63,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/TeacherEditor-Ccckcm2n.css",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 64,
+        "request": {
+          "method": "GET",
+          "url": "https://ghanaed.com/assets/TeacherEditor-BvSkGBxn.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": null
+        },
+        "_resourceType": "fetch"
+      }
+    ]
+  }
+}

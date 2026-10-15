@@ -1,0 +1,21 @@
+- document:
+  - heading "Tenaly ΓÇö Sign in or Create Account" [level=1]
+  - paragraph: AI lesson plans for Ghanaian teachers, KG to JHS.
+  - tablist:
+    - tab "Sign in" [selected]
+    - tab "Create account"
+  - tabpanel "Sign in":
+    - text: Email
+    - textbox
+    - text: Password
+    - textbox
+    - button "Show password"
+    - button "Sign in"
+    - link "Forgot password?":
+      - /url: /forgot-password
+  - text: or
+  - button "Continue with Google":
+    - img
+    - text: Continue with Google
+  - region "Notifications alt+T"
+  - button "Open help chat"

@@ -1,0 +1,126 @@
+- document:
+  - banner:
+    - link "SHS Planner":
+      - /url: https://shsplanner.com/
+    - navigation:
+      - link "Guides":
+        - /url: /guides/
+      - link "News":
+        - /url: /blog/
+      - link "Try the App":
+        - /url: https://shsplanner.com/
+  - article:
+    - heading "Sample Lesson Plan" [level=1]
+    - paragraph: Real, unedited output ΓÇö generated in about five minutes
+    - paragraph: "This is a complete lesson plan produced by SHS Planner, shown page by page exactly as it downloads. Nothing here was tidied up by hand: it is the Word document a teacher receives, formatted in the official template and ready to print."
+    - text: Tap any page to view it full size. The plan below is a General Science lesson for Year 1, but every subject follows the same structure.
+    - figure "Page 1 Header, Strand & Indicators Subject, week, duration and class size, followed by the strand, sub-strand, content standard and learning indicators pulled straight from the curriculum.":
+      - img "Sample lesson plan page 1 ΓÇö Header, Strand & Indicators"
+      - text: Page 1
+      - strong: Header, Strand & Indicators
+      - text: Subject, week, duration and class size, followed by the strand, sub-strand, content standard and learning indicators pulled straight from the curriculum.
+    - figure "Page 2 Essential Questions & Pedagogy Essential questions for both teachers and learners, plus the pedagogical strategies chosen for the lesson.":
+      - img "Sample lesson plan page 2 ΓÇö Essential Questions & Pedagogy"
+      - text: Page 2
+      - strong: Essential Questions & Pedagogy
+      - text: Essential questions for both teachers and learners, plus the pedagogical strategies chosen for the lesson.
+    - figure "Page 3 Teaching & Learning Resources The physical and digital resources needed, matched to the activities in the lesson.":
+      - img "Sample lesson plan page 3 ΓÇö Teaching & Learning Resources"
+      - text: Page 3
+      - strong: Teaching & Learning Resources
+      - text: The physical and digital resources needed, matched to the activities in the lesson.
+    - figure "Page 4 Introduction & Engagement The starter activity, written to connect the topic to something learners already recognise.":
+      - img "Sample lesson plan page 4 ΓÇö Introduction & Engagement"
+      - text: Page 4
+      - strong: Introduction & Engagement
+      - text: The starter activity, written to connect the topic to something learners already recognise.
+    - figure "Page 5 Main Lesson Activities Timed teaching activities with worked examples, learner tasks and differentiation built in.":
+      - img "Sample lesson plan page 5 ΓÇö Main Lesson Activities"
+      - text: Page 5
+      - strong: Main Lesson Activities
+      - text: Timed teaching activities with worked examples, learner tasks and differentiation built in.
+    - figure "Page 6 Worked Examples Step-by-step solutions laid out the way you would work them on the board.":
+      - img "Sample lesson plan page 6 ΓÇö Worked Examples"
+      - text: Page 6
+      - strong: Worked Examples
+      - text: Step-by-step solutions laid out the way you would work them on the board.
+    - figure "Page 7 Assessment & Marking The key assessment with its task, DoK levels and a full marking scheme.":
+      - img "Sample lesson plan page 7 ΓÇö Assessment & Marking"
+      - text: Page 7
+      - strong: Assessment & Marking
+      - text: The key assessment with its task, DoK levels and a full marking scheme.
+    - figure "Page 8 Closure & Reflection Lesson summary questions, homework, and the reflection section for after teaching.":
+      - img "Sample lesson plan page 8 ΓÇö Closure & Reflection"
+      - text: Page 8
+      - strong: Closure & Reflection
+      - text: Lesson summary questions, homework, and the reflection section for after teaching.
+    - heading "What Else You Can Generate" [level=2]
+    - link "≡ƒôï Assessments Exam paper, marking scheme and table of specification ΓÇö three separate documents Open the builder ΓåÆ":
+      - /url: https://shsplanner.com/?tab=assessment
+      - text: ≡ƒôï
+      - strong: Assessments
+      - text: Exam paper, marking scheme and table of specification ΓÇö three separate documents Open the builder ΓåÆ
+    - link "≡ƒô▒ Online Assessment Self-marking MCQ quiz your students take on their own phones Open the builder ΓåÆ":
+      - /url: https://shsplanner.com/?tab=assessment
+      - text: ≡ƒô▒
+      - strong: Online Assessment
+      - text: Self-marking MCQ quiz your students take on their own phones Open the builder ΓåÆ
+    - link "≡ƒôà Schemes of Work A full semester or academic year, built around your term dates Open the builder ΓåÆ":
+      - /url: https://shsplanner.com/?tab=tools
+      - text: ≡ƒôà
+      - strong: Schemes of Work
+      - text: A full semester or academic year, built around your term dates Open the builder ΓåÆ
+    - link "≡ƒôê PowerPoint Slides Classroom-ready slides with diagrams and worked examples Built from a lesson plan ΓåÆ":
+      - /url: https://shsplanner.com/?tab=planner
+      - text: ≡ƒôê
+      - strong: PowerPoint Slides
+      - text: Classroom-ready slides with diagrams and worked examples Built from a lesson plan ΓåÆ
+    - heading "Generate one for your own subject" [level=3]
+    - paragraph: Pick your subject, year and week ΓÇö and get a plan like this in the official template in about five minutes. Free credits on signup, no card required.
+    - link "Try SHS Planner Free":
+      - /url: https://shsplanner.com/
+    - heading "Common Questions" [level=2]
+    - term: Can I edit the plan after downloading?
+    - definition: Yes. It downloads as a standard Word document you can open and edit in Microsoft Word, Google Docs, WPS Office or any compatible app.
+    - term: Is this an official GES document?
+    - definition:
+      - text: No. SHS Planner is an independent website with no connection to GES or NaCCA. Documents are drafts for you to review and adapt ΓÇö see the
+      - link "About page":
+        - /url: /about.php
+      - text: .
+    - term: Which subjects are available?
+    - definition:
+      - text: A wide range of SHS subjects for Year 1 and Year 2, including core subjects, sciences, humanities, business, technical subjects and Ghanaian languages. More detail on the
+      - link "FAQ page":
+        - /url: /faq.php
+      - text: .
+  - contentinfo:
+    - paragraph:
+      - text: ┬⌐ 2026 SHS Planner ┬╖ Built by EDICODE TECHNOLOGIES for the Ghanaian teacher ┬╖
+      - link "shsplanner.com":
+        - /url: https://shsplanner.com/
+    - paragraph:
+      - link "About":
+        - /url: /about.php
+      - text: ┬╖
+      - link "Sample Plan":
+        - /url: /samples.php
+      - text: ┬╖
+      - link "FAQ":
+        - /url: /faq.php
+      - text: ┬╖
+      - link "Contact":
+        - /url: /contact.php
+      - text: ┬╖
+      - link "Guides":
+        - /url: /guides/
+      - text: ┬╖
+      - link "News":
+        - /url: /blog/
+    - paragraph:
+      - link "Privacy Policy":
+        - /url: /privacy.php
+      - text: ┬╖
+      - link "Terms of Service":
+        - /url: /terms.php
+    - paragraph: SHS Planner is an independent website and is not affiliated with GES, NaCCA or the Ministry of Education.

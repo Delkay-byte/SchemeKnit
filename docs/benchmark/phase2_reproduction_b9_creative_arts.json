@@ -1,0 +1,157 @@
+{
+ "authored": "2026-10-15 (post-P4, current main)",
+ "historical_artifact": {
+  "file": "docs/research/ghanaed/schemeknit_benchmark_lesson.json",
+  "note": "P1/P2-era deterministic output; preserved unmodified; scored 40/75 by the REA study with strand-concat topic, slot-fill prose ('…using ;') and 32/50-minute timing"
+ },
+ "inputs": {
+  "scheme": "sk_b9_creative_arts_scheme.docx",
+  "class_level": "Basic 9",
+  "subject": "Creative Arts and Design",
+  "indicator": "B9.1.3.1.1 Plan and execute design projects using the creative process.",
+  "strand": "DESIGN",
+  "sub_strand": "CREATIVE AND DESIGN PROCESSES",
+  "content_standard": "B9.1.3.1 Apply the creative process to manage design projects.",
+  "duration_minutes": 50,
+  "class_size": 30,
+  "source_tlrs": [
+   "Manila paper",
+   "Markers",
+   "Chart paper"
+  ],
+  "ai_mode": "OFF",
+  "zeli": "OFF",
+  "inputs_comparable": true,
+  "note": "identical source-week inputs as the archived artifact (code, indicator text, strand, sub-strand, standard, duration, scheme TLRs); lesson date/term dates are equivalent equivalents of the artifact's 2026-10 week"
+ },
+ "generated": {
+  "lesson_topic": "Plan and execute design projects using the creative process",
+  "previous_knowledge": "Previous lesson: CREATIVE AND DESIGN PROCESSES",
+  "content_standard": "B9.1.3.1 Apply the creative process to manage design projects.",
+  "content_standard_code": "B9.1.3.1",
+  "indicator_codes": [
+   "B9.1.3.1.1"
+  ],
+  "learning_objectives": [
+   {
+    "description": "Learners can Plan and execute design projects using the creative process.",
+    "indicator_code": "B9.1.3.1.1",
+    "source": "deterministic"
+   }
+  ],
+  "core_competencies": [
+   "Creativity and Innovation",
+   "Communication and Collaboration"
+  ],
+  "source_tlrs": [
+   "Manila paper",
+   "Markers",
+   "Chart paper"
+  ],
+  "teaching_learning_resources": [
+   "Manila paper",
+   "Markers",
+   "Chart paper",
+   "art materials",
+   "locally available materials",
+   "colours",
+   "paper",
+   "clay",
+   "instruments",
+   "locally available materials for making",
+   "display space",
+   "local materials for making",
+   "glue or thread"
+  ],
+  "starter_activity": "Build on the previous lesson ('CREATIVE AND DESIGN PROCESSES'). Perform the first step of Plan and execute design projects using the creative process without explaining it and ask learners to predict what you will do next and why. What to look for: Learners can plan and execute design projects using the creative process and the result meets two stated criteria.",
+  "introduction": "This lesson builds on 'CREATIVE AND DESIGN PROCESSES' and moves the class on to Plan and execute design projects using the creative process..",
+  "main_activities": [
+   {
+    "phase": "PHASE 1 · STARTER",
+    "description": "Build on the previous lesson ('CREATIVE AND DESIGN PROCESSES'). Perform the first step of Plan and execute design projects using the creative process without explaining it and ask learners to predict what you will do next and why. What to look for: Learners can plan and execute design projects using the creative process and the result meets two stated criteria.",
+    "duration_minutes": 8,
+    "source": "deterministic"
+   },
+   {
+    "phase": "CREATIVE DEMONSTRATION",
+    "description": "Teacher demonstrates the technique for Plan and execute design projects using the creative process with locally available materials, naming each step and the tools used. Look for: learners can name the key features of Plan and execute design projects using the creative process before you move on.",
+    "duration_minutes": 11,
+    "source": "deterministic"
+   },
+   {
+    "phase": "GUIDED CREATION",
+    "description": "Learners create their own work applying Plan and execute design projects using the creative process, using Manila paper; the teacher supports individuals. Step 2 · Guided creation: check each learner's work on Plan and execute design projects using the creative process and note anyone who needs help before the next step.",
+    "duration_minutes": 14,
+    "source": "deterministic"
+   },
+   {
+    "phase": "SHARE AND CRITIQUE",
+    "description": "Learners create their own work on Plan and execute design projects using the creative process using the technique and locally available materials; the teacher supports individuals. The finished work applies the stated criteria and the learner can justify two design choices.",
+    "duration_minutes": 7,
+    "source": "deterministic"
+   },
+   {
+    "phase": "PHASE 3 · PLENARY",
+    "description": "Three learners display or perform their work on Plan and execute design projects using the creative process; the class gives one kind, specific point of feedback each. Exit check: each learner answers one question about Plan and execute design projects using the creative process and the teacher marks each answer before leaving. Recap: each learner states in one sentence what they can now do with Plan and execute design projects using the creative process.",
+    "duration_minutes": 10,
+    "source": "deterministic"
+   }
+  ],
+  "learner_activities": [
+   "Learners state what they remember about Plan and execute design projects using the creative process and write one keyword in their books.",
+   "Examine the sample connected to Plan and execute design projects using the creative process and notice how it was made or performed.",
+   "Create your own work applying Plan and execute design projects using the creative process, using Manila paper.",
+   "Display or perform your work, give kind specific feedback on Plan and execute design projects using the creative process, then revise.",
+   "Learners answer the closing question about Plan and execute design projects using the creative process in their books and hand it in before leaving."
+  ],
+  "teacher_activities": [
+   "Build on the previous lesson ('CREATIVE AND DESIGN PROCESSES'). Perform the first step of Plan and execute design projects using the creative process without explaining it and ask learners to predict what you will do next and why. What to look for: Learners can plan and execute design projects using the creative process and the result meets two stated criteria.",
+   "Model Plan and execute design projects using the creative process slowly, think aloud, and check that all learners can see and hear.",
+   "Move around the room, observe each group, and correct misconceptions about Plan and execute design projects using the creative process on the spot.",
+   "Lead a short, kind critique, note one strength and one fix for each example relating to Plan and execute design projects using the creative process.",
+   "Three learners display or perform their work on Plan and execute design projects using the creative process; the class gives one kind, specific point of feedback each. Exit check: each learner answers one question about Plan and execute design projects using the creative process and the teacher marks each answer before leaving. Recap: each learner states in one sentence what they can now do with Plan and execute design projects using the creative process."
+  ],
+  "assessment": "Assess the created work or performance on Plan and execute design projects using the creative process against a simple rubric (technique, effort, expression). Success = Learners can plan and execute design projects using the creative process and the result meets two stated criteria. Assessment mode: Product or performance assessment with rubric.",
+  "differentiation": "Support: Provide a partially completed example and a checklist of the criteria.\nCore: all learners complete the main task on Plan and execute design projects using the creative process; the teacher checks that The finished work applies the stated criteria and the learner can justify two design choices.\nChallenge: Improve the work after peer feedback and explain which change improved it.\nGrouping: Whole-class demonstration, individual creation, peer critique in small groups.",
+  "class_assignment": "Learners create their own work applying Plan and execute design projects using the creative process, using locally available materials. The teacher observes technique and gives short feedback while they work. Set it in a situation from the learners' home, the nearby market or their local community.",
+  "home_assignment": "Finish or improve the work you started today on Plan and execute design projects using the creative process and bring it to the next lesson.",
+  "conclusion": "Three learners display or perform their work on Plan and execute design projects using the creative process; the class gives one kind, specific point of feedback each. Exit check: each learner answers one question about Plan and execute design projects using the creative process and the teacher marks each answer before leaving. Recap: each learner states in one sentence what they can now do with Plan and execute design projects using the creative process.",
+  "keywords": [
+   "Manila paper",
+   "Markers",
+   "Chart paper",
+   "projects",
+   "creative",
+   "invent"
+  ],
+  "stored_minutes_total": 50
+ },
+ "canonical_rubric": {
+  "scores": {
+   "indicator_fidelity": 5,
+   "objective_specificity": 5,
+   "topic_specificity": 5,
+   "phase1_usefulness": 5,
+   "phase2_usefulness": 5,
+   "phase3_usefulness": 5,
+   "activity_specificity": 5,
+   "teacher_action_clarity": 5,
+   "learner_action_clarity": 5,
+   "assessment_alignment": 5,
+   "resource_realism": 5,
+   "timing_integrity": 5,
+   "subject_pedagogy_fit": 4,
+   "ghana_context": 5,
+   "teachability": 5
+  },
+  "total": 74,
+  "teacher_ready": true,
+  "hard_failures": [],
+  "note": "same 15-criterion canonical rubric the P4 gate enforces"
+ },
+ "historical_defect_reproduction": {
+  "strand_concat_topic": false,
+  "slot_fill_artifacts": false,
+  "incomplete_timing": false
+ }
+}

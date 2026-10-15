@@ -1,0 +1,600 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GhanaEd LMS ΓÇö Training</title>
+<meta name="description" content="GhanaEd LMS training slides for students, teachers and head teachers ΓÇö step-by-step guidance to every feature.">
+<link rel="icon" href="/favicon.png">
+<style>
+  :root{
+    --green:#16a34a; --green-dark:#15803d; --ink:#0f172a; --muted:#475569;
+    --card:#ffffff; --accent:#f59e0b; --line:#e2e8f0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:linear-gradient(135deg,#0b1220 0%,#0f2027 100%);
+    color:var(--ink);
+  }
+  .topbar{
+    position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;
+    padding:12px 22px;background:rgba(11,18,32,.85);backdrop-filter:blur(8px);color:#fff;
+  }
+  .topbar .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px}
+  .topbar .brand img{height:30px;width:30px;border-radius:7px}
+  .topbar .actions{display:flex;gap:10px}
+  .topbar a,.topbar button{
+    color:#fff;text-decoration:none;border:1px solid rgba(255,255,255,.3);background:transparent;
+    padding:8px 14px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer
+  }
+  .topbar a.primary{background:var(--green);border-color:var(--green)}
+  .deck{max-width:1120px;margin:0 auto;padding:24px 16px 90px}
+  .slide{
+    background:var(--card);border-radius:20px;margin:0 auto 28px;
+    box-shadow:0 20px 50px rgba(0,0,0,.35);overflow:hidden;
+    min-height:640px;display:flex;flex-direction:column;page-break-after:always;position:relative;
+  }
+  .slide-head{
+    background:linear-gradient(135deg,var(--green) 0%,var(--green-dark) 100%);
+    color:#fff;padding:26px 40px;display:flex;align-items:center;justify-content:space-between;
+  }
+  .slide-head h1{font-size:30px;font-weight:800;letter-spacing:.3px}
+  .slide-head .kicker{font-size:14px;opacity:.9;text-transform:uppercase;letter-spacing:2px;font-weight:600}
+  .slide-no{font-size:13px;opacity:.85;background:rgba(255,255,255,.18);padding:6px 12px;border-radius:999px}
+  .slide-body{padding:34px 44px;flex:1;display:flex;gap:34px;align-items:flex-start}
+  .col-text{flex:1.25}
+  .col-shot{flex:1;display:flex;justify-content:center;align-items:flex-start}
+  .phone{border:10px solid #0f172a;border-radius:34px;overflow:hidden;box-shadow:0 18px 40px rgba(0,0,0,.4);max-width:300px;background:#000}
+  .phone img{display:block;width:100%;height:auto}
+  h2.lead{font-size:24px;color:var(--green-dark);margin-bottom:14px;font-weight:800}
+  h3.sub{font-size:17px;color:var(--ink);margin:18px 0 8px;font-weight:700}
+  p.intro{font-size:17px;color:var(--muted);line-height:1.6;margin-bottom:16px}
+  ol.steps{list-style:none;counter-reset:s;margin:8px 0}
+  ol.steps li{counter-increment:s;position:relative;padding:10px 0 10px 46px;font-size:16px;line-height:1.55;color:var(--ink);border-bottom:1px dashed var(--line)}
+  ol.steps li:last-child{border-bottom:none}
+  ol.steps li::before{content:counter(s);position:absolute;left:0;top:9px;width:30px;height:30px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px}
+  ul.bullets{list-style:none;margin:6px 0}
+  ul.bullets li{padding:7px 0 7px 26px;position:relative;font-size:16px;color:var(--ink);line-height:1.5}
+  ul.bullets li::before{content:"Γû╕";position:absolute;left:0;color:var(--green);font-weight:900}
+  .tip{margin-top:16px;background:#ecfdf5;border-left:5px solid var(--green);padding:12px 16px;border-radius:8px;font-size:15px;color:#065f46;line-height:1.5}
+  .warn{margin-top:16px;background:#fffbeb;border-left:5px solid var(--accent);padding:12px 16px;border-radius:8px;font-size:15px;color:#92400e;line-height:1.5}
+  strong{color:var(--green-dark)}
+  .title{background:linear-gradient(135deg,#15803d 0%,#0f766e 60%,#0b3d2e 100%);color:#fff;min-height:680px;align-items:center;justify-content:center;text-align:center;display:flex;flex-direction:column;padding:60px}
+  .title .badge{font-size:15px;letter-spacing:3px;text-transform:uppercase;opacity:.85;margin-bottom:16px}
+  .title h1{font-size:56px;font-weight:900;margin-bottom:10px}
+  .title .tag{font-size:24px;opacity:.95;font-style:italic;margin-bottom:30px}
+  .title .meta{font-size:16px;opacity:.85;line-height:1.8;border-top:1px solid rgba(255,255,255,.25);padding-top:22px;max-width:640px}
+  .pills{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:24px 0}
+  .pill{background:rgba(255,255,255,.15);padding:8px 16px;border-radius:999px;font-size:14px;font-weight:600}
+  .shots-row{display:flex;gap:24px;justify-content:center;flex-wrap:wrap;width:100%}
+  .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:10px 0}
+  .stat{background:#f8fafc;border:1px solid var(--line);border-radius:14px;padding:18px;text-align:center}
+  .stat .n{font-size:30px;font-weight:900;color:var(--green-dark)}
+  .stat .l{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:4px}
+  .table{width:100%;border-collapse:collapse;margin-top:8px;font-size:15px}
+  .table th,.table td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line)}
+  .table th{background:#f1f5f9;color:var(--ink);font-weight:700}
+  .brandbar{position:absolute;bottom:14px;left:24px;font-size:12px;color:#94a3b8;font-weight:700}
+
+  /* ΓöÇΓöÇ Presentation (full-screen, one slide per screen) ΓöÇΓöÇ */
+  body.present{overflow:hidden}
+  body.present .topbar{display:none}
+  body.present .deck{max-width:none;margin:0;padding:0;height:100vh;width:100vw;display:flex;align-items:center;justify-content:center}
+  body.present .slide{display:none;margin:0;border-radius:0;width:100vw;height:100vh;min-height:0;box-shadow:none;overflow:auto}
+  body.present .slide.current{display:flex;animation:fadeIn .35s ease}
+  @keyframes fadeIn{from{opacity:0;transform:scale(.985)}to{opacity:1;transform:none}}
+  body.present .slide-body{padding:5vh 7vw;gap:5vw;align-items:center}
+  body.present .slide-head{padding:3.2vh 7vw}
+  body.present .slide-head h1{font-size:clamp(28px,3.4vw,44px)}
+  body.present .phone{max-width:min(330px,32vw)}
+  body.present .title{height:100vh;min-height:0}
+  .pres-hud{display:none}
+  body.present .pres-hud{display:flex;position:fixed;bottom:0;left:0;right:0;z-index:60;align-items:center;gap:16px;padding:10px 20px;background:linear-gradient(180deg,transparent,rgba(11,18,32,.85));color:#fff}
+  .pres-hud button{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;width:42px;height:42px;border-radius:50%;font-size:18px;cursor:pointer;font-weight:800;display:flex;align-items:center;justify-content:center;transition:.15s}
+  .pres-hud button:hover{background:var(--green)}
+  .pres-hud .counter{font-size:14px;font-weight:700;min-width:64px;text-align:center}
+  .pres-hud .bar{flex:1;height:6px;background:rgba(255,255,255,.2);border-radius:999px;overflow:hidden}
+  .pres-hud .bar i{display:block;height:100%;background:var(--green);width:0;transition:width .3s}
+  .pres-hud .exit{margin-left:auto;font-size:13px;width:auto;padding:0 16px;border-radius:999px}
+
+  @media print{
+    body{background:#fff}.topbar,.pres-hud{display:none !important}
+    .deck{padding:0;max-width:none}
+    .slide{box-shadow:none;margin:0;border-radius:0;min-height:100vh;page-break-after:always}
+  }
+  @media(max-width:780px){.slide-body{flex-direction:column}.title h1{font-size:38px}}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a class="brand" href="/" style="border:none;padding:0">
+    <img src="/favicon.png" alt="GhanaEd"> GhanaEd LMS ┬╖ Training
+  </a>
+  <div class="actions">
+    <button onclick="startPresent()">Γû╢ Present</button>
+    <button onclick="window.print()">Γ¼ç Save as PDF</button>
+    <a href="/student-manual">Student Manual</a>
+    <a href="/teacher-guide">Teacher Guide</a>
+    <a class="primary" href="/login">Sign In</a>
+  </div>
+</div>
+
+<div class="deck">
+
+  <section class="slide title">
+    <div class="badge">Educator &amp; Student Training</div>
+    <h1>GhanaEd LMS</h1>
+    <div class="tag">AI-Powered Learning for Ghana's Future</div>
+    <div class="pills">
+      <span class="pill">≡ƒôÜ NaCCA Curriculum (KGΓÇôSHS)</span>
+      <span class="pill">≡ƒñû AI Lessons &amp; Tutor</span>
+      <span class="pill">≡ƒº¬ BSTEM Practicals</span>
+      <span class="pill">≡ƒÅ½ School Management</span>
+      <span class="pill">≡ƒô╢ Offline-First</span>
+    </div>
+    <div class="meta">Complete Training Slides ┬╖ Version 2.0 ┬╖ 2026<br>For Students, Teachers &amp; Head Teachers ┬╖ ghanaed.com</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-head"><div><div class="kicker">Overview</div><h1>What is GhanaEd LMS?</h1></div><span class="slide-no">2</span></div>
+    <div class="slide-body">
+      <div class="col-text">
+        <p class="intro">GhanaEd LMS is an <strong>AI-powered, offline-first learning platform</strong> built for Ghanaian schools and fully aligned to the NaCCA curriculum from KG to SHS.</p>
+        <ul class="bullets">
+          <li>Works <strong>online and offline</strong> ΓÇö ideal for low-connectivity areas</li>
+          <li>Installs like an app on phones, tablets and computers</li>
+          <li>AI helps teachers plan and grade; students learn with a personal tutor</li>
+          <li>Rich <strong>BSTEM practical activities</strong> and exam preparation</li>
+          <li>Complete <strong>school administration</strong> for Head Teachers</li>
+        </ul>
+        <div class="stat-grid">
+          <div class="stat"><div class="n">6,991</div><div class="l">Curriculum Docs</div></div>
+          <div class="stat"><div class="n">46</div><div class="l">Subjects</div></div>
+          <div class="stat"><div class="n">KGΓÇôSHS</div><div class="l">All Levels</div></div>
+        </div>
+      </div>
+      <div class="col-shot"><div class="phone"><img src="/training/shots/screenshot-01.png" alt="GhanaEd student dashboard"></div></div>
+    </div>
+    <div class="brandbar">GhanaEd LMS</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-head"><div><div class="kicker">Part A ┬╖ Everyone</div><h1>Getting Started</h1></div><span class="slide-no">3</span></div>
+    <div class="slide-body">
+      <div class="col-text">
+        <h2 class="lead">Log in &amp; install</h2>
+        <ol class="steps">
+          <li>Open a browser and go to <strong>ghanaed.com</strong>, then click <strong>Sign In</strong>.</li>
+          <li>Enter the <strong>username &amp; password</strong> from your school administrator.</li>
+          <li>You land on your <strong>Dashboard</strong> ΓÇö your home base.</li>
+          <li>Install the app: tap the <strong>"Install App"</strong> banner (or "Add to Home Screen").</li>
+        </ol>
+        <h3 class="sub">Navigate the portal</h3>
+        <ul class="bullets">
+          <li>Main pages live under the <strong>My Classroom</strong> dropdown</li>
+          <li>On phones, tap the <strong>menu (Γÿ░)</strong> icon</li>
+          <li>Tap <strong>Dashboard</strong> to return home anytime</li>
+        </ul>
+        <div class="tip">≡ƒÆí <strong>Add an email to your profile</strong> ΓÇö it's the only way to recover a forgotten password yourself.</div>
+      </div>
+      <div class="col-shot"><div class="phone"><img src="/training/shots/screenshot-01.png" alt="Dashboard home"></div></div>
+    </div>
+    <div class="brandbar">GhanaEd LMS</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-head"><div><div class="kicker">Part B ┬╖ Students</div><h1>Viewing Lessons</h1></div><span class="slide-no">4</span></div>
+    <div class="slide-body">
+      <div class="col-text">
+        <ol class="steps">
+          <li>Tap <strong>Lessons</strong>. Use the <strong>search bar</strong> or <strong>subject filter</strong> to find a lesson.</li>
+          <li>Tap a lesson card to open it.</li>
+          <li>Switch between <strong>Read</strong> (full text), <strong>Cards</strong> (swipeable flashcards) and <strong>Listen</strong> (audio).</li>
+          <li>Tap <strong>Mark as Completed</strong> ΓÇö earns <strong>5 game points</strong> and updates progress.</li>
+        </ol>
+        <div class="tip">≡ƒº¬ <strong>BSTEM practicals</strong> are split across days (Part 1/3, 2/3ΓÇª). From Day 2, be ready for a quick <strong>Mini Chalkboard recap</strong>.</div>
+      </div>
+      <div class="col-shot"><div class="phone"><img src="/training/shots/screenshot-02.png" alt="Lesson viewer"></div></div>
+    </div>
+    <div class="brandbar">GhanaEd LMS</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-head"><div><div class="kicker">Part B ┬╖ Students</div><h1>Completing Assignments</h1></div><span class="slide-no">5</span></div>
+    <div class="slide-body">
+      <div class="col-text">
+        <h2 class="lead">Written assignments</h2>
+        <ol class="steps">
+          <li>Tap <strong>Assignments</strong>, open the card and read the instructions.</li>
+          <li>Type your response in the text box.</li>
+          <li>Tap <strong>Submit</strong> (you can submit only once ΓÇö review first).</li>
+        </ol>
+        <h3 class="sub">Quiz assignments</h3>
+        <ul class="bullets">
+          <li>Quiz cards show a <strong>Quiz</strong> badge ΓÇö select one answer per question</li>
+          <li>Tap <strong>Submit Quiz</strong> ΓåÆ see <strong>score, answers &amp; explanations</strong> instantly</li>
+          <li>Earn <strong>5 game points</strong> per submission</li>
+        </ul>
+        <div class="tip">≡ƒÆí Overdue assignments show in <strong>red</strong> on your Dashboard ΓÇö submit early!</div>
+      </div>
+      <div class="col-shot"><div class="phone"><img src="/training/shots/screenshot-06.png" alt="Assignments list"></div></div>
+    </div>
+    <div class="brandbar">GhanaEd LMS</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-head"><div><div class="kicker">Part B ┬╖ Students</div><h1>Grades &amp; Progress</h1></div><span class="slide-no">6</span></div>
+    <div class="slide-body">
+      <div class="col-text">
+        <h2 class="lead">Check your grades</h2>
+        <ol class="steps">
+          <li>Tap <strong>My Grades</strong> to see your average and per-subject scores.</li>
+          <li>Use the tabs: <strong>Graded</strong>, <strong>Pending</strong>, <strong>All</strong>.</li>
+          <li>Read each <strong>score (/100)</strong> and your teacher's <strong>feedback</strong>.</li>
+        </ol>
+        <h3 class="sub">Track progress</h3>
+        <ul class="bullets">
+          <li>Tap <strong>My Progress</strong> ΓåÆ progress bar of completed indicators per subject</li>
+          <li>Expand a subject to see <strong>strands</strong> &amp; <strong>indicators</strong> (green tick = done)</li>
+        </ul>
+        <div class="tip">≡ƒÄ¿ Scores are colour-coded: <strong>green</strong> ΓëÑ70, <strong>yellow</strong> 50ΓÇô69, <strong>red</strong> below 50.</div>
+      </div>
+      <div class="col-shot"><div class="phone"><img src="/training/shots/screenshot-05.png" alt="My grades"></div></div>
+    </div>
+    <div class="brandbar">GhanaEd LMS</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-head"><div><div class="kicker">Part B ┬╖ Students</div><h1>BECE &amp; WASSCE Prep</h1></div><span class="slide-no">7</span></div>
+    <div class="slide-body">
+      <div class="col-text">
+        <ol class="steps">
+          <li>From the Dashboard tap <strong>Practice BECE</strong> (JHS) or <strong>Practice WASSCE</strong> (SHS).</li>
+          <li>Choose a subject ΓÇö see <strong>predicted high-priority topics</strong>.</li>
+          <li>Tap <strong>Generate paper</strong> for a full WAEC-style paper (40 MCQs, ~30 min, 5 credits).</li>
+          <li>Answer at your pace, then submit for <strong>instant AI grading</strong> with explanations.</li>
+        </ol>
+        <div class="tip">Γû╢∩╕Å Try the <strong>free demo paper</strong> first ΓÇö sample questions, no credits used.</div>
+      </div>
+      <div class="col-shot"><div class="shots-row">
+        <div class="phone"><img src="/training/shots/screenshot-03.png" alt="Practice BECE ΓÇö choose subject"></div>
+        <div class="phone"><img src="/training/shots/screenshot-04.png" alt="Generate AI paper"></div>
+      </div></div>
+    </div>
+    <div class="brandbar">GhanaEd LMS</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-head"><div><div class="kicker">Part B ┬╖ Students</div><h1>AI Tutor, Points &amp; Rewards</h1></div><span class="slide-no">8</span></div>
+    <div class="slide-body">
+      <div class="col-text">
+        <h2 class="lead">AI Tutor</h2>
+        <ul class="bullets">
+          <li>Open any lesson ΓåÆ use the <strong>AI Tutor</strong> below the content</li>
+          <li>Ask anything: <em>"Explain simply"</em>, <em>"Give an example"</em>, <em>"Quiz me"</em></li>
+        </ul>
+        <h3 class="sub">Earn game points</h3>
+        <ul class="bullets">
+          <li><strong>+5</strong> complete a lesson ┬╖ submit a quiz/assignment ┬╖ finish a practice paper</li>
+          <li><strong>+10</strong> referral bonus when a friend signs up with your link</li>
+          <li>Redeem <strong>50 points ΓåÆ 5 credits</strong> for AI features</li>
+        </ul>
+        <div class="tip">≡ƒÅå Climb the <strong>Top Learners</strong> leaderboard (This Week / Month / All Time) on your Profile.</div>
+      </div>
+      <div class="col-shot"><div class="phone"><img src="/training/shots/screenshot-01.png" alt="Dashboard XP and streak"></div></div>
+    </div>
+    <div class="brandbar">GhanaEd LMS</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-head"><div><div class="kicker">Part C ┬╖ Teachers</div><h1>Your Teacher Home</h1></div><span class="slide-no">9</span></div>
+    <div class="slide-body">
+      <div class="col-text">
+        <p class="intro">After logging in as a teacher you see your <strong>Teacher Home</strong> with quick stats ΓÇö Classes, Pending grading, and Lesson Plans ΓÇö plus a <strong>School Management</strong> entry.</p>
+        <h3 class="sub">Tools &amp; Resources menu</h3>
+        <ul class="bullets">
+          <li><strong>Academic:</strong> BECE Analyser, SHS Directory, Report Cards, SBA &amp; Broadsheet</li>
+          <li><strong>School:</strong> Timetable, Attendance, Fee Management, Conduct</li>
+          <li><strong>AI &amp; Planning:</strong> Teacher Portfolio, AI Letter Writer, AI Lesson Planner, Performance Appraisal</li>
+        </ul>
+        <div class="tip">≡ƒÆí Open the menu (Γÿ░) anytime to reach every teaching and admin tool in one place.</div>
+      </div>
+      <div class="col-shot"><div class="shots-row">
+        <div class="phone"><img src="/training/shots/screenshot-08.png" alt="Teacher home"></div>
+        <div class="phone"><img src="/training/shots/screenshot-07.png" alt="Tools menu"></div>
+      </div></div>
+    </div>
+    <div class="brandbar">GhanaEd LMS</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-head"><div><div class="kicker">Part C ┬╖ Teachers</div><h1>Creating Lessons</h1></div><span class="slide-no">10</span></div>
+    <div class="slide-body">
+      <div class="col-text">
+        <h2 class="lead">Option A ΓÇö Manually</h2>
+        <ol class="steps">
+          <li><strong>Lessons ΓåÆ + New Lesson</strong>.</li>
+          <li>Add a <strong>title</strong>, choose a <strong>subject</strong>, write content in the editor.</li>
+          <li>Click <strong>Save Lesson</strong> ΓÇö instantly available to students.</li>
+        </ol>
+        <h3 class="sub">Option B ΓÇö With AI</h3>
+        <ol class="steps">
+          <li>Click <strong>Create with AI</strong> to open the wizard.</li>
+          <li>Enter the <strong>topic</strong>, <strong>subject</strong> and a NaCCA <strong>content standard</strong>.</li>
+          <li>Click <strong>Generate</strong> ΓåÆ review ΓåÆ accept or regenerate (fully editable).</li>
+        </ol>
+      </div>
+      <div class="col-shot"><div class="phone"><img src="/training/shots/screenshot-02.png" alt="Lesson content"></div></div>
+    </div>
+    <div class="brandbar">GhanaEd LMS</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-head"><div><div class="kicker">Part C ┬╖ Teachers</div><h1>Lesson Planner &amp; BSTEM</h1></div><span class="slide-no">11</span></div>
+    <div class="slide-body">
+      <div class="col-text">
+        <h2 class="lead">Plan a term, attach materials</h2>
+        <ol class="steps">
+          <li>Open <strong>Lesson Planner</strong> ΓåÆ build a <strong>Daily Series</strong> or <strong>Scheme of Work</strong>.</li>
+          <li>On each day card click <strong>+ Note ┬╖ + Quiz ┬╖ + Task</strong> (5 credits each).</li>
+          <li>Use <strong>ΓÜí Bulk</strong> to generate for the whole term ΓÇö confirm the cost, watch live progress.</li>
+          <li><strong>Publish</strong> drafts so students can see them.</li>
+        </ol>
+        <h3 class="sub">≡ƒº¬ BSTEM Activity Library</h3>
+        <ul class="bullets">
+          <li><strong>49 NaCCA-aligned</strong> practical activities (Primary &amp; JHS)</li>
+          <li>Multi-session lessons with <strong>Starter / Main / Plenary</strong> structure</li>
+          <li>Mini Chalkboard recap &amp; grouping-aware framing built in</li>
+        </ul>
+      </div>
+      <div class="col-shot"><div class="phone"><img src="/training/shots/screenshot-07.png" alt="AI Lesson Planner"></div></div>
+    </div>
+    <div class="brandbar">GhanaEd LMS</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-head"><div><div class="kicker">Part C ┬╖ Teachers</div><h1>Quizzes &amp; Grading</h1></div><span class="slide-no">12</span></div>
+    <div class="slide-body">
+      <div class="col-text">
+        <h2 class="lead">Generate a quiz</h2>
+        <ol class="steps">
+          <li>Open a lesson ΓåÆ tap <strong>Generate Quiz</strong> (10 questions).</li>
+          <li>Review, toggle <strong>Show Answers</strong>, then <strong>Send as Assignment</strong> (auto-graded).</li>
+        </ol>
+        <h3 class="sub">Grade with AI assistance</h3>
+        <ol class="steps">
+          <li><strong>Assignments ΓåÆ submission ΓåÆ AI Grade</strong>.</li>
+          <li>Review the suggested <strong>grade, feedback, strengths &amp; improvements</strong>.</li>
+          <li><strong>Accept</strong> or modify before saving ΓÇö you always have the final say.</li>
+        </ol>
+        <div class="tip">≡ƒÆí Quizzes are auto-scored on submit; you can still override any score.</div>
+      </div>
+      <div class="col-shot"><div class="phone"><img src="/training/shots/screenshot-06.png" alt="Assignments and quizzes"></div></div>
+    </div>
+    <div class="brandbar">GhanaEd LMS</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-head"><div><div class="kicker">Part C ┬╖ Teachers</div><h1>Track, Discuss &amp; Communicate</h1></div><span class="slide-no">13</span></div>
+    <div class="slide-body">
+      <div class="col-text">
+        <h3 class="sub">Student Progress</h3>
+        <ul class="bullets">
+          <li><strong>Student Progress</strong> ΓåÆ click a student for a subject-by-subject breakdown</li>
+          <li>Identify gaps early ΓÇö review weekly</li>
+        </ul>
+        <h3 class="sub">Discussion Board</h3>
+        <ul class="bullets">
+          <li><strong>Discussions ΓåÆ New Topic</strong> for announcements &amp; homework Q&amp;A</li>
+          <li>Pin, Lock, Mark Best Answer; students upvote &amp; react</li>
+        </ul>
+        <h3 class="sub">Letters &amp; Messages to the Head</h3>
+        <ul class="bullets">
+          <li><strong>My Letters</strong> ΓÇö formal, categorised, tracked (Submitted ΓåÆ Responded)</li>
+          <li><strong>Messages</strong> ΓÇö quick real-time chat with your Head Teacher</li>
+        </ul>
+      </div>
+      <div class="col-shot"><div class="phone"><img src="/training/shots/screenshot-08.png" alt="Teacher home classes and plans"></div></div>
+    </div>
+    <div class="brandbar">GhanaEd LMS</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-head"><div><div class="kicker">Part D ┬╖ Head Teachers</div><h1>School Setup &amp; Classes</h1></div><span class="slide-no">14</span></div>
+    <div class="slide-body">
+      <div class="col-text">
+        <h2 class="lead">Get your school running</h2>
+        <ol class="steps">
+          <li>Receive your <strong>School ID</strong> &amp; admin credentials, then <strong>log in to School Management</strong>.</li>
+          <li><strong>Edit School Profile</strong> ΓÇö set the display name shown on report cards &amp; timetables.</li>
+          <li>Click <strong>Create Class</strong> ΓÇö curriculum subjects are added automatically by level.</li>
+          <li>Open a class card to access <strong>6 tabs</strong>: Students ┬╖ Subjects ┬╖ Assessment ┬╖ Attendance ┬╖ Master Sheet ┬╖ Report Cards.</li>
+        </ol>
+        <div class="warn">ΓÜá∩╕Å Deleting a class permanently removes its students, subjects, assessments and report cards.</div>
+      </div>
+      <div class="col-shot"><div class="phone"><img src="/training/shots/screenshot-08.png" alt="School management"></div></div>
+    </div>
+    <div class="brandbar">GhanaEd LMS</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-head"><div><div class="kicker">Part D ┬╖ Head Teachers</div><h1>Assessment, Attendance &amp; Report Cards</h1></div><span class="slide-no">15</span></div>
+    <div class="slide-body">
+      <div class="col-text">
+        <h3 class="sub">Assessment</h3>
+        <ul class="bullets">
+          <li><strong>Assessment</strong> tab ΓåÆ Create Assessment Sheet (set reopening date &amp; GES scheme)</li>
+          <li>Click a subject ΓåÆ enter <strong>Class</strong> &amp; <strong>Exam</strong> scores; view the <strong>Master Sheet</strong></li>
+        </ul>
+        <h3 class="sub">Attendance</h3>
+        <ul class="bullets"><li><strong>Attendance</strong> tab ΓåÆ enter Total School Days &amp; Days Present (absences auto-calc)</li></ul>
+        <h3 class="sub">Report Cards</h3>
+        <ul class="bullets">
+          <li><strong>Generate Report Cards</strong> ΓåÆ edit conduct, attitude, interest &amp; promotion</li>
+          <li><strong>Print</strong> (A4) or <strong>Generate Print Link</strong> to share with parents (no login)</li>
+        </ul>
+      </div>
+      <div class="col-shot"><div class="phone"><img src="/training/shots/screenshot-07.png" alt="Report cards tools"></div></div>
+    </div>
+    <div class="brandbar">GhanaEd LMS</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-head"><div><div class="kicker">Part D ┬╖ Head Teachers</div><h1>Leadership Tools</h1></div><span class="slide-no">16</span></div>
+    <div class="slide-body">
+      <div class="col-text">
+        <ul class="bullets">
+          <li><strong>Teacher Performance</strong> ΓÇö full ranking (attendance, lesson-prep, output) by term/year</li>
+          <li><strong>Letters Inbox</strong> ΓÇö read &amp; respond to teacher letters (New ΓåÆ In Review ΓåÆ Responded ΓåÆ Archived)</li>
+          <li><strong>Portfolio Reviews</strong> ΓÇö rate each teacher's NTC portfolio (Target / Approaching / Below)</li>
+          <li><strong>AI Term Report</strong> (10 credits) ΓÇö generate a District-Director report from live school data</li>
+          <li><strong>Messages</strong> ΓÇö chat with any teacher; fees &amp; timetables managed centrally</li>
+        </ul>
+        <div class="tip">≡ƒöÆ <strong>Privacy:</strong> Heads see school-wide data; teachers see only their own letters, portfolios &amp; chats.</div>
+      </div>
+      <div class="col-shot"><div class="phone"><img src="/training/shots/screenshot-07.png" alt="School management tools"></div></div>
+    </div>
+    <div class="brandbar">GhanaEd LMS</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-head"><div><div class="kicker">Part E ┬╖ Everyone</div><h1>Free Public Tools</h1></div><span class="slide-no">17</span></div>
+    <div class="slide-body">
+      <div class="col-text">
+        <h3 class="sub">BECE Analyser (/bece-analyser)</h3>
+        <ul class="bullets">
+          <li>Enter grades ΓåÆ automatic <strong>aggregate</strong> + rating</li>
+          <li>AI ranks <strong>9 SHS programmes</strong> with career paths</li>
+          <li>Simulate <strong>CSSPS</strong> with real placement rules (7 choices)</li>
+        </ul>
+        <h3 class="sub">SHS Pathways</h3>
+        <ul class="bullets"><li>Placement band, WASSCE subjects, readiness, university &amp; career paths</li></ul>
+        <h3 class="sub">SHS Directory (/shs-directory)</h3>
+        <ul class="bullets"><li>Search/filter every Ghana SHS by region, category, type &amp; gender</li></ul>
+      </div>
+      <div class="col-shot"><div class="phone"><img src="/training/shots/screenshot-07.png" alt="Public tools in menu"></div></div>
+    </div>
+    <div class="brandbar">GhanaEd LMS</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-head"><div><div class="kicker">Part F ┬╖ Reference</div><h1>Credits &amp; Pricing</h1></div><span class="slide-no">18</span></div>
+    <div class="slide-body" style="flex-direction:column">
+      <div style="display:flex;gap:30px;width:100%">
+        <div style="flex:1">
+          <h3 class="sub">What costs credits</h3>
+          <table class="table">
+            <tbody><tr><th>Feature</th><th>Credits</th></tr>
+            <tr><td>AI Lesson Plan (full series)</td><td>10</td></tr>
+            <tr><td>Generate AI Lesson (single)</td><td>5</td></tr>
+            <tr><td>Note / Quiz / Task on a plan</td><td>5 each</td></tr>
+            <tr><td>Quick Quiz (standalone)</td><td>3</td></tr>
+            <tr><td>AI Auto-Grade</td><td>2</td></tr>
+            <tr><td>AI Tutor (per message)</td><td>1</td></tr>
+            <tr><td>BECE / WASSCE Paper</td><td>5</td></tr>
+            <tr><td>AI Term Report (Head)</td><td>10</td></tr>
+          </tbody></table>
+        </div>
+        <div style="flex:1">
+          <h3 class="sub">Credit packages</h3>
+          <table class="table">
+            <tbody><tr><th>Package</th><th>Credits</th><th>Price</th></tr>
+            <tr><td>Starter</td><td>50</td><td>GHS 5</td></tr>
+            <tr><td>Basic</td><td>150</td><td>GHS 12</td></tr>
+            <tr><td>Standard</td><td>500</td><td>GHS 35</td></tr>
+            <tr><td>Premium</td><td>1,200</td><td>GHS 60</td></tr>
+            <tr><td>Mega</td><td>3,000</td><td>GHS 120</td></tr>
+          </tbody></table>
+          <div class="tip">≡ƒÄü New accounts get <strong>20 free credits</strong>. Students can convert <strong>50 points ΓåÆ 5 credits</strong>.</div>
+        </div>
+      </div>
+    </div>
+    <div class="brandbar">GhanaEd LMS</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-head"><div><div class="kicker">Reference</div><h1>Where to Find Everything</h1></div><span class="slide-no">19</span></div>
+    <div class="slide-body" style="flex-direction:column">
+      <table class="table">
+        <tbody><tr><th>I want toΓÇª</th><th>Go toΓÇª</th></tr>
+        <tr><td>Read a lesson (student)</td><td>My Classroom ΓåÆ Lessons</td></tr>
+        <tr><td>Submit homework (student)</td><td>My Classroom ΓåÆ Assignments</td></tr>
+        <tr><td>Practise for BECE/WASSCE</td><td>Dashboard ΓåÆ Practice BECE / WASSCE</td></tr>
+        <tr><td>Create a lesson (teacher)</td><td>Lessons ΓåÆ +New / Create with AI</td></tr>
+        <tr><td>Build a term plan (teacher)</td><td>Lesson Planner</td></tr>
+        <tr><td>Grade work (teacher)</td><td>Assignments ΓåÆ submission ΓåÆ AI Grade</td></tr>
+        <tr><td>Create a class (admin)</td><td>School Management ΓåÆ Create Class</td></tr>
+        <tr><td>Enter scores / attendance (admin)</td><td>Class ΓåÆ Assessment / Attendance tab</td></tr>
+        <tr><td>Generate report cards (admin)</td><td>Class ΓåÆ Report Cards tab</td></tr>
+        <tr><td>Teacher rankings / letters (head)</td><td>Leadership ΓåÆ Performance / Letters</td></tr>
+        <tr><td>Check BECE aggregate (anyone)</td><td>/bece-analyser</td></tr>
+        <tr><td>Find an SHS (anyone)</td><td>/shs-directory</td></tr>
+      </tbody></table>
+    </div>
+    <div class="brandbar">GhanaEd LMS</div>
+  </section>
+
+  <section class="slide title">
+    <div class="badge">Thank You</div>
+    <h1>Let's Get Started!</h1>
+    <div class="tag">Building Ghana's Future, One Lesson at a Time</div>
+    <div class="pills">
+      <span class="pill">Install the app today</span>
+      <span class="pill">Explore the Curriculum</span>
+      <span class="pill">Try an AI lesson &amp; BSTEM lab</span>
+    </div>
+    <div class="meta">Visit <strong>ghanaed.com</strong> ┬╖ Student Manual ┬╖ Teacher Guide ┬╖ Documentation<br>GhanaEd by Somnia Osbrain Foundation ┬╖ Support: info@ghanaed.com</div>
+  </section>
+
+</div>
+
+<div class="pres-hud" aria-hidden="true">
+  <button onclick="prevSlide()" title="Previous (ΓåÉ)">ΓÇ╣</button>
+  <button onclick="nextSlide()" title="Next (ΓåÆ)">ΓÇ║</button>
+  <span class="counter"><span id="cur">1</span> / <span id="tot">20</span></span>
+  <div class="bar"><i id="pbar"></i></div>
+  <button class="exit" onclick="exitPresent()" title="Exit (Esc)">Exit Γ£ò</button>
+</div>
+
+<script>
+  const slides = Array.from(document.querySelectorAll('.deck .slide'));
+  let idx = 0;
+  document.getElementById('tot').textContent = slides.length;
+  function show(i){
+    idx = Math.max(0, Math.min(slides.length - 1, i));
+    slides.forEach((s, n) => s.classList.toggle('current', n === idx));
+    document.getElementById('cur').textContent = idx + 1;
+    document.getElementById('pbar').style.width = ((idx + 1) / slides.length * 100) + '%';
+    slides[idx].scrollTop = 0;
+  }
+  function nextSlide(){ show(idx + 1); }
+  function prevSlide(){ show(idx - 1); }
+  function startPresent(){
+    document.body.classList.add('present');
+    show(0);
+    if (document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+  }
+  function exitPresent(){
+    document.body.classList.remove('present');
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  }
+  document.addEventListener('keydown', e => {
+    if (!document.body.classList.contains('present')) {
+      if (e.key === 'F5') { e.preventDefault(); startPresent(); }
+      return;
+    }
+    if (['ArrowRight', 'PageDown', ' ', 'Enter'].includes(e.key)) { e.preventDefault(); nextSlide(); }
+    else if (['ArrowLeft', 'PageUp', 'Backspace'].includes(e.key)) { e.preventDefault(); prevSlide(); }
+    else if (e.key === 'Home') { e.preventDefault(); show(0); }
+    else if (e.key === 'End') { e.preventDefault(); show(slides.length - 1); }
+    else if (e.key === 'Escape') { exitPresent(); }
+  });
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement) document.body.classList.remove('present');
+  });
+</script>
+
+
+</body></html>

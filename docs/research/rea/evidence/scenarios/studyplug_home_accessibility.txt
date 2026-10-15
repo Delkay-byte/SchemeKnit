@@ -1,0 +1,174 @@
+- document:
+  - main:
+    - navigation:
+      - link "StudyPlugHub StudyPlugHub":
+        - /url: /
+        - img "StudyPlugHub"
+        - text: StudyPlugHub
+      - link "About":
+        - /url: /about
+      - link "FAQ":
+        - /url: /faq
+      - link "Contact":
+        - /url: /contact
+      - link "StudyPlugHub on TikTok":
+        - /url: https://tiktok.com/@studyplughub
+        - img
+      - link "StudyPlugHub on YouTube":
+        - /url: https://youtube.com/@studyplughub
+        - img
+    - text: Akwaaba ≡ƒç¼≡ƒç¡
+    - heading "StudyPlugHub Ghana" [level=1]
+    - paragraph: AI-powered learning, built on the NaCCA curriculum
+    - paragraph: Every Ghanaian student. Every Ghanaian teacher. Free for learning. Always.
+    - text: 100% JSS coverage 39+ SHS subjects 100% NaCCA-aligned WAEC/WASSCE-anchored Study offline Higher education welcome Γåô Pick your door ≡ƒÄô For Students
+    - heading "I'm a Student" [level=3]
+    - paragraph: Get Frema, your AI tutor. WASSCE prep, essays, daily study companion ΓÇö built around the curriculum you actually sit exams on.
+    - region "Tool preview carousel":
+      - img "Frema, the AI tutor ΓÇö Socratic answers on SHS and JSS subjects"
+      - paragraph: Frema
+      - paragraph: AI Tutor
+      - button "Previous slide"
+      - button "Next slide"
+      - 'button "Go to slide 1: Frema"'
+      - 'button "Go to slide 2: Berur"'
+      - 'button "Go to slide 3: Exam Master"'
+      - 'button "Go to slide 4: Writing Coach"'
+    - link "Start learning":
+      - /url: https://studyplughub.com/?country=ghana&curriculum=waec-secondary
+    - text: ≡ƒôï For Teachers
+    - heading "I'm a Teacher" [level=3]
+    - paragraph: Plan lessons, set exams, print student notes, write report cards. One PDF in ΓÇö a complete NaCCA-aligned teaching pack out, in minutes.
+    - region "Tool preview carousel":
+      - 'img "Teaching Pack: Photosynthesis output, referencing NaCCA Learning Indicator 3.1.1.LI.1"'
+      - paragraph: Resource Summariser
+      - paragraph: Upload a PDF, get a teaching pack
+      - button "Previous slide"
+      - button "Next slide"
+      - 'button "Go to slide 1: Resource Summariser"'
+      - 'button "Go to slide 2: Lesson Planner"'
+      - 'button "Go to slide 3: Student Handout"'
+      - 'button "Go to slide 4: Exam Generator"'
+      - 'button "Go to slide 5: Wellbeing Hub"'
+    - link "Start teaching":
+      - /url: https://teachers.studyplughub.com/?country=ghana&curriculum=waec-secondary
+    - paragraph: Every screenshot above is from live production, generated end-to-end from a single PDF.
+    - paragraph: No demos. No mockups. This is what Ghanaian students and teachers get today.
+    - text: The promise
+    - heading "Why StudyPlugHub" [level=2]
+    - paragraph: One platform. Four stakeholders. Built so everyone in the Ghanaian classroom wins.
+    - text: Pillar 01
+    - heading "Coverage" [level=3]
+    - paragraph: Built on the curriculum teachers actually teach.
+    - list:
+      - listitem: Full NaCCA curriculum alignment, JSS to SHS
+      - listitem: WAEC/WASSCE-anchored ΓÇö 2024 and 2025 papers indexed
+      - listitem: Pedagogical exemplars for every Learning Indicator
+      - listitem: Rich Ghanaian contexts ΓÇö Cape Coast Castle, Tema Oil Refinery, Auntie Ama from Koforidua
+      - listitem: Higher education welcome ΓÇö tools designed for university students, polytechnic learners, and lecturers
+    - text: 39+
+    - paragraph: SHS subjects, including foreign languages and electives ┬╖ 100% JSS ┬╖ higher ed welcome
+    - text: Pillar 02
+    - heading "Our Promise" [level=3]
+    - paragraph: Learn it. Don't fake it.
+    - list:
+      - listitem: AI that teaches students to think, not think for them
+      - listitem: Socratic answers that build real understanding
+      - listitem: Reduces teacher workload by 70ΓÇô80%
+      - listitem: Lessons, exams, handouts ΓÇö all from one upload
+    - text: 70ΓÇô80%
+    - paragraph: Teacher workload reduction
+    - text: Pillar 03
+    - heading "For Parents" [level=3]
+    - paragraph: Peace of mind, built in.
+    - list:
+      - listitem: A platform that supports both your child AND their teachers
+      - listitem: Real progress ΓÇö not gamed scores or shortcut answers
+      - listitem: "Cultural respect built in: Akwaaba, Sankofa, Ghanaian examples"
+      - listitem: Free for every Ghanaian family. No card. No subscription.
+    - text: Γé╡0
+    - paragraph: What your family pays. Ever.
+    - text: Pillar 04
+    - heading "For Institutions" [level=3]
+    - paragraph: Partnership-ready. NaCCA-aligned by design.
+    - list:
+      - listitem: Built for NaCCA, GES, and the Ministry of Education
+      - listitem: Open to forward-thinking schools and districts
+      - listitem: Pan-African EdTech roadmap ΓÇö Ghana is the flagship
+      - listitem: "Reach us: partnerships@studyplughub.com"
+    - text: ≡ƒñ¥
+    - paragraph: Open to partnership
+    - link "≡ƒô¿ Start a conversation":
+      - /url: mailto:partnerships@studyplughub.com?subject=Ghana%20Partnership%20Inquiry
+    - text: Coming next on the roadmap TVET pathway Local languages Voice prompts Voices
+    - heading "Real voices. Real Ghana." [level=2]
+    - paragraph: Teachers, students, and parents ΓÇö the voices of the Ghanaian classroom.
+    - region "Voices from teachers, students, and parents":
+      - text: Parent Γ£¿ Verified
+      - paragraph: ΓÇ£StudyPlugHub has been a game-changer for my daughterΓÇÖs education. The platformΓÇÖs interactive tools and past question practice helped build her confidence and understanding of key concepts. WeΓÇÖre grateful for StudyPlugHubΓÇÖs impact on her academic success ΓÇö she is now in SHS 2. IΓÇÖd recommend it to other parents whose children are entering SHS level ΓÇö let them test and see.ΓÇ¥
+      - img "Portrait of George Oppong"
+      - paragraph: George Oppong
+      - paragraph: Father ┬╖ Tema ┬╖ ≡ƒç¼≡ƒç¡ Ghana
+      - text: Teacher
+      - paragraph: ΓÇ£Teacher voices coming soon. WeΓÇÖre working with SHS teachers across Greater Accra and Ashanti to gather feedback from the Ghanaian classroom.ΓÇ¥
+      - paragraph: Teacher voices
+      - paragraph: Joining the conversation ┬╖ ≡ƒç¼≡ƒç¡ Ghana
+      - text: Student
+      - paragraph: ΓÇ£Student voices coming soon. WeΓÇÖre rolling out to SHS classrooms across Accra and Kumasi this term.ΓÇ¥
+      - paragraph: Student voices
+      - paragraph: Joining the conversation ┬╖ ≡ƒç¼≡ƒç¡ Ghana
+      - button "Show voices starting from George Oppong"
+      - button "Show voices starting from Teacher voices"
+      - button "Show voices starting from Student voices"
+      - button "Show voices starting from That could be you"
+    - text: ≡ƒç¼≡ƒç¡
+    - heading "Ready when you are." [level=2]
+    - paragraph: No card required. No subscription. Just open the door that is yours.
+    - link "≡ƒÄô Start learning":
+      - /url: https://studyplughub.com/?country=ghana&curriculum=waec-secondary
+    - link "≡ƒôï Start teaching":
+      - /url: https://teachers.studyplughub.com/?country=ghana&curriculum=waec-secondary
+    - img "StudyPlugHub"
+    - text: StudyPlugHub
+    - paragraph: ┬⌐ 2026 StudyPlugHub ΓÇô Ethical AI Education for Africa
+    - link "StudyPlugHub on TikTok":
+      - /url: https://tiktok.com/@studyplughub
+      - img
+    - link "StudyPlugHub on YouTube":
+      - /url: https://youtube.com/@studyplughub
+      - img
+    - link "Privacy":
+      - /url: /privacy
+    - text: ┬╖
+    - link "Terms":
+      - /url: /terms
+    - text: ┬╖
+    - link "Guidelines":
+      - /url: /community/guidelines
+    - text: ┬╖
+    - link "Moderation":
+      - /url: /moderation
+    - text: ┬╖
+    - link "Contact":
+      - /url: /contact
+    - paragraph: ≡ƒç¼≡ƒç¡ Made for Ghana. Built across Africa. Free for learning. Always.
+  - alert
+  - text: ≡ƒì¬
+  - heading "StudyPlugHub uses cookies" [level=3]
+  - button "Dismiss": Γ£ò
+  - paragraph:
+    - text: We use essential cookies to keep you logged in and remember your preferences. We do
+    - strong: not
+    - text: use advertising cookies or track you across other websites. By continuing you accept our
+    - link "Privacy Policy":
+      - /url: /privacy
+    - text: and
+    - link "Terms of Service":
+      - /url: /terms
+    - text: .
+  - button "Essential Only"
+  - button "Accept All Γ£ô"
+  - paragraph:
+    - text: StudyPlugHub | ABN 98 844 353 839 | Registered in Australia |
+    - link "Cookie Policy":
+      - /url: /privacy#cookies

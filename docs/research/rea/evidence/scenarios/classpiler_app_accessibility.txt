@@ -1,0 +1,102 @@
+- document:
+  - paragraph:
+    - strong: Help us reach more teachers
+  - paragraph:
+    - text: We use Google Analytics and the Meta Pixel to see which of our adverts actually reach Ghanaian teachers, and how the platform gets used. Your lesson plans, assessments and pupil records are never shared.
+    - link "Learn more":
+      - /url: /privacy-policy
+  - button "Decline All"
+  - button "Manage Preferences"
+  - button "Accept All"
+  - navigation:
+    - link "Classpiler Logo Classpiler by Rootabytes":
+      - /url: /
+      - img "Classpiler Logo"
+      - text: Classpiler by Rootabytes
+    - link "Join a Class":
+      - /url: /diagnostic/join
+    - link "Login":
+      - /url: /login
+    - link "Sign Up Free":
+      - /url: /register
+  - img "Classpiler Logo"
+  - text: Classpiler by Rootabytes
+  - paragraph: "Your AI teaching assistant: plan lessons, diagnose learners, and differentiate in minutes"
+  - paragraph: Proudly Ghanaian ΓÇó Designed for Ghanaian educators ΓÇó Aligned with GES NaCCA standards
+  - link "Get Started ΓåÆ":
+    - /url: /register
+  - link "Watch Demo":
+    - /url: https://www.youtube.com/playlist?list=PLMp3r4zYBs4XDgWHymQtzAMXN4sAjQvIq
+  - paragraph: Are you a student?
+  - link "Join a Class ΓåÆ":
+    - /url: /diagnostic/join
+  - heading "Learner Diagnostics" [level=3]
+  - text: New
+  - paragraph: AI quizzes that identify knowledge gaps per strand, run live class sessions with join codes, and generate personalised remedial plans
+  - link "Set up diagnostics ΓåÆ":
+    - /url: /register
+  - heading "Fast Generation" [level=3]
+  - paragraph: Create complete lesson plans in under 5 minutes with AI assistance
+  - link "Create a lesson plan ΓåÆ":
+    - /url: /register
+  - heading "Curriculum Aligned" [level=3]
+  - paragraph: Aligned with Ghana Education Service standards and learning objectives
+  - link "Explore curriculum ΓåÆ":
+    - /url: /register
+  - heading "Auto Assessments" [level=3]
+  - paragraph: Generate questions and tests automatically based on your lessons
+  - link "Generate assessment ΓåÆ":
+    - /url: /register
+  - heading "Scheme of Learning" [level=3]
+  - paragraph: Generate term and annual schemes of work aligned to GES strands, export to PDF or Excel
+  - link "Build your scheme ΓåÆ":
+    - /url: /register
+  - heading "DL+ Ability Grouping" [level=3]
+  - paragraph: Auto-sort your class into L1, L2, and L3 groups aligned to Ghana's GALOP programme, then generate a targeted lesson per group
+  - link "Try DL+ grouping ΓåÆ":
+    - /url: /register
+  - heading "Phonics & Number Sense" [level=3]
+  - paragraph: Tap-to-toggle milestone tracker for KG-Basic 3. See your whole class's mastery at a glance, works offline
+  - link "Start tracking ΓåÆ":
+    - /url: /register
+  - heading "Learner Gamification" [level=3]
+  - paragraph: XP, streaks, trophies, and culturally grounded encouragement. Not "Great job." Ayekoo.
+  - link "See it in action ΓåÆ":
+    - /url: /register
+  - heading "Why Teachers Love Us" [level=2]
+  - heading "Save 5+ Hours Weekly" [level=4]
+  - paragraph: Spend less time planning, more time teaching and connecting with learners
+  - heading "Improve Lesson Quality" [level=4]
+  - paragraph: AI-powered suggestions ensure comprehensive, engaging lessons
+  - heading "Always Available" [level=4]
+  - paragraph: Access your lesson plans anytime, anywhere from any device
+  - heading "Free to Start" [level=4]
+  - paragraph: Begin creating better lesson plans today at no cost
+  - heading "Ready to Transform Your Teaching?" [level=2]
+  - paragraph: Built for Ghanaian teachers, by educators who understand your classroom
+  - link "Start Free Today ΓåÆ":
+    - /url: /register
+  - contentinfo:
+    - link "Features":
+      - /url: "#features"
+    - link "Sign Up Free":
+      - /url: /register
+    - link "Login":
+      - /url: /login
+    - link "Watch Demo":
+      - /url: https://www.youtube.com/playlist?list=PLMp3r4zYBs4XDgWHymQtzAMXN4sAjQvIq
+    - link "About Us":
+      - /url: /about
+    - link "Terms of Use":
+      - /url: https://rootabytes.com/terms-of-service.html
+    - link "Privacy Policy":
+      - /url: https://rootabytes.com/privacy-policy.html
+    - link "Data Protection":
+      - /url: https://rootabytes.com/data-protection.html
+    - link "Contact Us":
+      - /url: mailto:rootabytes@gmail.com
+    - 'link "WhatsApp: +233 24 220 3001"':
+      - /url: https://wa.me/233242203001
+    - paragraph: ┬⌐ 2026 Classpiler. Built for Ghanaian Educators
+    - paragraph: The AI teaching assistant for Ghanaian teachers ΓÇó Proudly Made in Ghana
+    - paragraph: Operated by Rootabytes Enterprise ΓÇó Registered with Ghana Data Protection Commission

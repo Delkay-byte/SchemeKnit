@@ -1,0 +1,146 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+
+<title>Teacher Guides &amp; Resources for Ghana SHS | SHS Planner</title>
+<meta name="description" content="Free guides for Ghanaian SHS teachers: how to write NaCCA lesson plans, build schemes of work, and format GES-aligned assessments ΓÇö plus real examples.">
+<meta name="keywords" content="NaCCA lesson plan guide, GES teacher resources, SHS scheme of work, Ghana teacher guides">
+<meta name="author" content="SHS Planner">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://shsplanner.com/guides/">
+
+<meta property="og:title" content="Teacher Guides &amp; Resources for Ghana SHS | SHS Planner">
+<meta property="og:description" content="Free guides for Ghanaian SHS teachers: how to write NaCCA lesson plans, build schemes of work, and format GES-aligned assessments ΓÇö plus real examples.">
+<meta property="og:url" content="https://shsplanner.com/guides/">
+<meta property="og:type" content="article">
+<meta property="og:locale" content="en_GH">
+<meta property="og:image" content="https://shsplanner.com/og-banner.png">
+<meta property="og:site_name" content="SHS Planner">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Teacher Guides &amp; Resources for Ghana SHS | SHS Planner">
+<meta name="twitter:description" content="Free guides for Ghanaian SHS teachers: how to write NaCCA lesson plans, build schemes of work, and format GES-aligned assessments ΓÇö plus real examples.">
+<meta name="twitter:image" content="https://shsplanner.com/og-banner.png">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "CollectionPage",
+  "name": "SHS Planner Teacher Guides",
+  "description": "Free guides for Ghanaian SHS teachers on NaCCA lesson plans, schemes of work, and assessments.",
+  "url": "https://shsplanner.com/guides/",
+  "inLanguage": "en",
+  "isPartOf": {"@type": "WebSite", "name": "SHS Planner", "url": "https://shsplanner.com"}
+}
+</script>
+<link rel="icon" href="/favicon.png" sizes="any">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#1B6B3A">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&amp;family=DM+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/guides/assets/guides.css?v=3">
+</head>
+<body>
+<header class="site">
+  <div class="inner">
+    <a class="brand" href="https://shsplanner.com/">SHS Planner</a>
+    <nav style="display:flex;align-items:center;gap:18px">
+      <a href="/guides/" style="color:var(--green);text-decoration:none;font-size:.88rem;font-weight:700">Guides</a>
+      <a href="/blog/" style="color:var(--muted);text-decoration:none;font-size:.88rem">News</a>
+      <a class="cta-top" href="https://shsplanner.com/">Try the App</a>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap" style="max-width:900px">
+  <h1>Guides for Ghana SHS Teachers</h1>
+  <p class="meta" style="margin-bottom:2rem">Free, practical guides on NaCCA lesson plans, schemes of work, and GES-aligned assessments ΓÇö written for teachers, by a teacher.</p>
+
+  <div class="grid">
+    <a class="g-card" href="/guides/lesson-plan-guide">
+      <span class="g-tag">Lesson Plans</span>
+      <h2>How to Write a NaCCA-Compliant Lesson Plan (2026 Guide)</h2>
+      <p>Structure, DoK levels, GESI, SEL, and a full worked example you can scroll through.</p>
+    </a>
+
+    <a class="g-card" href="/guides/strand-substrand-content-standard-guide">
+      <span class="g-tag">Curriculum</span>
+      <h2>Strand, Sub-Strand &amp; Content Standard Explained (With Examples)</h2>
+      <p>What each term means, how they connect, and real examples from Maths, English, Biology, and History.</p>
+    </a>
+
+    <a class="g-card" href="/guides/how-to-create-deploy-online-assessment">
+      <span class="g-tag">Assessment</span>
+      <h2>How to Create and Deploy an Online Assessment</h2>
+      <p>When to go online vs print, mapped against all 5 GES assessment types ΓÇö Class Exercise through End of Semester Exam.</p>
+    </a>
+
+    <a class="g-card" href="/guides/how-to-create-deploy-online-test">
+      <span class="g-tag">Online Tools</span>
+      <h2>How to Create and Deploy an Online Test</h2>
+      <p>A full walkthrough ΓÇö from topic selection to a live link to graded results.</p>
+    </a>
+
+    <a class="g-card" href="/guides/subject-specific-app-vs-shs-planner">
+      <span class="g-tag">Comparison</span>
+      <h2>Subject Specific App vs SHS Planner: What Each One Covers</h2>
+      <p>How Ghana's official GES/NaCCA Subject Specific App compares to SHS Planner, and how teachers use both together.</p>
+    </a>
+
+    <!-- Add new <a class="g-card"> entries here as more guides are uploaded -->
+  </div>
+</div>
+
+
+<footer class="site">
+  <p>┬⌐ 2026 SHS Planner ┬╖ Built by EDICODE TECHNOLOGIES for the Ghanaian teacher ┬╖ <a href="https://shsplanner.com/">shsplanner.com</a></p>
+  <p style="margin-top:6px"><a href="/about.php">About</a> ┬╖ <a href="/samples.php">Sample Plan</a> ┬╖ <a href="/faq.php">FAQ</a> ┬╖ <a href="/contact.php">Contact</a> ┬╖ <a href="/guides/">Guides</a> ┬╖ <a href="/blog/">News</a></p>
+  <p style="margin-top:4px"><a href="/privacy.php">Privacy Policy</a> ┬╖ <a href="/terms.php">Terms of Service</a></p>
+  <p style="margin-top:6px;font-size:.78rem;opacity:.75">SHS Planner is an independent website and is not affiliated with GES, NaCCA or the Ministry of Education.</p>
+</footer>
+
+
+
+<!-- ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+     Content Analytics
+     Both views AND clicks log into content_events as independent
+     permanent rows via /api/content_click.php ΓÇö deliberately NOT
+     using /tracker.php, which collapses a whole browser session into
+     one row and would erase this page's view the moment the visitor
+     navigates elsewhere.
+     ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ -->
+<script>
+(function(){
+  var sid = sessionStorage.getItem('shsp_sid');
+  if (!sid) {
+    sid = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    sessionStorage.setItem('shsp_sid', sid);
+  }
+
+  // Page view ΓÇö fire once on load, its own permanent row
+  try {
+    var vparams = 'event=view&page=' + encodeURIComponent(location.pathname) + '&sid=' + encodeURIComponent(sid);
+    fetch('/api/content_click.php?' + vparams, { method: 'GET', credentials: 'same-origin' }).catch(function(){});
+  } catch(e){}
+
+  // CTA click ΓÇö any link styled as a call-to-action toward the app
+  function trackClick(){
+    try {
+      var data = 'event=click&page=' + encodeURIComponent(location.pathname) + '&sid=' + encodeURIComponent(sid);
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon('/api/content_click.php', new Blob([data], {type:'application/x-www-form-urlencoded'}));
+      } else {
+        fetch('/api/content_click.php', {method:'POST', body:data, headers:{'Content-Type':'application/x-www-form-urlencoded'}, keepalive:true}).catch(function(){});
+      }
+    } catch(e){}
+  }
+  document.querySelectorAll('.cta-top, .cta-box a, .promo-cta').forEach(function(el){
+    el.addEventListener('click', trackClick);
+  });
+})();
+</script>
+
+
+
+</body></html>

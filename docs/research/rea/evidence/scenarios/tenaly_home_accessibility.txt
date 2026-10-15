@@ -1,0 +1,64 @@
+- document:
+  - banner:
+    - link "Tenaly":
+      - /url: /
+    - navigation:
+      - link "Blog":
+        - /url: /blog
+      - link "Contact":
+        - /url: /contact
+      - link "Pricing":
+        - /url: /pricing
+      - link "Sign in":
+        - /url: /auth?redirect=%2Fgenerate
+      - link "Generate":
+        - /url: /generate
+        - button "Generate"
+  - text: Aligned with GES & NaCCA curriculum
+  - heading "AI lesson plans for Ghanaian teachers, KG to JHS ΓÇö in seconds." [level=1]
+  - paragraph: Pick your level, subject, strand and indicator. Get a complete Daily Scheme of Learning, ready to print ΓÇö built on the official NaCCA framework.
+  - link "Generate a lesson plan":
+    - /url: /generate
+    - button "Generate a lesson plan"
+  - link "Sign in":
+    - /url: /auth?redirect=%2Fgenerate
+    - button "Sign in"
+  - paragraph: Sign in only required when you generate. Browse freely.
+  - heading "Why Ghanaian teachers use Tenaly" [level=2]
+  - heading "Full curriculum coverage" [level=3]
+  - paragraph: KG through JHS 3, every subject, every strand ΓÇö straight from the NaCCA framework.
+  - heading "AI-generated, teacher-ready" [level=3]
+  - paragraph: Daily SOL template with starter, main activities, plenary, core competencies and assessment.
+  - heading "Smart library" [level=3]
+  - paragraph: Plans are cached. The next teacher who picks the same indicator gets it instantly ΓÇö no extra tokens.
+  - heading "How it works" [level=2]
+  - text: "1"
+  - heading "Choose level" [level=4]
+  - paragraph: KG, Basic or JHS.
+  - text: "2"
+  - heading "Cascade selections" [level=4]
+  - paragraph: Subject ΓåÆ strand ΓåÆ sub-strand ΓåÆ indicator auto-populate.
+  - text: "3"
+  - heading "Add lesson details" [level=4]
+  - paragraph: Teacher, school, class, day, duration.
+  - text: "4"
+  - heading "Generate & download" [level=4]
+  - paragraph: Sign in once, get your Daily SOL.
+  - heading "Ready to plan your next lesson?" [level=2]
+  - paragraph: Try it free. No card needed.
+  - link "Start generating":
+    - /url: /generate
+    - button "Start generating"
+  - contentinfo:
+    - text: ┬⌐ 2026 Digital Leap
+    - link "Blog & FAQ":
+      - /url: /blog
+    - link "Contact Us":
+      - /url: /contact
+    - link "Pricing":
+      - /url: /pricing
+    - link "Privacy & Disclaimer":
+      - /url: /privacy
+    - text: Built for Ghanaian teachers
+  - region "Notifications alt+T"
+  - button "Open help chat"

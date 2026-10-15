@@ -1,0 +1,800 @@
+{
+  "evidence_id": "ev_6f227615f43927a72038ae61fa8959997629e3c7a50e267f20aa583adc4c05ca",
+  "operation": "capture_browser_scenario",
+  "provider": {
+    "id": "rea-playwright-browser-scenario",
+    "name": "REA Playwright browser scenario capture provider",
+    "version": "1"
+  },
+  "start_origin": "https://help.planbook.com",
+  "browser": {
+    "mode": "launch",
+    "process_ownership": "provider-owned",
+    "cleanup": "terminated-owned-process",
+    "product": "Chromium",
+    "version": "155.0.8059.79"
+  },
+  "duration_ms": 9581,
+  "completeness": {
+    "status": "complete",
+    "equality_eligible": true,
+    "missing_sections": [],
+    "truncated_sections": []
+  },
+  "limitations": [
+    "Event sequence records provider receipt order; simultaneous browser causality is not inferred.",
+    "Network content is retained only when selected; Playwright response-body bytes are API results and are not guaranteed to match wire bytes.",
+    "Request bytes are limited to what Playwright exposes; not_exposed does not establish body absence or multipart file coverage.",
+    "Network content reads settle within 5 seconds each and the observer does not request bodies from unfinished responses.",
+    "Playwright scenario events do not expose request initiator stacks; receipt order does not prove causality.",
+    "Storage values are hashed only after declared-secret redaction."
+  ],
+  "steps": [
+    {
+      "step_id": "scenario_start",
+      "action": "goto_start",
+      "status": "completed",
+      "before_url": {
+        "url": "about:blank",
+        "origin": null,
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "after_url": {
+        "url": "https://help.planbook.com/lesson-layouts",
+        "origin": "https://help.planbook.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "elapsed_ms": 4780,
+      "artifacts": {
+        "screenshot": {
+          "state": "not_requested"
+        },
+        "dom": {
+          "state": "not_requested"
+        },
+        "accessibility": {
+          "state": "not_requested"
+        },
+        "url": {
+          "state": "not_requested"
+        },
+        "history": {
+          "state": "not_requested"
+        },
+        "storage": {
+          "state": "not_requested"
+        }
+      },
+      "error": null
+    },
+    {
+      "step_id": "settle",
+      "action": "wait_for_timeout",
+      "status": "completed",
+      "before_url": {
+        "url": "https://help.planbook.com/lesson-layouts",
+        "origin": "https://help.planbook.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "after_url": {
+        "url": "https://help.planbook.com/lesson-layouts",
+        "origin": "https://help.planbook.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "elapsed_ms": 4605,
+      "artifacts": {
+        "screenshot": {
+          "file": "C:\\Users\\SAVIOUR\\AppData\\Local\\Temp\\opencode\\rea\\ex_planbook_help\\screenshot_settle.png",
+          "bytes": 139707
+        },
+        "dom": {
+          "file": "C:\\Users\\SAVIOUR\\AppData\\Local\\Temp\\opencode\\rea\\ex_planbook_help\\dom_settle.txt",
+          "bytes": 137518,
+          "text_len": 137518
+        },
+        "accessibility": {
+          "file": "C:\\Users\\SAVIOUR\\AppData\\Local\\Temp\\opencode\\rea\\ex_planbook_help\\accessibility_settle.txt",
+          "bytes": 4264,
+          "text_len": 4264
+        },
+        "url": {
+          "url": "https://help.planbook.com/lesson-layouts",
+          "origin": "https://help.planbook.com",
+          "query_parameter_names": [],
+          "redacted": false
+        },
+        "history": {
+          "state": "not_requested"
+        },
+        "storage": {
+          "state": "not_requested"
+        }
+      },
+      "error": null
+    }
+  ],
+  "network": [
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://help.planbook.com/lesson-layouts",
+        "origin": "https://help.planbook.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "document",
+      "txn": "request-1"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://7052064.fs1.hubspotusercontent-na1.net/hubfs/7052064/hub_generated/template_assets/DEFAULT_ASSET/1791562896888/template_two-column.min.css",
+        "origin": "https://7052064.fs1.hubspotusercontent-na1.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "stylesheet",
+      "txn": "request-2"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://7052064.fs1.hubspotusercontent-na1.net/hubfs/7052064/hub_generated/module_assets/1/-107255593217/1791562976143/module_website-header.min.css",
+        "origin": "https://7052064.fs1.hubspotusercontent-na1.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "stylesheet",
+      "txn": "request-3"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://7052064.fs1.hubspotusercontent-na1.net/hubfs/7052064/hub_generated/module_assets/1/-153268142413/1791562977249/module_kb-search-input.min.css",
+        "origin": "https://7052064.fs1.hubspotusercontent-na1.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "stylesheet",
+      "txn": "request-4"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://7052064.fs1.hubspotusercontent-na1.net/hubfs/7052064/hub_generated/module_assets/1/-112597758981/1791562884767/module_kb_breadcrumbs.min.css",
+        "origin": "https://7052064.fs1.hubspotusercontent-na1.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "stylesheet",
+      "txn": "request-5"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://7052064.fs1.hubspotusercontent-na1.net/hubfs/7052064/hub_generated/module_assets/1/-112597758980/1791562882705/module_kb_accordion_menu.css",
+        "origin": "https://7052064.fs1.hubspotusercontent-na1.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "stylesheet",
+      "txn": "request-6"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://help.planbook.com/hs-fs/hubfs/Header%20and%20Footer%20Extended%20(1400%20x%20600%20px)%20(1).png?width=1400&height=600&name=Header%20and%20Footer%20Extended%20(1400%20x%20600%20px)%20(1).png",
+        "origin": "https://help.planbook.com",
+        "query_parameter_names": [
+          "width",
+          "height",
+          "name"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-7"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://help.planbook.com/hs/hsstatic/cos-i18n/static-1.53/bundles/project.js",
+        "origin": "https://help.planbook.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-8"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://7052064.fs1.hubspotusercontent-na1.net/hubfs/7052064/hub_generated/module_assets/1/-107255593217/1791562976143/module_website-header.min.js",
+        "origin": "https://7052064.fs1.hubspotusercontent-na1.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-9"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://7052064.fs1.hubspotusercontent-na1.net/hubfs/7052064/hub_generated/module_assets/1/-153268142413/1791562977249/module_kb-search-input.min.js",
+        "origin": "https://7052064.fs1.hubspotusercontent-na1.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-10"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://7052064.fs1.hubspotusercontent-na1.net/hubfs/7052064/hub_generated/template_assets/DEFAULT_ASSET/1791562892064/template_purify.min.js",
+        "origin": "https://7052064.fs1.hubspotusercontent-na1.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-11"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://7052064.fs1.hubspotusercontent-na1.net/hubfs/7052064/hub_generated/module_assets/1/-112597758980/1791562882705/module_kb_accordion_menu.min.js",
+        "origin": "https://7052064.fs1.hubspotusercontent-na1.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-12"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://help.planbook.com/hs/scriptloader/44552839.js",
+        "origin": "https://help.planbook.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-13"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://help.planbook.com/hs/hsstatic/HubspotToolsMenu/static-1.640/js/index.js",
+        "origin": "https://help.planbook.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-14"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://help.planbook.com/hubfs/Header%20and%20Footer%20Extended%20%281200%20x%20600%20px%29%20%287%29.png",
+        "origin": "https://help.planbook.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-15"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://help.planbook.com/_hcms/googlefonts/Raleway/regular.woff2",
+        "origin": "https://help.planbook.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "font",
+      "txn": "request-16"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://help.planbook.com/_hcms/googlefonts/Raleway/700.woff2",
+        "origin": "https://help.planbook.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "font",
+      "txn": "request-17"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://app.hubspot.com/content-tools-menu/api/v1/tools-menu/has-permission-json?portalId=44552839",
+        "origin": "https://app.hubspot.com",
+        "query_parameter_names": [
+          "portalId"
+        ],
+        "redacted": false
+      },
+      "status": 204,
+      "resource_type": "xhr",
+      "txn": "request-18"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://js.hscollectedforms.net/collectedforms.js",
+        "origin": "https://js.hscollectedforms.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-19"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://js.hsadspixel.net/pixels.js",
+        "origin": "https://js.hsadspixel.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-20"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://js.hs-analytics.net/analytics/1792022100000/44552839.js",
+        "origin": "https://js.hs-analytics.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-21"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://js.usemessages.com/conversations-embed.js",
+        "origin": "https://js.usemessages.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-22"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://js.hs-banner.com/v2/44552839/banner.js",
+        "origin": "https://js.hs-banner.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-23"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://help.planbook.com/_hcms/livechat/widget?portalId=44552839&conversations-embed=static-1.28672&mobile=false&messagesUtk=4ecba2bdcc034624ae580260c2c4508d&traceId=4ecba2bdcc034624ae580260c2c4508d",
+        "origin": "https://help.planbook.com",
+        "query_parameter_names": [
+          "portalId",
+          "conversations-embed",
+          "mobile",
+          "messagesUtk",
+          "traceId"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "xhr",
+      "txn": "request-24"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://forms.hscollectedforms.net/collected-forms/v1/config/json?portalId=44552839&utk=",
+        "origin": "https://forms.hscollectedforms.net",
+        "query_parameter_names": [
+          "portalId",
+          "utk"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "xhr",
+      "txn": "request-25"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://app.hubspot.com/conversations-visitor/44552839/threads/utk/4ecba2bdcc034624ae580260c2c4508d?uuid=078eda6fbf144e7eb60741b16b9ff874&mobile=false&mobileSafari=false&hideWelcomeMessage=false&hstc=&domain=help.planbook.com&inApp53=false&messagesUtk=4ecba2bdcc034624ae580260c2c4508d&url=https%3A%2F%2Fhelp.planbook.com%2Flesson-layouts&inline=false&isFullscreen=false&globalCookieOptOut=&isFirstVisitorSession=true&isAttachmentDisabled=false&isInitialInputFocusDisabled=false&enableWidgetCookieBanner=false&isInCMS=true&hideScrollToButton=true&isIOSMobile=false",
+        "origin": "https://app.hubspot.com",
+        "query_parameter_names": [
+          "uuid",
+          "mobile",
+          "mobileSafari",
+          "hideWelcomeMessage",
+          "hstc",
+          "domain",
+          "inApp53",
+          "messagesUtk",
+          "url",
+          "inline",
+          "isFullscreen",
+          "globalCookieOptOut",
+          "isFirstVisitorSession",
+          "isAttachmentDisabled",
+          "isInitialInputFocusDisabled",
+          "enableWidgetCookieBanner",
+          "isInCMS",
+          "hideScrollToButton",
+          "isIOSMobile"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "document",
+      "txn": "request-26"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://api.hubapi.com/hs-script-loader-public/v2/config/pixels-and-events/json?portalId=44552839",
+        "origin": "https://api.hubapi.com",
+        "query_parameter_names": [
+          "portalId"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "xhr",
+      "txn": "request-27"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.hsappstatic.net/trellis-theming-assets/static-1.733/stylesheets/hubspot-theme.stable.css",
+        "origin": "https://static.hsappstatic.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "stylesheet",
+      "txn": "request-28"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.hsappstatic.net/trellis-theming-assets/static-1.733/bundles/hubspot-theme.stable.js",
+        "origin": "https://static.hsappstatic.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-29"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.hsappstatic.net/head-dlb/static-1.5007/bundle.production.js",
+        "origin": "https://static.hsappstatic.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-30"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.hsappstatic.net/conversations-visitor-ui/static-1.31090/sass/visitor.css",
+        "origin": "https://static.hsappstatic.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "stylesheet",
+      "txn": "request-31"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.hsappstatic.net/hubspot-dlb/static-2.1911/bundle.production.js",
+        "origin": "https://static.hsappstatic.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-32"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.hsappstatic.net/react-dlb/static-1.93/bundle.production.js",
+        "origin": "https://static.hsappstatic.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-33"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.hsappstatic.net/conversations-visitor-ui/static-1.31115/bundles/visitor.js",
+        "origin": "https://static.hsappstatic.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-34"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.hsappstatic.net/conversations-visitor-ui/static-1.31090/i18n-data-data-modern-locales-en-us.js",
+        "origin": "https://static.hsappstatic.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-35"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.hsappstatic.net/conversations-visitor-ui/static-1.9449/audio/notification.mp3",
+        "origin": "https://static.hsappstatic.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 206,
+      "resource_type": "media",
+      "txn": "request-36"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.hsappstatic.net/whisper-core/ex/whisper-core.js",
+        "origin": "https://static.hsappstatic.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-37"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.hsappstatic.net/whisper-core/static-1.10473/whisper-core-entry.js",
+        "origin": "https://static.hsappstatic.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-38"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://exceptions.hubspot.com/frontend/observability/page-tracking/store/?sentry_version=7&sentry_client=raven-js%2F3.19.1&deployable=conversations-visitor-ui",
+        "origin": "https://exceptions.hubspot.com",
+        "query_parameter_names": [
+          "sentry_version",
+          "sentry_client",
+          "deployable"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "xhr",
+      "txn": "request-39"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://app.hubspot.com/api/cartographer/v1/rhumb?hs_static_app=conversations-visitor-ui&hs_static_app_version=1.31115",
+        "origin": "https://app.hubspot.com",
+        "query_parameter_names": [
+          "hs_static_app",
+          "hs_static_app_version"
+        ],
+        "redacted": false
+      },
+      "status": 204,
+      "resource_type": "ping",
+      "txn": "request-40"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://connect.facebook.net/en_US/fbevents.js",
+        "origin": "https://connect.facebook.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-41"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://track.hubspot.com/__ptq.gif?k=1&sd=1366x900&cd=24-bit&cs=UTF-8&ln=en-us&bfp=ef8807c8b6803a5b55204ef898c2d300&v=1.1&a=44552839&pi=166514980224&ct=listing-page&ccu=https%3A%2F%2Fhelp.planbook.com%2Flesson-layouts&cgi=202231605123&pu=https%3A%2F%2Fhelp.planbook.com%2Flesson-layouts&t=Lesson+Layouts+%7C+Planbook+Help+Center&cts=1792022267454&vi=0dbcc864f3f78a59443e5ee8849dac51&nc=true&u=45518907.0dbcc864f3f78a59443e5ee8849dac51.1792022267452.1792022267452.1792022267452.1&b=45518907.1.1792022267452&cc=15",
+        "origin": "https://track.hubspot.com",
+        "query_parameter_names": [
+          "k",
+          "sd",
+          "cd",
+          "cs",
+          "ln",
+          "bfp",
+          "v",
+          "a",
+          "pi",
+          "ct",
+          "ccu",
+          "cgi",
+          "pu",
+          "t",
+          "cts",
+          "vi",
+          "nc",
+          "u",
+          "b",
+          "cc"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-42"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://help.planbook.com/hubfs/planbook-icon%20(2).svg",
+        "origin": "https://help.planbook.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "other",
+      "txn": "request-43"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://connect.facebook.net/signals/config/1456963462357512?v=2.9.419&r=stable&domain=help.planbook.com&hme=7459fa3e38c2784dbaf309537bed5fa7e8560fab51fb61e53e5ffafeb46a02a9&ex_m=118%2C241%2C171%2C27%2C82%2C83%2C162%2C78%2C77%2C11%2C181%2C102%2C20%2C153%2C141%2C46%2C85%2C90%2C149%2C176%2C183%2C8%2C4%2C5%2C7%2C6%2C3%2C103%2C115%2C32%2C17%2C31%2C18%2C33%2C34%2C35%2C37%2C55%2C163%2C87%2C126%2C22%2C24%2C51%2C47%2C49%2C48%2C95%2C104%2C108%2C124%2C160%2C164%2C53%2C125%2C29%2C26%2C133%2C79%2C43%2C166%2C165%2C167%2C157%2C155%2C30%2C42%2C66%2C123%2C178%2C80%2C21%2C128%2C93%2C76%2C23%2C97%2C98%2C130%2C96%2C151%2C150%2C154%2C109%2C177%2C180%2C41%2C56%2C127%2C54%2C161%2C72%2C185%2C110%2C184%2C210%2C255%2C84%2C274%2C273%2C272%2C14%2C25%2C28%2C40%2C62%2C117%2C68%2C10%2C73%2C111%2C112%2C113%2C119%2C144%2C38%2C36%2C146%2C147%2C148%2C143%2C142%2C172%2C86%2C175%2C173%2C174%2C57%2C69%2C67%2C137%2C19%2C179%2C52%2C324%2C325%2C326%2C323%2C339%2C361%2C248%2C237%2C70%2C238%2C236%2C364%2C355%2C59%2C249%2C121%2C145%2C92%2C135%2C61%2C134%2C140%2C139%2C65%2C74%2C168%2C88%2C89%2C129%2C44%2C39%2C60%2C63%2C114%2C182%2C1%2C138%2C16%2C136%2C12%2C2%2C64%2C105%2C15%2C75%2C71%2C132%2C101%2C100%2C187%2C188%2C106%2C107%2C9%2C116%2C186%2C58%2C158%2C99%2C91%2C81%2C131%2C120%2C169%2C50%2C159%2C0%2C94%2C152%2C156%2C170%2C45%2C122%2C13%2C189",
+        "origin": "https://connect.facebook.net",
+        "query_parameter_names": [
+          "v",
+          "r",
+          "domain",
+          "hme",
+          "ex_m"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-44"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://metrics-fe-na1.hubspot.com/cartographer/v1/ipl",
+        "origin": "https://metrics-fe-na1.hubspot.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 204,
+      "resource_type": "ping",
+      "txn": "request-45"
+    }
+  ],
+  "console": [
+    {
+      "level": "warning",
+      "text": "[quick-fetch] quickFetchScript was not included or running in Node.js environment. Falling back to stubbed implementation."
+    }
+  ],
+  "page_errors": [],
+  "websockets": [],
+  "downloads": [],
+  "screenshots": [
+    {
+      "step": "settle",
+      "file": "C:\\Users\\SAVIOUR\\AppData\\Local\\Temp\\opencode\\rea\\ex_planbook_help\\screenshot_settle.png",
+      "bytes": 139707
+    }
+  ],
+  "final_url": {
+    "url": "https://help.planbook.com/lesson-layouts",
+    "origin": "https://help.planbook.com",
+    "query_parameter_names": [],
+    "redacted": false
+  }
+}

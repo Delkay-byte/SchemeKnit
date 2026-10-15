@@ -1,0 +1,118 @@
+- document:
+  - banner:
+    - img "SHS Planner"
+    - text: SHS Planner shsplanner.com
+    - button "Sign In"
+  - heading "≡ƒÄë FREE ≡ƒÄë SCHEME OF WORK THIS OCTOBER" [level=1]
+  - paragraph: ≡ƒôÜ Generate 1 Free Scheme of Work for the Semester. Each Teacher Has 1 Free Download. ≡ƒôà Offer valid until 31th October, 2026
+  - navigation: ≡ƒô¥ Lesson Plan ≡ƒôè Assessment ≡ƒôï Scheme of Work
+  - main:
+    - text: ≡ƒôï
+    - heading "Lesson Plan Builder" [level=2]
+    - button "Help":
+      - img
+      - text: Help
+    - text: SHS Year *
+    - combobox:
+      - option "Year 1" [selected]
+      - option "Year 2"
+      - option "Year 3"
+    - text: Γû╛ Region *
+    - combobox:
+      - option "Select region..." [selected]
+      - option "Ashanti Region"
+      - option "Brong-Ahafo Region"
+      - option "Central Region"
+      - option "Eastern Region"
+      - option "Greater Accra Region"
+      - option "Northern Region"
+      - option "Upper East Region"
+      - option "Upper West Region"
+      - option "Volta Region"
+      - option "Western Region"
+      - option "Ahafo Region"
+      - option "Bono East Region"
+      - option "North East Region"
+      - option "Oti Region"
+      - option "Savannah Region"
+      - option "Western North Region"
+    - text: Γû╛ School Name
+    - textbox "e.g. Presbyterian Boys Senior High School"
+    - text: School Type Mixed Boys Girls Subject *
+    - combobox:
+      - option "Loading subjects..." [selected]
+    - text: Γû╛ Week / Topic *
+    - combobox:
+      - option "Select week / topic..." [selected]
+    - text: Γû╛ Lessons per Week 1 2 ≡ƒöÆ 3 ≡ƒöÆ 4 ≡ƒöÆ Based on your timetable ΓÇö E.g. '3' if you meet the class 3 times every week. ≡ƒöÆ Free-trial accounts can generate 1 lesson per week at a time.
+    - link "Buy credits":
+      - /url: "#"
+    - text: to unlock up to 4. Duration of Each Lesson
+    - combobox:
+      - option "0 hr"
+      - option "1 hr" [selected]
+      - option "2 hr"
+      - option "3 hr"
+      - option "4 hr"
+    - combobox:
+      - option "00 min" [selected]
+      - option "05 min"
+      - option "10 min"
+      - option "15 min"
+      - option "20 min"
+      - option "25 min"
+      - option "30 min"
+      - option "35 min"
+      - option "40 min"
+      - option "45 min"
+      - option "50 min"
+      - option "55 min"
+    - text: Γû╛ Number of Students * 20 30 40 50 60 70 Other Class Proficiency Level (optional)
+    - combobox:
+      - option "MA ΓÇö Mixed-Ability Class" [selected]
+      - option "HP ΓÇö Highly Performing"
+      - option "NS ΓÇö Needs Support"
+    - text: Γû╛ Helps tailor differentiation strategies in your plan. Special Notes (optional)
+    - 'textbox "e.g. 1. Use this example in the lesson plan: 2x + 5 = 10 2. The school is located in a fishing village 3. My students like football very much 4. There are 2 visually impaired students in my class You can add anything else you believe should be considered when generating the lesson plan."':
+      - /placeholder: "e.g. 1. Use this example in the lesson plan: 2x + 5 = 10\n2. The school is located in a fishing village\n3. My students like football very much\n4. There are 2 visually impaired students in my class\n\nYou can add anything else you believe should be considered when generating the lesson plan."
+    - text: Helps tailor the plan to your class. Teaching & Learning Resources Markers Γ£ò Whiteboard Γ£ò Calculators Γ£ò Phone Γ£ò Tablets Γ£ò
+    - textbox "Add resource..."
+    - button "+ Add"
+    - button "Γ£¿ Generate Lesson Plan"
+    - paragraph: Select a region
+  - contentinfo:
+    - paragraph: SHS Planner ΓÇö GhanaΓÇÖs Smart Teaching Assistant ┬╖ shsplanner.com ┬╖ NaCCA-aligned ≡ƒç¼≡ƒç¡
+    - paragraph:
+      - link "About":
+        - /url: /about.php
+      - text: "|"
+      - link "Sample Plan":
+        - /url: /samples.php
+      - text: "|"
+      - link "FAQ":
+        - /url: /faq.php
+      - text: "|"
+      - link "Guides":
+        - /url: /guides/
+      - text: "|"
+      - link "News":
+        - /url: /blog/
+      - text: "|"
+      - link "Contact":
+        - /url: /contact.php
+    - paragraph:
+      - link "Privacy Policy":
+        - /url: /privacy.php
+      - text: "|"
+      - link "Terms of Service":
+        - /url: /terms.php
+    - paragraph: SHS Planner is an independent website and is not affiliated with GES, NaCCA or the Ministry of Education.
+    - paragraph:
+      - link "Γ¡É Reviews":
+        - /url: "#"
+      - text: "|"
+      - link "≡ƒôú Report an issue":
+        - /url: "#"
+  - text: 1 of 4 Lesson Plans Generate a full NaCCA/GES-aligned lesson plan for any subject and week in the correct template with just a tap in minutes.
+  - button "Skip"
+  - button "Next"
