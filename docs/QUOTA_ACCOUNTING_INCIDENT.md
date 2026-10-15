@@ -362,7 +362,73 @@ the incident is **not closed**. Owner-side action, in order:
 5. Run the §12.4 read-only SQL, then the §12.5 backfill if the owner
    elects exact counter reconciliation.
 
+## 13d) Deployment executed + verified (2026-10-15, owner-approved one-time deploy)
+
+Owner authorization: one backend-only deployment of already-pushed
+`origin/main` = `3ef1a41`, after a fresh PostgreSQL quota gate pass; no
+local-only commits; no production lessons; no data modification.
+
+- **Pre-deploy gate:** `TEACHFLOW_TEST_DATABASE_URL=postgresql+psycopg://…`
+  against docker `postgres:16-alpine` (SQLAlchemy 2.0.52 + psycopg 3.3.5):
+  `test_postgres_quota_driver.py` + `test_monthly_quota.py` +
+  `test_quota_enforcement_journey.py` → **22 passed** (incl. threading
+  concurrency, 5-permit/6th-403, zero-charge release).
+- **Deploy:** `POST /v1/services/srv-damsbb1ntn7c73d7eg10/deploys`
+  (manual, cache not cleared) → `dep-db8aftlg1s2s739kr47g`, commit
+  **`3ef1a41a7c8013f1c66ece15ba130495665926e0`** (message matches the
+  incident-report commit), created `2026-10-15T10:16:22Z`,
+  **live** `2026-10-15T10:18:21Z`. Single attempt; no retries.
+- **Deployed tree contains the fix:** `git merge-base --is-ancestor
+  70738f8 3ef1a41` → true. The deployed build includes the quota fix
+  (`70738f8`), the P4 gate (`ae84f19`) and everything through `3ef1a41`;
+  it does **not** include later local-only engineering commits.
+- **Read-only probes:** `GET /api/health` → 200
+  `{"status":"healthy",…,"version":"1.0.5"}` (liveness only — static
+  `APP_VERSION`); frontend → 200.
+- **Status of the four required outcomes:**
+  1. Quota fix code deployed: **YES** (deploy record + ancestor check).
+  2. Future enforcement through the production runtime: **NOT TESTED** —
+     no authorized token for the smoke account; lesson generation and the
+     free-regeneration probe were explicitly excluded from this phase.
+     Runtime enforcement therefore still needs the §12.3 check (or an
+     approved equivalent) before GO.
+  3. Historical usage reconciled: **NO** — proposal in §13e, awaiting
+     explicit owner approval. No UPDATE/DELETE executed.
+  4. Production readiness: **NO-GO** until §13e is approved and applied
+     and §12.3 evidence exists.
+
+## 13e) Historical usage reconciliation proposal (APPROVAL REQUIRED — NOT EXECUTED)
+
+Chargeability of the incident-window activity under the established
+idempotency/free-regeneration rules (§6 table):
+
+| Event | Rule | Units |
+|---|---|---|
+| 6 accepted distinct occurrences (`week1:0`, `week2:0`, `week2:1`, `week4:0`, `week4:1`, `week5:0`) | distinct `{scheme_id}:{indicator_code}` → 1 unit each | **6 chargeable** |
+| free regeneration of `week2:0` | same occurrence → idempotent, no new unit | 0 |
+| P4 hard rejection `week3:0:B9.1.1.2.1` (nothing persisted) | failed/rejected work is zero-charge; unit row released | 0 (orphan row exists only because the broken path never released it) |
+| 400 validation reject | rejected before reservation | 0 |
+
+**Proposed correction** (exactly §12.5, unchanged): delete the orphan
+`usage_units` row(s) with no matching persisted lesson, then recompute
+`usage_periods.units_used` from the unit ledger for
+`c11bde4c-a9bb-4f41-b96a-921570cf856e`, period `2026-10`.
+
+**Expected post-correction state:** `units_used = 6` (limit 5) → new
+distinct generations correctly **blocked until 2026-11-01**; free
+regenerations of the six counted codes remain free (unit-key conflict →
+`consumed=0`); the six accepted lessons remain saved (accepted-only
+persistence is unaffected); every other account untouched
+(`SELECT user_id, count(*) FROM usage_units GROUP BY user_id;` run first
+to confirm scope).
+
+**Not executed.** Awaiting explicit owner approval; until applied, every
+quota read for this account truthfully reports the still-broken stored
+counter (`used=0`) even though the deployed code is correct — which is
+why readiness stays NO-GO.
+
 ## 14) Residual risks / open items
+
 
 
 - Deployment + owner verification (§12) outstanding — RED/NO-GO stands until
