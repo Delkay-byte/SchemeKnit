@@ -496,7 +496,7 @@ class StructuredPDFEngine:
             lines = []
             for i in items:
                 lines.append(
-                    f"[{i.prompt}] (DoK {i.dok_level})")
+                    f"{i.prompt} (DoK {i.dok_level})")
                 if getattr(i, "expected_evidence", ""):
                     lines.append(f"Expected evidence: {i.expected_evidence}")
                 if getattr(i, "marking_guidance", ""):

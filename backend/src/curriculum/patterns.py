@@ -376,7 +376,12 @@ PATTERNS: List[LessonPattern] = [
         [
             PatternStep("Creative demonstration", "input", "demonstration"),
             PatternStep("Guided creation", "guided", "creation", True),
-            PatternStep("Share and critique", "independent", "discussion"),
+            # "critique" routes to the subject's own critique/feedback move
+            # (creative_arts critique, career quality_check via act_key) —
+            # previously "discussion" fell through to the CREATION move for
+            # creative arts, so the share/critique row literally repeated the
+            # creation instruction (REA finding, benchmark activity-specificity).
+            PatternStep("Share and critique", "independent", "critique"),
         ],
         subjects=("creative_arts", "career_technology", "english"),
         verbs=("create", "design", "compose", "produce", "construct", "draw",

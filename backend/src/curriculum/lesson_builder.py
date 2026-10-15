@@ -219,11 +219,12 @@ _PHASE_BANK: Dict[str, List[Tuple[str, str]]] = {
     ],
     "classification": [
         ("Presentation of examples",
-         "Present two contrasting examples linked to {focus_short} and ask "
-         "learners what is the same and what is different."),
+         "Present two contrasting examples linked to {focus_short} and have "
+         "each learner list what is the same and what is different."),
         ("Classification activity",
          "Learners sort/group the given items according to the rule for "
-         "{focus_short}, explaining the basis of each group using {resource}."),
+         "{focus_short}; each group writes one sentence explaining its basis, "
+         "using {resource}."),
         ("Accuracy check",
          "Review the groups as a class, challenge one borderline item and agree "
          "the correct classification for {focus_short}."),
@@ -259,7 +260,7 @@ _PHASE_BANK: Dict[str, List[Tuple[str, str]]] = {
          "teacher's support, using the model as a scaffold."),
         ("Independent writing",
          "Each learner completes and improves their piece on {focus_short} "
-         "against a short checklist."),
+         "against a short checklist of three points."),
     ],
     "discussion": [
         ("Stimulus",
@@ -274,14 +275,14 @@ _PHASE_BANK: Dict[str, List[Tuple[str, str]]] = {
     ],
     "comparison": [
         ("First item",
-         "Present the first item for {focus_short} and have learners note its "
-         "features."),
+         "Present the first item for {focus_short} and have each learner note "
+         "two of its features in their exercise books."),
         ("Second item",
-         "Present the second item and have learners note how it differs for "
-         "{focus_short}."),
+         "Present the second item and have pairs note how it differs for "
+         "{focus_short}, recording one difference."),
         ("Comparison task",
-         "Learners complete a comparison chart for {focus_short}, stating the "
-         "similarities and differences clearly."),
+         "Learners complete a comparison chart for {focus_short}, writing two "
+         "or three similarities and differences clearly on chart paper."),
     ],
     "creation": [
         ("Inspiration",
@@ -317,8 +318,9 @@ _PHASE_BANK: Dict[str, List[Tuple[str, str]]] = {
     ],
     "demonstration": [
         ("Teacher demonstration",
-         "Demonstrate {focus_short} slowly, thinking aloud, and check that every "
-         "learner can see and hear."),
+         "Demonstrate one worked example of {focus_short} to the whole class, "
+         "thinking aloud at every step; then each learner names one step they "
+         "saw."),
         ("Guided imitation",
          "Learners repeat or reproduce the demonstration for {focus_short} with "
          "the teacher's prompts, using {resource}."),
@@ -2563,6 +2565,10 @@ def build_lesson(
     _core_evidence = _safe_format(activity.evidence, **fmt).strip()
     if _core_evidence and not _core_evidence.endswith("."):
         _core_evidence += "."
+    # Bank evidence entries are full sentences ("The finished work applies…");
+    # after "the teacher checks that …" the clause must read as one sentence.
+    if _core_evidence:
+        _core_evidence = _core_evidence[:1].lower() + _core_evidence[1:]
     _support_tmpl = (activity.support if (activity.support and not early_years)
                      else profile.support_template)
     _challenge_tmpl = (activity.challenge if (activity.challenge and not early_years)
@@ -2573,13 +2579,22 @@ def build_lesson(
             "challenge", focus_short, prior)
 
     # ── Differentiation — tied to the actual task ───────────────────────
+    # Tier templates that do not interpolate the focus are anchored on THIS
+    # indicator's task, so a support/challenge line never reads as a generic
+    # subject sentence reused across every lesson ("Support: Provide a word
+    # bank…" with no mention of what is being supported).
+    def _anchor_tier(tmpl: str, text: str) -> str:
+        if not text or not focus_short or "{focus" in (tmpl or ""):
+            return text
+        return f"{text.rstrip('. ')} on {focus_short}."
+
     differentiation = "\n".join([
-        f"Support: {_safe_format(_support_tmpl, **fmt)}",
+        f"Support: {_anchor_tier(_support_tmpl, _safe_format(_support_tmpl, **fmt).strip())}",
         (f"Core: all learners complete the main task on {focus_short}; the "
          f"teacher checks that {_core_evidence}") if _core_evidence else
         (f"Core: all learners complete the main task on {focus_short} "
          "independently with standard guidance."),
-        f"Challenge: {_challenge}",
+        f"Challenge: {_anchor_tier(_challenge_tmpl, _challenge)}",
         f"Grouping: {profile.grouping}",
     ])
 

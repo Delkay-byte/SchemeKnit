@@ -403,8 +403,10 @@ class DOCXExportEngine:
             doc.add_heading('Assessment Questions / Checks (with marking)',
                             level=3)
             for i in items:
+                # No square brackets: the approved-template content hygiene
+                # check forbids bare [ or ] anywhere in the document.
                 doc.add_paragraph(
-                    f"[{i.prompt}] (DoK {i.dok_level})",
+                    f"{i.prompt} (DoK {i.dok_level})",
                     style='List Bullet')
                 if getattr(i, "expected_evidence", ""):
                     doc.add_paragraph(
@@ -423,25 +425,19 @@ class DOCXExportEngine:
             doc.add_heading('Marking Rubric for the Learner Task', level=3)
             if rubric.task:
                 doc.add_paragraph(rubric.task)
+            # Emitted as text lines, not a table: an extra rubric TABLE breaks
+            # the approved-source topology contract (generated table count must
+            # be an exact multiple of the source's — docx_structure_compare).
             level_names = ("3 — meets the standard", "2 — developing",
                            "1 — needs support")
-            table = doc.add_table(rows=1,
-                                  cols=1 + max(1, len(level_names)))
-            table.style = 'Table Grid'
-            header = table.rows[0].cells
-            header[0].text = 'Criterion'
-            for j, name in enumerate(level_names):
-                header[j + 1].text = name
             for c in rubric.criteria:
-                row = table.add_row().cells
-                row[0].text = c.criterion
+                doc.add_paragraph(f"Criterion: {c.criterion}")
                 for d in c.descriptors:
-                    idx = {"3": 1, "2": 2, "1": 3}.get(
-                        (d.get("points") or "").strip(), 1)
-                    if idx - 1 < len(level_names):
-                        row[idx].text = (
-                            f"{d.get('descriptor', '')} "
-                            f"({d.get('points', '')} pt)")
+                    pts = (d.get("points") or "").strip()
+                    label = {p: n for p, n in zip(("3", "2", "1"), level_names)}.get(
+                        pts, f"{pts} points")
+                    doc.add_paragraph(
+                        f"  {label}: {d.get('descriptor', '')} ({pts} pt)")
             doc.add_paragraph(f"Total marks: {rubric.total_points}")
             if rubric.evidence_to_award:
                 doc.add_paragraph(rubric.evidence_to_award)
@@ -530,7 +526,7 @@ def _append_assessment_structure(document, lessons) -> None:
             for i in items:
                 # Plain paragraphs: bundled form copies do not necessarily
                 # carry Word's 'List Bullet' style.
-                document.add_paragraph(f"• [{i.prompt}] (DoK {i.dok_level})")
+                document.add_paragraph(f"• {i.prompt} (DoK {i.dok_level})")
                 for prefix, value in (
                         ("Expected evidence: ", i.expected_evidence),
                         ("Marking: ", i.marking_guidance),
@@ -542,24 +538,19 @@ def _append_assessment_structure(document, lessons) -> None:
             _heading(document, 'Marking Rubric for the Learner Task')
             if rubric.task:
                 document.add_paragraph(rubric.task)
+            # Text lines, never a table: bundled forms must keep the source's
+            # table topology exactly (extra tables fail the approved-source
+            # compare — generated count must be an exact multiple of source).
             level_names = ("3 — meets the standard", "2 — developing",
                            "1 — needs support")
-            table = document.add_table(rows=1, cols=1 + len(level_names))
-            table.style = 'Table Grid'
-            header = table.rows[0].cells
-            header[0].text = 'Criterion'
-            for j, name in enumerate(level_names):
-                header[j + 1].text = name
             for c in rubric.criteria:
-                row = table.add_row().cells
-                row[0].text = c.criterion
+                document.add_paragraph(f"Criterion: {c.criterion}")
                 for d in c.descriptors:
-                    idx = {"3": 1, "2": 2, "1": 3}.get(
-                        (d.get("points") or "").strip(), 1)
-                    if 0 < idx <= len(level_names):
-                        row[idx].text = (
-                            f"{d.get('descriptor', '')} "
-                            f"({d.get('points', '')} pt)")
+                    pts = (d.get("points") or "").strip()
+                    label = {p: n for p, n in zip(("3", "2", "1"), level_names)}.get(
+                        pts, f"{pts} points")
+                    document.add_paragraph(
+                        f"  {label}: {d.get('descriptor', '')} ({pts} pt)")
             document.add_paragraph(f"Total marks: {rubric.total_points}")
             if rubric.evidence_to_award:
                 document.add_paragraph(rubric.evidence_to_award)
