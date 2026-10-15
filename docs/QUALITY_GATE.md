@@ -26,7 +26,7 @@ The gate enforces hard structural/curriculum invariants (`src/engines/lesson_qua
 | D | `missing_indicator` | Lesson indicator empty/malformed. |
 | E | `missing_objective` | Objective missing or effectively empty. |
 | F | `objective_not_related_to_indicator` | Objective weakly/incorrectly related to source indicator (indicator-interpreter based; not naive substring). |
-| G | `objective_too_generic` / `generic_objective` | Objective is generic ("learners can explore/understand/discuss/learn/talk about/know/be aware…") per canonical rubric. |
+| G | `objective_too_generic` / `generic_objective` | Objective is generic ("learners can explore/understand/discuss/learn/talk about/know/be aware…") per canonical rubric. **Oct 2026 correction:** the measurable outcome verb is now read from the objective's outcome-verb position on ONE shared inventory (`src/curriculum/indicator_actions.py`) with exact word boundaries — verbs official curriculum rows legitimately use (`add`, `multiply`, `install`, `indicate`, `assess`, `relate`, `recognise`, `skip count`, `lire`, `écouter`, …) are no longer false-rejected as generic, while vague outcomes ("learners will discuss the topic"), noun-phrase outcomes and accidental substring hits (`household`→`use`, `performance`→`perform`) are still rejected. Thresholds, the recall floor (≥ 0.15) and all other hard-failure criteria are unchanged (chain tests: `tests/test_phase1_measurable_verbs.py`). |
 | H | `missing_phase1` | Phase 1 (starter/introduction) missing required structure. |
 | I | `missing_phase2` | Phase 2 (main/development) missing. |
 | J | `missing_phase3` | Phase 3 (plenary/closure) missing. |
