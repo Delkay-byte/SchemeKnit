@@ -19,6 +19,13 @@ from __future__ import annotations
 import re
 
 from ..models import Subject
+from .indicator_actions import (  # noqa: F401 — canonical action canon
+    ACTION_CATEGORIES,
+    ACTIONS as _CANONICAL_ACTIONS,
+    bloom_category as _action_bloom_category,
+    leading_action as _canonical_leading_action,
+    outcome_action as _canonical_outcome_action,
+)
 
 SUBJECT_STRAND_KEY = {
     Subject.MATHEMATICS: "mathematics",
@@ -49,17 +56,11 @@ _STOPWORDS = {
     "learners'", "children", "pupils",
 }
 
-_MEASURABLE_VERBS = {
-    "identify", "describe", "demonstrate", "compare", "classify",
-    "classify", "explain", "apply", "investigate", "distinguish",
-    "examine", "categorise", "categorize", "design", "state", "list",
-    "model", "represent", "determine", "analyse", "analyze", "evaluate",
-    "outline", "create", "perform", "measure", "calculate", "interpret",
-    "justify", "name", "match", "arrange", "sort", "construct", "draw",
-    "solve", "round", "express", "use", "ask", "respond", "record",
-    "research", "reflect", "role play", "participate", "write", "read",
-    "practise", "practice", "distinguish between", "give examples",
-}
+# Measurable-action vocabulary: ONE canonical list
+# (src/curriculum/indicator_actions.py), not a competing inventory. Kept as
+# an alias because the frozen benchmark harness re-exports
+# ``_MEASURABLE_VERBS`` from here.
+_MEASURABLE_VERBS = frozenset(_CANONICAL_ACTIONS)
 
 _GENERIC_OBJECTIVE_RE = re.compile(
     r"learners can (explore|understand|discuss|learn|talk about|know|be aware)\b",
@@ -161,21 +162,15 @@ def distinct_markers(pattern, text):
 
 
 def first_indicator_verb(indicator):
-    """The first measurable action verb of the indicator text."""
-    # Strip a leading GES code only ("B7.1.1.1.1 ", "7.1.2 ") — never the
-    # opening words of the sentence itself ("Demonstrate how to use the
-    # Start screen …" must still start with its own verb).
-    text = re.sub(r"^\s*[A-Za-z]{0,3}\d[\d.]*\s+", "", indicator or "").lower()
-    words = re.findall(r"[a-z]+", text)
-    for i, word in enumerate(words):
-        for verb in _MEASURABLE_VERBS:
-            parts = verb.split()
-            if word == parts[0] and words[i:i + len(parts)] == parts:
-                return verb
-        if word.endswith("ate") or word.endswith("ise") or word.endswith("ize"):
-            if word in _MEASURABLE_VERBS:
-                return word
-    return ""
+    """The primary measurable action verb of the indicator text.
+
+    Delegates to the canonical indicator-action interpreter so the gate and
+    the builder cannot disagree about what a measurable lead is. The
+    interpreter handles GES codes, ``learners can/will`` preambles, multiword
+    actions (``skip count``, ``role play``) and accented
+    (French / Ghanaian-language) action phrases.
+    """
+    return _canonical_leading_action(indicator)
 
 
 def verb_stem_matches(verb, text):
@@ -274,8 +269,10 @@ def c02_objective_specificity(entry, lp):
     if _GENERIC_OBJECTIVE_RE.search(obj):
         return 1
     verb = first_indicator_verb(entry["indicator"])
-    has_verb = verb_stem_matches(verb, obj) or any(
-        v in obj.lower().split() for v in _MEASURABLE_VERBS)
+    # Word-boundary outcome-verb check on the shared canon: "performance"
+    # no longer counts as "perform", but the objective's own outcome verb
+    # (right after ``Learners can …``) must name a measurable action.
+    has_verb = verb_stem_matches(verb, obj) or _canonical_outcome_action(obj) != ""
     recall = overlap_recall(entry["indicator"], obj)
     if has_verb and recall >= 0.50:
         return 5
@@ -633,7 +630,11 @@ def hard_failures(entry, lp):
             failures.append("generic_objective")
         else:
             recall = overlap_recall(entry["indicator"], obj)
-            has_verb = any(v in obj.lower() for v in _MEASURABLE_VERBS)
+            # Outcome-verb interpretation (canonical, word-boundary): the
+            # verb right after "Learners can/will …" must name a measurable
+            # action — a measurable word elsewhere in the sentence or an
+            # accidental substring is NOT an assessable outcome.
+            has_verb = _canonical_outcome_action(obj) != ""
             if not has_verb or recall < 0.15:
                 failures.append("generic_objective")
 
