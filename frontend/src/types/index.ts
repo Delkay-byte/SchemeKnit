@@ -228,6 +228,37 @@ export interface TeachingActivity {
   source: ContentSource
 }
 
+export interface AssessmentItem {
+  prompt: string
+  dok_level?: number
+  bloom_category?: string
+  expected_evidence?: string
+  marking_guidance?: string
+  misconception?: string
+  follow_up?: string
+  source?: ContentSource
+}
+
+export interface RubricLevelDescriptor {
+  level: string
+  descriptor: string
+  points: number
+}
+
+export interface RubricCriterion {
+  criterion: string
+  descriptors: RubricLevelDescriptor[]
+  points?: number
+}
+
+export interface AnalyticRubric {
+  task: string
+  criteria: RubricCriterion[]
+  total_points?: number
+  evidence_to_award?: string[]
+  authority_note?: string
+}
+
 export interface LessonPlan {
   id: string
   week_number: number
@@ -262,6 +293,11 @@ export interface LessonPlan {
   group_work: string
   individual_work: string
   assessment: string
+  // Phase 3 structured assessment (read-only): DoK-tagged prompts with
+  // marking guidance, and an analytic rubric only where a product/performance
+  // is assessed. Absent/empty for older lessons and early-years levels.
+  assessment_items?: AssessmentItem[]
+  assessment_rubric?: AnalyticRubric | null
   differentiation: string
   remediation: string
   extension: string

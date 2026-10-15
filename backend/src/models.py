@@ -726,6 +726,53 @@ class ReferenceEntry(BaseModel):
     notes: str = ""
 
 
+class AssessmentItem(BaseModel):
+    """ONE assessment prompt with what earns credit (DoK + marking).
+
+    Deterministic; generated with AI OFF. Notes:
+      * ``dok_level`` 1–4 (Depth of Knowledge — NOT the Bloom taxonomy;
+        ``bloom_category`` repeats the shared interpreter classification and
+        the two are deliberately different concepts).
+      * ``expected_evidence`` says what the teacher sees when the learner
+        succeeds; answers are computed only where the lesson supplies the
+        numbers reliably (Phase 3 §D).
+      * Prompts always assess THIS indicator — never a generic quiz.
+    """
+    prompt: str
+    dok_level: int = 1
+    bloom_category: str = ""
+    expected_evidence: str = ""
+    marking_guidance: str = ""
+    misconception: str = ""
+    follow_up: str = ""
+    source: ContentSource = ContentSource.DETERMINISTIC
+
+
+class RubricCriterion(BaseModel):
+    """One observable rubric criterion with level descriptors and points."""
+    criterion: str
+    descriptors: List[Dict[str, str]] = []   # [{"level", "descriptor", "points"}]
+    points: int = 2
+
+
+class AnalyticRubric(BaseModel):
+    """A practical analytic marking rubric for a learner-created product,
+    performance, investigation or extended response.
+
+    NEVER an official NaCCA/GES rubric — generated locally, plain observable
+    language, points sum to ``total_points``. Attached only when a lesson's
+    assessment genuinely marks a product or performance.
+    """
+    task: str = ""
+    criteria: List[RubricCriterion] = []
+    total_points: int = 0
+    evidence_to_award: str = ""
+    authority_note: str = (
+        "SchemeKnit-generated marking guide for this task — "
+        "not an official NaCCA or GES rubric.")
+    source: ContentSource = ContentSource.DETERMINISTIC
+
+
 #: Official NaCCA core-competency taxonomy (canonical labels + codes).
 NACCA_CORE_COMPETENCIES: List[Dict[str, str]] = [
     {"code": "CP", "label": "Critical Thinking and Problem Solving"},
@@ -832,6 +879,14 @@ class LessonPlan(BaseModel):
     group_work: str = ""
     individual_work: str = ""
     assessment: str = ""
+    #: Structured assessment prompts with DoK levels + marking guidance
+    #: (Phase 3). Deterministic, AI OFF; empty for early-years and simple
+    #: single-check lessons where the prose ``assessment`` suffices.
+    assessment_items: List[AssessmentItem] = []
+    #: Analytic scoring rubric for THIS lesson when its assessment genuinely
+    #: marks a learner-created product/performance/task; never invented for
+    #: short oral/written checks.
+    assessment_rubric: Optional[AnalyticRubric] = None
     differentiation: str = ""
     remediation: str = ""
     extension: str = ""
