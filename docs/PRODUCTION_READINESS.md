@@ -1,14 +1,14 @@
 # PRODUCTION READINESS — Final Smoke Verification (P4 Runtime Evidence)
 
-**Date:** 2026-10-09  
-**Source commit:** 2121a2c → fix `70738f8` (quota incident — see §5)  
-**App code:** identical to ae84f19 (P4) — `git diff --stat ae84f19..2121a2c` is docs-only (4 doc files)  
-**Production commit (actual):** UNKNOWN (no public deploy/build marker; behaviour markers used)  
-**Status:** JOURNEY GREEN + P4 EVIDENCED — **RED / NO-GO until fix `70738f8` is deployed and verified** (quota accounting defect root-caused; full report: docs/QUOTA_ACCOUNTING_INCIDENT.md)
+**Date:** 2026-10-09, updated 2026-10-15 (Phase 8 engineering close-out)  
+**Source commit:** 2121a2c → fix `70738f8` (quota incident — see §5) → local engineering Phases 1–8 on main (see §8)  
+**App code:** identical to ae84f19 (P4) at the 2121a2c stage — `git diff --stat ae84f19..2121a2c` is docs-only (4 doc files)  
+**Production commit (actual):** **`3ef1a41`** — owner-approved one-time backend deploy `dep-db8aftlg1s2s739kr47g`, live 2026-10-15T10:18:21Z (contains quota fix `70738f8`; deploy record + ancestor check). Local main is deliberately AHEAD of the deployed commit (Phases 1–7 engineering, §8) and is NOT deployed — no production deploy without explicit owner approval.  
+**Status:** JOURNEY GREEN + P4 EVIDENCED + quota fix DEPLOYED — **RED / NO-GO until (a) the §12.3 runtime enforcement check passes on the deployed build and (b) the §13e historical reconciliation is approved and applied** (quota accounting defect root-caused and deployed; full report: docs/QUOTA_ACCOUNTING_INCIDENT.md)
 
 ## 1) Source baseline
-- HEAD == origin/main == 2121a2c. P4 (quality gate A–X, repair, rebuild ≤2, rubric, WAPEF saved-selection-only, accept-scoped replacement, quota 0/1, calibration) fully included.
-- Local reference: P4 gate 58 passed; WAPEF boundary 11 passed; full non-env suite 2366 passed / 11 skipped; frontend `tsc --noEmit` clean, `next build` passes.
+- At the 2121a2c smoke stage: HEAD == origin/main == 2121a2c; P4 (quality gate A–X, repair, rebuild ≤2, rubric, WAPEF saved-selection-only, accept-scoped replacement, quota 0/1, calibration) fully included.
+- Local reference at Phase 8 close-out (2026-10-15): full backend suite **2419 passed / 16 skipped**; PG quota driver gate **22 passed**; Phase 7 multi-subject export fidelity **13 passed**; frozen corpora **11/11 + 40/40 + 19/19 teacher-ready, first-pass 100%** (docs/benchmark/final_gate_metrics_2026-10-15.json). Frontend unaffected by Phases 4–7 (backend-only).
 
 ## 2) Production state (runtime, 2026-10-09)
 - API health 200 `{"status":"healthy","service":"SchemeKnit","version":"1.0.5"}` (1.24 s cold).
@@ -56,4 +56,22 @@ Scheme `backend/real_documents/BASIC 9 SCIENCE SCHEME OF LEARNING.docx`, product
 - **Browser UI journey:** not executed; frontend serves 200, journey verified at API level → PARTIAL.
 
 ## 7) GO/NO-GO
-**NO-GO / RED — until (a) the §12.3 runtime enforcement check passes on the deployed build and (b) the §13e historical reconciliation is approved and applied (`used=6`, over-limit block until 2026-11-01).** Deployed build updated 2026-10-15: live Render deploy `dep-db8aftlg1s2s739kr47g` = commit `3ef1a41` (contains quota fix `70738f8`), verified by deploy record + ancestor check; health 200. The complete AI-OFF upload→export journey and P4 end-to-end behavior already passed on this code lineage (§3, §4). Remaining gap is historical data, not code: the affected account's stored counter is still `used=0` until §13e runs, so the free-tier cap is under-enforced for that account this month. No production lesson generation until an approved safe test plan exists. Owner decision required on §13e.
+**NO-GO / RED — until (a) the §12.3 runtime enforcement check passes on the deployed build and (b) the §13e historical reconciliation is approved and applied (`used=6`, over-limit block until 2026-11-01).** Deployed build updated 2026-10-15: live Render deploy `dep-db8aftlg1s2s739kr47g` = commit `3ef1a41` (contains quota fix `70738f8`), verified by deploy record + ancestor check; health 200. The complete AI-OFF upload→export journey and P4 end-to-end behavior already passed on this code lineage (§3, §4). Remaining gaps are owner-gated, not open code defects: (1) no authorized production token exists for a live enforcement probe (no production lesson generation allowed without an approved safe test plan), and (2) the affected account's stored counter is still `used=0` until §13e runs, so the free-tier cap is under-enforced for that account this month. Owner decisions required on the §12.3 test plan and §13e.
+
+## 8) Engineering close-out record (Phases 1–8, local main, 2026-10-15)
+
+Local main carries post-deploy engineering that is intentionally NOT deployed (deploy requires explicit owner approval). Every phase is a separate commit with committed evidence:
+
+| Phase | Commit | Outcome |
+|---|---|---|
+| 0 Quota incident closure | `e5499fc`, `e7941f8` | Deployed commit established; owner-approved one-time deploy of `3ef1a41` live 2026-10-15; §13c–§13d evidence recorded; §13e backfill prepared, NOT executed (HOLD) |
+| 1 Verb correction verification | `c9412b0`, `5a7698c` | Shared indicator-action inventory fixes false rejections; all ten flagged verb families verified; no additional rubric change |
+| 2 Current baseline | `59af277`, `a66cd64` | Current-code baseline 100% teacher-ready (11/40/19); P2.1-era 31/40+12/19 delta reconciled (same fixtures/harness; only the Phase 1 fix differs) |
+| 3 DoK assessment + rubrics | `8974da3` | Deterministic Depth-of-Knowledge assessment items + conditional analytic rubric on the canonical lesson model; read-only frontend display; migration v033 |
+| 4 Differentiation / Ghana / realism | `b16b42a` | Frozen corpora improved with zero regressions (activity_specificity +0.27/+0.34/+0.58, resource_realism +0.18/+0.23/+0.27); DOCX hygiene defects (bare brackets, rubric tables breaking form topology) fixed |
+| 5 Reuse/retry/recovery | `923d5ff` | Five NO-GAP/OBSERVATION findings; one demonstrated gap fixed — orphaned `pending` jobs (process death) now fail at startup (age-thresholded sweep) |
+| 6 Zeli/P4 call-graph audit | `d9c230d` | "post-AI" wording verified accurate; Zeli-separation rules hold in code; documented no-change |
+| 7 Final benchmark + export fidelity | `bdfc661` | 100% teacher-ready held (11/40/19, first-pass 100%); six-subject DOCX/PDF export fidelity suite 13 passed |
+| 8 Production readiness docs | (this commit) | This document + pilot/production-version.md brought to the deployed-state truth; NO-GO restated on the two owner-gated items |
+
+Verification at close-out: full backend suite 2419 passed / 16 skipped; PG driver gate 22 passed; Phase 7 export fidelity 13 passed; frozen corpora artifacts committed under docs/benchmark/. No production data was mutated at any point in Phases 1–8; historical quota reconciliation remains HOLD pending explicit owner approval (exact SQL, expected results, rollback plan: docs/QUOTA_ACCOUNTING_INCIDENT.md §13e).
