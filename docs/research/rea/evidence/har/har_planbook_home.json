@@ -1,0 +1,972 @@
+{
+  "log": {
+    "version": "1.2",
+    "creator": {
+      "name": "REA-derived sanitized summary",
+      "version": "1.0"
+    },
+    "note": "Derived from REA capture_browser_scenario Evidence; URL query values, headers values, cookies and bodies were never retained by REA.",
+    "entries": [
+      {
+        "_id": 1,
+        "request": {
+          "method": "GET",
+          "url": "https://www.planbook.com/",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "document"
+      },
+      {
+        "_id": 2,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/assets/fonts/Raleway/all.css",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "stylesheet"
+      },
+      {
+        "_id": 3,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/assets/pretty-checkbox/pretty-checkbox.min.css",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "stylesheet"
+      },
+      {
+        "_id": 4,
+        "request": {
+          "method": "GET",
+          "url": "https://www.planbook.com/css/app.03a9886a.css",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "stylesheet"
+      },
+      {
+        "_id": 5,
+        "request": {
+          "method": "GET",
+          "url": "https://www.planbook.com/css/chunk-vendors.6f591f80.css",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "stylesheet"
+      },
+      {
+        "_id": 6,
+        "request": {
+          "method": "GET",
+          "url": "https://www.planbook.com/js/app.272542f5.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 7,
+        "request": {
+          "method": "GET",
+          "url": "https://www.planbook.com/js/chunk-vendors.fd369b51.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 8,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/js/vars.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 9,
+        "request": {
+          "method": "GET",
+          "url": "https://www.planbook.com/css/chunk-38be035e.b4c93d23.css",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "other"
+      },
+      {
+        "_id": 10,
+        "request": {
+          "method": "GET",
+          "url": "https://www.planbook.com/css/chunk-4c96f7e0.eb0b1b7f.css",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "other"
+      },
+      {
+        "_id": 11,
+        "request": {
+          "method": "GET",
+          "url": "https://www.planbook.com/js/chunk-2d230300.7e5f0e5d.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "other"
+      },
+      {
+        "_id": 12,
+        "request": {
+          "method": "GET",
+          "url": "https://www.planbook.com/js/chunk-38be035e.ac25101a.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "other"
+      },
+      {
+        "_id": 13,
+        "request": {
+          "method": "GET",
+          "url": "https://www.planbook.com/js/chunk-4c96f7e0.c588aab6.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "other"
+      },
+      {
+        "_id": 14,
+        "request": {
+          "method": "GET",
+          "url": "https://www.planbook.com/css/chunk-4c96f7e0.eb0b1b7f.css",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "stylesheet"
+      },
+      {
+        "_id": 15,
+        "request": {
+          "method": "GET",
+          "url": "https://www.planbook.com/js/chunk-4c96f7e0.c588aab6.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 16,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-home-c.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 17,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/laptop-with-ui-2.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 18,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-review-quote.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 19,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-lesson.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 20,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-blue-icons.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 21,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-coinbank.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 22,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-support.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 23,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-purple-icons.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 24,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-list.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 25,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-feedback.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 26,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-gold-icons.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 27,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-apple.jpg",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 28,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-teachers-c.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 29,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/teacherSchedule.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 30,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/teacherLesson.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 31,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/teacherCollaborate.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 32,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/teacherTemplate.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 33,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/teacherStandards.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 34,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/teacherViews.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 35,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/teacherGrades.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 36,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-schools-c.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 37,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/schoolLessons.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 38,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/schoolTeachers.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 39,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/schoolCurriculum.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 40,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/schoolStudents.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 41,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/schoolEvents.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 42,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/schoolLayouts.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 43,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-pricing-c.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 44,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/mobile-app-store.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 45,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/mobile-play-store.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 46,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-mobile-c.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 47,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-mobile-ballon.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 48,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-mobile-teachers.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 49,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-mobile-blue-icons.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 50,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-mobile-admins.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 51,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-mobile-students.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 52,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-mobile-purple-icons.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 53,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-help-c.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 54,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-about-c.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 55,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-about-rocket.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 56,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-about-colors.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 57,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-about-paperclip.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 58,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-about-copy.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 59,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-about-mobile.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 60,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-about-share.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 61,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-about-profile.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 62,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-about-flip.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 63,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-about-ui.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 64,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-about-desk.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 65,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-about-binders.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 66,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-career-c.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 67,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/sppslogo.gif",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 68,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/welcome-home-blue-w-2.jpg",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 69,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/assets/fonts/Raleway/1Ptrg8zYS_SKggPNwN4rWqZPANqczVs.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 70,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/assets/fonts/Raleway/1Ptrg8zYS_SKggPNwOIpWqZPANqczVs.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 71,
+        "request": {
+          "method": "GET",
+          "url": "https://www.planbook.com/fonts/fa-light-300.48093c8d.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 72,
+        "request": {
+          "method": "GET",
+          "url": "https://www.planbook.com/fonts/fa-solid-900.0bf5b479.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 73,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/assets/fonts/Raleway/1Ptrg8zYS_SKggPNwPIsWqZPANqczVs.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 74,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/assets/fonts/Raleway/1Ptsg8zYS_SKggPNwE44TYFqL_KWxQ.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 75,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/assets/fonts/Raleway/1Ptug8zYS_SKggPNyC0IT4ttDfA.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 76,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/assets/fonts/Raleway/1Ptpg8zYS_SKggPNyCgwgqB_AtCb71ka4Q.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 77,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/assets/fonts/Raleway/1Ptrg8zYS_SKggPNwJYtWqZPANqczVs.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 78,
+        "request": {
+          "method": "GET",
+          "url": "https://www.planbook.com/fonts/fa-brands-400.b202664d.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 79,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/planbook-logo-blue.svg",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 80,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.planbook.com/images/favicon.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "other"
+      }
+    ]
+  }
+}

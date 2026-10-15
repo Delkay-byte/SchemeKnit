@@ -1,0 +1,993 @@
+{
+  "evidence_id": "ev_4e5f3de9d3924451614a2f74382d57aa6576efd0d56d4e23174f9ae4a1b5f662",
+  "operation": "capture_browser_scenario",
+  "provider": {
+    "id": "rea-playwright-browser-scenario",
+    "name": "REA Playwright browser scenario capture provider",
+    "version": "1"
+  },
+  "start_origin": "https://classpiler.com",
+  "browser": {
+    "mode": "launch",
+    "process_ownership": "provider-owned",
+    "cleanup": "terminated-owned-process",
+    "product": "Chromium",
+    "version": "155.0.8059.79"
+  },
+  "duration_ms": 9633,
+  "completeness": {
+    "status": "incomplete",
+    "equality_eligible": false,
+    "missing_sections": [
+      "events"
+    ],
+    "truncated_sections": []
+  },
+  "limitations": [
+    "Event sequence records provider receipt order; simultaneous browser causality is not inferred.",
+    "Network content is retained only when selected; Playwright response-body bytes are API results and are not guaranteed to match wire bytes.",
+    "Request bytes are limited to what Playwright exposes; not_exposed does not establish body absence or multipart file coverage.",
+    "Network content reads settle within 5 seconds each and the observer does not request bodies from unfinished responses.",
+    "Playwright scenario events do not expose request initiator stacks; receipt order does not prove causality.",
+    "Storage values are hashed only after declared-secret redaction.",
+    "Some network requests had not completed when capture ended; later activity is unknown."
+  ],
+  "steps": [
+    {
+      "step_id": "scenario_start",
+      "action": "goto_start",
+      "status": "completed",
+      "before_url": {
+        "url": "about:blank",
+        "origin": null,
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "after_url": {
+        "url": "https://classpiler.com/",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "elapsed_ms": 3344,
+      "artifacts": {
+        "screenshot": {
+          "state": "not_requested"
+        },
+        "dom": {
+          "state": "not_requested"
+        },
+        "accessibility": {
+          "state": "not_requested"
+        },
+        "url": {
+          "state": "not_requested"
+        },
+        "history": {
+          "state": "not_requested"
+        },
+        "storage": {
+          "state": "not_requested"
+        }
+      },
+      "error": null
+    },
+    {
+      "step_id": "settle",
+      "action": "wait_for_timeout",
+      "status": "completed",
+      "before_url": {
+        "url": "https://classpiler.com/",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "after_url": {
+        "url": "https://classpiler.com/",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "elapsed_ms": 6087,
+      "artifacts": {
+        "screenshot": {
+          "file": "C:\\Users\\SAVIOUR\\AppData\\Local\\Temp\\opencode\\rea\\ex_classpiler_app\\screenshot_settle.png",
+          "bytes": 92541
+        },
+        "dom": {
+          "file": "C:\\Users\\SAVIOUR\\AppData\\Local\\Temp\\opencode\\rea\\ex_classpiler_app\\dom_settle.txt",
+          "bytes": 30131,
+          "text_len": 30131
+        },
+        "accessibility": {
+          "file": "C:\\Users\\SAVIOUR\\AppData\\Local\\Temp\\opencode\\rea\\ex_classpiler_app\\accessibility_settle.txt",
+          "bytes": 4649,
+          "text_len": 4649
+        },
+        "url": {
+          "url": "https://classpiler.com/",
+          "origin": "https://classpiler.com",
+          "query_parameter_names": [],
+          "redacted": false
+        },
+        "history": {
+          "state": "not_requested"
+        },
+        "storage": {
+          "state": "not_requested"
+        }
+      },
+      "error": null
+    }
+  ],
+  "network": [
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "document",
+      "txn": "request-1"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/cdn-cgi/speculation",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "other",
+      "txn": "request-2"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.googletagmanager.com/gtag/js?id=G-1230G0V98Q",
+        "origin": "https://www.googletagmanager.com",
+        "query_parameter_names": [
+          "id"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-3"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/assets/index-UpfppKNm.js",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-4"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/assets/rolldown-runtime-12rGtxZI.js",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-5"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/assets/chart-vendor-CH-Y-tRw.js",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-6"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/assets/katex-vendor-kW-ng9V5.js",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-7"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/assets/react-vendor-Bv0OOY5y.js",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-8"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/assets/vendor-DTXL74fw.js",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-9"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/assets/katex-vendor-DWfq818h.css",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "stylesheet",
+      "txn": "request-10"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/assets/index-BAUdDCWA.css",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "stylesheet",
+      "txn": "request-11"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.cloudflareinsights.com/beacon.min.js/v4bc70e2c01a94c73b74392e4234840661791215815920",
+        "origin": "https://static.cloudflareinsights.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-12"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/manifest.json",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "manifest",
+      "txn": "request-13"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/cdn-cgi/challenge-platform/scripts/jsd/main.js",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 302,
+      "resource_type": "script",
+      "txn": "request-14"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/sw.js",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-15"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/assets/Landing-muN4gOwE.js",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-16"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/assets/Logo-L7PdO0RX.js",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-17"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/assets/SEO-BbctTppq.js",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-18"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://o4511819100913664.ingest.de.sentry.io/api/4511819161206864/envelope/?sentry_version=7&sentry_key=c37b3008e5cf41f2b8b5b4c2c97419fb&sentry_client=sentry.javascript.react%2F10.68.0",
+        "origin": "https://o4511819100913664.ingest.de.sentry.io",
+        "query_parameter_names": [
+          "sentry_version",
+          "sentry_key",
+          "sentry_client"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-19"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/cdn-cgi/challenge-platform/h/g/scripts/jsd/4df4a60fa397/main.js?",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-20"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://classpiler.com/cdn-cgi/challenge-platform/h/g/jsd/oneshot/4df4a60fa397/0.42370442069390424:1792019729:3uJ0huEipi1YWZ8vxuMrK5bOPGr-ZJKcBnaIT5xR_kw/a4aa8ec45ec69333",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "xhr",
+      "txn": "request-21"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/Classpiler-logo.png",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-22"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/workbox-454714e3.js",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "other",
+      "txn": "request-23"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://www.google-analytics.com/g/collect?v=2&tid=G-1230G0V98Q&gtm=45je6ad1v9238072647za208zd9238072647xf1&_p=1792022575729&gcd=13l3l3l3l1l1&npa=0&dma=0&cid=101658117.1792022577&frm=0&ngs=1&pscdl=noapi&rcb=7&sr=1366x900&uaa=x86&uab=64&uafvl=Google%2520Chrome%3B155.0.8059.79%7CChromium%3B155.0.8059.79%7CNot(A%253ABrand%3B24.0.0.0&uam=&uamb=0&uap=Windows&uapv=19.0.0&uaw=0&ul=en-us&_s=1&tag_exp=115938465~115938468~118897920~118897930~120213116~120385423~120469145~120469153~121246026~121246034&sid=[redacted-session]&sct=1&seg=0&dl=https%3A%2F%2Fclasspiler.com%2F&dt=Classpiler%20-%20AI%20Teaching%20Assistant%20for%20Ghanaian%20Teachers&_tu=QA&en=page_view&_fv=1&_nsi=1&_ss=1&_ee=1&ep.anonymize_ip=true&tfd=2461",
+        "origin": "https://www.google-analytics.com",
+        "query_parameter_names": [
+          "v",
+          "tid",
+          "gtm",
+          "_p",
+          "gcd",
+          "npa",
+          "dma",
+          "cid",
+          "frm",
+          "ngs",
+          "pscdl",
+          "rcb",
+          "sr",
+          "uaa",
+          "uab",
+          "uafvl",
+          "uam",
+          "uamb",
+          "uap",
+          "uapv",
+          "uaw",
+          "ul",
+          "_s",
+          "tag_exp",
+          "sid",
+          "sct",
+          "seg",
+          "dl",
+          "dt",
+          "_tu",
+          "en",
+          "_fv",
+          "_nsi",
+          "_ss",
+          "_ee",
+          "ep.anonymize_ip",
+          "tfd"
+        ],
+        "redacted": false
+      },
+      "status": 204,
+      "resource_type": "fetch",
+      "txn": "request-24"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/vite.svg",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-25"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://classpiler.com/cdn-cgi/rum?",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 204,
+      "resource_type": "xhr",
+      "txn": "request-26"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/favicon.png",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "other",
+      "txn": "request-27"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/icons/android/android-launchericon-144-144.png",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "other",
+      "txn": "request-28"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/placeholder-visual.svg",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-29"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/mathGenerators.js",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-30"
+    },
+    {
+      "kind": "request-failed",
+      "method": "POST",
+      "url": {
+        "url": "https://www.google-analytics.com/g/collect?v=2&tid=G-1230G0V98Q&gtm=45je6ad1v9238072647za208zd9238072647xf1&_p=1792022575729&gcd=13l3l3l3l1l1&npa=0&dma=0&cid=101658117.1792022577&frm=0&ngs=1&pscdl=noapi&rcb=7&sr=1366x900&uaa=x86&uab=64&uafvl=Google%2520Chrome%3B155.0.8059.79%7CChromium%3B155.0.8059.79%7CNot(A%253ABrand%3B24.0.0.0&uam=&uamb=0&uap=Windows&uapv=19.0.0&uaw=0&ul=en-us&_s=1&tag_exp=115938465~115938468~118897920~118897930~120213116~120385423~120469145~120469153~121246026~121246034&sid=[redacted-session]&sct=1&seg=0&dl=https%3A%2F%2Fclasspiler.com%2F&dt=Classpiler%20-%20AI%20Teaching%20Assistant%20for%20Ghanaian%20Teachers&_tu=QA&en=page_view&_fv=1&_nsi=1&_ss=1&_ee=1&ep.anonymize_ip=true&tfd=2461",
+        "origin": "https://www.google-analytics.com",
+        "query_parameter_names": [
+          "v",
+          "tid",
+          "gtm",
+          "_p",
+          "gcd",
+          "npa",
+          "dma",
+          "cid",
+          "frm",
+          "ngs",
+          "pscdl",
+          "rcb",
+          "sr",
+          "uaa",
+          "uab",
+          "uafvl",
+          "uam",
+          "uamb",
+          "uap",
+          "uapv",
+          "uaw",
+          "ul",
+          "_s",
+          "tag_exp",
+          "sid",
+          "sct",
+          "seg",
+          "dl",
+          "dt",
+          "_tu",
+          "en",
+          "_fv",
+          "_nsi",
+          "_ss",
+          "_ee",
+          "ep.anonymize_ip",
+          "tfd"
+        ],
+        "redacted": false
+      },
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/math-demo.html",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 308,
+      "resource_type": "fetch",
+      "txn": "request-31"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/math-demo",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-32"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/index.html",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 308,
+      "resource_type": "fetch",
+      "txn": "request-33"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-34"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/gnat-logo.svg",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-35"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/gnat-logo-watermark.svg",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-36"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/firebase-messaging-sw.js",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-37"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/favicon.png",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-38"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/apple-touch-icon.png",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-39"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/Timothy-Aguya-Akasiya.png",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-40"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/Classpiler-logo.png",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-41"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/icons/windows11/Wide310x150Logo.scale-400.png",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-42"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/icons/windows11/Wide310x150Logo.scale-200.png",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-43"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/icons/windows11/Wide310x150Logo.scale-150.png",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-44"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/icons/windows11/Wide310x150Logo.scale-125.png",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-45"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/icons/windows11/Wide310x150Logo.scale-100.png",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-46"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/icons/windows11/StoreLogo.scale-400.png",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-47"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/icons/windows11/StoreLogo.scale-200.png",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-48"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/icons/windows11/StoreLogo.scale-150.png",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-49"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/icons/windows11/StoreLogo.scale-125.png",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-50"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/icons/windows11/StoreLogo.scale-100.png",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-51"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/icons/windows11/Square44x44Logo.targetsize-96.png",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-52"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/icons/windows11/Square44x44Logo.targetsize-80.png",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-53"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/icons/windows11/Square44x44Logo.targetsize-72.png",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-54"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/icons/windows11/Square44x44Logo.targetsize-64.png",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-55"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/icons/windows11/Square44x44Logo.targetsize-60.png",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-56"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/icons/windows11/Square44x44Logo.targetsize-48.png",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-57"
+    },
+    {
+      "kind": "request",
+      "method": "GET",
+      "url": {
+        "url": "https://classpiler.com/icons/windows11/Square44x44Logo.targetsize-44.png",
+        "origin": "https://classpiler.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "resource_type": "fetch",
+      "txn": "request-58"
+    }
+  ],
+  "console": [
+    {
+      "level": "info",
+      "text": "Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner."
+    }
+  ],
+  "page_errors": [],
+  "websockets": [],
+  "downloads": [],
+  "screenshots": [
+    {
+      "step": "settle",
+      "file": "C:\\Users\\SAVIOUR\\AppData\\Local\\Temp\\opencode\\rea\\ex_classpiler_app\\screenshot_settle.png",
+      "bytes": 92541
+    }
+  ],
+  "final_url": {
+    "url": "https://classpiler.com/",
+    "origin": "https://classpiler.com",
+    "query_parameter_names": [],
+    "redacted": false
+  }
+}

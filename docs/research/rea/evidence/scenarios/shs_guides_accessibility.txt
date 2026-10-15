@@ -1,0 +1,68 @@
+- document:
+  - banner:
+    - link "SHS Planner":
+      - /url: https://shsplanner.com/
+    - navigation:
+      - link "Guides":
+        - /url: /guides/
+      - link "News":
+        - /url: /blog/
+      - link "Try the App":
+        - /url: https://shsplanner.com/
+  - heading "Guides for Ghana SHS Teachers" [level=1]
+  - paragraph: Free, practical guides on NaCCA lesson plans, schemes of work, and GES-aligned assessments ΓÇö written for teachers, by a teacher.
+  - link "Lesson Plans How to Write a NaCCA-Compliant Lesson Plan (2026 Guide) Structure, DoK levels, GESI, SEL, and a full worked example you can scroll through.":
+    - /url: /guides/lesson-plan-guide
+    - text: Lesson Plans
+    - heading "How to Write a NaCCA-Compliant Lesson Plan (2026 Guide)" [level=2]
+    - paragraph: Structure, DoK levels, GESI, SEL, and a full worked example you can scroll through.
+  - link "Curriculum Strand, Sub-Strand & Content Standard Explained (With Examples) What each term means, how they connect, and real examples from Maths, English, Biology, and History.":
+    - /url: /guides/strand-substrand-content-standard-guide
+    - text: Curriculum
+    - heading "Strand, Sub-Strand & Content Standard Explained (With Examples)" [level=2]
+    - paragraph: What each term means, how they connect, and real examples from Maths, English, Biology, and History.
+  - link "Assessment How to Create and Deploy an Online Assessment When to go online vs print, mapped against all 5 GES assessment types ΓÇö Class Exercise through End of Semester Exam.":
+    - /url: /guides/how-to-create-deploy-online-assessment
+    - text: Assessment
+    - heading "How to Create and Deploy an Online Assessment" [level=2]
+    - paragraph: When to go online vs print, mapped against all 5 GES assessment types ΓÇö Class Exercise through End of Semester Exam.
+  - link "Online Tools How to Create and Deploy an Online Test A full walkthrough ΓÇö from topic selection to a live link to graded results.":
+    - /url: /guides/how-to-create-deploy-online-test
+    - text: Online Tools
+    - heading "How to Create and Deploy an Online Test" [level=2]
+    - paragraph: A full walkthrough ΓÇö from topic selection to a live link to graded results.
+  - 'link "Comparison Subject Specific App vs SHS Planner: What Each One Covers How Ghana''s official GES/NaCCA Subject Specific App compares to SHS Planner, and how teachers use both together."':
+    - /url: /guides/subject-specific-app-vs-shs-planner
+    - text: Comparison
+    - 'heading "Subject Specific App vs SHS Planner: What Each One Covers" [level=2]'
+    - paragraph: How Ghana's official GES/NaCCA Subject Specific App compares to SHS Planner, and how teachers use both together.
+  - contentinfo:
+    - paragraph:
+      - text: ┬⌐ 2026 SHS Planner ┬╖ Built by EDICODE TECHNOLOGIES for the Ghanaian teacher ┬╖
+      - link "shsplanner.com":
+        - /url: https://shsplanner.com/
+    - paragraph:
+      - link "About":
+        - /url: /about.php
+      - text: ┬╖
+      - link "Sample Plan":
+        - /url: /samples.php
+      - text: ┬╖
+      - link "FAQ":
+        - /url: /faq.php
+      - text: ┬╖
+      - link "Contact":
+        - /url: /contact.php
+      - text: ┬╖
+      - link "Guides":
+        - /url: /guides/
+      - text: ┬╖
+      - link "News":
+        - /url: /blog/
+    - paragraph:
+      - link "Privacy Policy":
+        - /url: /privacy.php
+      - text: ┬╖
+      - link "Terms of Service":
+        - /url: /terms.php
+    - paragraph: SHS Planner is an independent website and is not affiliated with GES, NaCCA or the Ministry of Education.

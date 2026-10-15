@@ -1,0 +1,404 @@
+{
+  "evidence_id": "ev_2dfcbcb2097de5e65ad88a24ba39e20cadfaf60964355c750010566c33da7722",
+  "operation": "capture_browser_scenario",
+  "provider": {
+    "id": "rea-playwright-browser-scenario",
+    "name": "REA Playwright browser scenario capture provider",
+    "version": "1"
+  },
+  "start_origin": "https://rootabytes.com",
+  "browser": {
+    "mode": "launch",
+    "process_ownership": "provider-owned",
+    "cleanup": "terminated-owned-process",
+    "product": "Chromium",
+    "version": "155.0.8059.79"
+  },
+  "duration_ms": 7148,
+  "completeness": {
+    "status": "complete",
+    "equality_eligible": true,
+    "missing_sections": [],
+    "truncated_sections": []
+  },
+  "limitations": [
+    "Event sequence records provider receipt order; simultaneous browser causality is not inferred.",
+    "Network content is retained only when selected; Playwright response-body bytes are API results and are not guaranteed to match wire bytes.",
+    "Request bytes are limited to what Playwright exposes; not_exposed does not establish body absence or multipart file coverage.",
+    "Network content reads settle within 5 seconds each and the observer does not request bodies from unfinished responses.",
+    "Playwright scenario events do not expose request initiator stacks; receipt order does not prove causality.",
+    "Storage values are hashed only after declared-secret redaction."
+  ],
+  "steps": [
+    {
+      "step_id": "scenario_start",
+      "action": "goto_start",
+      "status": "completed",
+      "before_url": {
+        "url": "about:blank",
+        "origin": null,
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "after_url": {
+        "url": "https://rootabytes.com/products/classpiler",
+        "origin": "https://rootabytes.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "elapsed_ms": 2292,
+      "artifacts": {
+        "screenshot": {
+          "state": "not_requested"
+        },
+        "dom": {
+          "state": "not_requested"
+        },
+        "accessibility": {
+          "state": "not_requested"
+        },
+        "url": {
+          "state": "not_requested"
+        },
+        "history": {
+          "state": "not_requested"
+        },
+        "storage": {
+          "state": "not_requested"
+        }
+      },
+      "error": null
+    },
+    {
+      "step_id": "settle",
+      "action": "wait_for_timeout",
+      "status": "completed",
+      "before_url": {
+        "url": "https://rootabytes.com/products/classpiler",
+        "origin": "https://rootabytes.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "after_url": {
+        "url": "https://rootabytes.com/products/classpiler",
+        "origin": "https://rootabytes.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "elapsed_ms": 4690,
+      "artifacts": {
+        "screenshot": {
+          "file": "C:\\Users\\SAVIOUR\\AppData\\Local\\Temp\\opencode\\rea\\ex_classpiler_home\\screenshot_settle.png",
+          "bytes": 372488
+        },
+        "dom": {
+          "file": "C:\\Users\\SAVIOUR\\AppData\\Local\\Temp\\opencode\\rea\\ex_classpiler_home\\dom_settle.txt",
+          "bytes": 30633,
+          "text_len": 30633
+        },
+        "accessibility": {
+          "file": "C:\\Users\\SAVIOUR\\AppData\\Local\\Temp\\opencode\\rea\\ex_classpiler_home\\accessibility_settle.txt",
+          "bytes": 7850,
+          "text_len": 7850
+        },
+        "url": {
+          "url": "https://rootabytes.com/products/classpiler",
+          "origin": "https://rootabytes.com",
+          "query_parameter_names": [],
+          "redacted": false
+        },
+        "history": {
+          "state": "not_requested"
+        },
+        "storage": {
+          "state": "not_requested"
+        }
+      },
+      "error": null
+    }
+  ],
+  "network": [
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://rootabytes.com/products/classpiler",
+        "origin": "https://rootabytes.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "document",
+      "txn": "request-1"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://rootabytes.com/assets/index-BvbMGZsH.js",
+        "origin": "https://rootabytes.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-2"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://rootabytes.com/assets/vendor-C3DRSVr_.js",
+        "origin": "https://rootabytes.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-3"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://rootabytes.com/assets/index-CR6zZ4FY.css",
+        "origin": "https://rootabytes.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "stylesheet",
+      "txn": "request-4"
+    },
+    {
+      "kind": "request",
+      "method": "GET",
+      "url": {
+        "url": "https://static.cloudflareinsights.com/beacon.min.js",
+        "origin": "https://static.cloudflareinsights.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "resource_type": "script",
+      "txn": "request-5"
+    },
+    {
+      "kind": "request-failed",
+      "method": "GET",
+      "url": {
+        "url": "https://static.cloudflareinsights.com/beacon.min.js",
+        "origin": "https://static.cloudflareinsights.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "failure": "csp"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://rootabytes.com/cdn-cgi/challenge-platform/scripts/jsd/main.js",
+        "origin": "https://rootabytes.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 302,
+      "resource_type": "script",
+      "txn": "request-6"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://rootabytes.com/assets/Rootabyte-logo-icon-IBAbEvPN.png",
+        "origin": "https://rootabytes.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-7"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://rootabytes.com/assets/Classpiler-logo-_zzWllee.png",
+        "origin": "https://rootabytes.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-8"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://rootabytes.com/assets/poppins-latin-700-normal-Qrb0O0WB.woff2",
+        "origin": "https://rootabytes.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "font",
+      "txn": "request-9"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://rootabytes.com/assets/poppins-latin-400-normal-cpxAROuN.woff2",
+        "origin": "https://rootabytes.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "font",
+      "txn": "request-10"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://rootabytes.com/assets/open-sans-latin-500-normal-C0rntwkW.woff2",
+        "origin": "https://rootabytes.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "font",
+      "txn": "request-11"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://rootabytes.com/assets/open-sans-latin-400-normal-Bk63H6sG.woff2",
+        "origin": "https://rootabytes.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "font",
+      "txn": "request-12"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://rootabytes.com/assets/poppins-latin-600-normal-zEkxB9Mr.woff2",
+        "origin": "https://rootabytes.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "font",
+      "txn": "request-13"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://rootabytes.com/assets/raleway-latin-300-normal-B0PjX2GJ.woff2",
+        "origin": "https://rootabytes.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "font",
+      "txn": "request-14"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://rootabytes.com/assets/open-sans-latin-ext-400-normal-URAvo6nN.woff2",
+        "origin": "https://rootabytes.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "font",
+      "txn": "request-15"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://rootabytes.com/cdn-cgi/challenge-platform/h/g/scripts/jsd/4df4a60fa397/main.js?",
+        "origin": "https://rootabytes.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-16"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://rootabytes.com/favicon.png",
+        "origin": "https://rootabytes.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "other",
+      "txn": "request-17"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://rootabytes.com/cdn-cgi/challenge-platform/h/g/jsd/oneshot/4df4a60fa397/0.42370442069390424:1792019729:3uJ0huEipi1YWZ8vxuMrK5bOPGr-ZJKcBnaIT5xR_kw/a4aa85f9a9479342",
+        "origin": "https://rootabytes.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "xhr",
+      "txn": "request-18"
+    }
+  ],
+  "console": [
+    {
+      "level": "error",
+      "text": "Loading the script 'https://static.cloudflareinsights.com/beacon.min.js' violates the following Content Security Policy directive: \"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.emailjs.com https://www.googletagmanager.com https://www.google-analytics.com\". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback. The action has been blocked."
+    },
+    {
+      "level": "error",
+      "text": "Loading the font 'data:font/woff2;base64,d09GMgABAAAAAA6sABIAAAAAG0wAAA5LAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGiYbgTYcOgZgP1NUQVReAFwIgXwJnxQREAqCLIIwCxIAATYCJAMgBCAFhHgHUgyFHxsCGiMR9ouyak72lwf0EKkl7s9wN0JaXnxFW664YKMz95rWNgND06WzDBJh8AcbDrc05D+PZ/25Ly+psJ0O1A92mJW6Hil/Jwt3BCzI7reU/fZj206/gL8+8JBJw8UuJEr8hJDOqjWb3RAqwq1uHSCZqtEBAuHe3hPJ7n4wDDTEPJAwlIA8A9acWKOJ34tOTPGZSSL0lUhp9MXK/N5Uk3Sr9CYdKYM36ZD27FZ"
+    },
+    {
+      "level": "error",
+      "text": "Loading the font 'data:font/woff;base64,d09GRgABAAAAAAYkAA8AAAAAB6wAAQABAAAAAAAAAAAAAAAAAAAAAAAAAABHREVGAAABWAAAACEAAAAmADcAEkdQT1MAAAF8AAAAhwAAALbZA91MR1NVQgAAAgQAAAA5AAAAOu2e8oxPUy8yAAACQAAAAE4AAABgcv/DFlNUQVQAAAKQAAAASQAAAF5e+0M1Y21hcAAAAtwAAABAAAAAXCHOHuFnYXNwAAADHAAAABAAAAAQABUAI2dseWYAAAMsAAAA6gAAAOo+5UAIaGVhZAAABBgAAAA2AAAANh+h6pVoaGVhAAAEUAAAAB8AAAAkDcgEi2htdHgAAARwAAAAIAAAACAdXQKvbG9jYQAA"
+    },
+    {
+      "level": "error",
+      "text": "Loading the font 'data:font/woff2;base64,d09GMgABAAAAAA7IABIAAAAAG2gAAA5mAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGiYbgTYcOgZgP1NUQVRaAFwIgXwJnxQREAqCLIIvCxIAATYCJAMgBCAFhRYHUgyFHxsbGiMRwsYBAFR7NgR/VcCTofEiatPawNEIgWusqDAIY5uIEHjHQbMGHhuw85sWKhLd/OyHb7wiFkZIMmvQt+nP7h2Hxhy6RJQESypO434xI6JAxGsqpGJffWrK6ZS8u9iOMzq3X+lZhWsgS/m5RjpWACrgM2WvopbBEhQevr83z/1bq9XxtTK+PbFY1VYxJo0shCH8z9bcNP5mEoSPEnl7w6rfq2aSlyJ1dob"
+    },
+    {
+      "level": "error",
+      "text": "Loading the font 'data:font/woff;base64,d09GRgABAAAAAAYgAA8AAAAAB5wAAQABAAAAAAAAAAAAAAAAAAAAAAAAAABHREVGAAABWAAAACEAAAAmADcAEkdQT1MAAAF8AAAAhgAAALbY8t15R1NVQgAAAgQAAAA5AAAAOu2e8oxPUy8yAAACQAAAAE4AAABgc2PDLFNUQVQAAAKQAAAAQwAAAFpfDkDZY21hcAAAAtQAAABAAAAAXCHOHuFnYXNwAAADFAAAABAAAAAQABUAI2dseWYAAAMkAAAA6gAAAOo5w0BQaGVhZAAABBAAAAA2AAAANh+56o1oaGVhAAAESAAAAB8AAAAkDeAEs2htdHgAAARoAAAAIAAAACAdjgKWbG9jYQAA"
+    }
+  ],
+  "page_errors": [],
+  "websockets": [],
+  "downloads": [],
+  "screenshots": [
+    {
+      "step": "settle",
+      "file": "C:\\Users\\SAVIOUR\\AppData\\Local\\Temp\\opencode\\rea\\ex_classpiler_home\\screenshot_settle.png",
+      "bytes": 372488
+    }
+  ],
+  "final_url": {
+    "url": "https://rootabytes.com/products/classpiler",
+    "origin": "https://rootabytes.com",
+    "query_parameter_names": [],
+    "redacted": false
+  }
+}

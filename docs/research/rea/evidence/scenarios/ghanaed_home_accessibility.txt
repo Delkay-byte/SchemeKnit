@@ -1,0 +1,328 @@
+- document:
+  - status:
+    - link "Back to School Double AI credits until 11th November 2026. ┬╖ Open the store":
+      - /url: /subscribe
+  - button "Install GhanaEd app":
+    - img
+  - navigation:
+    - link "GhanaEd GhanaEd":
+      - /url: /
+      - img "GhanaEd"
+      - text: GhanaEd
+    - link "Product":
+      - /url: "#features"
+    - link "Schools":
+      - /url: "#schools"
+    - link "Pricing":
+      - /url: "#pricing"
+    - link "Blog":
+      - /url: /blog
+    - link "Sign In":
+      - /url: /login
+    - link "Get Started Free":
+      - /url: /register
+  - main:
+    - text: Built for Ghana's NaCCA Curriculum
+    - heading "The AI platform for Ghanaian schools" [level=1]
+    - paragraph: Plan lessons, run the school, and let students practise ΓÇö online or when the network drops. Akua plans with teachers. Self-Tutor practises with students.
+    - link "Start Teaching Free":
+      - /url: /register
+      - text: Start Teaching Free
+      - img
+    - link "Get teaChat (Android)":
+      - /url: /download/teachat
+    - paragraph: 20 free AI credits on signup ┬╖ No card
+    - text: For teachers and students
+    - heading "Plan, practise, and prepare" [level=2]
+    - paragraph: Akua plans the week with teachers. Self-Tutor practises with students. CSSPS practice is free.
+    - link "Lesson Planner GES weeks that stay on the indicators. Akua drafts. The teacher decides. Start free":
+      - /url: /register
+      - heading "Lesson Planner" [level=3]
+      - paragraph: GES weeks that stay on the indicators. Akua drafts. The teacher decides.
+      - text: Start free
+    - link "Self-Tutor Students practise the NaCCA indicator, with Ghana examples and a check on their answer. Open Self-Tutor":
+      - /url: /register
+      - heading "Self-Tutor" [level=3]
+      - paragraph: Students practise the NaCCA indicator, with Ghana examples and a check on their answer.
+      - text: Open Self-Tutor
+    - link "CSSPS 2026 Practise the 8-school form before the real one. Free, and no school account. Start practice":
+      - /url: /bece-analyser
+      - heading "CSSPS 2026" [level=3]
+      - paragraph: Practise the 8-school form before the real one. Free, and no school account.
+      - text: Start practice
+    - text: 0+ Curriculum Strands 0+ Content Standards 0+ Learning Indicators 0 Education Levels Interactive Demo
+    - heading "See GhanaEd in Action" [level=2]
+    - paragraph: Click the tabs to explore how students learn and how schools are managed ΓÇö all in one platform.
+    - button "Learning Experience":
+      - img
+      - text: Learning Experience
+    - button "BSTEM Library":
+      - img
+      - text: BSTEM Library
+    - button "School Management":
+      - img
+      - text: School Management
+    - text: ghanaed.com/curriculum CURRICULUM BROWSER Basic School (KG-JHS) KG Primary School JHS SHS Powered by AI
+    - heading "Intelligent Tools for Smarter Education" [level=2]
+    - paragraph: Our AI assistant, Akua, helps teachers create content, grade work, and guide students ΓÇö saving hours every week.
+    - img
+    - heading "AI Lesson Generator" [level=3]
+    - paragraph: Generate curriculum-aligned lessons with objectives, activities, and exercises in seconds.
+    - text: 5 credits
+    - img
+    - heading "Akua AI Tutor" [level=3]
+    - paragraph: Students ask questions about lesson content and receive detailed, context-aware explanations.
+    - text: 1 credit/msg
+    - img
+    - heading "AI Auto-Grading" [level=3]
+    - paragraph: Get rubric-based scoring and detailed feedback on open-ended assignments automatically.
+    - text: 2 credits
+    - img
+    - heading "Smart Exam Prep" [level=3]
+    - paragraph: BECE & WASSCE AI-powered topic prediction, practice papers, and performance tracking.
+    - text: 3-5 credits 100% Free Tool
+    - heading "BECE Aggregate Calculator & CSSPS 2026 Practice" [level=2]
+    - paragraph: Calculate your BECE aggregate, explore 1,000+ SHS/TVET schools, and build a full 8-school CSSPS 2026 list (6 main + 2 alternatives) with live rule checks. Free for every student ΓÇö no school account required.
+    - link "Start Free Practice":
+      - /url: /bece-analyser
+    - link "Browse SHS Directory":
+      - /url: /shs-directory
+    - text: 1,400+ Schools 16 Regions 8 Schools Built for Everyone
+    - heading "Whether You Teach or Learn" [level=2]
+    - paragraph: GhanaEd equips both teachers and students with the tools they need to succeed.
+    - img
+    - heading "For Students" [level=3]
+    - list:
+      - listitem:
+        - img
+        - text: Browse the full NaCCA curriculum
+        - emphasis: Free
+      - listitem:
+        - img
+        - text: Access lessons with math support
+        - emphasis: Free
+      - listitem:
+        - img
+        - text: Submit assignments & view grades
+        - emphasis: Free
+      - listitem:
+        - img
+        - text: Participate in peer discussions
+        - emphasis: Free
+      - listitem:
+        - img
+        - text: Track curriculum progress
+        - emphasis: Free
+      - listitem:
+        - img
+        - text: Practise with Self-Tutor
+        - emphasis: 1 cr
+      - listitem:
+        - img
+        - text: BECE/WASSCE exam prep
+        - emphasis: 3-5 cr
+      - listitem:
+        - img
+        - text: Download practice papers
+        - emphasis: 1 cr
+    - link "Start Learning":
+      - /url: /register
+      - text: Start Learning
+      - img
+    - img
+    - heading "For Teachers & Admins" [level=3]
+    - list:
+      - listitem:
+        - img
+        - text: Create & manage classes
+        - emphasis: Free
+      - listitem:
+        - img
+        - text: Assign work & grade submissions
+        - emphasis: Free
+      - listitem:
+        - img
+        - text: Track attendance & progress
+        - emphasis: Free
+      - listitem:
+        - img
+        - text: Moderate peer discussions
+        - emphasis: Free
+      - listitem:
+        - img
+        - text: Bulk import student rosters
+        - emphasis: Free
+      - listitem:
+        - img
+        - text: Plan lessons with Akua
+        - emphasis: 5 cr
+      - listitem:
+        - img
+        - text: AI auto-grade submissions
+        - emphasis: 2 cr
+      - listitem:
+        - img
+        - text: Generate report cards
+        - emphasis: 2 cr/subj
+    - link "Start Teaching":
+      - /url: /register
+      - text: Start Teaching
+      - img
+    - text: School Management
+    - heading "Run Your Entire School from One Place" [level=2]
+    - paragraph: From student enrollment to report card delivery ΓÇö everything a school needs, built in.
+    - text: "01"
+    - img
+    - heading "Class Management" [level=3]
+    - paragraph: Create classes, enroll students individually or via CSV bulk import, and assign teachers to subjects.
+    - text: "02"
+    - img
+    - heading "Assessment & Grading" [level=3]
+    - paragraph: Build custom assessment sheets, enter scores on the master sheet, and let AI auto-grade open-ended work.
+    - text: "03"
+    - img
+    - heading "Report Cards" [level=3]
+    - paragraph: Generate GES-aligned report cards with 5 grading schemes. Download PDFs or share via secure public links.
+    - text: "04"
+    - img
+    - heading "Attendance Tracking" [level=3]
+    - paragraph: Record daily attendance with a single tap. View absence trends and aggregate statistics per student.
+    - text: Exam Preparation
+    - heading "Prepare for National Exams with AI" [level=2]
+    - paragraph: Smart tools that predict weak topics, generate practice papers, and track improvement over time.
+    - img
+    - heading "BECE Prep" [level=3]
+    - text: JHS
+    - list:
+      - listitem:
+        - img
+        - text: AI predicts your weakest exam topics
+      - listitem:
+        - img
+        - text: Generate unlimited practice papers
+      - listitem:
+        - img
+        - text: Track scores across multiple attempts
+      - listitem:
+        - img
+        - text: Get AI-powered study recommendations
+    - link "Start BECE Prep":
+      - /url: /register
+    - img
+    - heading "WASSCE Prep" [level=3]
+    - text: SHS
+    - list:
+      - listitem:
+        - img
+        - text: AI predicts your weakest exam topics
+      - listitem:
+        - img
+        - text: Generate exam-style question sets
+      - listitem:
+        - img
+        - text: Performance trends & analytics
+      - listitem:
+        - img
+        - text: Downloadable papers with answer keys
+    - link "Start WASSCE Prep":
+      - /url: /register
+    - text: How It Works
+    - heading "Up and Running in Minutes" [level=2]
+    - paragraph: Four simple steps from setup to student success.
+    - text: "01"
+    - heading "Set Up Your School" [level=3]
+    - paragraph: Register your school, add teachers, and enroll students in minutes.
+    - text: "02"
+    - heading "Browse & Assign" [level=3]
+    - paragraph: Explore the NaCCA curriculum, create lessons, and assign work to classes.
+    - text: "03"
+    - heading "Learn & Submit" [level=3]
+    - paragraph: Students access lessons offline, complete assignments, and submit their work.
+    - text: "04"
+    - heading "Track & Improve" [level=3]
+    - paragraph: Review grades, monitor progress across indicators, and support every learner.
+    - text: Testimonials
+    - heading "Loved by Educators Across Ghana" [level=2]
+    - button "Previous testimonial":
+      - img
+    - img
+    - img
+    - img
+    - img
+    - img
+    - paragraph: ΓÇ£GhanaEd transformed how I manage my classroom. My students can access lessons even when the internet is down, and I can track every child's progress.ΓÇ¥
+    - text: AM Ama Mensah JHS Teacher, Accra
+    - button "Next testimonial":
+      - img
+    - tablist "Testimonials":
+      - tab "Go to testimonial 1" [selected]
+      - tab "Go to testimonial 2"
+      - tab "Go to testimonial 3"
+    - text: Pricing
+    - heading "Simple, Pay-As-You-Go" [level=2]
+    - paragraph:
+      - text: Most features are completely free. AI-powered tools use credits ΓÇö start with
+      - strong: 20 free credits
+      - text: on signup. No subscriptions, no lock-in.
+    - img
+    - strong: AI Lessons
+    - text: from 5 credits
+    - img
+    - strong: Auto-Grading
+    - text: from 2 credits
+    - img
+    - strong: AI Tutoring
+    - text: 1 credit/message Credit packs start at
+    - strong: GHS 5
+    - text: Volume discounts up to 60% off
+    - link "Get Started Free":
+      - /url: /register
+      - text: Get Started Free
+      - img
+    - heading "Ready to Transform Learning in Your School?" [level=2]
+    - paragraph: Join teachers across Ghana using GhanaEd to deliver quality education ΓÇö online or offline.
+    - link "Get Started Free":
+      - /url: /register
+      - text: Get Started Free
+      - img
+  - contentinfo:
+    - img "GhanaEd"
+    - text: GhanaEd
+    - paragraph: AI-powered, offline-first learning management for Ghanaian schools. Built on the NaCCA curriculum.
+    - paragraph: Product
+    - link "Demo":
+      - /url: "#demo"
+    - link "Training":
+      - /url: /training.html
+    - link "Product":
+      - /url: "#features"
+    - link "How It Works":
+      - /url: "#how-it-works"
+    - link "Pricing":
+      - /url: "#pricing"
+    - link "Get teaChat":
+      - /url: /download/teachat
+    - paragraph: Resources
+    - link "Documentation":
+      - /url: /docs
+    - link "Teacher Guide":
+      - /url: /teacher-guide
+    - link "Student Manual":
+      - /url: /student-manual
+    - link "School Manual":
+      - /url: /school-manual
+    - paragraph: Company
+    - link "Webinar":
+      - /url: /webinar
+    - link "Blog":
+      - /url: /blog
+    - link "Contact":
+      - /url: /contact
+    - link "About Us":
+      - /url: /about
+    - link "Privacy Policy":
+      - /url: /privacy
+    - link "Terms of Service":
+      - /url: /terms-of-service
+    - paragraph: ┬⌐ 2026 GhanaEd by Somnia Osbrain Foundation. All rights reserved.
+  - status

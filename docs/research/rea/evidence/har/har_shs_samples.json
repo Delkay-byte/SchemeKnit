@@ -1,0 +1,238 @@
+{
+  "log": {
+    "version": "1.2",
+    "creator": {
+      "name": "REA-derived sanitized summary",
+      "version": "1.0"
+    },
+    "note": "Derived from REA capture_browser_scenario Evidence; URL query values, headers values, cookies and bodies were never retained by REA.",
+    "entries": [
+      {
+        "_id": 1,
+        "request": {
+          "method": "GET",
+          "url": "https://shsplanner.com/samples.php",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 301
+        },
+        "_resourceType": "document"
+      },
+      {
+        "_id": 2,
+        "request": {
+          "method": "GET",
+          "url": "https://www.shsplanner.com/samples.php",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "document"
+      },
+      {
+        "_id": 3,
+        "request": {
+          "method": "GET",
+          "url": "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;500;600;700&display=swap",
+          "queryParamNames": [
+            "family",
+            "family",
+            "display"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "stylesheet"
+      },
+      {
+        "_id": 4,
+        "request": {
+          "method": "GET",
+          "url": "https://www.shsplanner.com/guides/assets/guides.css?v=3",
+          "queryParamNames": [
+            "v"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "stylesheet"
+      },
+      {
+        "_id": 5,
+        "request": {
+          "method": "GET",
+          "url": "https://www.shsplanner.com/manifest.webmanifest",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "manifest"
+      },
+      {
+        "_id": 6,
+        "request": {
+          "method": "GET",
+          "url": "https://fonts.gstatic.com/s/playfairdisplay/v40/nuFiD-vYSZviVYUb_rj3ij__anPXDTzYgA.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 7,
+        "request": {
+          "method": "GET",
+          "url": "https://fonts.gstatic.com/s/dmsans/v17/rP2Yp2ywxg089UriI5-g4vlH9VoD8Cmcqbu0-K4.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 8,
+        "request": {
+          "method": "GET",
+          "url": "https://www.shsplanner.com/assets/img/sample-lesson-plan/sample-page-1.jpg",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 9,
+        "request": {
+          "method": "GET",
+          "url": "https://www.shsplanner.com/assets/img/sample-lesson-plan/sample-page-2.jpg",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 10,
+        "request": {
+          "method": "GET",
+          "url": "https://www.shsplanner.com/assets/img/sample-lesson-plan/sample-page-3.jpg",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 11,
+        "request": {
+          "method": "GET",
+          "url": "https://www.shsplanner.com/assets/img/sample-lesson-plan/sample-page-4.jpg",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 12,
+        "request": {
+          "method": "GET",
+          "url": "https://www.shsplanner.com/assets/img/sample-lesson-plan/sample-page-5.jpg",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 13,
+        "request": {
+          "method": "GET",
+          "url": "https://www.shsplanner.com/assets/img/sample-lesson-plan/sample-page-6.jpg",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 14,
+        "request": {
+          "method": "GET",
+          "url": "https://www.shsplanner.com/assets/img/sample-lesson-plan/sample-page-7.jpg",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 15,
+        "request": {
+          "method": "GET",
+          "url": "https://www.shsplanner.com/assets/img/sample-lesson-plan/sample-page-8.jpg",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 16,
+        "request": {
+          "method": "GET",
+          "url": "https://www.shsplanner.com/api/content_click.php?event=view&page=%2Fsamples.php&sid=[redacted-session]",
+          "queryParamNames": [
+            "event",
+            "page",
+            "sid"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 17,
+        "request": {
+          "method": "GET",
+          "url": "https://www.shsplanner.com/favicon.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "other"
+      },
+      {
+        "_id": 18,
+        "request": {
+          "method": "GET",
+          "url": "https://www.shsplanner.com/icon192.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "other"
+      }
+    ]
+  }
+}

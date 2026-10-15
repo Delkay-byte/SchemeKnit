@@ -1,0 +1,194 @@
+<!DOCTYPE html><html lang="en" data-flavor="web" data-theme="light" style="--kb: 0px;"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="google-site-verification" content="LekTracd2HwzacgrIiaYXETtcjWD_xVxFfJP5-rbOAQ">
+    <meta name="theme-color" content="#006B3F">
+    <meta name="description" content="GhanaEd LMS ΓÇö Ghana's leading AI-powered learning management system. BSTEM practical activity library, NaCCA-aligned curriculum, AI Lesson Planner, BECE Analyser, SHS Pathways and offline-first delivery for schools across Ghana and Africa. Built and owned by Osborn Martin Gatugbe under the Somnia Osbrain Foundation LBG.">
+    <meta name="keywords" content="BSTEM, BSTEM Ghana, STEM Ghana, STEM education Africa, ITEC, ITEC Ghana, ITEC Global, GhanaEd, GhanaEd LMS, AI Lesson Planner, GES Lesson Planner, NaCCA lesson planner, NaCCA curriculum, Ghana Education Service, LMS in Ghana, learning management system Ghana, best LMS Ghana, top school management systems Ghana, top school management systems Africa, school management system Ghana, school management software Africa, BECE analyser, BECE past questions, SHS pathways, Ghana online learning, e-learning Ghana, offline learning Ghana, primary school software Ghana, JHS software Ghana, SHS software Ghana, Osborn Martin Gatugbe">
+    <meta name="author" content="Osborn Martin Gatugbe">
+    <meta name="publisher" content="Somnia Osbrain Foundation LBG">
+    <meta name="application-name" content="GhanaEd LMS">
+    <meta name="apple-mobile-web-app-title" content="GhanaEd LMS">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+    <meta name="googlebot" content="index, follow">
+    <meta name="rating" content="general">
+    <meta name="geo.region" content="GH">
+    <meta name="geo.placename" content="Ghana">
+    <meta name="geo.position" content="7.9465;-1.0232">
+    <meta name="ICBM" content="7.9465, -1.0232">
+    <meta name="language" content="English">
+    <meta name="distribution" content="global">
+    <meta name="coverage" content="Worldwide">
+    <meta name="target" content="all">
+    <meta name="audience" content="students, teachers, schools, parents, education administrators">
+    <meta name="subject" content="Learning Management System, STEM Education, NaCCA Curriculum, AI Lesson Planning">
+    <meta name="copyright" content="┬⌐ Osborn Martin Gatugbe / Somnia Osbrain Foundation LBG">
+    <link rel="canonical" href="https://ghanaed.com/">
+    <!-- Open Graph / Facebook / WhatsApp -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://ghanaed.com/">
+    <meta property="og:site_name" content="GhanaEd LMS">
+    <meta property="og:title" content="GhanaEd LMS ΓÇö AI-Powered Learning &amp; School Management for Ghana &amp; Africa">
+    <meta property="og:description" content="The leading NaCCA-aligned LMS in Ghana. BSTEM practical library, AI Lesson Planner, BECE Analyser, SHS Pathways and offline-first delivery. Built and owned by Osborn Martin Gatugbe under the Somnia Osbrain Foundation LBG.">
+    <meta property="og:image" content="https://ghanaed.com/og/og-default.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="GhanaEd LMS ΓÇö AI-powered learning platform for Ghana">
+    <meta property="og:locale" content="en_GH">
+    <meta property="og:locale:alternate" content="en_US">
+    <meta property="article:author" content="Osborn Martin Gatugbe">
+    <!-- Twitter / X Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="GhanaEd LMS ΓÇö AI-Powered Learning &amp; School Management for Ghana &amp; Africa">
+    <meta name="twitter:description" content="NaCCA-aligned LMS with BSTEM practical library, AI Lesson Planner, BECE Analyser &amp; SHS Pathways. Built and owned by Osborn Martin Gatugbe under the Somnia Osbrain Foundation LBG.">
+    <meta name="twitter:image" content="https://ghanaed.com/og/og-default.png">
+    <meta name="twitter:image:alt" content="GhanaEd LMS ΓÇö AI-powered learning platform for Ghana">
+    <meta name="twitter:creator" content="@GhanaEd">
+    <meta name="twitter:site" content="@GhanaEd">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+    <!-- Non-blocking Inter: avoids render-blocking Google Fonts CSS -->
+    <link rel="stylesheet" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    </noscript>
+    <!--Developer==OSBORN MARTIN GATUGBE-->
+    <!--AUTHORITY==THIS IS THE PROPERTY OF OSBORN MARTIN GATUGBE-->
+    <!--Owner==OSBORN MARTIN GATUGBE | Entity==SOMNIA OSBRAIN FOUNDATION LBG-->
+    <title>GhanaEd LMS ΓÇö AI-Powered Learning &amp; School Management for Ghana &amp; Africa | BSTEM ΓÇó NaCCA ΓÇó BECE</title>
+    <!-- Structured Data: Organization + WebSite + SoftwareApplication + Person -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://ghanaed.com/#organization",
+          "name": "Somnia Osbrain Foundation LBG",
+          "alternateName": ["Somnia Osbrain Foundation", "GhanaEd", "GhanaEd LMS"],
+          "url": "https://ghanaed.com/",
+          "logo": "https://ghanaed.com/icon-512.png",
+          "image": "https://ghanaed.com/icon-512.png",
+          "description": "Somnia Osbrain Foundation LBG is the owner and publisher of GhanaEd LMS ΓÇö Ghana's leading AI-powered learning and school management platform, aligned to the NaCCA curriculum with a BSTEM practical activity library, AI Lesson Planner, BECE Analyser and SHS Pathways.",
+          "foundingDate": "2024",
+          "founder": {
+            "@id": "https://ghanaed.com/#osborn-martin-gatugbe"
+          },
+          "owns": {
+            "@id": "https://ghanaed.com/#app"
+          },
+          "address": {
+            "@type": "PostalAddress",
+            "addressCountry": "GH",
+            "addressRegion": "Greater Accra"
+          },
+          "areaServed": ["Ghana", "West Africa", "Africa"],
+          "knowsAbout": [
+            "BSTEM", "STEM education", "NaCCA curriculum", "AI Lesson Planner",
+            "GES Lesson Planner", "BECE Analyser", "SHS Pathways",
+            "Learning Management System", "School Management System",
+            "Offline-first learning", "Ghana Education Service"
+          ],
+          "sameAs": [
+            "https://ghanaed.com/about",
+            "https://ghanaed.com/contact"
+          ]
+        },
+        {
+          "@type": "Person",
+          "@id": "https://ghanaed.com/#osborn-martin-gatugbe",
+          "name": "Osborn Martin Gatugbe",
+          "jobTitle": "Founder, Lead Developer & Owner",
+          "worksFor": { "@id": "https://ghanaed.com/#organization" },
+          "affiliation": { "@id": "https://ghanaed.com/#organization" },
+          "nationality": "Ghanaian",
+          "description": "Founder, Lead Developer and Owner of GhanaEd LMS, operating under the Somnia Osbrain Foundation LBG. Architect of the BSTEM Activity Library, AI Lesson Planner and offline-first school management platform for Ghana and Africa."
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://ghanaed.com/#website",
+          "url": "https://ghanaed.com/",
+          "name": "GhanaEd LMS",
+          "publisher": { "@id": "https://ghanaed.com/#organization" },
+          "inLanguage": "en-GH",
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": "https://ghanaed.com/?q={search_term_string}",
+            "query-input": "required name=search_term_string"
+          }
+        },
+        {
+          "@type": "SoftwareApplication",
+          "@id": "https://ghanaed.com/#app",
+          "name": "GhanaEd LMS",
+          "applicationCategory": "EducationalApplication",
+          "applicationSubCategory": "Learning Management System",
+          "operatingSystem": "Web, Android, iOS",
+          "url": "https://ghanaed.com/",
+          "image": "https://ghanaed.com/icon-512.png",
+          "description": "AI-powered learning and school management platform for Ghana and Africa. Includes BSTEM Practical Activity Library, AI Lesson Planner aligned to the NaCCA / GES curriculum, BECE Analyser, SHS Pathways guidance, and offline-first delivery.",
+          "creator": { "@id": "https://ghanaed.com/#osborn-martin-gatugbe" },
+          "publisher": { "@id": "https://ghanaed.com/#organization" },
+          "featureList": [
+            "BSTEM Practical Activity Library (Primary & JHS)",
+            "AI Lesson Planner (NaCCA / GES aligned)",
+            "BECE Past Questions Analyser",
+            "SHS Pathways guidance",
+            "Offline-first content delivery",
+            "School Management & Reporting",
+            "Teacher, Student & School portals"
+          ],
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "GHS",
+            "availability": "https://schema.org/InStock"
+          },
+          "inLanguage": "en-GH"
+        }
+      ]
+    }
+    </script>
+    <!-- Google AdSense script is loaded on demand from src/lib/adsense.js when
+         the user is ad-eligible and the host is a public domain. Loading it
+         globally caused 403 console noise + "Uncaught (in promise) Object" on
+         localhost and unapproved domains. -->
+    <script>
+      // Unregister PWA SWs inside Capacitor (origin https://localhost).
+      // Do NOT replace navigator.serviceWorker ΓÇö Chrome's module loader
+      // uses the real container; a dummy hangs /assets/*.js with no console.
+      (function () {
+        try {
+          var host = (typeof location !== "undefined" && location.hostname) || "";
+          var isNative =
+            host === "localhost" ||
+            host === "127.0.0.1" ||
+            (window.Capacitor && typeof window.Capacitor.isNativePlatform === "function" && window.Capacitor.isNativePlatform()) ||
+            /Capacitor/i.test(navigator.userAgent || "");
+          if (!isNative) return;
+          var sw = navigator.serviceWorker;
+          if (sw && sw.getRegistrations) {
+            sw.getRegistrations().then(function (regs) {
+              regs.forEach(function (r) { r.unregister().catch(function () {}); });
+            }).catch(function () {});
+          }
+          if (window.caches && caches.keys) {
+            caches.keys().then(function (keys) {
+              keys.forEach(function (k) { caches.delete(k).catch(function () {}); });
+            }).catch(function () {});
+          }
+        } catch (e) { /* never let this crash the app */ }
+      })();
+    </script>
+    <script type="module" crossorigin="" src="/assets/index-CR7UdDlA.js"></script>
+    <link rel="modulepreload" crossorigin="" href="/assets/vendor-react-CLVQub2T.js">
+    <link rel="modulepreload" crossorigin="" href="/assets/vendor-icons-C5TH_qft.js">
+    <link rel="stylesheet" crossorigin="" href="/assets/index-DnZaqmQ3.css">
+  <link rel="manifest" href="/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script><link rel="stylesheet" crossorigin="" href="/assets/styles-BE3EjIxi.css"><link rel="stylesheet" crossorigin="" href="/assets/bstem-pitch-DnqIxFtN.css"></head>
+  <body>
+    <div id="root"><div class="install-fab-wrap"><button class="install-fab-btn" aria-label="Install GhanaEd app"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></button></div><div class="reg-page"><div class="reg-shell"><div class="reg-brand"><img alt="GhanaEd" src="data:image/webp;base64,UklGRp4EAABXRUJQVlA4IJIEAAAwGACdASpIAEgAPmEskUakIqGhKPkqqIAMCUAargAli2WQ09cT1G7ZDzGecB6JfQA/qvUPfqB05vsafuR+ytkofcvAnv2+jvYDKSRgj1n+D3gjEX+Z/MDmJ+rv+S84njBowP+J/ZPxm+L76O833zn/2fcF/k39Y/3fXz/cP2jf2xNKMXa/1bfzoRhTCyL1qgzdZ5JnzWKv4G85uDBUdHiIpxukW/51xTlCqJlYLtMdZhJeoJ8RFkP855k9xxR4IPTmQyHIyb2kKnyQAP79OdRLlDmi+C5b+nrHho3Wc8e2g8ZWw071glnNo/POTU8ozdnRcIRbAdlKuHiHxMdNB3dFWTyBIjhpXknXE1CB1I63NLDEn1W4wqioHv5pqBLnskzeoHlAdoNHvy7GWmd5+axYTFyC9Y7GhrwZAW0dw8wZOsUUqLztV5hJ6HVWzIqZ9atvmGhTwh4CzJyAQ5KpvV40ODovTfL5j1JWJqqgr523YmaApOhG6BMrc01sO5q+bdIHc3J5Q8mPsIdtk90DkufL3jZ1fmmHK4bBN7nW/WGpLvKFmTprMrsU/mi2KzUdeivAuCZGR15IlSYY2/crZwQcWWosYFJ044lxNnbcVu7zHfaZTVe5HhrC00Tx5GKgyH+vrruxNoQWTT+9fCzwVzMOqGuqIJZ2d5kQK/HkM2kev9K9d8WGNSbQ/MsEjOhPLv9/GMLVU1AiDSnpc/BqwfvcUS4ky5xdLWixNPyIf+Fid8LEqk8qZCPxg8IzGxuf+qhwzfmtKefW/nN3T2WqJIDgYn/woZsC29jePK8eJFfLC0qrUVDlvshbknhEJC6AFK7riWHvtgb4kLwkyl3FTschuSr7sDkUjit+XNy2YQm3XW3QrxkIeVfrf3U/RZ/g5sCwkeu87zt0CBLaHhMuEtfHYkb06NUVnPM+2rPA63dZr9FvWf0M12/ijKl7OMSeP/h5HS5ujznNIxeq70GxMxFs4p7XRYhFCq8ecb+W///6vX7fyZEdXxeXEOhnJquw+9QsKdC7fTDbD+iiFss35f9F8j5ElaxXgrE/g+BSDS/dfgxHnu6dY612DSMf+abh5nGxhYNf7Vd0HD3V9TJP/f/o6BSEDToxCz+ORdO+URFduSS5OzIPPu3wGH7Se6PsuC3wzJXJvG7Hd74UnpJPrpISJ5tdUJtfzAQ7/958lyO4LOkdZU29OSX6X0c0ER0gKM4o+P2yqT5t8gvqffHBDoJHWXPVOEm+aCCjPXRz0XyO29lJhrHDfbgUioAhhVtnIbQLnRt0QTkXi1OWL7cKO8B3lIJrKktRuHRW3ZgCpGfpSi2xbgHEfej6vTH3NNoFo3aRfYjIpzR4a8p7D0zz0cIJ1zvuCX5E992J/NDvG4kagLHwzxTyNqmDqI0f8ra6sMzMvvzMftu+yLfV+Ptg9XjSmFg8BFdHoqPzkDAYtHIVmhEiaadJi4IXFB/wk/MNUnI2CFNvD/xjH/5zHbP5XfJvN3v6WVBpDn8MJ/71jt80PDVXWVcqx+2on1nNRvfFHE5nmbLtvxXTnbzOn6VQAAAAAAA="><h1>Create your account</h1><p>Join GhanaEd ΓÇö free starter credits included</p></div><div class="reg-card"><div class="reg-slide"><h2>How will you use GhanaEd?</h2><p class="reg-hint">Pick what fits you now. Personal accounts can request to join a school later.</p><div class="reg-path-list"><button type="button" class="reg-path-card"><span class="reg-path-icon" aria-hidden="true"><svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 20 20" aria-hidden="true" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-2a1 1 0 00-1-1H9a1 1 0 00-1 1v2a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clip-rule="evenodd"></path></svg></span><span class="reg-path-body"><strong>School or organisation</strong><span>Basic / private school, office, department, or grade-based system</span></span><span class="reg-path-chev" aria-hidden="true">ΓåÆ</span></button><button type="button" class="reg-path-card"><span class="reg-path-icon personal" aria-hidden="true"><svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 20 20" aria-hidden="true" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-6-3a2 2 0 11-4 0 2 2 0 014 0zm-2 4a5 5 0 00-4.546 2.916A5.986 5.986 0 0010 16a5.986 5.986 0 004.546-2.084A5 5 0 0010 11z" clip-rule="evenodd"></path></svg></span><span class="reg-path-body"><strong>Personal account</strong><span>No school yet ΓÇö continue with Google, join a school when ready</span></span><span class="reg-path-chev" aria-hidden="true">ΓåÆ</span></button></div><p class="reg-footer">Already have an account? <a href="/login" data-discover="true">Sign in</a></p><p class="reg-footer-note">No card needed ┬╖ 20 free credits ┬╖ <a href="/" data-discover="true">Back to home</a></p></div></div></div></div><div class="toast-container" role="status" aria-live="polite"></div></div>
+  
+
+</body></html>

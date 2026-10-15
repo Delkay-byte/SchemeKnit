@@ -1,0 +1,256 @@
+{
+  "log": {
+    "version": "1.2",
+    "creator": {
+      "name": "REA-derived sanitized summary",
+      "version": "1.0"
+    },
+    "note": "Derived from REA capture_browser_scenario Evidence; URL query values, headers values, cookies and bodies were never retained by REA.",
+    "entries": [
+      {
+        "_id": 1,
+        "request": {
+          "method": "GET",
+          "url": "https://tenaly.app/",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "document"
+      },
+      {
+        "_id": 2,
+        "request": {
+          "method": "GET",
+          "url": "https://tenaly.app/assets/styles-DnJhZfxX.css",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "stylesheet"
+      },
+      {
+        "_id": 3,
+        "request": {
+          "method": "GET",
+          "url": "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap",
+          "queryParamNames": [
+            "family",
+            "family",
+            "display"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "stylesheet"
+      },
+      {
+        "_id": 4,
+        "request": {
+          "method": "GET",
+          "url": "https://tenaly.app/assets/index-BkRjvJfS.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 5,
+        "request": {
+          "method": "GET",
+          "url": "https://tenaly.app/assets/index-nrHTsZOV.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 6,
+        "request": {
+          "method": "GET",
+          "url": "https://tenaly.app/assets/chevron-right-jJwp7qAG.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 7,
+        "request": {
+          "method": "GET",
+          "url": "https://tenaly.app/assets/graduation-cap-CuM8QXrx.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 8,
+        "request": {
+          "method": "GET",
+          "url": "https://tenaly.app/assets/house-DjfLU8n6.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 9,
+        "request": {
+          "method": "GET",
+          "url": "https://tenaly.app/assets/credit-card-DTpD_Z-B.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 10,
+        "request": {
+          "method": "GET",
+          "url": "https://tenaly.app/assets/book-open-Cbdcqmph.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 11,
+        "request": {
+          "method": "GET",
+          "url": "https://tenaly.app/assets/mail-DoZrrAl1.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 12,
+        "request": {
+          "method": "GET",
+          "url": "https://tenaly.app/assets/shield-check-CqkH9Kr4.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 13,
+        "request": {
+          "method": "GET",
+          "url": "https://tenaly.app/assets/arrow-right-Q7KWy4-_.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 14,
+        "request": {
+          "method": "GET",
+          "url": "https://tenaly.app/assets/database-BnEsC0Hv.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 15,
+        "request": {
+          "method": "GET",
+          "url": "https://tenaly.app/assets/shield-D0o5zvEy.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 16,
+        "request": {
+          "method": "GET",
+          "url": "https://tenaly.app/~flock.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 17,
+        "request": {
+          "method": "GET",
+          "url": "https://tenaly.app/__l5e/events.124894084da8c432.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 18,
+        "request": {
+          "method": "GET",
+          "url": "https://fonts.gstatic.com/s/cormorantgaramond/v21/co3bmX5slCNuHLi8bLeY9MK7whWMhyjYqXtK.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 19,
+        "request": {
+          "method": "GET",
+          "url": "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 20,
+        "request": {
+          "method": "POST",
+          "url": "https://tenaly.app/__l5e/trackevents",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 202
+        },
+        "_resourceType": "fetch"
+      }
+    ]
+  }
+}

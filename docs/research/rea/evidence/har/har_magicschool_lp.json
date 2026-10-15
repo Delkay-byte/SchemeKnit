@@ -1,0 +1,837 @@
+{
+  "log": {
+    "version": "1.2",
+    "creator": {
+      "name": "REA-derived sanitized summary",
+      "version": "1.0"
+    },
+    "note": "Derived from REA capture_browser_scenario Evidence; URL query values, headers values, cookies and bodies were never retained by REA.",
+    "entries": [
+      {
+        "_id": 1,
+        "request": {
+          "method": "GET",
+          "url": "https://www.magicschool.ai/tools/lesson-plan",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "document"
+      },
+      {
+        "_id": 2,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/css/magicschool-ai.shared.1c1385bdc.css",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "stylesheet"
+      },
+      {
+        "_id": 3,
+        "request": {
+          "method": "GET",
+          "url": "https://ajax.googleapis.com/ajax/libs/webfont/1.6.26/webfont.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 4,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn-cookieyes.com/client_data/643e0fb28246e9ffd93b5190/script.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 5,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.amplitude.com/script/e77e0b640b2cbe43ff235bbf62d75947.experiment.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 6,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629%2F6544eda5f000985a163a8687%2F6a7215b2c5044b9439b51225%2Ffinsweetcomponentsconfig-1.0.1.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 7,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/6960237ddf1dfc1de13a396f_logo.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 8,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187275d5e5e4179e4063b/6a7649e23d2b643286bc0061_Tool-page-lesson-plan-hero.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 9,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/6942dc8796f84dea47e052aa_purple-star.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 10,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/6969320c26262222b3740f40_star.svg",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 11,
+        "request": {
+          "method": "GET",
+          "url": "https://www.magicschool.ai/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 12,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/6942dd3f439f09df5ceb117c_wol-stars.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 13,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/69443c3c17794f58ede0a2b9_footer-cta-stars-left.svg",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 14,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/69443c08849421a532b6a184_cta-footer-bg-star-right.svg",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 15,
+        "request": {
+          "method": "GET",
+          "url": "https://d3e54v103j8qbb.cloudfront.net/js/jquery-3.5.1.min.dc5e7f18c8.js?site=645187265d5e5e386be40629",
+          "queryParamNames": [
+            "site"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 16,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/js/magicschool-ai.schunk.a5c4158440a6e151.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 17,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/js/magicschool-ai.schunk.64ca16094a9b22a1.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 18,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/js/magicschool-ai.2b7e816a.9590a7e7c867e80e.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 19,
+        "request": {
+          "method": "GET",
+          "url": "https://fonts.googleapis.com/css?family=Figtree:300,400,500,600,700%7COooh+Baby:300,400,500,600,700%7CPoppins:300,400,500,600,700",
+          "queryParamNames": [
+            "family"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "stylesheet"
+      },
+      {
+        "_id": 20,
+        "request": {
+          "method": "POST",
+          "url": "https://log.cookieyes.com/api/v1/log",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "ping"
+      },
+      {
+        "_id": 21,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn-cookieyes.com/client_data/643e0fb28246e9ffd93b5190/banner.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 22,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/69794445facfecfb03041a31_Group%202147229294.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 23,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/6939ba9d7a6ece034a2befb9_Jokker-Semibold.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 24,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/69de991b01143803ee368573_arrow-icon.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 25,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/697940e295c8a2749405527f_line-arrow-right-large-1--arrow-right-keyboard-large-head.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 26,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/69693091b05333530231be25_head.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 27,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/6a7628b6126f12b17cc79c96_clock.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 28,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/6a7628b68ae705f6ca3ff721_compouter.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 29,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/6940431f5e04747eaa752643_drop-closed.svg",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 30,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187275d5e5e4179e4063b/6a764a3206766f23106d65f7_Lesson-Plan-Use-Case-1.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 31,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.jsdelivr.net/npm/@finsweet/fs-components@2/fs-components.js?v=1792022233176",
+          "queryParamNames": [
+            "v"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 32,
+        "request": {
+          "method": "GET",
+          "url": "https://fonts.gstatic.com/s/poppins/v24/pxiEyp8kv8JHgFVrJJfecg.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 33,
+        "request": {
+          "method": "GET",
+          "url": "https://fonts.gstatic.com/s/figtree/v9/_Xms-HUzqDCFdgfMm4S9DQ.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 34,
+        "request": {
+          "method": "GET",
+          "url": "https://acsbapp.com/apps/app/dist/js/app.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 35,
+        "request": {
+          "method": "GET",
+          "url": "https://fonts.gstatic.com/s/ooohbaby/v4/2sDcZGJWgJTT2Jf76xQzaGW5.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 36,
+        "request": {
+          "method": "GET",
+          "url": "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLDz8Z1xlFQ.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 37,
+        "request": {
+          "method": "GET",
+          "url": "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLGT9Z1xlFQ.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 38,
+        "request": {
+          "method": "GET",
+          "url": "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLEj6Z1xlFQ.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 39,
+        "request": {
+          "method": "GET",
+          "url": "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLCz7Z1xlFQ.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 40,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.jsdelivr.net/npm/@finsweet/fs-components@2/dist/chunk-J7NTLVPZ.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 41,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.jsdelivr.net/npm/@finsweet/fs-components@2/dist/chunk-M65MOCFB.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 42,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.jsdelivr.net/npm/@finsweet/fs-components@2/dist/chunk-2PJ4KWGC.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 43,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.jsdelivr.net/npm/@finsweet/fs-components@2/dist/chunk-5WLRVGM2.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 44,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn-cookieyes.com/client_data/643e0fb28246e9ffd93b5190/6iavRKZa.json",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 45,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/694042f5ce5cc4c8904b70e6_drop-arrow.svg",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 46,
+        "request": {
+          "method": "GET",
+          "url": "https://accounts.finsweet.com/v1/components/verify?componentId=slider&siteId=645187265d5e5e386be40629",
+          "queryParamNames": [
+            "componentId",
+            "siteId"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 47,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.jsdelivr.net/npm/@finsweet/fs-components@2/dist/src-CTTUF44Y.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 48,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn-cookieyes.com/client_data/643e0fb28246e9ffd93b5190/config/_kJmEuM7.json",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 49,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.jsdelivr.net/npm/@finsweet/fs-components@2/dist/chunk-T2VXSWBI.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 50,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn-cookieyes.com/client_data/643e0fb28246e9ffd93b5190/translations/prgLb2Cl.json",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 51,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn-cookieyes.com/client_data/643e0fb28246e9ffd93b5190/audit-table/d_5bUwIv.json",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 52,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn-cookieyes.com/assets/images/close.svg",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 53,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.acsbapp.com/config/magicschool.ai/config.json",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 54,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/69404fd7fc4d83e7bb0197fd_quote-01.svg",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 55,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/6940507d10da99361ace56d0_quote-02.svg",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 56,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/694050c4e03f9dc8622baab0_quote-03.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 57,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/694443cf44f889025926f791_Frame%202147231882%20(1).svg",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 58,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/6940507de9ecab59624efbc0_quote-05.svg",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 59,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/694050c1e03f9dc8622ba926_quote-06.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 60,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/6940507d0da628bf4cd0dcb7_quote-07.svg",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 61,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/6940507d66347c2e76b081df_quote-08.svg",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 62,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/694050c16302b6384aa393ef_quote-09.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 63,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/694051dd34e1e287aff07095_quote-star-blue.svg",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 64,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/694051dd66334d8de89ef6e8_quote-star-yellow.svg",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 65,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/694051ddb939a0e51c951550_quote-star-orange.svg",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 66,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/694051ddccc8d0a20f5d717a_quote-star-purple.svg",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 67,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/694051dd997d91c4d8ab3ca7_quote-star-teal.svg",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 68,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.prod.website-files.com/645187265d5e5e386be40629/69446a90ee324df666f4baea_Favicon_32x32.webp",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "other"
+      }
+    ]
+  }
+}

@@ -1,0 +1,324 @@
+- document:
+  - banner:
+    - navigation:
+      - link "Scorlar Logo":
+        - /url: /
+        - img "Scorlar Logo"
+      - link "Features":
+        - /url: /#features
+      - link "Benefits":
+        - /url: /#benefits
+      - link "Pricing":
+        - /url: /#pricing
+      - link "Blog":
+        - /url: /blog
+      - button "Log in":
+        - link "Log in":
+          - /url: /login
+      - link "Get Started":
+        - /url: /register
+  - img "Hero Background"
+  - paragraph: No Slides. No Prompting. No Setup.
+  - heading "Built for Students. Designed for Teachers. Powered by Ghana's Curriculum." [level=1]
+  - paragraph: Students start instantly ΓÇö no slides, uploads, or prompts. The full GES curriculum is ready from day one with AI quizzes, summaries, and past questions that adapt to weak areas. Teachers create lesson plans, quizzes, and printable exams in minutes, fully GES-aligned. University students upload materials for AI-powered exam prep tailored to their courses.
+  - link "Start now":
+    - /url: /register
+    - text: Start now
+    - img
+  - img
+  - img
+  - img
+  - img
+  - img
+  - paragraph: 100+ Positive Client Reviews
+  - main:
+    - paragraph: JHS and SHS students get the entire curriculum pre-loaded. University students bring their own course materials. Teachers generate lesson plans in minutes ΓÇö AI handles everything else.
+    - img "Teaching"
+    - text: 10,000+ Students 500+ Teachers 50+ Schools 98% Satisfaction How it works
+    - heading "A proven process to achieve your academic goals" [level=2]
+    - link "Get in touch":
+      - /url: /register
+      - text: Get in touch
+      - img
+    - text: "01"
+    - img "Access Content"
+    - heading "Access All Curriculum Instantly" [level=3]
+    - paragraph: Sign up and immediately access the entire Ghanaian curriculum. Unlike other platforms, you don't need to upload documents - everything is already pre-loaded and ready to use.
+    - link "Get Started":
+      - /url: /register
+      - text: Get Started
+      - img
+    - text: "02"
+    - heading "Generate Lessons, Quizzes & Plans" [level=3]
+    - paragraph: Teachers generate complete GES-aligned lesson plans with one click. Students generate AI quizzes from any topic, create flashcards, and get audio summaries ΓÇö all from the pre-loaded curriculum or their uploaded course materials.
+    - link "Learn More":
+      - /url: /register
+      - text: Learn More
+      - img
+    - img "Generate lessons and quizzes"
+    - text: "03"
+    - img "Practice and Excel"
+    - heading "Practice & Excel in Exams" [level=3]
+    - paragraph: Take AI-generated quizzes, practice with WASSCE and BECE past questions, and get personalized feedback. Create quizzes for classmates with shareable join codes.
+    - link "Start Practicing":
+      - /url: /register
+      - text: Start Practicing
+      - img
+    - text: For Teachers
+    - heading "Prepare lessons in minutes, not hours" [level=2]
+    - paragraph: AI-assisted lesson planning aligned with the Ghanaian curriculum. Generate quizzes automatically and track every student's progress with actionable data.
+    - img
+    - heading "AI Lesson Planning" [level=3]
+    - paragraph: Generate complete lesson plans from the pre-loaded curriculum. The AI understands GES standards and creates structured, ready-to-teach content.
+    - img
+    - heading "Student Progress Analytics" [level=3]
+    - paragraph: See quiz scores, lesson completion, and weak topics for every student. Identify who needs help before they fall behind.
+    - img
+    - heading "Auto-Generated Assessments" [level=3]
+    - paragraph: Create quizzes and exercises instantly with AI. Get automatic grading with detailed analytics on student performance and areas needing improvement.
+    - link "Start Teaching Smarter":
+      - /url: /register
+      - text: Start Teaching Smarter
+      - img
+    - img "Teacher Features"
+    - img "Student Features"
+    - text: For Students
+    - heading "Learn smarter, excel in exams" [level=2]
+    - paragraph: Access audio lessons, AI-curated videos, and study materials. Study with friends, and prepare for WASSCE & BECE with AI-powered practice questions and past exam analysis.
+    - img
+    - heading "Video & Audio Lessons" [level=3]
+    - paragraph: Learn through engaging video content and audio summaries. Perfect for visual and auditory learners to study anywhere, anytime.
+    - img
+    - heading "Group Study Sessions" [level=3]
+    - paragraph: Create or join study groups with classmates. Share lessons, post questions, run group practice quizzes, and compete on leaderboards.
+    - img
+    - heading "Past Questions & AI Feedback" [level=3]
+    - paragraph: Practice WASSCE and BECE past questions with AI-suggested answers. Get personalized, encouraging feedback on every quiz you take.
+    - img
+    - heading "Recommended YouTube Videos" [level=3]
+    - paragraph: Every lesson comes with AI-curated YouTube videos relevant to the topic. Watch explanations from top educators without leaving the platform.
+    - link "Start Learning Today":
+      - /url: /register
+      - text: Start Learning Today
+      - img
+    - text: Peer Learning
+    - heading "Create quizzes, challenge your friends" [level=2]
+    - paragraph: Students can create their own quizzes and share them with classmates using simple join codes. Learn together, compete, and make studying fun.
+    - img
+    - heading "Share with Join Codes" [level=3]
+    - paragraph: Create a quiz and get a unique join code. Share it with classmates via WhatsApp or in class - anyone with the code can participate.
+    - img
+    - heading "AI-Enhanced Creation" [level=3]
+    - paragraph: Get AI suggestions while creating questions. The AI helps ensure questions are clear, curriculum-aligned, and properly formatted.
+    - img
+    - heading "Compete & Collaborate" [level=3]
+    - paragraph: See leaderboards, compare scores, and motivate each other. Teaching others is one of the best ways to learn - now you can do it digitally.
+    - link "Create Your First Quiz":
+      - /url: /register
+      - text: Create Your First Quiz
+      - img
+    - img "Student Quizzes"
+    - img "School Platform"
+    - text: For Schools
+    - heading "Transform your entire institution" [level=2]
+    - paragraph: Unlock AI-powered teaching and learning for all teachers and students. Reduce preparation time, track performance, and stay curriculum-compliant.
+    - img
+    - heading "Multi-User Management" [level=3]
+    - paragraph: Manage all teacher and student accounts from one dashboard. Assign roles, monitor usage, and control access across your school.
+    - img
+    - heading "Comprehensive Analytics" [level=3]
+    - paragraph: Track school-wide performance metrics, identify struggling students, and measure teaching effectiveness with detailed reports.
+    - img
+    - heading "Curriculum Compliance" [level=3]
+    - paragraph: All content aligned with GES standards. Ensure every lesson and assessment meets Ghanaian curriculum requirements automatically.
+    - link "Register your school":
+      - /url: /register/school
+      - text: Register your school
+      - img
+    - text: Platform Features
+    - heading "What makes Scorlar unique" [level=2]
+    - paragraph: From BECE and WASSCE prep to university course mastery ΓÇö AI that knows the Ghanaian curriculum inside out
+    - img
+    - heading "JHS & SHS Curriculum" [level=3]
+    - paragraph: All Junior and Senior High School materials pre-ingested. Access lessons, flashcards, audio summaries, and AI quizzes the moment you sign up ΓÇö no document uploads required.
+    - img
+    - heading "University Mode" [level=3]
+    - paragraph: Tertiary students add courses from 300+ Ghanaian universities, upload lecture slides and textbooks, and get AI exam questions grounded in their own course materials.
+    - img
+    - heading "AI Lesson Planning" [level=3]
+    - paragraph: Teachers generate complete GES-aligned lesson plans in minutes. AI handles strands, content standards, learning indicators, and assessment rubrics ΓÇö ready to teach.
+    - img
+    - heading "Exam Prep & Past Questions" [level=3]
+    - paragraph: Practice WASSCE and BECE past questions with AI-generated model answers. AI identifies which topics need more work based on your quiz performance.
+    - img
+    - heading "Quizzes & Peer Challenges" [level=3]
+    - paragraph: Generate AI quizzes from any topic. Students create challenges, share them via join codes, and compete on leaderboards with classmates.
+    - img
+    - heading "Student Analytics" [level=3]
+    - paragraph: Teachers track quiz scores, lesson progress, and weak topics per student. Spot struggling learners early with clear, actionable data.
+    - img
+    - heading "Video Recommendations" [level=3]
+    - paragraph: AI picks the most relevant YouTube videos for every lesson topic ΓÇö curated educational content alongside your curriculum lessons, no searching required.
+    - img
+    - heading "Export Everything" [level=3]
+    - paragraph: Teachers export lesson plans (PDF, DOCX), assessments, teaching notes, and grade reports. Students export lessons as PDFs. Share professional documents without leaving the platform.
+    - text: Testimonials
+    - heading "Trusted by educators across Ghana" [level=2]
+    - img
+    - img
+    - img
+    - img
+    - img
+    - paragraph: "\"Scorlar has transformed how I prepare lessons. What used to take hours now takes minutes, and the quality is exceptional.\""
+    - img
+    - paragraph: Raphael K.
+    - paragraph: ICT Teacher, Western North
+    - img
+    - img
+    - img
+    - img
+    - img
+    - paragraph: "\"The AI tutor is incredible. My students can get help anytime they need it, and I can track their progress in real-time.\""
+    - img
+    - paragraph: Joshua B.
+    - paragraph: Private Tutor
+    - img
+    - img
+    - img
+    - img
+    - img
+    - paragraph: "\"As a student, Scorlar has helped me understand difficult concepts. The personalized learning path keeps me motivated.\""
+    - img
+    - paragraph: Blessing Quainoo
+    - paragraph: SHS 2 Student, Winneba
+    - text: Pricing
+    - heading "Flexible pricing tailored to your educational needs" [level=2]
+    - button "Monthly"
+    - button "Yearly Save ~17%"
+    - button "Students"
+    - button "Teachers"
+    - button "Schools"
+    - heading "Free" [level=3]
+    - text: 100 credits/month Free
+    - link "Start for Free":
+      - /url: /register
+    - list:
+      - listitem: Γ£ô Limited lessons
+      - listitem: Γ£ô Limited past questions
+      - listitem: Γ£ô Group study participation
+    - list:
+      - listitem: Γ£ò AI generation
+      - listitem: Γ£ò Audio summaries
+      - listitem: Γ£ò Flashcards & mind maps
+    - text: JHS
+    - heading "Basic" [level=3]
+    - text: 800 credits/month GHS 15 /mo
+    - link "Get Started":
+      - /url: /register?plan=student-basic
+    - list:
+      - listitem: Γ£ô Full lesson access
+      - listitem: Γ£ô Past questions
+      - listitem: Γ£ô Group studies
+      - listitem: Γ£ô Flashcards & summaries
+    - text: Most Popular
+    - heading "SHS" [level=3]
+    - text: 2000 credits/month GHS 35 /mo
+    - link "Get Started":
+      - /url: /register?plan=student-shs
+    - list:
+      - listitem: Γ£ô Everything in Basic
+      - listitem: Γ£ô Mind maps
+      - listitem: Γ£ô Audio summaries
+      - listitem: Γ£ô Ad-hoc lesson generation
+    - heading "Power" [level=3]
+    - text: 5000 credits/month GHS 75 /mo
+    - link "Get Started":
+      - /url: /register?plan=student-power
+    - list:
+      - listitem: Γ£ô Everything in SHS
+      - listitem: Γ£ô Priority AI
+      - listitem: Γ£ô Exam-prep tools
+      - listitem: Γ£ô Advanced insights
+    - text: Credit Top-ups GHS 12 ΓåÆ 500 credits GHS 40 ΓåÆ 2000 credits GHS 150 ΓåÆ 8500 credits Credit usage AI chat / Q&A (per turn) ┬╖ 5 SC Flashcard deck (10 cards) ┬╖ 10 SC Lesson summary ┬╖ 15 SC Mind map ┬╖ 15 SC Quiz generation (10 questions) ┬╖ 20 SC Audio summary ┬╖ 25 SC Ad-hoc student lesson ┬╖ 50 SC Teaching notes ┬╖ 50 SC Full lesson plan (GES) ┬╖ 75 SC Curriculum doc ingest ┬╖ 150 SC FAQ
+    - heading "Frequently asked questions" [level=2]
+    - group: Does Scorlar support university students? +
+    - group: What makes Scorlar different from other apps? +
+    - group: Can students create and share quizzes? +
+    - group: Does Scorlar have WASSCE and BECE past questions? +
+    - group: What payment methods do you accept? +
+    - group: Is Scorlar aligned with the GES curriculum? +
+    - text: Contact
+    - heading "Get in touch with our education experts" [level=2]
+    - textbox "Full Name"
+    - textbox "Email Address"
+    - combobox:
+      - option "I am a..." [disabled] [selected]
+      - option "Teacher"
+      - option "Student"
+      - option "Parent"
+      - option "School Administrator"
+    - textbox "School Name"
+    - textbox "Phone Number"
+    - textbox "Message or Additional Details"
+    - button "Submit your Form"
+    - img "Student Success"
+    - paragraph: "\"Scorlar has completely transformed how I teach. My students are more engaged, and I can track their progress in ways I never thought possible. Highly recommend!\""
+    - img
+    - paragraph: Cosmos
+    - img
+    - img
+    - img
+    - img
+    - img
+    - img "CTA Background"
+    - heading "Ready to teach smarter and learn faster?" [level=2]
+    - paragraph: Join thousands of Ghanaian teachers and students using AI to plan lessons, master the curriculum, and prepare for exams.
+    - link "Get Started Free":
+      - /url: /register
+      - text: Get Started Free
+      - img
+    - link "Sign In":
+      - /url: /login
+  - contentinfo:
+    - link "Scorlar Logo":
+      - /url: /
+      - img "Scorlar Logo"
+    - paragraph: AI-powered education platform with pre-loaded Ghanaian curriculum
+    - heading "Product" [level=3]
+    - list:
+      - listitem:
+        - link "Features":
+          - /url: "#features"
+      - listitem:
+        - link "Pricing":
+          - /url: "#pricing"
+      - listitem:
+        - link "Roadmap":
+          - /url: "#"
+    - heading "Company" [level=3]
+    - list:
+      - listitem:
+        - link "About":
+          - /url: /about
+      - listitem:
+        - link "Blog":
+          - /url: "#"
+      - listitem:
+        - link "Careers":
+          - /url: "#"
+    - heading "Support" [level=3]
+    - list:
+      - listitem:
+        - link "Help Center":
+          - /url: /help
+      - listitem:
+        - link "Contact":
+          - /url: /contact
+      - listitem:
+        - link "Privacy":
+          - /url: /privacy
+    - paragraph: ┬⌐ 2026 Scorlar Education Labs. All rights reserved.
+    - link "Terms":
+      - /url: /terms
+    - link "Privacy":
+      - /url: /privacy

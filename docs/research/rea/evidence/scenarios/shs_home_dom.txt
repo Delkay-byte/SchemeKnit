@@ -1,0 +1,1206 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+
+<!-- SEO Meta Tags -->
+<title>SHS Planner ΓÇö Free AI Lesson Plan Generator for Ghana Teachers</title>
+<meta name="description" content="Generate NaCCA-aligned lesson plans in minutes. Free for Ghana SHS teachers. Covers Additional Mathematics, Physics, English and more. Built for GES standards.">
+<meta name="keywords" content="Ghana lesson plan, NaCCA lesson plan, SHS lesson plan generator, GES lesson plan Ghana, SHS teacher resources Ghana, Additional Mathematics lesson plan">
+<meta name="author" content="SHS Planner">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://shsplanner.com/">
+
+<!-- Open Graph (WhatsApp/Facebook sharing) -->
+<meta property="og:title" content="SHS Planner ΓÇö AI Lesson Plan Generator for Ghana Teachers">
+<meta property="og:description" content="Generate NaCCA-aligned lesson plans in minutes. Free for Ghana SHS teachers.">
+<meta property="og:url" content="https://shsplanner.com">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="en_GH">
+<meta property="og:image" content="https://shsplanner.com/og-banner.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="SHS Planner ΓÇö Ghana's Smart Teaching Assistant">
+<meta property="og:site_name" content="SHS Planner">
+
+<!-- Twitter/X Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="SHS Planner ΓÇö AI Lesson Plan Generator for Ghana Teachers">
+<meta name="twitter:description" content="Generate NaCCA-aligned lesson plans in minutes. Free for Ghana SHS teachers.">
+<meta name="twitter:image" content="https://shsplanner.com/og-banner.png">
+
+<!-- Schema.org for Google -->
+<script type="application/ld+json">{"@context":"https:\/\/schema.org","@type":"WebApplication","name":"SHS Planner","description":"AI-powered lesson plan generator for Ghana SHS teachers. NaCCA and GES aligned.","url":"https:\/\/shsplanner.com","image":"https:\/\/shsplanner.com\/icon512.png","applicationCategory":"EducationalApplication","operatingSystem":"Any","offers":{"@type":"Offer","price":"0","priceCurrency":"GHS","description":"3 free credits on signup"},"audience":{"@type":"EducationalAudience","educationalRole":"teacher"},"educationalLevel":"Secondary School","countryOfOrigin":"GH","inLanguage":"en","aggregateRating":{"@type":"AggregateRating","ratingValue":4.5,"reviewCount":18,"bestRating":5,"worstRating":1},"review":[{"@type":"Review","reviewRating":{"@type":"Rating","ratingValue":3,"bestRating":5,"worstRating":1},"author":{"@type":"Person","name":"S.K"},"reviewBody":"Very helpful, but it needs to be looked at. ItΓÇÖs difficult to retrieve your lost credit and downloaded files. Why do you have to buy another credit on the same lesson plan even if something like bad nextwork during the download and you want to download again."},{"@type":"Review","reviewRating":{"@type":"Rating","ratingValue":5,"bestRating":5,"worstRating":1},"author":{"@type":"Person","name":"Stephen"},"reviewBody":"The app is really  helpful and needs to be looked at."},{"@type":"Review","reviewRating":{"@type":"Rating","ratingValue":5,"bestRating":5,"worstRating":1},"author":{"@type":"Person","name":"Pratt"},"reviewBody":"The App is really Good,  Especially the online assessment"},{"@type":"Review","reviewRating":{"@type":"Rating","ratingValue":5,"bestRating":5,"worstRating":1},"author":{"@type":"Person","name":"DORIS"},"reviewBody":"Credit is too expensive, at least 1 credit should be able to generate both assessment and a lesson plan or better still two lesson plan. But all the same extremely good app"},{"@type":"Review","reviewRating":{"@type":"Rating","ratingValue":5,"bestRating":5,"worstRating":1},"author":{"@type":"Person","name":"Rashidatoahil"},"reviewBody":"It is very fast and efficient to use in populating a learning planner"}]}</script>
+
+<!-- Favicon -->
+<link rel="icon" href="/favicon.png" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon192.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#1B6B3A">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SHS Planner">
+<link rel="apple-touch-icon" sizes="180x180" href="/appletouchicon.png">
+<meta name="msapplication-TileImage" content="/icon192.png">
+<meta name="msapplication-TileColor" content="#1B6B3A">
+
+<!-- Fonts & CSS -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&amp;family=DM+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/app.css?v=1.0">
+<!-- OneSignal Web Push ΓÇö only loaded once configured in includes/config.php.
+     Prompt-timing/appearance itself is controlled from your OneSignal
+     dashboard (Settings -> Web Push -> Prompt Setup), not here. -->
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer=""></script>
+<script>
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(function(OneSignal) {
+    OneSignal.init({
+      appId: "abd02438-3dd4-4ffb-b2e7-3d8e4d0306a0",
+      // Push registration was failing for EVERY visitor with a 404:
+      //   "Failed to register a ServiceWorker for scope ('https://shsplanner.com/')
+      //    with script ('https://shsplanner.com/OneSignalSDKWorker.js...')"
+      // because that file had never been uploaded ΓÇö so quiz-deadline and refund
+      // notifications were not reaching anyone through the push channel at all.
+      //
+      // The file could NOT simply be dropped at the site root, though: OneSignal
+      // defaults to the root scope, and /sw.js is already registered there (see
+      // the registration further down this file). Only one service worker can
+      // control a scope, so a root-scope OneSignal worker would have REPLACED
+      // sw.js and taken offline support and the PWA app shell down with it.
+      // Giving OneSignal its own narrow scope lets both coexist.
+      //
+      // serviceWorkerPath is relative to the origin root (no leading slash);
+      // serviceWorkerParam.scope needs the leading and trailing slashes.
+      // These two and the actual file location must always agree.
+      serviceWorkerPath: "push/onesignal/OneSignalSDKWorker.js",
+      serviceWorkerParam: { scope: "/push/onesignal/" }
+    });
+  });
+</script>
+<style id="shsp-app-style">
+:root{--g:#1B6B3A;--gl:#2a8a4e;--gd:#124d29;--gold:#C8973A;--goldt:#96691C;--cr:#FFFDF8;--tx:#1a1a2e;--mu:#6b7280;--br:#e5e7eb;--ind:#6366f1;--red:#dc2626;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:var(--cr);color:var(--tx);}
+.hdr{background:linear-gradient(135deg,#124d29,#1B6B3A);padding:0 1.5rem;position:sticky;top:0;z-index:200;box-shadow:0 2px 12px rgba(0,0,0,.2);}
+.hdr-in{max-width:1180px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:60px;}
+.logo{display:flex;align-items:center;gap:10px;}
+.lm{width:34px;height:34px;border-radius:8px;background:#fff;overflow:hidden;display:flex;align-items:center;justify-content:center;}
+.lt{font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:700;color:#fff;}
+.ls{font-size:.65rem;color:rgba(255,255,255,.85);letter-spacing:.06em;text-transform:uppercase;}
+.hr{display:flex;align-items:center;gap:8px;}
+.cpill{display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.2);border-radius:20px;padding:5px 11px;cursor:pointer;}
+.cpill .cn{font-size:.82rem;font-weight:700;color:#fff;} .cpill .cl{font-size:.68rem;color:rgba(255,255,255,.85);}
+.ubtn{display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.11);border:1px solid rgba(255,255,255,.18);border-radius:20px;padding:5px 12px;cursor:pointer;}
+.ubtn span{font-size:.79rem;color:#fff;}
+.sibtn{background:var(--gold);border:none;border-radius:8px;padding:6px 14px;color:var(--tx);font-family:'DM Sans',sans-serif;font-size:.82rem;font-weight:700;cursor:pointer;}
+.hero{padding:2rem 1.5rem 1.5rem;text-align:center;border-bottom:1px solid var(--br);}
+.hero h1{font-family:'Playfair Display',serif;font-size:clamp(1.5rem,3.5vw,2.2rem);font-weight:900;color:var(--gd);line-height:1.15;margin-bottom:.5rem;}
+.hero h1 span{color:var(--goldt);}
+.hero p{color:var(--mu);font-size:.92rem;max-width:460px;margin:0 auto;line-height:1.65;}
+.main{padding:1.5rem;max-width:1180px;margin:0 auto;}
+.grid{display:grid;grid-template-columns:420px 1fr;gap:1.5rem;align-items:start;}
+@media(max-width:900px){.grid{grid-template-columns:1fr;}}
+.card{background:#fff;border-radius:14px;box-shadow:0 4px 20px rgba(27,107,58,.08);border:1px solid var(--br);overflow:hidden;}
+.ch{background:linear-gradient(135deg,var(--g),var(--gl));padding:1rem 1.4rem;display:flex;align-items:center;gap:8px;}
+.ch h2{font-family:'Playfair Display',serif;font-size:.96rem;font-weight:700;color:#fff;}
+.cb{padding:1.2rem;}
+.f{margin-bottom:1rem;}
+.f label{display:block;font-size:.7rem;font-weight:700;color:var(--gd);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.34rem;}
+.req{color:var(--red);}
+.f input,.f select,.f textarea{width:100%;padding:.56rem .82rem;border:1.5px solid var(--br);border-radius:10px;font-family:'DM Sans',sans-serif;font-size:.88rem;color:var(--tx);background:#fff;outline:none;transition:border .15s;appearance:none;}
+.f input:focus,.f select:focus,.f textarea:focus{border-color:var(--g);}
+.f textarea{resize:vertical;min-height:58px;line-height:1.5;}
+.asm-special-ta::placeholder{font-size:.68rem;line-height:1.5;color:var(--mu);}
+.sw{position:relative;}.sw::after{content:'Γû╛';position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--mu);pointer-events:none;}
+.hint{font-size:.7rem;color:var(--mu);margin-top:.22rem;line-height:1.5;}
+.oi{width:100%;padding:.56rem .82rem;border:1.5px solid var(--g);border-radius:10px;font-family:'DM Sans',sans-serif;font-size:.88rem;outline:none;margin-top:.38rem;}
+.pills{display:flex;gap:6px;flex-wrap:wrap;}
+.pill{padding:.36rem .84rem;border-radius:20px;font-size:.79rem;font-weight:600;cursor:pointer;border:2px solid var(--br);background:#fff;color:var(--mu);transition:all .16s;user-select:none;}
+.pill:hover:not(.poff){border-color:var(--g);color:var(--g);}
+.pill.on{background:var(--g);border-color:var(--g);color:#fff;}
+.pill.gon{background:var(--gold);border-color:var(--gold);color:var(--tx);}
+.pill-locked{opacity:.55;cursor:pointer;background:#f3f4f6!important;color:#9ca3af!important;border-color:#e5e7eb!important;}
+.pill-locked:hover{border-color:var(--gold)!important;color:var(--goldt)!important;}
+.poff{background:#f3f4f6;border-color:#e5e7eb;cursor:not-allowed;}.poff .pot,.poff .pos,.poff .poi,.poff .mt,.poff .ms{color:#4b5563;opacity:1;}
+.pills.eq{display:flex;gap:8px;}
+.pills.eq .pill{flex:1;text-align:center;padding:.66rem .5rem;border-radius:11px;font-size:.83rem;}
+.sow-sec-lbl{display:flex;align-items:center;gap:7px;font-size:.72rem;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--g),var(--gl));padding:.55rem .95rem;border-radius:10px;text-transform:uppercase;letter-spacing:.05em;margin:1.15rem 0 .85rem;}
+.sow-sec-lbl:first-child{margin-top:0;}
+.sow-opt-tag{font-size:.64rem;font-weight:600;text-transform:none;letter-spacing:0;color:rgba(255,255,255,.8);margin-left:auto;background:rgba(255,255,255,.18);padding:2px 8px;border-radius:8px;}
+.help-q-btn{margin-left:auto;display:inline-flex;align-items:center;gap:5px;padding:.34rem .75rem .34rem .6rem;border-radius:20px;border:1.5px solid #BFDBFE;background:#EFF6FF;color:#1D4ED8;font-family:'DM Sans',sans-serif;font-size:.74rem;font-weight:700;cursor:pointer;flex-shrink:0;transition:all .15s;white-space:nowrap;}.help-q-btn:hover{background:#DBEAFE;border-color:#93C5FD;}.help-q-btn svg{flex-shrink:0;}
+.mcards,.smcards,.ptog{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+.sow-2col{display:grid;grid-template-columns:1fr 1fr;gap:1rem;}
+.sow-radio{display:flex;align-items:center;gap:11px;padding:.72rem .95rem;border:2px solid var(--br);border-radius:12px;cursor:pointer;margin-bottom:8px;background:#fff;transition:all .15s;}
+.sow-radio:last-child{margin-bottom:0;}
+.sow-radio:hover{border-color:var(--g);}
+.sow-radio.on{border-color:var(--g);background:rgba(27,107,58,.06);}
+.sow-radio-dot{width:19px;height:19px;border-radius:50%;border:2px solid var(--br);flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:border-color .15s;}
+.sow-radio.on .sow-radio-dot{border-color:var(--g);}
+.sow-radio.on .sow-radio-dot::after{content:'';width:10px;height:10px;border-radius:50%;background:var(--g);}
+.sow-radio-txt{font-size:.86rem;font-weight:700;color:var(--tx);}
+.sow-radio.on .sow-radio-txt{color:var(--g);}
+.mc,.smc,.po{border:2px solid var(--br);border-radius:11px;padding:.76rem .9rem;cursor:pointer;transition:all .17s;background:#fff;text-align:center;}
+.mc:hover,.po:hover{border-color:var(--g);} .smc:hover{border-color:var(--ind);}
+.mc.on,.po.on{border-color:var(--g);background:rgba(27,107,58,.05);}
+.smc.on{border-color:var(--ind);background:rgba(99,102,241,.05);}
+.mi,.si,.poi{font-size:1.3rem;margin-bottom:.22rem;}
+.mt{font-size:.81rem;font-weight:700;color:var(--gd);} .mc.on .mt{color:var(--g);}
+.ms{font-size:.69rem;color:var(--mu);margin-top:.1rem;}
+.st{font-size:.81rem;font-weight:700;color:#312e81;} .smc.on .st{color:var(--ind);}
+.ss{font-size:.69rem;color:var(--mu);margin-top:.15rem;line-height:1.4;}
+.pot{font-size:.8rem;font-weight:700;color:var(--gd);} .po.on .pot{color:var(--g);}
+.pos{font-size:.68rem;color:var(--mu);margin-top:.1rem;}
+.rgrid{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:.6rem;}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:.28rem .76rem;border-radius:20px;font-size:.77rem;font-weight:500;cursor:pointer;border:1.5px solid;}
+.con{background:var(--g);color:#fff;border-color:var(--g);}
+.coff{background:rgba(27,107,58,.05);color:var(--gd);border-color:rgba(27,107,58,.18);}
+.coff:hover{border-color:var(--g);}
+.crm{font-size:.64rem;background:rgba(255,255,255,.24);border-radius:50%;width:13px;height:13px;display:inline-flex;align-items:center;justify-content:center;font-weight:700;cursor:pointer;}
+.radd{display:flex;gap:6px;}
+.ri{flex:1;padding:.46rem .76rem;border:1.5px solid var(--br);border-radius:10px;font-family:'DM Sans',sans-serif;font-size:.83rem;outline:none;}
+.ri:focus{border-color:var(--g);}
+.rabt{padding:.46rem .84rem;border-radius:10px;border:none;background:var(--g);color:#fff;font-size:.79rem;font-weight:600;cursor:pointer;white-space:nowrap;}
+.tgrid{display:flex;flex-wrap:wrap;gap:5px;max-height:150px;overflow-y:auto;padding:4px;border:1.5px solid var(--br);border-radius:10px;}
+.tc{padding:.24rem .64rem;border-radius:13px;font-size:.71rem;font-weight:500;cursor:pointer;border:1.5px solid var(--br);background:#fff;color:var(--mu);user-select:none;}
+.tc:hover{border-color:var(--ind);color:var(--ind);} .tc.ton{background:var(--ind);border-color:var(--ind);color:#fff;}
+.tpicker{border:1.5px solid var(--br);border-radius:12px;overflow:hidden;}
+.tp-yr{border-bottom:1px solid var(--br);}
+.tp-yr:last-child{border-bottom:none;}
+.tp-yr-hdr{display:flex;align-items:center;gap:8px;padding:.44rem .7rem;background:#f8fafc;border-bottom:1px solid var(--br);}
+.tp-yr-lbl{font-size:.68rem;font-weight:800;color:var(--gd);text-transform:uppercase;letter-spacing:.05em;}
+.tp-yr-actions{display:flex;gap:8px;margin-left:auto;}
+.tp-all-btn{background:none;border:none;color:var(--ind);font-size:.66rem;font-weight:700;cursor:pointer;padding:2px 3px;}
+.tp-all-btn:hover{text-decoration:underline;}
+.tp-yr-count{font-size:.66rem;color:var(--mu);font-weight:600;white-space:nowrap;}
+.tp-scroll{max-height:170px;overflow-y:auto;}
+.tp-row{display:flex;align-items:flex-start;gap:8px;padding:.4rem .7rem;cursor:pointer;border-bottom:1px solid #f1f5f9;transition:background .12s;}
+.tp-row:last-child{border-bottom:none;}
+.tp-row:hover{background:#f8fafc;}
+.tp-row.on{background:rgba(99,102,241,.07);}
+.tp-box{flex-shrink:0;width:15px;height:15px;border-radius:5px;border:1.5px solid var(--br);display:flex;align-items:center;justify-content:center;font-size:.58rem;color:#fff;margin-top:2px;background:#fff;}
+.tp-row.on .tp-box{background:var(--ind);border-color:var(--ind);}
+.tp-wk{flex-shrink:0;font-size:.7rem;font-weight:700;color:var(--ind);white-space:nowrap;}
+.tp-ttl{font-size:.74rem;color:var(--tx);line-height:1.4;}
+.tp-empty{padding:.65rem .7rem;font-size:.71rem;color:var(--mu);font-style:italic;}
+.dz{border:2px dashed var(--br);border-radius:11px;padding:1.4rem 1rem;text-align:center;cursor:pointer;background:#fafafa;}
+.dz:hover,.dz.has{border-color:var(--ind);border-style:solid;}
+.dz .dzi{font-size:1.6rem;margin-bottom:.32rem;opacity:.5;} .dz.has .dzi{opacity:1;}
+.dz .dzt{font-size:.86rem;font-weight:600;color:var(--gd);} .dz .dzs{font-size:.73rem;color:var(--mu);margin-top:.22rem;}
+.clscard{border:1.5px solid var(--br);border-radius:11px;overflow:hidden;margin-bottom:.76rem;}
+.clshdr{background:rgba(27,107,58,.07);padding:.56rem .9rem;border-bottom:1px solid var(--br);font-size:.69rem;font-weight:700;color:var(--g);text-transform:uppercase;letter-spacing:.06em;}
+.clsbdy{padding:.78rem .9rem;display:flex;flex-direction:column;gap:.56rem;}
+.clsinp{width:100%;padding:.46rem .72rem;border:1.5px solid var(--br);border-radius:9px;font-family:'DM Sans',sans-serif;font-size:.85rem;outline:none;}
+.clsinp:focus{border-color:var(--g);}
+.clslbl{font-size:.68rem;font-weight:600;color:var(--mu);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.21rem;}
+.ppills{display:flex;gap:5px;flex-wrap:wrap;}
+.pp{padding:.24rem .66rem;border-radius:13px;font-size:.71rem;font-weight:600;cursor:pointer;border:1.5px solid var(--br);background:#fff;color:var(--mu);}
+.pp:hover{border-color:#3b82f6;color:#3b82f6;} .pp.pon{background:#3b82f6;border-color:#3b82f6;color:#fff;}
+.clsta{width:100%;padding:.46rem .72rem;border:1.5px solid var(--br);border-radius:9px;font-family:'DM Sans',sans-serif;font-size:.8rem;outline:none;resize:none;min-height:52px;line-height:1.5;}
+.clsta:focus{border-color:var(--g);}
+.dok-row{display:flex;align-items:center;gap:10px;margin-bottom:.52rem;}
+.dok-lbl{font-size:.77rem;font-weight:600;color:var(--gd);width:190px;flex-shrink:0;}
+.dok-inp{width:70px;padding:.44rem .58rem;border:1.5px solid var(--br);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:.89rem;text-align:center;outline:none;-moz-appearance:textfield;}
+.dok-inp::-webkit-outer-spin-button,.dok-inp::-webkit-inner-spin-button{-webkit-appearance:none;}
+.dok-inp:focus{border-color:var(--g);}
+.bgen{width:100%;padding:.81rem;border-radius:11px;border:none;background:linear-gradient(135deg,var(--gold),#e0b05a);color:var(--tx);font-family:'DM Sans',sans-serif;font-size:.94rem;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(200,151,58,.28);transition:all .2s;display:flex;align-items:center;justify-content:center;gap:7px;}
+.bgen:hover:not(:disabled){transform:translateY(-2px);}
+.bgen:disabled{opacity:.5;cursor:not-allowed;}
+.bgen.ind{background:linear-gradient(135deg,var(--ind),#818cf8);}
+.divider{height:1px;background:var(--br);margin:.82rem 0;}
+.soon{background:#fff7ed;border:1.5px solid #fcd34d;border-radius:11px;padding:.82rem 1.1rem;text-align:center;}
+.soon p{font-size:.84rem;color:#92400e;font-weight:500;}
+.srow{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+.soi{width:82px;padding:.34rem .61rem;border:1.5px solid var(--br);border-radius:10px;font-family:'DM Sans',sans-serif;font-size:.85rem;outline:none;}
+.omt{min-height:480px;}
+.oe{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:480px;gap:.76rem;color:var(--mu);text-align:center;padding:2rem;}
+.oe .ico{font-size:2.5rem;opacity:.2;} .oe h3{font-family:'Playfair Display',serif;font-size:1.08rem;color:var(--gd);opacity:.38;} .oe p{font-size:.83rem;max-width:230px;line-height:1.65;}
+.ldg{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:480px;gap:1rem;padding:2rem;text-align:center;}
+.sp{width:42px;height:42px;border-radius:50%;border:4px solid rgba(27,107,58,.1);border-top-color:var(--g);animation:sp .8s linear infinite;}
+@keyframes sp{to{transform:rotate(360deg);}}
+.ldg h3{font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--gd);} .ldg p{font-size:.83rem;color:var(--mu);}
+/* AI Stage Loader */
+.ai-loader{display:flex;flex-direction:column;align-items:center;padding:2rem 1.8rem;min-height:480px;justify-content:center;gap:0;}
+.ai-loader-hdr{text-align:center;margin-bottom:2rem;}
+.ai-loader-hdr h3{font-family:'Playfair Display',serif;font-size:1.15rem;font-weight:900;color:var(--gd);margin-bottom:.4rem;}
+.ai-loader-hdr p{font-size:.8rem;color:var(--mu);line-height:1.6;}
+.ai-orb{width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--g),#2a8a4e);margin:0 auto 1.5rem;position:relative;animation:orbPulse 2s ease-in-out infinite;box-shadow:0 0 0 0 rgba(27,107,58,.4);}
+.ai-orb::after{content:'Γ£ª';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1.3rem;color:#fff;}
+@keyframes orbPulse{0%,100%{box-shadow:0 0 0 0 rgba(27,107,58,.4);}50%{box-shadow:0 0 0 14px rgba(27,107,58,.0);}}
+.ai-stages{width:100%;max-width:300px;display:flex;flex-direction:column;gap:0;}
+.ai-stage{display:flex;align-items:center;gap:12px;padding:9px 14px;border-radius:10px;margin-bottom:4px;opacity:0;transform:translateY(8px);transition:all .4s ease;font-size:.86rem;font-weight:500;color:var(--mu);}
+.ai-stage.visible{opacity:1;transform:translateY(0);}
+.ai-stage.done{color:var(--g);background:rgba(27,107,58,.06);}
+.ai-stage.active{color:var(--gd);background:rgba(27,107,58,.09);font-weight:700;}
+.ai-stage.active .stage-icon{animation:spinIcon 1s linear infinite;}
+@keyframes spinIcon{to{transform:rotate(360deg);}}
+.stage-icon{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:.7rem;font-weight:700;}
+.stage-icon.done-ico{background:var(--g);color:#fff;}
+.stage-icon.active-ico{background:rgba(27,107,58,.15);border:2px solid var(--g);color:var(--g);}
+.stage-icon.wait-ico{background:rgba(0,0,0,.05);border:2px solid var(--br);color:var(--mu);}
+.ai-progress{width:100%;max-width:300px;height:3px;background:var(--br);border-radius:2px;margin-top:1.2rem;overflow:hidden;}
+.ai-progress-bar{height:100%;background:linear-gradient(90deg,var(--g),#2a8a4e);border-radius:2px;transition:width .6s ease;width:0%;}
+.stbox{padding:1rem 1.4rem;}
+.sthdr{display:flex;align-items:center;gap:8px;margin-bottom:.68rem;padding:.48rem .78rem;background:rgba(27,107,58,.06);border-radius:8px;}
+.sthdr span{font-size:.77rem;font-weight:600;color:var(--g);}
+.sttxt{font-family:'Times New Roman',serif;font-size:.77rem;line-height:1.7;color:#444;max-height:370px;overflow-y:auto;white-space:pre-wrap;border:1px solid var(--br);border-radius:8px;padding:10px 12px;background:#fafafa;}
+.dots span{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--g);margin:0 3px;animation:bop 1.1s ease-in-out infinite;}
+.dots span:nth-child(2){animation-delay:.2s;} .dots span:nth-child(3){animation-delay:.4s;}
+@keyframes bop{0%,80%,100%{transform:scale(.5);opacity:.3}40%{transform:scale(1);opacity:1}}
+.eb{background:#fef2f2;border:1.5px solid #fca5a5;border-radius:11px;padding:.92rem 1.3rem;margin:1rem 1.4rem;text-align:center;}
+.eb p{color:var(--red);font-size:.84rem;font-weight:500;}
+.newbtn{display:block;margin:.7rem auto 0;padding:.44rem 1.1rem;border-radius:8px;border:1.5px solid var(--g);background:#fff;color:var(--g);font-family:'DM Sans',sans-serif;font-size:.79rem;font-weight:600;cursor:pointer;}
+.newbtn:hover{background:var(--g);color:#fff;}
+.dbtns{display:grid;grid-template-columns:1fr;gap:8px;padding:.78rem 1.4rem 0;background:#f9fafb;border-top:1px solid var(--br);}
+.dbtn{padding:.7rem;border-radius:10px;border:none;font-family:'DM Sans',sans-serif;font-size:.87rem;font-weight:700;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:6px;}
+.dbtn-w{background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;}
+.dbtn-w:hover{transform:translateY(-1px);}
+.dbtn-s{width:calc(100% - 2.8rem);display:flex;align-items:center;justify-content:center;gap:7px;margin:.58rem 1.4rem .78rem;padding:.76rem;border-radius:10px;border:none;background:linear-gradient(135deg,#059669,#10b981);color:#fff;font-family:'DM Sans',sans-serif;font-size:.94rem;font-weight:700;cursor:pointer;box-shadow:0 3px 12px rgba(5,150,105,.26);transition:all .2s;}
+.dbtn-s:hover{transform:translateY(-2px);}
+.dl-note{padding:.48rem 1.4rem .96rem;text-align:center;font-size:.72rem;color:var(--mu);}
+.dl-note button{background:none;border:none;color:var(--g);font-weight:600;cursor:pointer;font-size:.72rem;}
+.apanel{border:1.5px solid var(--br);border-radius:11px;overflow:hidden;margin-bottom:.76rem;}
+.aph{background:linear-gradient(135deg,var(--ind),#818cf8);padding:.66rem 1.02rem;display:flex;align-items:center;justify-content:space-between;cursor:pointer;}
+.apht{font-size:.85rem;font-weight:700;color:#fff;display:flex;align-items:center;gap:6px;}
+.apcb{padding:.25rem .68rem;border-radius:6px;border:1px solid rgba(255,255,255,.26);background:rgba(255,255,255,.12);color:#fff;font-size:.71rem;font-weight:600;cursor:pointer;}
+.apb{padding:1rem;font-size:.82rem;line-height:1.7;color:var(--tx);white-space:pre-wrap;max-height:350px;overflow-y:auto;display:none;}
+.apb.open{display:block;}
+/* GES Template Styles */
+.ges{font-family:'Times New Roman',serif;font-size:.79rem;border:1px solid #000;line-height:1.6;}
+.ges-row{display:grid;border-bottom:1px solid #000;}
+.ges-row.r2{grid-template-columns:28% 72%;}
+.ges-lbl{padding:6px 9px;font-weight:700;border-right:1px solid #000;vertical-align:middle;}
+.ges-val{padding:6px 9px;line-height:1.6;}
+.ges-full{padding:5px 10px;}
+.ges-lsn-ttl{font-weight:700;color:#1B6B3A;font-size:.84rem;margin-bottom:6px;padding:6px 8px;border-left:3px solid #1B6B3A;background:rgba(27,107,58,.04);}
+.ges-sec-h{font-weight:700;color:#1F7A8C;font-size:.78rem;margin-top:10px;margin-bottom:3px;padding:3px 8px;background:rgba(31,122,140,.07);border-left:2px solid #1F7A8C;letter-spacing:.04em;}
+.ges-sec-b{padding-left:12px;padding-right:8px;padding-top:4px;padding-bottom:4px;line-height:1.7;}
+.ges-sec-b div{margin-bottom:2px;}
+.ges-sec-b div.blank{margin-bottom:6px;}
+.ges-bold{font-weight:700;color:#333;}
+.ges-editable{cursor:text;border-radius:4px;transition:background .12s,box-shadow .12s;}
+.ges-editable:hover{background:rgba(37,99,235,.06);box-shadow:0 0 0 1px rgba(37,99,235,.25);}
+.ges-editable.ges-editing{background:transparent;box-shadow:none;}
+.apb{cursor:text;}
+.apb.asm-editing{cursor:default;}
+/* Modals */
+.mbd{position:fixed;inset:0;background:rgba(0,0,0,.44);z-index:500;display:flex;align-items:center;justify-content:center;padding:1.5rem;}
+.mbd.hidden{display:none;}
+.modal{background:#fff;border-radius:16px;width:100%;max-width:412px;box-shadow:0 18px 56px rgba(0,0,0,.22);overflow:hidden;}
+.mhdr{background:linear-gradient(135deg,var(--gd),var(--g));padding:1.22rem 1.4rem;position:relative;}
+.mhdr h2{font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:900;color:#fff;}
+.mhdr p{font-size:.76rem;color:rgba(255,255,255,.85);margin-top:.15rem;}
+.mx{position:absolute;right:1.1rem;top:1.1rem;background:rgba(255,255,255,.16);border:none;color:#fff;width:26px;height:26px;border-radius:50%;cursor:pointer;font-size:.9rem;}
+.mbody{padding:1.32rem;}
+.mtabs{display:flex;border-bottom:2px solid var(--br);margin-bottom:1rem;}
+.mtt{flex:1;padding:.58rem;text-align:center;font-size:.81rem;font-weight:600;cursor:pointer;color:var(--mu);border-bottom:2px solid transparent;margin-bottom:-2px;}
+.mtt.on{color:var(--g);border-bottom-color:var(--g);}
+.gbtn{width:100%;padding:.65rem;border-radius:9px;border:1.5px solid var(--br);background:#fff;display:flex;align-items:center;justify-content:center;gap:9px;font-family:'DM Sans',sans-serif;font-size:.86rem;font-weight:600;color:var(--tx);cursor:pointer;margin-bottom:.8rem;}
+.gbtn:hover{border-color:#4285f4;}
+.gico{width:17px;height:17px;}
+.ordiv{display:flex;align-items:center;gap:.6rem;margin-bottom:.8rem;}
+.ordiv::before,.ordiv::after{content:'';flex:1;height:1px;background:var(--br);}
+.ordiv span{font-size:.71rem;color:var(--mu);font-weight:600;}
+.ainp{width:100%;padding:.58rem .84rem;border:1.5px solid var(--br);border-radius:9px;font-family:'DM Sans',sans-serif;font-size:.86rem;outline:none;margin-bottom:.6rem;}
+.ainp:focus{border-color:var(--g);}
+.abtn{width:100%;padding:.71rem;border-radius:9px;border:none;background:var(--g);color:#fff;font-family:'DM Sans',sans-serif;font-size:.9rem;font-weight:700;cursor:pointer;}
+.anote{font-size:.71rem;color:var(--mu);text-align:center;margin-top:.7rem;line-height:1.5;}
+.anote strong{color:var(--g);}
+.buyhdr{background:linear-gradient(135deg,#92400e,#b45309)!important;}
+.packs{display:flex;flex-direction:column;gap:.66rem;margin-bottom:1rem;}
+.pack{border:2px solid var(--br);border-radius:11px;padding:.8rem .9rem;display:flex;align-items:center;justify-content:space-between;cursor:pointer;position:relative;background:#fff;}
+.pack:hover{border-color:var(--gold);} .pack.pop{border-color:var(--gold);background:#fffbeb;}
+.poptag{position:absolute;top:-9px;right:11px;background:var(--gold);color:var(--tx);border-radius:9px;padding:2px 9px;font-size:.68rem;font-weight:700;}
+.packl .pt{font-size:.9rem;font-weight:700;color:var(--gd);} .packl .pp2{font-size:.78rem;color:var(--mu);margin-top:.07rem;} .packl .ps{font-size:.71rem;color:var(--g);font-weight:600;margin-top:.07rem;}
+.packbtn{padding:.36rem .9rem;border-radius:7px;border:none;background:var(--gold);color:var(--tx);font-size:.78rem;font-weight:700;cursor:pointer;}
+.buynote{font-size:.73rem;color:var(--mu);text-align:center;line-height:1.5;padding:.7rem;background:#f9fafb;border-radius:8px;}
+footer{text-align:center;padding:1.2rem;border-top:1px solid var(--br);color:var(--mu);font-size:.74rem;}
+.mi-badge{display:inline-block;min-width:1rem;padding:.04rem .36rem;margin-left:.3rem;border-radius:9px;background:var(--red);color:#fff;font-size:.66rem;font-weight:800;line-height:1.35;vertical-align:1px;}
+@keyframes miPulse{0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.5);}50%{box-shadow:0 0 0 5px rgba(220,38,38,0);}}
+@keyframes qzLivePulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.4;transform:scale(1.3);}}
+.mi-pulse{animation:miPulse 1s ease-out 4;border-radius:9px;}
+.ob-wrap{max-width:480px;margin:0 auto;padding:1rem;}.ob-hdr{text-align:center;padding:1.2rem 0 .8rem;}.ob-logo-circle{width:60px;height:60px;background:#fff;border:2px solid var(--br);border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;margin:0 auto .8rem;}.ob-title{font-family:'Playfair Display',serif;font-size:1.3rem;color:var(--gd);margin-bottom:.3rem;}.ob-sub{font-size:.8rem;color:var(--mu);}.ob-body{padding:.5rem 0;}.ob-inp{width:100%;}.modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:1000;align-items:center;justify-content:center;background:rgba(0,0,0,.5);overflow-y:auto;padding:1rem;}.modal:not(.hidden){display:flex;}.mode-choice-wrap{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.3rem;}.mode-choice{border:2px solid var(--br);border-radius:14px;padding:1.1rem .9rem;text-align:center;cursor:pointer;background:#fff;transition:border .15s,background .15s;}.mode-choice:hover,.mode-choice.mc-on{border-color:var(--g);background:#f0fdf4;}.mc-icon{font-size:1.5rem;margin-bottom:.35rem;}.mc-title{font-weight:700;font-size:.86rem;color:var(--gd);margin-bottom:.2rem;}.mode-choice.mc-on .mc-title{color:var(--g);}.mc-sub{font-size:.71rem;color:var(--mu);line-height:1.4;}@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}footer span{color:var(--g);font-weight:600;}
+/* Option C fix: nav tabs sized to fit as many phones as possible without scrolling, with a fade+scroll fallback (.pnav-fade, wired in JS) for anything still too narrow ΓÇö was previously a single fixed size that overflowed with no visual hint on some phones (e.g. iOS with Larger Text), leaving 'Scheme of Work' cut off at the edge looking broken rather than swipeable. */
+.pnav-outer{position:relative;background:#fff;border-bottom:1px solid var(--br);position:sticky;top:60px;z-index:100;}
+.pnav{display:flex;gap:6px;padding:.7rem 1rem;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+.pnav::-webkit-scrollbar{display:none;}
+.pnav-fade{position:absolute;top:0;right:0;bottom:0;width:30px;background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.95));pointer-events:none;opacity:1;transition:opacity .2s;}
+.pnav-fade.hide{opacity:0;}
+.pnt{padding:.62rem .85rem;border-radius:12px;font-size:.78rem;font-weight:700;cursor:pointer;color:var(--gd);background:#f1f5f9;border:2px solid var(--br);display:flex;align-items:center;gap:5px;transition:all .18s;white-space:nowrap;flex-shrink:0;}
+.pnt:hover{border-color:var(--g);background:#e7f5ec;}
+.pnt.on{color:#fff;background:linear-gradient(135deg,var(--g),var(--gl));border-color:var(--g);box-shadow:0 3px 10px rgba(27,107,58,.28);transform:translateY(-1px);}
+.page{display:none;} .page.on{display:block;}
+.tools-grid{display:flex;flex-direction:column;gap:1rem;padding:1.5rem;max-width:720px;margin:0 auto;}
+.tool-card{background:#fff;border-radius:14px;box-shadow:0 4px 20px rgba(27,107,58,.08);border:1px solid var(--br);overflow:hidden;}
+.tool-hdr{padding:1rem 1.4rem;display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;transition:opacity .15s;}
+.tool-hdr:hover{opacity:.88;}
+.tool-hdr .ti{font-size:1.5rem;} .tool-hdr .tt{font-family:'Playfair Display',serif;font-size:1rem;font-weight:700;color:#fff;} .tool-hdr .ts{font-size:.72rem;color:rgba(255,255,255,.85);margin-top:.1rem;}
+.tool-hdr-txt{flex:1;} .tool-chevron{font-size:.85rem;color:rgba(255,255,255,.8);transition:transform .25s;margin-left:auto;} .tool-chevron.open{transform:rotate(180deg);}
+.tool-body{padding:1rem 1.4rem;display:none;} .tool-body.open{display:block;}
+.tool-out{border-top:1px solid var(--br);margin-top:1rem;padding:1rem 1.4rem;display:none;} .tool-out.vis{display:block;}
+.sow-table{width:100%;border-collapse:collapse;font-family:'Times New Roman',serif;font-size:.77rem;}
+.sow-table th{background:var(--g);color:#fff;padding:6px 8px;text-align:left;font-weight:700;border:1px solid #000;}
+.sow-table td{border:1px solid #ccc;padding:5px 8px;vertical-align:top;line-height:1.5;} .sow-table tr:nth-child(even) td{background:#f9fafb;}
+.tt-table{width:100%;border-collapse:collapse;font-family:'DM Sans',sans-serif;font-size:.78rem;}
+.tt-table th{padding:7px 10px;background:var(--g);color:#fff;text-align:center;font-weight:700;border:1px solid rgba(255,255,255,.2);}
+.tt-table td{border:1px solid var(--br);padding:6px 9px;text-align:center;vertical-align:middle;min-width:90px;}
+.tt-table .period-lbl{background:#f9fafb;font-weight:600;color:var(--gd);text-align:left;} .tt-table .break-row td{background:#fff7ed;color:#92400e;font-style:italic;font-weight:600;} .tt-table .subj-cell{border-radius:6px;padding:4px 6px;font-size:.72rem;font-weight:600;}
+.tool-dl{display:flex;gap:8px;margin-top:.9rem;flex-wrap:wrap;} .tool-dl button{padding:.58rem 1rem;border-radius:9px;border:none;font-family:'DM Sans',sans-serif;font-size:.82rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;}
+.tdbtn-w{background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;} .tdbtn-n{background:#f3f4f6;color:var(--gd);border:1.5px solid var(--br)!important;}
+.tt-inp-grid{display:grid;grid-template-columns:1fr 1fr;gap:.7rem;} @media(max-width:600px){.tt-inp-grid{grid-template-columns:1fr;}}
+/* Small-phone fixes (common budget Android widths, ~320-380px) ΓÇö these
+   elements had a fixed 2-column layout or fixed label width that didn't
+   collapse at the existing 900px/600px breakpoints, so they got cramped
+   or overflowed sideways on the narrowest real devices. */
+@media(max-width:400px){
+.mcards,.smcards,.ptog,.mode-choice-wrap{grid-template-columns:1fr!important;}
+.dok-row{flex-wrap:wrap;}
+.dok-lbl{width:100%;}
+/* Header row overflow ΓÇö on phones in the ~400-520px CSS-viewport range (very common for budget Android devices), the logo + credits pill + profile button + Sign Out button together exceeded the available width with no wrap, pushing Sign Out off-screen entirely with no visible scroll affordance. The narrower 400px fix alone didnΓÇÖt catch this wider range, so itΓÇÖs duplicated here at a broader breakpoint. */
+@media(max-width:520px){
+.hdr-in{flex-wrap:wrap;height:auto;padding:8px 0;gap:6px;}
+.hr{flex-wrap:wrap;row-gap:6px;}
+}
+.sow-2col{grid-template-columns:1fr!important;}
+.pnav{padding:0 .6rem;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.pnt{padding:.55rem .85rem;font-size:.78rem;white-space:nowrap;border-radius:10px;}
+.main,.cb{padding:1rem .9rem;}
+.tp-yr-hdr{flex-wrap:wrap;}
+}
+/* Weekly Teaching Schedule (Scheme of Work) ΓÇö on phones the 5-column table
+   was unreadable (the Topic dropdown rendered as an unlabelled sliver).
+   Below 700px it becomes a stack of clearly-labelled cards instead, with
+   a large, obviously-tappable Topic dropdown as the focal point of each. */
+@media(max-width:700px){
+.sow-wk-table thead{display:none;}
+.sow-wk-table,.sow-wk-table tbody{display:block;width:100%;}
+.sow-wk-table{border:none!important;}
+.sow-wk-table tr.sow-wk-row{display:block;background:#fff;border:1.5px solid var(--br);border-radius:13px;margin-bottom:12px;padding:.9rem 1rem;box-shadow:0 1px 5px rgba(0,0,0,.06);}
+.sow-wk-table tr.sow-wk-break{border-color:#fcd34d;background:#fffbeb!important;}
+.sow-wk-table tr.sow-wk-exam{border-color:#fca5a5;background:#fef2f2!important;}
+.sow-wk-table td{display:block;border:none!important;padding:.4rem 0!important;background:transparent!important;}
+.sow-wk-table td[data-label]::before{content:attr(data-label);display:block;font-size:.63rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--mu);margin-bottom:.25rem;}
+.sow-wk-table td[data-label="Week"]{display:inline-block;width:auto;margin-right:1.1rem;vertical-align:top;}
+.sow-wk-table td[data-label="Week Ending"]{display:inline-block;width:auto;vertical-align:top;}
+.sow-wk-table td.sow-wk-empty{display:none!important;}
+.sow-wk-table select{width:100%;font-size:.92rem!important;padding:.68rem .8rem!important;border:2px solid var(--g)!important;border-radius:10px!important;background:#f0fdf4!important;font-weight:700!important;color:var(--gd)!important;}
+.sow-wk-table input[type=text]{width:100%;font-size:.86rem!important;padding:.55rem .75rem!important;border:1.5px solid var(--br)!important;border-radius:9px!important;background:#fff!important;}
+.sow-wk-table td[data-label="Focal Areas"]{font-size:.78rem!important;}
+}
+
+/* Simple first-visit guided tour ΓÇö spotlights the real feature nav buttons (Lesson Plan / Assessment / Online Quiz toggle / Scheme of Work) one at a time with a short callout. No sample previews ΓÇö just a highlight and one line of description. */
+.gt-dim{position:fixed;inset:0;z-index:850;pointer-events:none;}
+.gt-hole{position:fixed;z-index:851;border-radius:12px;box-shadow:0 0 0 9999px rgba(10,20,15,.6);pointer-events:none;transition:top .3s ease,left .3s ease,width .3s ease,height .3s ease;}
+.gt-hole::after{content:'';position:absolute;inset:-3px;border-radius:14px;border:2px solid var(--gold);animation:gtPulse 1.6s ease-in-out infinite;}
+@keyframes gtPulse{0%,100%{box-shadow:0 0 0 0 rgba(200,151,58,.5);}50%{box-shadow:0 0 0 6px rgba(200,151,58,0);}}
+.gt-card{position:fixed;z-index:852;background:#fff;border-radius:13px;box-shadow:0 16px 44px rgba(0,0,0,.3);width:250px;max-width:calc(100vw - 1.6rem);overflow:hidden;transition:top .3s ease,left .3s ease;}
+.gt-card-hdr{background:linear-gradient(135deg,var(--gd),var(--g));padding:.6rem .85rem;}
+.gt-step-lbl{font-size:.62rem;font-weight:700;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.1rem;}
+.gt-title{font-family:'Playfair Display',serif;font-size:.92rem;font-weight:700;color:#fff;}
+.gt-body{padding:.75rem .85rem;}
+.gt-desc{font-size:.78rem;color:var(--tx);line-height:1.5;margin-bottom:.7rem;}
+.gt-dots{display:flex;gap:4px;margin-bottom:.7rem;}
+.gt-dot{width:5px;height:5px;border-radius:50%;background:var(--br);transition:all .2s;}
+.gt-dot.on{background:var(--g);width:14px;border-radius:4px;}
+.gt-foot{display:flex;align-items:center;gap:6px;}
+.gt-skip{background:none;border:none;color:var(--mu);font-size:.71rem;font-weight:600;cursor:pointer;padding:.3rem 0;font-family:inherit;}
+.gt-skip:hover{color:var(--tx);text-decoration:underline;}
+.gt-sp{flex:1;}
+.gt-next{background:var(--g);border:none;color:#fff;font-size:.74rem;font-weight:700;padding:.38rem .9rem;border-radius:7px;cursor:pointer;font-family:inherit;}
+.gt-next:hover{background:var(--gd);}
+.gt-vp-x{position:absolute;top:8px;right:10px;background:rgba(255,255,255,.25);border:none;color:#fff;width:24px;height:24px;border-radius:50%;font-size:1rem;line-height:1;cursor:pointer;z-index:2;}
+.gt-vp-x:hover{background:rgba(255,255,255,.4);}
+
+/* Mock/illustrative tour steps (no real element to spotlight ΓÇö used for the online-quiz post-generation walkthrough: link generated, shared on WhatsApp, a student taking it). Dims the whole screen and centers a wider card with a small mockup graphic instead of highlighting a real page element. */
+.gt-mock-dim{position:fixed;inset:0;z-index:850;background:rgba(10,20,15,.6);}
+.gt-card.gt-card-lg{width:300px;}
+.gt-card.gt-card-video{width:360px;}
+@media (min-width:640px){.gt-card.gt-card-video{width:640px;}}
+@media (min-width:1024px){.gt-card.gt-card-video{width:760px;}}
+.gt-card-video .gt-desc{font-size:.85rem;}
+.gt-card-video .gt-title{font-size:1.05rem;}
+.gt-mock-lbl{font-size:.62rem;font-weight:800;color:var(--mu);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem;}
+.gt-mock-box{background:#f8fafc;border:1.5px solid var(--br);border-radius:11px;padding:.7rem .8rem;margin-bottom:.7rem;}
+.gt-mock-link-row{display:flex;align-items:center;gap:6px;background:#fff;border:1.5px solid var(--g);border-radius:9px;padding:.5rem .65rem;margin-bottom:.5rem;}
+.gt-mock-link-txt{flex:1;font-size:.72rem;color:var(--gd);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.gt-mock-link-copy{background:var(--g);color:#fff;border:none;border-radius:6px;padding:.3rem .55rem;font-size:.65rem;font-weight:700;flex-shrink:0;}
+.gt-mock-check{display:flex;align-items:center;gap:6px;font-size:.76rem;font-weight:700;color:var(--gd);margin-bottom:.5rem;}
+.gt-mock-wa-bubble{background:#dcf8c6;border-radius:10px;border-top-left-radius:2px;padding:.6rem .7rem;font-size:.74rem;color:#111b21;line-height:1.5;position:relative;}
+.gt-mock-wa-link{color:#039be5;text-decoration:underline;word-break:break-all;}
+.gt-mock-wa-time{font-size:.6rem;color:#667781;text-align:right;margin-top:.3rem;}
+.gt-mock-phone{background:#fff;border:1.5px solid var(--br);border-radius:13px;padding:.7rem .75rem;}
+.gt-mock-phone-top{display:flex;justify-content:space-between;align-items:center;font-size:.6rem;font-weight:700;color:var(--gd);margin-bottom:.4rem;}
+.gt-mock-phone-timer{background:#fef2f2;color:var(--red);padding:.15rem .4rem;border-radius:10px;font-weight:800;}
+.gt-mock-phone-bar{height:4px;background:var(--br);border-radius:2px;overflow:hidden;margin-bottom:.5rem;}
+.gt-mock-phone-fill{height:100%;width:40%;background:var(--g);}
+.gt-mock-phone-q{font-size:.74rem;font-weight:700;color:var(--tx);margin-bottom:.45rem;line-height:1.4;}
+.gt-mock-phone-opt{display:flex;align-items:center;gap:6px;padding:.35rem .5rem;border:1.5px solid var(--br);border-radius:7px;margin-bottom:.3rem;font-size:.68rem;color:var(--tx);}
+.gt-mock-phone-opt.on{border-color:var(--g);background:rgba(27,107,58,.06);font-weight:700;color:var(--gd);}
+.gt-mock-phone-dot{width:12px;height:12px;border-radius:50%;border:1.5px solid var(--br);flex-shrink:0;}
+.gt-mock-phone-opt.on .gt-mock-phone-dot{border-color:var(--g);background:var(--g);}
+/* Help modal video embed (YouTube/Facebook) ΓÇö responsive 16:9 box, sits above the text content when the admin has set a video_url for that tab; nothing renders here at all when it's blank. */
+.hlp-video-label{display:flex;align-items:center;gap:7px;font-size:.82rem;font-weight:800;color:#124d29;margin-bottom:.5rem;}
+.hlp-video-label .hlp-play-dot{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:#1B6B3A;color:#fff;font-size:.62rem;flex-shrink:0;}
+.hlp-video-wrap{position:relative;width:100%;padding-bottom:56.25%;height:0;margin-bottom:1rem;border-radius:10px;overflow:hidden;background:#000;box-shadow:0 0 0 3px rgba(27,107,58,.15);}
+.hlp-video-wrap iframe{position:absolute;top:0;left:0;width:100%;height:100%;border:0;}
+.hlp-video-cap{font-size:.72rem;color:#6b7280;margin:-.6rem 0 1.1rem;text-align:center;}
+</style><script id="MathJax-script" async="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script><script src="https://accounts.google.com/gsi/client" async="" defer=""></script><style>.auth-dlg{background:#fff;border-radius:20px;width:100%;max-width:370px;padding:1.6rem 1.5rem 1.5rem;box-shadow:0 24px 64px rgba(0,0,0,.18);position:relative;animation:authIn .22s ease;max-height:calc(100vh - 3rem);overflow-y:auto}@keyframes authIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}.auth-x{position:absolute;top:.9rem;right:.9rem;width:28px;height:28px;border-radius:50%;border:none;background:#f3f4f6;color:#6b7280;font-size:.85rem;cursor:pointer;display:flex;align-items:center;justify-content:center}.auth-x:hover{background:#e5e7eb}.auth-brand{display:flex;align-items:center;gap:9px;margin-bottom:1.1rem}.auth-brand-mk{width:36px;height:36px;background:#fff;border:1.5px solid var(--br);overflow:hidden;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0}.auth-brand-name{font-family:'Playfair Display',serif;font-size:.95rem;font-weight:700;color:#1a1a2e;line-height:1.2}.auth-brand-url{font-size:.6rem;color:#9ca3af;letter-spacing:.05em}.auth-h{font-family:'Playfair Display',serif;font-size:1.35rem;font-weight:900;color:#124d29;margin-bottom:.2rem}.auth-p{font-size:.78rem;color:#6b7280;margin-bottom:1.1rem;line-height:1.5}.auth-btn-google{width:100%;padding:.68rem;border-radius:10px;border:1.5px solid #e5e7eb;background:#fff;display:flex;align-items:center;justify-content:center;gap:8px;font-family:'DM Sans',sans-serif;font-size:.88rem;font-weight:600;color:#374151;cursor:pointer;transition:border-color .15s,box-shadow .15s;margin-bottom:.75rem}.auth-btn-google:hover{border-color:#4285f4;box-shadow:0 2px 8px rgba(66,133,244,.14)}.auth-or{display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem;color:#9ca3af;font-size:.74rem}.auth-or::before,.auth-or::after{content:'';flex:1;height:1px;background:#e5e7eb}.auth-method{width:100%;padding:.72rem .9rem;border-radius:11px;border:1.5px solid #e5e7eb;background:#fff;display:flex;align-items:center;gap:11px;cursor:pointer;transition:all .15s;text-align:left;font-family:'DM Sans',sans-serif}.auth-method:hover{border-color:#1B6B3A;background:#f7fdf9}.auth-method-ico{width:34px;height:34px;border-radius:9px;background:#eff6ff;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}.auth-method-ttl{font-size:.86rem;font-weight:700;color:#1a1a2e;display:block}.auth-method-sub{font-size:.68rem;color:#9ca3af;display:block;margin-top:.06rem}.auth-free{text-align:center;font-size:.72rem;color:#9ca3af;margin-top:.85rem}.auth-free strong{color:#1B6B3A}.auth-back{display:inline-flex;align-items:center;gap:4px;font-size:.78rem;font-weight:600;color:#6b7280;cursor:pointer;margin-bottom:.9rem;border:none;background:none;padding:0;font-family:'DM Sans',sans-serif}.auth-back:hover{color:#1B6B3A}.auth-lbl{display:block;font-size:.7rem;font-weight:700;color:#374151;letter-spacing:.04em;margin-bottom:.38rem}.auth-inp{width:100%;padding:.65rem .82rem;border:1.5px solid #e5e7eb;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:.92rem;color:#1a1a2e;outline:none;margin-bottom:.7rem;transition:border-color .15s;background:#fff}.auth-inp:focus{border-color:#1B6B3A}.auth-btn-main{width:100%;padding:.74rem;border-radius:10px;border:none;background:linear-gradient(135deg,#124d29,#1B6B3A);color:#fff;font-family:'DM Sans',sans-serif;font-size:.9rem;font-weight:700;cursor:pointer;margin-bottom:.5rem;transition:opacity .15s;display:flex;align-items:center;justify-content:center;gap:6px}.auth-btn-main:hover{opacity:.91}.auth-btn-main:disabled{opacity:.45;cursor:not-allowed}.auth-otp-ok{background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:9px;padding:.55rem .8rem;font-size:.8rem;color:#15803d;font-weight:600;margin-bottom:.7rem}.auth-otp-inp{width:100%;padding:.82rem .5rem;border:1.5px solid #e5e7eb;border-radius:10px;font-size:2rem;font-weight:700;letter-spacing:.6rem;text-align:center;font-family:'DM Sans',monospace;outline:none;margin-bottom:.7rem;transition:border-color .15s}.auth-otp-inp:focus{border-color:#1B6B3A}.auth-resend{text-align:center;font-size:.75rem;color:#9ca3af;margin-top:.4rem}.auth-resend a{color:#1B6B3A;font-weight:600;text-decoration:none}.auth-resend a:hover{text-decoration:underline}.mo{background:#fff;border-radius:20px;max-width:500px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.18);padding:.5rem}</style><style>.buy-dlg{background:#fff;border-radius:20px;max-width:430px;width:100%;padding:1.5rem;box-shadow:0 24px 64px rgba(0,0,0,.18);position:relative}#buy-m{align-items:flex-start!important;overflow-y:auto!important;padding-top:1.2rem;padding-bottom:1.2rem}.buy-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.15rem}.buy-top-l{display:flex;align-items:center;gap:10px}.buy-ico{width:38px;height:38px;background:#fff7ed;border:1.5px solid #fde68a;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}.buy-ttl{font-family:'Playfair Display',serif;font-size:1.05rem;font-weight:700;color:#1a1a2e}.buy-rem{font-size:.72rem;color:#9ca3af;margin-top:.06rem}.buy-lbl{font-size:.7rem;font-weight:700;color:#374151;letter-spacing:.04em;margin-bottom:.45rem}.buy-qty-row{display:flex;align-items:center;gap:8px;margin-bottom:.65rem}.buy-pm{width:36px;height:36px;border-radius:9px;border:1.5px solid #e5e7eb;background:#fff;font-size:1.2rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#374151;flex-shrink:0}.buy-pm:hover{border-color:#1B6B3A;color:#1B6B3A}.buy-qty-inp{flex:1;padding:.6rem;border:1.5px solid #e5e7eb;border-radius:9px;font-size:1.2rem;font-weight:700;text-align:center;font-family:'DM Sans',sans-serif;outline:none;-moz-appearance:textfield}.buy-qty-inp:focus{border-color:#1B6B3A}.buy-qty-inp::-webkit-outer-spin-button,.buy-qty-inp::-webkit-inner-spin-button{-webkit-appearance:none}.buy-quick{display:flex;gap:6px;margin-bottom:1rem}.buy-qp{flex:1;padding:.38rem .2rem;border-radius:8px;border:1.5px solid #e5e7eb;background:#fff;font-size:.79rem;font-weight:700;cursor:pointer;color:#374151;text-align:center;position:relative}.buy-qp:hover,.buy-qp.bq-on{border-color:#1B6B3A;background:#f0fdf4;color:#1B6B3A}.buy-disc-pip{display:block;font-size:.6rem;font-weight:700;color:#15803d;margin-top:.06rem}.buy-div{height:1px;background:#f3f4f6;margin:.85rem 0}.buy-price-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:.38rem}.buy-price-lbl{font-size:.8rem;color:#6b7280}.buy-price-val{font-size:1.12rem;font-weight:700;color:#1a1a2e}.buy-disc-note{font-size:.73rem;color:#15803d;font-weight:600;background:#f0fdf4;padding:.38rem .7rem;border-radius:7px;margin-bottom:.75rem;display:none}.buy-now-btn{width:100%;padding:.78rem;border-radius:11px;border:none;background:linear-gradient(135deg,#C8973A,#e0b05a);color:#fff;font-family:'DM Sans',sans-serif;font-size:.9rem;font-weight:700;cursor:pointer;margin-bottom:.75rem;transition:opacity .15s}.buy-now-btn:hover{opacity:.92}.buy-now-btn:disabled{opacity:.5;cursor:not-allowed}.buy-info-note{font-size:.71rem;color:#9ca3af;text-align:center;line-height:1.55}.buy-info-note strong{color:#C8973A}.buy-ref-nudge{display:flex;flex-direction:column;gap:8px;margin-top:.7rem;padding:.65rem .8rem;background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:11px;cursor:pointer;transition:border-color .15s,background .15s}.buy-ref-nudge:hover{border-color:#1B6B3A;background:#e7fce7}.buy-ref-nudge:active{border-color:#1B6B3A;background:#dcfce7}.buy-ref-top{display:flex;align-items:center;gap:9px}.buy-ref-ico{font-size:1.15rem;flex-shrink:0;line-height:1}.buy-ref-txt{flex:1;font-size:.72rem;line-height:1.5;color:#166534}.buy-ref-txt b{color:#124d29}.buy-ref-btn{align-self:flex-start;background:#1B6B3A;color:#fff;font-size:.74rem;font-weight:700;padding:.4rem .85rem;border-radius:20px;line-height:1}.ob-sel{width:100%;padding:.56rem .82rem;border:1.5px solid var(--br);border-radius:10px;font-family:'DM Sans',sans-serif;font-size:.88rem;color:var(--tx);background:#fff;outline:none;appearance:none;-webkit-appearance:none}.ob-sel:focus{border-color:var(--g)}.ob-sel-wrap{position:relative}.ob-sel-wrap::after{content:'Γû╛';position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--mu);pointer-events:none}.ob-other-inp{width:100%;padding:.52rem .82rem;border:1.5px solid var(--g);border-radius:10px;font-family:'DM Sans',sans-serif;font-size:.86rem;outline:none;margin-top:.4rem;display:none}#buy-sc-explain .auth-back{margin-bottom:.4rem}.buy-explain-h{font-size:.86rem;font-weight:800;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:9px;padding:.55rem .7rem;margin:.1rem 0 .8rem;line-height:1.35;font-family:'Playfair Display',Georgia,serif}.buy-step{display:flex;gap:.6rem;margin-bottom:.6rem}.buy-step-n{width:22px;height:22px;border-radius:50%;background:#f0f8f3;color:#124d29;font-weight:800;font-size:.72rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:.05rem}.buy-step-t{font-size:.79rem;line-height:1.45;color:#374151}.buy-otp-callout{background:#eff6ff;border:1.5px solid #93c5fd;border-radius:9px;padding:.55rem .75rem;font-size:.78rem;line-height:1.5;color:#1e3a8a;margin:.1rem 0 .75rem}.buy-otp-callout b{color:#1e40af}.buy-step-t b{color:#1a1a2e}.buy-step-t u{text-decoration:none;color:#1B6B3A;font-weight:700}.buy-step-t ul{margin:.35rem 0 0;padding-left:1.05rem;list-style:disc}.buy-step-t li{margin-bottom:.28rem;color:#4a5461}.buy-step-t li:last-child{margin-bottom:0}</style><style>.lp-img-banner{margin:0;border-bottom:1px solid var(--br);position:relative;overflow:hidden;max-height:220px;background:#f3f4f6}.lp-img-banner img{width:100%;height:220px;object-fit:cover;display:block}.lp-img-credit{position:absolute;bottom:0;right:0;background:rgba(0,0,0,.45);color:#fff;font-size:.62rem;padding:2px 7px;border-radius:4px 0 0 0}.lp-img-bar{height:4px;background:linear-gradient(90deg,var(--g),var(--gold),var(--g));background-size:200% 100%;animation:lp-sh 1.4s linear infinite}@keyframes lp-sh{0%{background-position:200% 0}100%{background-position:-200% 0}}</style><style>.pw-wrap{position:relative;overflow:hidden}.pw-blur-zone{filter:blur(4px);user-select:none;pointer-events:none;opacity:.7}.pw-lock{position:absolute;bottom:0;left:0;right:0;height:320px;background:linear-gradient(to bottom,rgba(255,255,255,0) 0%,rgba(255,255,255,.97) 28%,#fff 55%);display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:1.8rem;z-index:10}.pw-icon{font-size:2rem;margin-bottom:.5rem}.pw-msg{font-size:.88rem;font-weight:700;color:#1e293b;margin-bottom:.25rem;text-align:center}.pw-sub{font-size:.75rem;color:#64748b;margin-bottom:1rem;text-align:center;max-width:260px;line-height:1.5}.pw-dl-btn{background:linear-gradient(135deg,#1B6B3A,#2a8a4e);color:#fff;border:none;border-radius:11px;padding:.72rem 1.6rem;font-family:'DM Sans',sans-serif;font-size:.9rem;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(27,107,58,.3);transition:all .2s}.pw-dl-btn:hover{transform:translateY(-2px)}.pw-free-note{font-size:.7rem;color:#64748b;margin-top:.6rem;text-align:center}.pw-toast{position:fixed;top:80px;left:50%;transform:translateX(-50%);z-index:9999;background:#1e293b;color:#fff;border-radius:12px;padding:.82rem 1.4rem;font-size:.84rem;font-weight:600;box-shadow:0 8px 32px rgba(0,0,0,.22);display:flex;align-items:center;gap:.7rem;max-width:360px;text-align:center;animation:pwSlideIn .3s ease}.pw-toast.warn{background:#92400e}.pw-toast.info{background:#1e3a8a}@keyframes pwSlideIn{from{opacity:0;top:60px}to{opacity:1;top:80px}}</style><style>.hlp-mbd{position:fixed;inset:0;background:rgba(15,23,32,.55);z-index:9600;display:flex;align-items:center;justify-content:center;padding:1.2rem;font-family:"DM Sans",sans-serif}.hlp-mbd.hidden{display:none}.hlp-modal{background:#fff;border-radius:16px;width:100%;max-width:560px;max-height:88vh;overflow-y:auto;box-shadow:0 25px 70px rgba(0,0,0,.35)}.hlp-hdr{background:linear-gradient(135deg,#124d29,#1B6B3A);color:#fff;padding:1.1rem 1.3rem;border-radius:16px 16px 0 0;position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;gap:10px;z-index:2}.hlp-hdr h2{font-family:"Playfair Display",serif;font-size:1.02rem;font-weight:800;margin:0;line-height:1.35}.hlp-x{background:rgba(255,255,255,.18);border:none;color:#fff;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:.9rem;flex-shrink:0}.hlp-body{padding:1.3rem 1.4rem 1.6rem;color:#334155;font-size:.88rem;line-height:1.65}.hlp-body h3{font-family:"Playfair Display",serif;color:#124d29;font-size:.98rem;font-weight:800;margin:1.15rem 0 .5rem}.hlp-body h3:first-child{margin-top:0}.hlp-body p{margin:0 0 .7rem}.hlp-body ul,.hlp-body ol{margin:0 0 .8rem;padding-left:1.25rem}.hlp-body li{margin-bottom:.4rem}.hlp-body b{color:#124d29}</style><style>.nbell{position:relative;background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.2);border-radius:20px;width:34px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.95rem;line-height:1;padding:0;flex-shrink:0;transition:background .15s;}.nrefbtn{background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.2);border-radius:20px;height:32px;display:flex;align-items:center;justify-content:center;gap:5px;cursor:pointer;font-size:.95rem;line-height:1;padding:0 .65rem;flex-shrink:0;transition:background .15s;color:#fff;font-family:"DM Sans",sans-serif;}.nrefbtn:hover{background:rgba(255,255,255,.24);}.nrefbtn-lbl{font-size:.7rem;font-weight:700;white-space:nowrap;}@media(max-width:520px){.nrefbtn-lbl{display:none;}.nrefbtn{padding:0;width:32px;}}.nbell:hover{background:rgba(255,255,255,.24);}.nbell-dot{position:absolute;top:-4px;right:-4px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:#dc2626;color:#fff;font-size:.62rem;font-weight:800;display:flex;align-items:center;justify-content:center;border:2px solid #175f34;font-family:"DM Sans",sans-serif;}.npanel{position:absolute;top:52px;right:0;width:340px;max-width:calc(100vw - 20px);background:#fff;border-radius:14px;box-shadow:0 14px 44px rgba(0,0,0,.24);border:1px solid var(--br);overflow:hidden;z-index:640;}.npanel-hdr{display:flex;align-items:center;justify-content:space-between;padding:.7rem .95rem;background:linear-gradient(135deg,#124d29,#1B6B3A);}.npanel-hdr h3{font-family:"Playfair Display",serif;font-size:.92rem;font-weight:700;color:#fff;margin:0;}.npanel-clear{background:none;border:none;color:rgba(255,255,255,.82);font-size:.7rem;font-weight:700;cursor:pointer;font-family:"DM Sans",sans-serif;padding:2px 4px;}.npanel-clear:hover{color:#fff;text-decoration:underline;}.nlist{max-height:min(420px,60vh);overflow-y:auto;-webkit-overflow-scrolling:touch;}.nitem{display:flex;gap:10px;padding:.75rem .95rem;border-bottom:1px solid #f1f5f9;background:#fff;}.nitem:last-child{border-bottom:none;}.nitem.unread{background:#f0fdf4;}.nitem-ico{font-size:1.1rem;line-height:1.3;flex-shrink:0;}.nitem-bd{flex:1;min-width:0;}.nitem-t{font-size:.83rem;font-weight:700;color:var(--gd);line-height:1.4;}.nitem.unread .nitem-t::after{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--g);margin-left:6px;vertical-align:middle;}.nitem-b{font-size:.75rem;color:var(--mu);line-height:1.55;margin-top:.18rem;white-space:pre-wrap;word-break:break-word;}.nitem-tm{font-size:.66rem;color:#9ca3af;margin-top:.3rem;}.nitem-act{margin-top:.42rem;background:none;border:1.5px solid var(--br);border-radius:7px;padding:.24rem .6rem;font-size:.7rem;font-weight:700;color:var(--g);cursor:pointer;font-family:"DM Sans",sans-serif;}.nitem-act:hover{border-color:var(--g);background:#f0fdf4;}.nempty{padding:2rem 1rem;text-align:center;color:var(--mu);font-size:.8rem;line-height:1.6;}.nempty .ni{font-size:1.7rem;opacity:.28;display:block;margin-bottom:.5rem;}.rf-bd{position:fixed;inset:0;background:rgba(0,0,0,.44);z-index:900;display:flex;align-items:center;justify-content:center;padding:1.1rem;overflow-y:auto;}.rf-bd.hidden{display:none;}.rf-m{background:#fff;border-radius:16px;width:100%;max-width:430px;box-shadow:0 18px 56px rgba(0,0,0,.22);overflow:hidden;}.rf-h{background:linear-gradient(135deg,#92400e,#C8973A);padding:1.2rem 1.4rem;position:relative;}.rf-h h2{font-family:"Playfair Display",serif;font-size:1.08rem;font-weight:900;color:#fff;margin:0;}.rf-h p{font-size:.75rem;color:rgba(255,255,255,.82);margin:.16rem 0 0;line-height:1.5;}.rf-x{position:absolute;right:1.05rem;top:1.05rem;background:rgba(255,255,255,.2);border:none;color:#fff;width:26px;height:26px;border-radius:50%;cursor:pointer;font-size:.85rem;line-height:1;}.rf-b{padding:1.25rem;}.rf-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;margin-bottom:1.05rem;}.rf-stat{background:#f9fafb;border:1.5px solid var(--br);border-radius:10px;padding:.6rem .3rem;text-align:center;}.rf-stat b{display:block;font-size:1.15rem;font-weight:900;color:var(--gd);line-height:1.2;}.rf-stat span{font-size:.62rem;color:var(--mu);text-transform:uppercase;letter-spacing:.04em;font-weight:700;}.rf-stat.earned{background:#f0fdf4;border-color:#86efac;}.rf-stat.earned b{color:var(--g);}.rf-lbl{font-size:.68rem;font-weight:800;color:var(--gd);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.34rem;}.rf-link{display:flex;gap:6px;margin-bottom:.85rem;}.rf-link input{flex:1;min-width:0;padding:.55rem .7rem;border:1.5px solid var(--br);border-radius:9px;font-family:"DM Sans",sans-serif;font-size:.78rem;color:var(--tx);background:#f9fafb;outline:none;}.rf-cp{padding:.55rem .85rem;border-radius:9px;border:none;background:var(--g);color:#fff;font-size:.75rem;font-weight:700;cursor:pointer;white-space:nowrap;font-family:"DM Sans",sans-serif;flex-shrink:0;}.rf-cp.done{background:#059669;}.rf-share{display:flex;gap:7px;margin-bottom:1rem;}.rf-sb{flex:1;padding:.68rem;border-radius:10px;border:none;font-family:"DM Sans",sans-serif;font-size:.82rem;font-weight:700;cursor:pointer;color:#fff;display:flex;align-items:center;justify-content:center;gap:6px;}.rf-wa{background:#25D366;} .rf-any{background:var(--gd);}.rf-how{background:#fffbeb;border:1.5px solid #fcd34d;border-radius:10px;padding:.75rem .9rem;}.rf-how b{display:block;font-size:.75rem;color:#92400e;margin-bottom:.35rem;}.rf-how ol{margin:0;padding-left:1.05rem;}.rf-how li{font-size:.73rem;color:#78350f;line-height:1.6;margin-bottom:.16rem;}.rf-load{text-align:center;padding:2.2rem 1rem;}@media(max-width:420px){.npanel{width:calc(100vw - 20px);right:-6px;}.rf-share{flex-direction:column;}}</style><script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.es6.js?v=160610" defer=""></script><style type="text/css">.CtxtMenu_InfoClose {  top:.2em; right:.2em;}
+.CtxtMenu_InfoContent {  overflow:auto; text-align:left; font-size:80%;  padding:.4em .6em; border:1px inset; margin:1em 0px;  max-height:20em; max-width:30em; background-color:#EEEEEE;  white-space:normal;}
+.CtxtMenu_Info.CtxtMenu_MousePost {outline:none;}
+.CtxtMenu_Info {  position:fixed; left:50%; width:auto; text-align:center;  border:3px outset; padding:1em 2em; background-color:#DDDDDD;  color:black;  cursor:default; font-family:message-box; font-size:120%;  font-style:normal; text-indent:0; text-transform:none;  line-height:normal; letter-spacing:normal; word-spacing:normal;  word-wrap:normal; white-space:nowrap; float:none; z-index:201;  border-radius: 15px;                     /* Opera 10.5 and IE9 */  -webkit-border-radius:15px;               /* Safari and Chrome */  -moz-border-radius:15px;                  /* Firefox */  -khtml-border-radius:15px;                /* Konqueror */  box-shadow:0px 10px 20px #808080;         /* Opera 10.5 and IE9 */  -webkit-box-shadow:0px 10px 20px #808080; /* Safari 3 & Chrome */  -moz-box-shadow:0px 10px 20px #808080;    /* Forefox 3.5 */  -khtml-box-shadow:0px 10px 20px #808080;  /* Konqueror */  filter:progid:DXImageTransform.Microsoft.dropshadow(OffX=2, OffY=2, Color="gray", Positive="true"); /* IE */}
+</style><style type="text/css">.CtxtMenu_MenuClose {  position:absolute;  cursor:pointer;  display:inline-block;  border:2px solid #AAA;  border-radius:18px;  -webkit-border-radius: 18px;             /* Safari and Chrome */  -moz-border-radius: 18px;                /* Firefox */  -khtml-border-radius: 18px;              /* Konqueror */  font-family: "Courier New", Courier;  font-size:24px;  color:#F0F0F0}
+.CtxtMenu_MenuClose span {  display:block; background-color:#AAA; border:1.5px solid;  border-radius:18px;  -webkit-border-radius: 18px;             /* Safari and Chrome */  -moz-border-radius: 18px;                /* Firefox */  -khtml-border-radius: 18px;              /* Konqueror */  line-height:0;  padding:8px 0 6px     /* may need to be browser-specific */}
+.CtxtMenu_MenuClose:hover {  color:white!important;  border:2px solid #CCC!important}
+.CtxtMenu_MenuClose:hover span {  background-color:#CCC!important}
+.CtxtMenu_MenuClose:hover:focus {  outline:none}
+</style><style type="text/css">.CtxtMenu_Menu {  position:absolute;  background-color:white;  color:black;  width:auto; padding:5px 0px;  border:1px solid #CCCCCC; margin:0; cursor:default;  font: menu; text-align:left; text-indent:0; text-transform:none;  line-height:normal; letter-spacing:normal; word-spacing:normal;  word-wrap:normal; white-space:nowrap; float:none; z-index:201;  border-radius: 5px;                     /* Opera 10.5 and IE9 */  -webkit-border-radius: 5px;             /* Safari and Chrome */  -moz-border-radius: 5px;                /* Firefox */  -khtml-border-radius: 5px;              /* Konqueror */  box-shadow:0px 10px 20px #808080;         /* Opera 10.5 and IE9 */  -webkit-box-shadow:0px 10px 20px #808080; /* Safari 3 & Chrome */  -moz-box-shadow:0px 10px 20px #808080;    /* Forefox 3.5 */  -khtml-box-shadow:0px 10px 20px #808080;  /* Konqueror */}
+.CtxtMenu_MenuItem {  padding: 1px 2em;  background:transparent;}
+.CtxtMenu_MenuArrow {  position:absolute; right:.5em; padding-top:.25em; color:#666666;  font-family: null; font-size: .75em}
+.CtxtMenu_MenuActive .CtxtMenu_MenuArrow {color:white}
+.CtxtMenu_MenuArrow.CtxtMenu_RTL {left:.5em; right:auto}
+.CtxtMenu_MenuCheck {  position:absolute; left:.7em;  font-family: null}
+.CtxtMenu_MenuCheck.CtxtMenu_RTL { right:.7em; left:auto }
+.CtxtMenu_MenuRadioCheck {  position:absolute; left: .7em;}
+.CtxtMenu_MenuRadioCheck.CtxtMenu_RTL {  right: .7em; left:auto}
+.CtxtMenu_MenuInputBox {  padding-left: 1em; right:.5em; color:#666666;  font-family: null;}
+.CtxtMenu_MenuInputBox.CtxtMenu_RTL {  left: .1em;}
+.CtxtMenu_MenuComboBox {  left:.1em; padding-bottom:.5em;}
+.CtxtMenu_MenuSlider {  left: .1em;}
+.CtxtMenu_SliderValue {  position:absolute; right:.1em; padding-top:.25em; color:#333333;  font-size: .75em}
+.CtxtMenu_SliderBar {  outline: none; background: #d3d3d3}
+.CtxtMenu_MenuLabel {  padding: 1px 2em 3px 1.33em;  font-style:italic}
+.CtxtMenu_MenuRule {  border-top: 1px solid #DDDDDD;  margin: 4px 3px;}
+.CtxtMenu_MenuDisabled {  color:GrayText}
+.CtxtMenu_MenuActive {  background-color: #606872;  color: white;}
+.CtxtMenu_MenuDisabled:focus {  background-color: #E8E8E8}
+.CtxtMenu_MenuLabel:focus {  background-color: #E8E8E8}
+.CtxtMenu_ContextMenu:focus {  outline:none}
+.CtxtMenu_ContextMenu .CtxtMenu_MenuItem:focus {  outline:none}
+.CtxtMenu_SelectionMenu {  position:relative; float:left;  border-bottom: none; -webkit-box-shadow:none; -webkit-border-radius:0px; }
+.CtxtMenu_SelectionItem {  padding-right: 1em;}
+.CtxtMenu_Selection {  right: 40%; width:50%; }
+.CtxtMenu_SelectionBox {  padding: 0em; max-height:20em; max-width: none;  background-color:#FFFFFF;}
+.CtxtMenu_SelectionDivider {  clear: both; border-top: 2px solid #000000;}
+.CtxtMenu_Menu .CtxtMenu_MenuClose {  top:-10px; left:-10px}
+</style><style id="MJX-CHTML-styles">
+mjx-container[jax="CHTML"] {
+  line-height: 0;
+}
+
+mjx-container [space="1"] {
+  margin-left: .111em;
+}
+
+mjx-container [space="2"] {
+  margin-left: .167em;
+}
+
+mjx-container [space="3"] {
+  margin-left: .222em;
+}
+
+mjx-container [space="4"] {
+  margin-left: .278em;
+}
+
+mjx-container [space="5"] {
+  margin-left: .333em;
+}
+
+mjx-container [rspace="1"] {
+  margin-right: .111em;
+}
+
+mjx-container [rspace="2"] {
+  margin-right: .167em;
+}
+
+mjx-container [rspace="3"] {
+  margin-right: .222em;
+}
+
+mjx-container [rspace="4"] {
+  margin-right: .278em;
+}
+
+mjx-container [rspace="5"] {
+  margin-right: .333em;
+}
+
+mjx-container [size="s"] {
+  font-size: 70.7%;
+}
+
+mjx-container [size="ss"] {
+  font-size: 50%;
+}
+
+mjx-container [size="Tn"] {
+  font-size: 60%;
+}
+
+mjx-container [size="sm"] {
+  font-size: 85%;
+}
+
+mjx-container [size="lg"] {
+  font-size: 120%;
+}
+
+mjx-container [size="Lg"] {
+  font-size: 144%;
+}
+
+mjx-container [size="LG"] {
+  font-size: 173%;
+}
+
+mjx-container [size="hg"] {
+  font-size: 207%;
+}
+
+mjx-container [size="HG"] {
+  font-size: 249%;
+}
+
+mjx-container [width="full"] {
+  width: 100%;
+}
+
+mjx-box {
+  display: inline-block;
+}
+
+mjx-block {
+  display: block;
+}
+
+mjx-itable {
+  display: inline-table;
+}
+
+mjx-row {
+  display: table-row;
+}
+
+mjx-row > * {
+  display: table-cell;
+}
+
+mjx-mtext {
+  display: inline-block;
+}
+
+mjx-mstyle {
+  display: inline-block;
+}
+
+mjx-merror {
+  display: inline-block;
+  color: red;
+  background-color: yellow;
+}
+
+mjx-mphantom {
+  visibility: hidden;
+}
+
+_::-webkit-full-page-media, _:future, :root mjx-container {
+  will-change: opacity;
+}
+
+mjx-assistive-mml {
+  position: absolute !important;
+  top: 0px;
+  left: 0px;
+  clip: rect(1px, 1px, 1px, 1px);
+  padding: 1px 0px 0px 0px !important;
+  border: 0px !important;
+  display: block !important;
+  width: auto !important;
+  overflow: hidden !important;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+mjx-assistive-mml[display="block"] {
+  width: 100% !important;
+}
+
+mjx-c::before {
+  display: block;
+  width: 0;
+}
+
+.MJX-TEX {
+  font-family: MJXZERO, MJXTEX;
+}
+
+.TEX-B {
+  font-family: MJXZERO, MJXTEX-B;
+}
+
+.TEX-I {
+  font-family: MJXZERO, MJXTEX-I;
+}
+
+.TEX-MI {
+  font-family: MJXZERO, MJXTEX-MI;
+}
+
+.TEX-BI {
+  font-family: MJXZERO, MJXTEX-BI;
+}
+
+.TEX-S1 {
+  font-family: MJXZERO, MJXTEX-S1;
+}
+
+.TEX-S2 {
+  font-family: MJXZERO, MJXTEX-S2;
+}
+
+.TEX-S3 {
+  font-family: MJXZERO, MJXTEX-S3;
+}
+
+.TEX-S4 {
+  font-family: MJXZERO, MJXTEX-S4;
+}
+
+.TEX-A {
+  font-family: MJXZERO, MJXTEX-A;
+}
+
+.TEX-C {
+  font-family: MJXZERO, MJXTEX-C;
+}
+
+.TEX-CB {
+  font-family: MJXZERO, MJXTEX-CB;
+}
+
+.TEX-FR {
+  font-family: MJXZERO, MJXTEX-FR;
+}
+
+.TEX-FRB {
+  font-family: MJXZERO, MJXTEX-FRB;
+}
+
+.TEX-SS {
+  font-family: MJXZERO, MJXTEX-SS;
+}
+
+.TEX-SSB {
+  font-family: MJXZERO, MJXTEX-SSB;
+}
+
+.TEX-SSI {
+  font-family: MJXZERO, MJXTEX-SSI;
+}
+
+.TEX-SC {
+  font-family: MJXZERO, MJXTEX-SC;
+}
+
+.TEX-T {
+  font-family: MJXZERO, MJXTEX-T;
+}
+
+.TEX-V {
+  font-family: MJXZERO, MJXTEX-V;
+}
+
+.TEX-VB {
+  font-family: MJXZERO, MJXTEX-VB;
+}
+
+mjx-stretchy-v mjx-c, mjx-stretchy-h mjx-c {
+  font-family: MJXZERO, MJXTEX-S1, MJXTEX-S4, MJXTEX, MJXTEX-A ! important;
+}
+
+@font-face /* 0 */ {
+  font-family: MJXZERO;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2/MathJax_Zero.woff") format("woff");
+}
+
+@font-face /* 1 */ {
+  font-family: MJXTEX;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2/MathJax_Main-Regular.woff") format("woff");
+}
+
+@font-face /* 2 */ {
+  font-family: MJXTEX-B;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2/MathJax_Main-Bold.woff") format("woff");
+}
+
+@font-face /* 3 */ {
+  font-family: MJXTEX-I;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2/MathJax_Math-Italic.woff") format("woff");
+}
+
+@font-face /* 4 */ {
+  font-family: MJXTEX-MI;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2/MathJax_Main-Italic.woff") format("woff");
+}
+
+@font-face /* 5 */ {
+  font-family: MJXTEX-BI;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2/MathJax_Math-BoldItalic.woff") format("woff");
+}
+
+@font-face /* 6 */ {
+  font-family: MJXTEX-S1;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2/MathJax_Size1-Regular.woff") format("woff");
+}
+
+@font-face /* 7 */ {
+  font-family: MJXTEX-S2;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2/MathJax_Size2-Regular.woff") format("woff");
+}
+
+@font-face /* 8 */ {
+  font-family: MJXTEX-S3;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2/MathJax_Size3-Regular.woff") format("woff");
+}
+
+@font-face /* 9 */ {
+  font-family: MJXTEX-S4;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2/MathJax_Size4-Regular.woff") format("woff");
+}
+
+@font-face /* 10 */ {
+  font-family: MJXTEX-A;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2/MathJax_AMS-Regular.woff") format("woff");
+}
+
+@font-face /* 11 */ {
+  font-family: MJXTEX-C;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2/MathJax_Calligraphic-Regular.woff") format("woff");
+}
+
+@font-face /* 12 */ {
+  font-family: MJXTEX-CB;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2/MathJax_Calligraphic-Bold.woff") format("woff");
+}
+
+@font-face /* 13 */ {
+  font-family: MJXTEX-FR;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2/MathJax_Fraktur-Regular.woff") format("woff");
+}
+
+@font-face /* 14 */ {
+  font-family: MJXTEX-FRB;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2/MathJax_Fraktur-Bold.woff") format("woff");
+}
+
+@font-face /* 15 */ {
+  font-family: MJXTEX-SS;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2/MathJax_SansSerif-Regular.woff") format("woff");
+}
+
+@font-face /* 16 */ {
+  font-family: MJXTEX-SSB;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2/MathJax_SansSerif-Bold.woff") format("woff");
+}
+
+@font-face /* 17 */ {
+  font-family: MJXTEX-SSI;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2/MathJax_SansSerif-Italic.woff") format("woff");
+}
+
+@font-face /* 18 */ {
+  font-family: MJXTEX-SC;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2/MathJax_Script-Regular.woff") format("woff");
+}
+
+@font-face /* 19 */ {
+  font-family: MJXTEX-T;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2/MathJax_Typewriter-Regular.woff") format("woff");
+}
+
+@font-face /* 20 */ {
+  font-family: MJXTEX-V;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2/MathJax_Vector-Regular.woff") format("woff");
+}
+
+@font-face /* 21 */ {
+  font-family: MJXTEX-VB;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2/MathJax_Vector-Bold.woff") format("woff");
+}
+</style><style id="googleidentityservice_button_styles">.qJTHM{-moz-user-select:none;-webkit-user-select:none;-ms-user-select:none;color:#202124;direction:ltr;-webkit-touch-callout:none;font-family:Roboto-Regular,arial,sans-serif;-webkit-font-smoothing:antialiased;font-weight:400;margin:0;overflow:hidden;-webkit-text-size-adjust:100%}.ynRLnc{left:-9999px;position:absolute;top:-9999px}.L6cTce{display:none}.bltWBb{overflow-wrap:break-word;word-break:break-word}.hSRGPd{color:#1a73e8;cursor:pointer;font-weight:500;text-decoration:none}.Bz112c-W3lGp{height:16px;width:16px}.Bz112c-E3DyYd{height:20px;width:20px}.Bz112c-r9oPif{height:24px;width:24px}.Bz112c-u2z5K{height:36px;width:36px}.Bz112c-uaxL4e{border-radius:10px}.LgbsSe-Bz112c{display:block}.S9gUrf-YoZ4jf{border:none;margin:0;padding:0}.S9gUrf-YoZ4jf *{border:none;margin:0;padding:0}.fFW7wc-ibnC6b>.aZ2wEe>div{border-color:#4285f4}.P1ekSe-ZMv3u{-webkit-transition:height .2s linear;transition:height .2s linear}.P1ekSe-ZMv3u>div:first-child{background-color:#1a73e8!important;-webkit-transition:width .3s linear;transition:width .3s linear}.P1ekSe-ZMv3u>div:nth-child(2){background-image:-webkit-gradient(linear,left top,right top,from(rgba(255,255,255,.7)),to(rgba(255,255,255,.7))),-webkit-gradient(linear,left top,right top,from(#1a73e8),to(#1a73e8))!important;background-image:-webkit-linear-gradient(left,rgba(255,255,255,.7),rgba(255,255,255,.7)),-webkit-linear-gradient(left,#1a73e8,#1a73e8)!important;background-image:linear-gradient(90deg,rgba(255,255,255,.7),rgba(255,255,255,.7)),linear-gradient(90deg,#1a73e8,#1a73e8)!important}.P1ekSe-ZMv3u>div:nth-child(3){background-image:-webkit-gradient(linear,left top,right top,from(rgba(255,255,255,.7)),to(rgba(255,255,255,.7))),-webkit-gradient(linear,left top,right top,from(#1a73e8),to(#1a73e8))!important;background-image:-webkit-linear-gradient(left,rgba(255,255,255,.7),rgba(255,255,255,.7)),-webkit-linear-gradient(left,#1a73e8,#1a73e8)!important;background-image:linear-gradient(90deg,rgba(255,255,255,.7),rgba(255,255,255,.7)),linear-gradient(90deg,#1a73e8,#1a73e8)!important}.haAclf{display:inline-block}.nsm7Bb-HzV7m-LgbsSe{border-radius:4px;box-sizing:border-box;-webkit-transition:background-color .218s,border-color .218s;transition:background-color .218s,border-color .218s;-moz-user-select:none;-webkit-user-select:none;-ms-user-select:none;-webkit-appearance:none;background-color:#fff;background-image:none;border:1px solid #dadce0;color:#3c4043;cursor:pointer;font-family:Google Sans,arial,sans-serif;font-size:.875rem;height:40px;letter-spacing:.25px;outline:none;overflow:hidden;padding:0 12px;position:relative;text-align:center;vertical-align:middle;white-space:nowrap;width:auto}.nsm7Bb-HzV7m-LgbsSe.TzA9Ye-LgbsSe{font-size:14px}@media screen and (-ms-high-contrast:active){.nsm7Bb-HzV7m-LgbsSe{border:2px solid windowText;color:windowText}}@media screen and (preferes-contrast:more){.nsm7Bb-HzV7m-LgbsSe{color:#000}}.nsm7Bb-HzV7m-LgbsSe.pSzOP-SxQuSe{font-size:.875rem;height:32px;letter-spacing:.25px;padding:0 10px}.nsm7Bb-HzV7m-LgbsSe.pSzOP-SxQuSe.TzA9Ye-LgbsSe{font-size:14px}.nsm7Bb-HzV7m-LgbsSe.purZT-SxQuSe{font-size:.6875rem;height:20px;letter-spacing:.3px;padding:0 8px}.nsm7Bb-HzV7m-LgbsSe.purZT-SxQuSe.TzA9Ye-LgbsSe{font-size:11px}.nsm7Bb-HzV7m-LgbsSe.Bz112c-LgbsSe{padding:0;width:40px}.nsm7Bb-HzV7m-LgbsSe.Bz112c-LgbsSe.pSzOP-SxQuSe{width:32px}.nsm7Bb-HzV7m-LgbsSe.Bz112c-LgbsSe.purZT-SxQuSe{width:20px}.nsm7Bb-HzV7m-LgbsSe.JGcpL-RbRzK{border-radius:20px}.nsm7Bb-HzV7m-LgbsSe.JGcpL-RbRzK.pSzOP-SxQuSe{border-radius:16px}.nsm7Bb-HzV7m-LgbsSe.JGcpL-RbRzK.purZT-SxQuSe{border-radius:10px}.nsm7Bb-HzV7m-LgbsSe.i5vt6e-to915-Ia7Qfc{border:1px solid #8e918f;background-color:#131314;color:#e3e3e3}.nsm7Bb-HzV7m-LgbsSe.MFS4be-Ia7Qfc{border:none;color:#fff}.nsm7Bb-HzV7m-LgbsSe.MFS4be-v3pZbf-Ia7Qfc{background-color:#1a73e8}.nsm7Bb-HzV7m-LgbsSe.MFS4be-JaPV2b-Ia7Qfc{background-color:#202124;color:#e8eaed}@media screen and (prefers-contrast:more){.nsm7Bb-HzV7m-LgbsSe.MFS4be-JaPV2b-Ia7Qfc{color:#fff}}.nsm7Bb-HzV7m-LgbsSe .nsm7Bb-HzV7m-LgbsSe-Bz112c{height:18px;margin-right:8px;min-width:18px;width:18px}.nsm7Bb-HzV7m-LgbsSe.pSzOP-SxQuSe .nsm7Bb-HzV7m-LgbsSe-Bz112c{height:14px;min-width:14px;width:14px}.nsm7Bb-HzV7m-LgbsSe.purZT-SxQuSe .nsm7Bb-HzV7m-LgbsSe-Bz112c{height:10px;min-width:10px;width:10px}.nsm7Bb-HzV7m-LgbsSe.jVeSEe .nsm7Bb-HzV7m-LgbsSe-Bz112c{margin-left:8px;margin-right:-4px}.nsm7Bb-HzV7m-LgbsSe.Bz112c-LgbsSe .nsm7Bb-HzV7m-LgbsSe-Bz112c{margin:0;padding:10px}.nsm7Bb-HzV7m-LgbsSe.Bz112c-LgbsSe.pSzOP-SxQuSe .nsm7Bb-HzV7m-LgbsSe-Bz112c{padding:8px}.nsm7Bb-HzV7m-LgbsSe.Bz112c-LgbsSe.purZT-SxQuSe .nsm7Bb-HzV7m-LgbsSe-Bz112c{padding:4px}.nsm7Bb-HzV7m-LgbsSe .nsm7Bb-HzV7m-LgbsSe-Bz112c-haAclf{border-top-left-radius:3px;border-bottom-left-radius:3px;display:-webkit-box;display:-webkit-flex;display:flex;-webkit-box-pack:center;-webkit-justify-content:center;justify-content:center;-webkit-box-align:center;-webkit-align-items:center;align-items:center;background-color:#fff;height:36px;margin-left:-10px;margin-right:12px;min-width:36px;width:36px}.nsm7Bb-HzV7m-LgbsSe .nsm7Bb-HzV7m-LgbsSe-Bz112c-haAclf .nsm7Bb-HzV7m-LgbsSe-Bz112c,.nsm7Bb-HzV7m-LgbsSe.Bz112c-LgbsSe .nsm7Bb-HzV7m-LgbsSe-Bz112c-haAclf .nsm7Bb-HzV7m-LgbsSe-Bz112c{margin:0;padding:0}.nsm7Bb-HzV7m-LgbsSe.pSzOP-SxQuSe .nsm7Bb-HzV7m-LgbsSe-Bz112c-haAclf{height:28px;margin-left:-8px;margin-right:10px;min-width:28px;width:28px}.nsm7Bb-HzV7m-LgbsSe.purZT-SxQuSe .nsm7Bb-HzV7m-LgbsSe-Bz112c-haAclf{height:16px;margin-left:-6px;margin-right:8px;min-width:16px;width:16px}.nsm7Bb-HzV7m-LgbsSe.Bz112c-LgbsSe .nsm7Bb-HzV7m-LgbsSe-Bz112c-haAclf{border-radius:3px;margin-left:2px;margin-right:0;padding:0}.nsm7Bb-HzV7m-LgbsSe.JGcpL-RbRzK .nsm7Bb-HzV7m-LgbsSe-Bz112c-haAclf{border-radius:18px}.nsm7Bb-HzV7m-LgbsSe.pSzOP-SxQuSe.JGcpL-RbRzK .nsm7Bb-HzV7m-LgbsSe-Bz112c-haAclf{border-radius:14px}.nsm7Bb-HzV7m-LgbsSe.purZT-SxQuSe.JGcpL-RbRzK .nsm7Bb-HzV7m-LgbsSe-Bz112c-haAclf{border-radius:8px}.nsm7Bb-HzV7m-LgbsSe .nsm7Bb-HzV7m-LgbsSe-bN97Pc-sM5MNb{display:-webkit-box;display:-webkit-flex;display:flex;-webkit-align-items:center;-webkit-box-align:center;align-items:center;-webkit-flex-direction:row;-webkit-box-orient:horizontal;-webkit-box-direction:normal;flex-direction:row;-webkit-box-pack:justify;-webkit-justify-content:space-between;justify-content:space-between;-webkit-flex-wrap:nowrap;flex-wrap:nowrap;height:100%;position:relative;width:100%}.nsm7Bb-HzV7m-LgbsSe .oXtfBe-l4eHX{-webkit-box-pack:center;-webkit-justify-content:center;justify-content:center}.nsm7Bb-HzV7m-LgbsSe .nsm7Bb-HzV7m-LgbsSe-BPrWId{-webkit-flex-grow:1;-webkit-box-flex:1;flex-grow:1;font-family:Google Sans,arial,sans-serif;font-weight:500;overflow:hidden;text-overflow:ellipsis;vertical-align:top}.nsm7Bb-HzV7m-LgbsSe.purZT-SxQuSe .nsm7Bb-HzV7m-LgbsSe-BPrWId{font-weight:300}.nsm7Bb-HzV7m-LgbsSe .oXtfBe-l4eHX .nsm7Bb-HzV7m-LgbsSe-BPrWId{-webkit-flex-grow:0;-webkit-box-flex:0;flex-grow:0}.nsm7Bb-HzV7m-LgbsSe .nsm7Bb-HzV7m-LgbsSe-MJoBVe{-webkit-transition:background-color .218s;transition:background-color .218s;bottom:0;left:0;position:absolute;right:0;top:0}.nsm7Bb-HzV7m-LgbsSe:focus,.nsm7Bb-HzV7m-LgbsSe:hover{box-shadow:none;border-color:rgb(210,227,252);outline:none}.nsm7Bb-HzV7m-LgbsSe:focus-within{outline:2px solid #00639b;border-color:transparent}.nsm7Bb-HzV7m-LgbsSe:hover .nsm7Bb-HzV7m-LgbsSe-MJoBVe{background:rgba(66,133,244,.08)}.nsm7Bb-HzV7m-LgbsSe:active .nsm7Bb-HzV7m-LgbsSe-MJoBVe,.nsm7Bb-HzV7m-LgbsSe:focus .nsm7Bb-HzV7m-LgbsSe-MJoBVe{background:rgba(66,133,244,.1)}.nsm7Bb-HzV7m-LgbsSe.i5vt6e-to915-Ia7Qfc:hover .nsm7Bb-HzV7m-LgbsSe-MJoBVe{background:rgba(255,255,255,.08)}.nsm7Bb-HzV7m-LgbsSe.i5vt6e-to915-Ia7Qfc:active .nsm7Bb-HzV7m-LgbsSe-MJoBVe,.nsm7Bb-HzV7m-LgbsSe.i5vt6e-to915-Ia7Qfc:focus .nsm7Bb-HzV7m-LgbsSe-MJoBVe{background:rgba(255,255,255,.12)}.nsm7Bb-HzV7m-LgbsSe.MFS4be-Ia7Qfc:hover .nsm7Bb-HzV7m-LgbsSe-MJoBVe{background:rgba(255,255,255,.24)}.nsm7Bb-HzV7m-LgbsSe.MFS4be-Ia7Qfc:active .nsm7Bb-HzV7m-LgbsSe-MJoBVe,.nsm7Bb-HzV7m-LgbsSe.MFS4be-Ia7Qfc:focus .nsm7Bb-HzV7m-LgbsSe-MJoBVe{background:rgba(255,255,255,.32)}.nsm7Bb-HzV7m-LgbsSe .n1UuX-DkfjY{border-radius:50%;display:-webkit-box;display:-webkit-flex;display:flex;height:20px;margin-left:-4px;margin-right:8px;min-width:20px;width:20px}.nsm7Bb-HzV7m-LgbsSe.jVeSEe .nsm7Bb-HzV7m-LgbsSe-BPrWId{font-family:Roboto;font-size:12px;text-align:left}.nsm7Bb-HzV7m-LgbsSe.jVeSEe .nsm7Bb-HzV7m-LgbsSe-BPrWId .K4efff .fmcmS,.nsm7Bb-HzV7m-LgbsSe.jVeSEe .nsm7Bb-HzV7m-LgbsSe-BPrWId .ssJRIf{overflow:hidden;text-overflow:ellipsis}.nsm7Bb-HzV7m-LgbsSe.jVeSEe .nsm7Bb-HzV7m-LgbsSe-BPrWId .K4efff{display:-webkit-box;display:-webkit-flex;display:flex;-webkit-align-items:center;-webkit-box-align:center;align-items:center;color:#5f6368;fill:#5f6368;font-size:11px;font-weight:400}.nsm7Bb-HzV7m-LgbsSe.jVeSEe.i5vt6e-to915-Ia7Qfc .nsm7Bb-HzV7m-LgbsSe-BPrWId .K4efff{color:#c4c7c5;fill:#c4c7c5}.nsm7Bb-HzV7m-LgbsSe.jVeSEe.MFS4be-Ia7Qfc .nsm7Bb-HzV7m-LgbsSe-BPrWId .K4efff{color:#e8eaed;fill:#e8eaed}@media screen and (prefers-contrast:more){.nsm7Bb-HzV7m-LgbsSe.jVeSEe .nsm7Bb-HzV7m-LgbsSe-BPrWId .K4efff,.nsm7Bb-HzV7m-LgbsSe.jVeSEe.MFS4be-Ia7Qfc .nsm7Bb-HzV7m-LgbsSe-BPrWId .K4efff{color:#000;fill:#000}}.nsm7Bb-HzV7m-LgbsSe.jVeSEe .nsm7Bb-HzV7m-LgbsSe-BPrWId .K4efff .Bz112c{height:18px;margin:-3px -3px -3px 2px;min-width:18px;width:18px}.nsm7Bb-HzV7m-LgbsSe.jVeSEe .nsm7Bb-HzV7m-LgbsSe-Bz112c-haAclf{border-top-left-radius:0;border-bottom-left-radius:0;border-top-right-radius:3px;border-bottom-right-radius:3px;margin-left:12px;margin-right:-10px}.nsm7Bb-HzV7m-LgbsSe.jVeSEe.JGcpL-RbRzK .nsm7Bb-HzV7m-LgbsSe-Bz112c-haAclf{border-radius:18px}.L5Fo6c-sM5MNb{border:0;display:block;left:0;position:relative;top:0}.L5Fo6c-bF1uUb{border-radius:4px;bottom:0;cursor:pointer;left:0;position:absolute;right:0;top:0}.L5Fo6c-bF1uUb:focus{border:none;outline:none}sentinel{}</style><link id="googleidentityservice" type="text/css" media="all" href="https://accounts.google.com/gsi/style" rel="stylesheet"></head>
+<body style="overflow: hidden;">
+
+
+
+
+<!-- The SHS Planner App -->
+<div id="app"><header class="hdr">
+  <div class="hdr-in">
+    <div class="logo"><div class="lm"><img src="/icon192.png" alt="SHS Planner" style="width:100%;height:100%;object-fit:cover;display:block"></div><div><div class="lt">SHS Planner</div><div class="ls">shsplanner.com</div></div></div>
+    <div class="hr" id="hdr-r"><button class="sibtn" onclick="openAuth('signin')">Sign In</button></div>
+  </div>
+</header>
+<style>.promo-msg-line{display:block;margin:.4rem 0;line-height:1.5}.promo-msg-hero .promo-msg-line{font-size:1rem}.promo-msg-pop .promo-msg-line{font-size:.92rem}.promo-msg-chip{display:inline-block;margin:.6rem 0 .1rem;padding:.3rem .85rem;border-radius:999px;background:#e8f5ec;color:#124d29;font-weight:700;font-size:.85rem;line-height:1.4}@media (max-width:600px){.promo-msg-hero .promo-msg-line{font-size:.84rem;line-height:1.35;margin:.2rem 0}.promo-msg-pop .promo-msg-line{font-size:.88rem;line-height:1.45;margin:.3rem 0}.promo-msg-chip{font-size:.74rem;padding:.22rem .65rem;margin:.4rem 0 0}.hero.promo-hero h1{font-size:1.4rem;line-height:1.2;margin-bottom:.35rem}}</style><div class="hero promo-hero">
+  <h1>≡ƒÄë FREE ≡ƒÄë  SCHEME OF WORK THIS OCTOBER</h1>
+  <p class="promo-msg-hero" style="max-width:680px;margin:.4rem auto 0"><span class="promo-msg-line">≡ƒôÜ Generate 1 Free Scheme of Work for the Semester.</span><span class="promo-msg-line">Each Teacher Has 1 Free Download.</span><span class="promo-msg-chip">≡ƒôà Offer valid until 31th October, 2026</span></p>
+</div>
+<div class="pnav-outer" style="top: 60px;"><nav class="pnav" id="pnav-el">
+  <div class="pnt on" id="pnt-planner" onclick="switchPage('planner')">≡ƒô¥ Lesson Plan</div>
+  <div class="pnt" id="pnt-assessment" onclick="switchPage('assessment')">≡ƒôè Assessment</div>
+  <div class="pnt" id="pnt-tools" onclick="switchPage('tools')">≡ƒôï Scheme of Work</div>
+  
+</nav><div class="pnav-fade hide" id="pnav-fade-el"></div></div>
+<div class="page" id="page-dashboard"><div id="dash-root"></div></div><div class="page on" id="page-planner">
+<main class="main">
+<div class="grid">
+  <div class="card">
+    <div class="ch"><span>≡ƒôï</span><h2>Lesson Plan Builder</h2><button class="help-q-btn" onclick="openHelpModal('lesson_plan')" title="Help"><svg width="14" height="14" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.6"></circle><path d="M10 9.2v5.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path><circle cx="10" cy="6.3" r="1.1" fill="currentColor"></circle></svg>Help</button></div>
+    <div class="cb" id="form-cb">
+      <div id="ms"><div class="divider"></div><div id="lp-tour-g1"><div class="f"><label>SHS Year <span class="req">*</span></label><div class="sw"><select id="yr-pills-ms"><option value="1">Year 1</option><option value="2">Year 2</option><option value="3">Year 3</option></select></div></div><div class="divider"></div><div class="f"><label>Region <span class="req">*</span></label><div class="sw"><select id="sel-region-ms" onchange="S.region=this.value;renderMS()"><option value="">Select region...</option><option value="Ashanti Region">Ashanti Region</option><option value="Brong-Ahafo Region">Brong-Ahafo Region</option><option value="Central Region">Central Region</option><option value="Eastern Region">Eastern Region</option><option value="Greater Accra Region">Greater Accra Region</option><option value="Northern Region">Northern Region</option><option value="Upper East Region">Upper East Region</option><option value="Upper West Region">Upper West Region</option><option value="Volta Region">Volta Region</option><option value="Western Region">Western Region</option><option value="Ahafo Region">Ahafo Region</option><option value="Bono East Region">Bono East Region</option><option value="North East Region">North East Region</option><option value="Oti Region">Oti Region</option><option value="Savannah Region">Savannah Region</option><option value="Western North Region">Western North Region</option></select></div></div></div><div id="lp-tour-g2"><div class="f"><label>School Name</label><input type="text" placeholder="e.g. Presbyterian Boys Senior High School" value="" oninput="S.school=this.value" style=""></div><div class="f"><label>School Type</label><div class="pills" id="st-pills-ms"><div class="pill on">Mixed</div><div class="pill">Boys</div><div class="pill">Girls</div></div></div></div><div class="divider"></div><div id="lp-tour-g3"><div class="f"><label>Subject <span class="req">*</span></label><div class="sw"><select id="sel-subj-ms" onchange="onSubj(this.value)"><option>Loading subjects...</option></select></div></div><div class="divider"></div><div class="f"><label>Week / Topic <span class="req">*</span></label><div class="sw"><select id="sel-wk" onchange="S.week=this.value;renderMS()"><option value="">Select week / topic...</option></select></div></div></div><div id="lp-tour-g4"><div class="f"><label>Lessons per Week</label><div class="pills"><div class="pill gon" onclick="S.lessons=1;renderMS()">1</div><div class="pill pill-locked" onclick="openBuy('Buy credits to plan multiple lessons per week.')" title="Buy credits to unlock">2 ≡ƒöÆ</div><div class="pill pill-locked" onclick="openBuy('Buy credits to plan multiple lessons per week.')" title="Buy credits to unlock">3 ≡ƒöÆ</div><div class="pill pill-locked" onclick="openBuy('Buy credits to plan multiple lessons per week.')" title="Buy credits to unlock">4 ≡ƒöÆ</div></div><div class="hint" style="margin-top:.3rem">Based on your timetable ΓÇö E.g. '3' if you meet the class 3 times every week.</div><div class="hint" style="margin-top:.4rem">≡ƒöÆ Free-trial accounts can generate 1 lesson per week at a time. <a href="#" onclick="openBuy('Buy credits to plan multiple lessons per week.');return false;" style="color:#1B6B3A;font-weight:700;text-decoration:underline">Buy credits</a> to unlock up to 4.</div></div></div><div class="f"><label>Duration of Each Lesson</label><div class="sw" style="display:flex;gap:.5rem;align-items:center"><select onchange="S.durH=+this.value;setDur();renderMS()" style="flex:1;min-width:0"><option value="0">0 hr</option><option value="1" selected="">1 hr</option><option value="2">2 hr</option><option value="3">3 hr</option><option value="4">4 hr</option></select><select onchange="S.durM=+this.value;setDur();renderMS()" style="flex:1;min-width:0"><option value="0" selected="">00 min</option><option value="5">05 min</option><option value="10">10 min</option><option value="15">15 min</option><option value="20">20 min</option><option value="25">25 min</option><option value="30">30 min</option><option value="35">35 min</option><option value="40">40 min</option><option value="45">45 min</option><option value="50">50 min</option><option value="55">55 min</option></select></div></div><div class="f"><label>Number of Students <span class="req">*</span></label><div class="srow"><div class="pill" onclick="S.size=20;renderMS()">20</div><div class="pill on" onclick="S.size=30;renderMS()">30</div><div class="pill" onclick="S.size=40;renderMS()">40</div><div class="pill" onclick="S.size=50;renderMS()">50</div><div class="pill" onclick="S.size=60;renderMS()">60</div><div class="pill" onclick="S.size=70;renderMS()">70</div><div class="pill" onclick="S.size='Other';renderMS()">Other</div></div></div><div class="divider"></div><div id="lp-tour-g5"><div class="f"><label>Class Proficiency Level <span style="font-weight:400;color:var(--mu);text-transform:none;letter-spacing:0;font-size:.67rem">(optional)</span></label><div class="sw"><select onchange="S.proficiency=this.value" style="width:100%;padding:.56rem .82rem;border:1.5px solid var(--br);border-radius:10px;font-family:'DM Sans',sans-serif;font-size:.84rem;outline:none;background:#fff;appearance:none;-webkit-appearance:none"><option value="MA" selected="">MA ΓÇö Mixed-Ability Class</option><option value="HP">HP ΓÇö Highly Performing</option><option value="NS">NS ΓÇö Needs Support</option></select></div><div class="hint">Helps tailor differentiation strategies in your plan.</div></div><div class="f"><label>Special Notes <span style="font-weight:400;color:var(--mu);text-transform:none;letter-spacing:0;font-size:.67rem">(optional)</span></label><textarea placeholder="e.g. 1. Use this example in the lesson plan: 2x + 5 = 10
+2. The school is located in a fishing village
+3. My students like football very much
+4. There are 2 visually impaired students in my class
+
+You can add anything else you believe should be considered when generating the lesson plan." oninput="S.allClsNotes=this.value" rows="6" style="width: 100%; padding: 0.56rem 0.82rem; border: 1.5px solid var(--br); border-radius: 10px; font-family: &quot;DM Sans&quot;, sans-serif; font-size: 0.84rem; outline: none; resize: vertical;"></textarea><div class="hint">Helps tailor the plan to your class.</div></div></div><div class="divider"></div><div id="lp-tour-g6"><div class="f"><label>Teaching &amp; Learning Resources</label><div class="rgrid" id="res-chips"><div class="chip on">Markers <span onclick="S.resources.splice(0,1);renderResChips()" style="margin-left:4px;cursor:pointer;opacity:.7">Γ£ò</span></div><div class="chip on">Whiteboard <span onclick="S.resources.splice(1,1);renderResChips()" style="margin-left:4px;cursor:pointer;opacity:.7">Γ£ò</span></div><div class="chip on">Calculators <span onclick="S.resources.splice(2,1);renderResChips()" style="margin-left:4px;cursor:pointer;opacity:.7">Γ£ò</span></div><div class="chip on">Phone <span onclick="S.resources.splice(3,1);renderResChips()" style="margin-left:4px;cursor:pointer;opacity:.7">Γ£ò</span></div><div class="chip on">Tablets <span onclick="S.resources.splice(4,1);renderResChips()" style="margin-left:4px;cursor:pointer;opacity:.7">Γ£ò</span></div></div><div class="radd"><input class="ri" type="text" id="res-inp" placeholder="Add resource..." onkeydown="if(event.key==='Enter')addRes()" style=""><button class="rabt" onclick="addRes()">+ Add</button></div></div></div><div class="divider"></div><button class="bgen ind" onclick="doGen()">Γ£¿ Generate Lesson Plan</button><p style="font-size:.74rem;color:var(--mu);text-align:center;margin-top:.38rem">Select a region</p></div>
+    </div>
+  </div>
+  <div class="card omt" id="out-card" style="display:none">
+    <div class="ch"><span id="out-ico">≡ƒôä</span><h2 id="out-ttl">Generated Lesson Plan</h2></div>
+    <div id="out-body"></div>
+  </div>
+</div>
+</main>
+</div>
+<div class="page" id="page-assessment">
+<main class="main">
+<div class="grid">
+<div class="card">
+<div class="ch"><span>≡ƒôè</span><h2>Assessment Builder</h2><button class="help-q-btn" onclick="openHelpModal('assessment')" title="Help"><svg width="14" height="14" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.6"></circle><path d="M10 9.2v5.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path><circle cx="10" cy="6.3" r="1.1" fill="currentColor"></circle></svg>Help</button></div>
+<div class="cb" id="asm-form-cb"><div id="asm-deploy-toggle" style="display: flex; gap: 8px; margin-bottom: 1rem;"><button type="button" id="asm-mode-doc" style="flex:1;padding:.6rem .7rem;border-radius:10px;cursor:pointer;border:1.5px solid var(--g);background:var(--g);color:#fff;font-weight:700;font-size:.82rem;display:flex;align-items:center;justify-content:space-between;gap:8px"><span>≡ƒôä Printed Document</span><span onclick="event.stopPropagation();openHelpModal('assessment_printed')" title="Help with Printed Document" style="width:17px;height:17px;border-radius:50%;background:rgba(120,120,120,.22);display:inline-flex;align-items:center;justify-content:center;font-size:.62rem;font-weight:800;color:inherit;flex-shrink:0;cursor:pointer">i</span></button><button type="button" id="asm-mode-online" style="flex:1;padding:.6rem .7rem;border-radius:10px;cursor:pointer;border:1.5px solid var(--br);background:#fff;color:var(--tx);font-weight:700;font-size:.82rem;display:flex;align-items:center;justify-content:space-between;gap:8px"><span>≡ƒÆ╗ Online Quiz (MCQ)</span><span onclick="event.stopPropagation();openHelpModal('assessment_online')" title="Help with Online Quiz" style="width:17px;height:17px;border-radius:50%;background:rgba(120,120,120,.22);display:inline-flex;align-items:center;justify-content:center;font-size:.62rem;font-weight:800;color:inherit;flex-shrink:0;cursor:pointer">i</span></button></div>
+<div id="asm-tour-yrsem">
+<div class="f"><label>SHS Year <span class="req">*</span></label><div class="sw"><select id="asm-yr-pills"></select></div></div>
+<div class="f"><label>Semester <span class="req">*</span></label><div class="pills eq" id="asm-sem-pills"></div></div>
+</div>
+
+<div class="divider"></div>
+<div id="asm-tour-school">
+<div class="f"><label>School Name</label><input type="text" id="asm-school-inp" placeholder="e.g. Yaa Asantewaa Senior High School" value="" oninput="A.school=this.value" style=""></div>
+<div class="f"><label>School Logo <span style="font-weight:400;color:var(--mu);text-transform:none;letter-spacing:0;font-size:.67rem">(optional ΓÇö skip if you don't want a logo on your documents)</span></label><div class="dz" id="asm-logo-dz" onclick="document.getElementById('asm-logo-fi').click()"><input type="file" id="asm-logo-fi" style="display: none;" accept="image/png,image/jpeg" onchange="onAsmLogo(this)"><div class="dzi" id="asm-logo-ico">≡ƒôü</div><div class="dzt" id="asm-logo-txt">Click to upload school logo (PNG/JPG)</div><div class="dzs" id="asm-logo-sub">Leave this blank and ignore it if you don't want a logo ΓÇö your documents will still generate normally without one</div></div></div>
+</div>
+
+<div class="divider"></div>
+<div id="qz-title-classes-field" style="display: none;"><div class="f"><label>Assessment Title</label><div class="sw"><select id="qz-title"><option value="Class Exercise">Class Exercise</option><option value="Class Test">Class Test</option><option value="Assignment">Assignment</option><option value="Mid-Semester Examination">Mid-Semester Examination</option><option value="End of Semester Examination">End of Semester Examination</option></select></div></div><div class="f"><label>Class(es) taking this quiz <span style="color:#dc2626">*</span></label><div style="font-size:.74rem;color:var(--mu);line-height:1.5;margin:-.15rem 0 .4rem"><b>How to add:</b> 1) type a class name in the box below, 2) tap <b>+ Add</b>. Repeat for each class. Classes saved in your Class Rosters appear here automatically.</div><div class="rgrid" id="qz-classes-chips"></div><div class="radd"><input type="text" class="ri" id="qz-classes-newinp" placeholder="Type class name, e.g. 2 Science 1" oninput="this.style.borderColor=''" onkeydown="if(event.key==='Enter'){event.preventDefault();qzAddClassChip();}" style=""><button type="button" class="rabt" onclick="qzAddClassChip()">+ Add</button></div></div></div><div class="f"><label>Subject <span class="req">*</span></label><div class="sw"><select id="asm-sel-subj" onchange="onAsmSubj(this.value)"><option>Loading subjects...</option></select></div></div>
+<div id="asm-ms"></div><div id="asm-online-panel" style="display: none;"></div>
+</div>
+</div>
+<div class="card omt" id="asm-out-card" style="display:none">
+<div class="ch"><span>≡ƒôè</span><h2>Generated Assessment</h2></div>
+<div id="asm-out-body"></div>
+</div>
+</div>
+</main>
+</div>
+<div class="page" id="page-tools">
+<main class="main" style="max-width:1100px">
+<div class="card" style="margin-bottom:1rem" id="sow-setup-card">
+<div class="ch"><span>≡ƒôï</span><h2>Scheme of Work Builder</h2><button class="help-q-btn" onclick="openHelpModal('scheme_of_work')" title="Help"><svg width="14" height="14" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.6"></circle><path d="M10 9.2v5.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path><circle cx="10" cy="6.3" r="1.1" fill="currentColor"></circle></svg>Help</button></div>
+<div class="cb" id="sow-setup-cb"></div>
+</div>
+<div id="sow-table-section" style="display:none">
+<div class="card" style="margin-bottom:1rem">
+<div class="ch" style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:8px"><span>≡ƒôà</span><h2>Weekly Teaching Schedule</h2></div><span id="sow-cal-label" style="font-size:.73rem;color:rgba(255,255,255,.75)"></span></div>
+<div class="cb" id="sow-table-cb"></div>
+</div>
+<div class="card" style="margin-bottom:1rem">
+<div class="ch"><span>≡ƒôÜ</span><h2>References</h2></div>
+<div class="cb" id="sow-refs-cb"></div>
+</div>
+<div style="display:flex;gap:10px;margin-bottom:1.5rem;flex-wrap:wrap">
+<button class="bgen" style="flex:1;min-width:200px" onclick="previewSOW()">≡ƒæü Preview Scheme of Work</button>
+<button class="bgen" style="flex:1;min-width:200px;background:linear-gradient(135deg,#b45309,#d97706)" onclick="resetSOWFull()">Γ£û Start Over</button>
+</div>
+</div>
+<div id="sow-preview-section" style="display:none">
+<div class="card">
+<div class="ch" style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:8px"><span>≡ƒôï</span><h2>Scheme of Work Preview</h2></div><button onclick="editSOW()" style="background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:7px;padding:4px 11px;font-size:.74rem;cursor:pointer">Γ£Ä Edit</button></div>
+<div id="sow-preview-body" style="padding:1rem 1.4rem;overflow-x:auto"></div>
+<div style="background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;border-radius:9px;padding:.6rem .85rem;font-size:.76rem;line-height:1.5;margin:0 1.4rem .8rem">≡ƒÆí Please read through the downloaded document and adjust anything needed to fit your class before using it.<div style="margin-top:.55rem"><a href="#" onclick="openReportIssue('Issue with generated Scheme of Work');return false;" style="display:inline-flex;align-items:center;gap:6px;background:#1e40af;color:#fff;padding:.42rem .85rem;border-radius:20px;font-weight:700;font-size:.74rem;text-decoration:none">≡ƒôú Not satisfied? Tap to report an issue</a></div></div>
+<div style="display:flex;gap:8px;padding:0 1.4rem 1rem;flex-wrap:wrap">
+<button class="dbtn dbtn-w" style="flex:1" onclick="downloadSOW()">Γåô Download (.doc)</button>
+
+<button class="dbtn" style="flex:1;background:#f3f4f6;color:var(--gd);border:1.5px solid var(--br)" onclick="resetSOWFull()">Γ£¿ New Scheme</button>
+</div>
+</div>
+</div>
+</main>
+</div>
+<footer><p><span>SHS Planner</span> ΓÇö GhanaΓÇÖs Smart Teaching Assistant ┬╖ shsplanner.com ┬╖ NaCCA-aligned ≡ƒç¼≡ƒç¡</p><p style="margin-top:.55rem;font-size:.72rem"><a href="/about.php" style="color:var(--g);text-decoration:none;font-weight:600">About</a><span style="color:var(--br);margin:0 .4rem">|</span><a href="/samples.php" style="color:var(--g);text-decoration:none;font-weight:600">Sample Plan</a><span style="color:var(--br);margin:0 .4rem">|</span><a href="/faq.php" style="color:var(--g);text-decoration:none;font-weight:600">FAQ</a><span style="color:var(--br);margin:0 .4rem">|</span><a href="/guides/" style="color:var(--g);text-decoration:none;font-weight:600">Guides</a><span style="color:var(--br);margin:0 .4rem">|</span><a href="/blog/" style="color:var(--g);text-decoration:none;font-weight:600">News</a><span style="color:var(--br);margin:0 .4rem">|</span><a href="/contact.php" style="color:var(--g);text-decoration:none;font-weight:600">Contact</a></p><p style="margin-top:.4rem;font-size:.68rem"><a href="/privacy.php" style="color:var(--mu);text-decoration:none">Privacy Policy</a><span style="color:var(--br);margin:0 .4rem">|</span><a href="/terms.php" style="color:var(--mu);text-decoration:none">Terms of Service</a></p><p style="margin-top:.45rem;font-size:.66rem;color:var(--mu);line-height:1.5">SHS Planner is an independent website and is not affiliated with GES, NaCCA or the Ministry of Education.</p><p style="margin-top:.5rem;font-size:.72rem"><a href="#" onclick="openReviewsList();return false;" style="color:var(--g);text-decoration:none;font-weight:600">Γ¡É Reviews</a><span style="color:var(--br);margin:0 .5rem">|</span><a href="#" onclick="openReportIssue();return false;" style="color:var(--g);text-decoration:none;font-weight:600">≡ƒôú Report an issue</a><span id="my-issues-link" style="display:none"><span style="color:var(--br);margin:0 .5rem">|</span><a href="#" onclick="openMyIssues();return false;" style="color:var(--g);text-decoration:none;font-weight:600">≡ƒôº My issues<span id="mi-badge" class="mi-badge" style="display:none"></span></a></span></p></footer>
+
+<!-- Auth Modal -->
+<div class="mbd hidden" id="auth-m" onclick="if(event.target===this)closeAuth()"><div class="auth-dlg"><button class="auth-x" onclick="closeAuth()">Γ£ò</button><div class="auth-brand"><div class="auth-brand-mk"><img src="/icon192.png" alt="SHS Planner" style="width:100%;height:100%;object-fit:cover;display:block"></div><div><div class="auth-brand-name">SHS Planner</div><div class="auth-brand-url">shsplanner.com</div></div></div><h2 class="auth-h" id="auth-h">Welcome</h2><p class="auth-p" id="auth-sub">Sign in to continue</p><div id="auth-sc-methods"><div id="g-signin-btn" style="display:flex;justify-content:center;min-height:44px;align-items:center;margin-bottom:.6rem" data-rendered="1"><div class="S9gUrf-YoZ4jf" style="position: relative;"><div><div tabindex="0" role="button" aria-labelledby="button-label" class="nsm7Bb-HzV7m-LgbsSe  TzA9Ye-LgbsSe hJDwNd-SxQuSe i5vt6e-Ia7Qfc uaxL4e-RbRzK" style="width:300px; max-width:400px; min-width:min-content;"><div class="nsm7Bb-HzV7m-LgbsSe-MJoBVe"></div><div class="nsm7Bb-HzV7m-LgbsSe-bN97Pc-sM5MNb "><div class="nsm7Bb-HzV7m-LgbsSe-Bz112c"><svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" class="LgbsSe-Bz112c"><g><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path><path fill="none" d="M0 0h48v48H0z"></path></g></svg></div><span class="nsm7Bb-HzV7m-LgbsSe-BPrWId">Continue with Google</span><span class="L6cTce" id="button-label">Continue with Google. Opens in new tab</span></div></div></div><iframe src="https://accounts.google.com/gsi/button?theme=outline&amp;size=large&amp;width=300&amp;text=continue_with&amp;is_fedcm_supported=true&amp;client_id=557905936407-jomeaii3snonst1usfd87ip5qftah7v5.apps.googleusercontent.com&amp;iframe_id=gsi_166483_554223&amp;cas=j17UwmhrOjas%2FLiNYgzeKj431IcJoMO4eHDXKqdPUZo" class="L5Fo6c-PQbLGe" allow="identity-credentials-get" id="gsi_166483_554223" title="Sign in with Google Button" style="display: block; position: relative; top: 0px; left: 0px; height: 0px; width: 0px; border: 0px;"></iframe></div></div><div class="auth-or"><span>or</span></div><button class="auth-method" onclick="authShowEmail()"><div class="auth-method-ico">Γ£ë</div><div><span class="auth-method-ttl">Continue with Email</span><span class="auth-method-sub">We'll send a code to your inbox ΓÇö no password needed</span></div></button><p class="auth-free">Γî¢ Today's free-credit signups are full ΓÇö you can still sign up and use SHS Planner, new free credits open up again tomorrow</p></div><div id="auth-sc-email" style="display:none"><button class="auth-back" onclick="authShowMethods()">ΓåÉ Back</button><label class="auth-lbl">Γ£ë Email Address</label><input type="email" id="inp-email" class="auth-inp" placeholder="yourname@gmail.com" inputmode="email" onkeydown="if(event.key==='Enter')authSendEmailOTP()" style=""><button class="auth-btn-main" id="auth-send-btn" onclick="authSendEmailOTP()">Send Code ΓåÆ</button></div><div id="auth-sc-otp" style="display:none"><button class="auth-back" onclick="authBackToEmail()">ΓåÉ Back</button><div class="auth-otp-ok" id="auth-otp-ok">Γ£ô Code sent</div><div class="hint" style="margin-bottom:.8rem">DonΓÇÖt see it within a minute? Check your <strong>Spam / Junk folder</strong> too ΓÇö some email providers file it there.</div><label class="auth-lbl">Enter 6-digit code</label><input type="tel" id="inp-otp" class="auth-otp-inp" placeholder="000000" maxlength="6" inputmode="numeric" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,6)" onkeydown="if(event.key==='Enter')authVerifyEmailOTP()" style=""><button class="auth-btn-main" id="auth-verify-btn" onclick="authVerifyEmailOTP()">Γ£ô Verify &amp; Sign In</button><div class="auth-resend"><span id="auth-resend-timer"></span>&nbsp;<a href="#" id="auth-resend-link" style="display:none" onclick="authSendEmailOTP(true);return false">Resend code</a>&nbsp;┬╖&nbsp;<a href="#" onclick="authBackToEmail();return false">Change email</a></div></div></div></div>
+
+<!-- Buy Modal -->
+<div class="mbd hidden" id="buy-m" onclick="if(event.target===this)closeBuy()"><div class="buy-dlg"><button class="auth-x" style="position:absolute;top:1.1rem;right:1.1rem;z-index:2" onclick="closeBuy()">Γ£ò</button><div class="buy-top" id="buy-top-hdr"><div class="buy-top-l"><div class="buy-ico">≡ƒÆ│</div><div><div class="buy-ttl">Buy Credits</div><div class="buy-rem" id="buy-sub">Credits never expire</div></div></div></div><div id="buy-sc-qty"><div class="buy-lbl">Number of Credits</div><div class="buy-qty-row"><button class="buy-pm" onclick="buyChangeQty(-1)">ΓêÆ</button><input type="number" id="buy-qty-inp" class="buy-qty-inp" value="1" min="1" max="500" oninput="buySetQty(this.value)" style=""><button class="buy-pm" onclick="buyChangeQty(1)">+</button></div><div class="buy-quick"><button class="buy-qp bq-on" id="bqp-1" onclick="buySetQty(1)">1</button><button class="buy-qp" id="bqp-5" onclick="buySetQty(5)">5</button><button class="buy-qp" id="bqp-10" onclick="buySetQty(10)">10<span class="buy-disc-pip">ΓêÆ15%</span></button><button class="buy-qp" id="bqp-20" onclick="buySetQty(20)">20<span class="buy-disc-pip">ΓêÆ15%</span></button></div><div class="buy-div"></div><div class="buy-price-row"><span class="buy-price-lbl">Total</span><span class="buy-price-val" id="buy-price-val">GHΓé╡ 10.00</span></div><div class="buy-disc-note" id="buy-disc-note">Γ£ô 15% discount applied ΓÇö 10+ credits</div><button class="buy-now-btn" id="buy-now-btn" onclick="buyShowExplain()">Buy 1 Credit ΓÇö GHΓé╡ 10.00</button><div class="buy-info-note">≡ƒÆí <strong>1 credit = GHΓé╡ 10</strong> ┬╖ Credits never expire ┬╖ Buy 10+ for 15% off</div><div class="buy-ref-nudge" onclick="closeBuy();openReferralModal();"><div class="buy-ref-top"><span class="buy-ref-ico">≡ƒÄë</span><div class="buy-ref-txt"><b>Don't want to pay?</b> Refer a teacher and earn a free credit the moment they generate their first document.</div></div><div class="buy-ref-btn">Get My Referral Link ΓÇ║</div></div></div><div id="buy-sc-explain" style="display:none"><button class="auth-back" onclick="buyBackToQty()">ΓåÉ Back</button><div class="buy-explain-h">Read &amp; Follow These Steps to Successfully Make Your Purchase</div><div class="buy-step"><div class="buy-step-n">1</div><div class="buy-step-t"><b>You'll be taken to a secured payment screen, Paystack.</b></div></div><div class="buy-step"><div class="buy-step-n">2</div><div class="buy-step-t"><b>Choose Mobile Money or Card.</b> Most teachers pay with <b>Mobile Money</b> (MTN, Telecel, AirtelTigo) ΓÇö it's selected by default. Card also works if you prefer it.</div></div><div class="buy-step"><div class="buy-step-n">3</div><div class="buy-step-t"><b>Approve the payment.</b> A prompt appears on your phone ΓÇö enter your <b>MoMo PIN</b> to confirm. Not showing? Dial <b>*170#</b> and approve it under <b>My Approvals</b>.</div></div><div class="buy-otp-callout">≡ƒôº <b>First-time payers:</b> you may get an SMS code to confirm your number. Not in your inbox? Check <b>Notifications</b> or your <b>Spam</b> folder.</div><div class="buy-step"><div class="buy-step-n">4</div><div class="buy-step-t"><b>That's it ΓÇö your credit is added to your account automatically.</b></div></div><div style="text-align:center;font-size:.78rem;color:#92400e;font-weight:700;margin:.2rem 0 .5rem">≡ƒæç Tap the button below to continue</div><button class="buy-now-btn" id="buy-continue-btn" onclick="_doBuyNow()">Click Here to Continue &amp; Buy Credits</button><div class="buy-info-note">Having trouble paying? <a href="#" onclick="closeBuy();openReportIssue('Trouble buying credits');return false;" style="color:#1B6B3A;font-weight:700;text-decoration:underline">Report an issue</a> and we'll help.</div></div></div></div></div>
+
+<!-- Pass auth state to JavaScript securely -->
+<script>
+window.SHSP = {
+  user: null,
+  apiBase: '/api',
+  siteUrl: 'https://shsplanner.com',
+  // Live from includes/config.php ΓÇö read by app.js instead of a hardcoded
+  // JS literal, so the signup-bonus wording (auth modal, referral share
+  // text, etc.) can never silently drift out of sync with the real value
+  // again. Change the number once, here, and every place that mentions it
+  // in the UI updates automatically.
+  // Admin-configurable (Growth Controls) via 'free_signup_credits' /
+  // 'referred_signup_credits' ΓÇö see shspResolveSignupCredits() in
+  // includes/db.php, which is the actual server-side source of truth
+  // this mirrors. Falls back to the config.php constants automatically
+  // when those settings are unset (same fallback shspResolveSignupCredits()
+  // itself uses), so nothing breaks on an install that's never touched
+  // this setting.
+  freeSignupCredits: 2,
+  referredSignupCredits: 1,
+  // True if today's free-credit cap is already full ΓÇö app.js must NOT
+  // show the "New accounts get N free credits" promise when this is true,
+  // since a signup happening right now would actually get 0.
+  dailyCapReached: true,
+  // Free-trial status (never purchased) + all admin-configurable free-trial
+  // restrictions ΓÇö see includes/db.php. The actual backend files
+  // (generate.php, deduct.php, quiz.php) enforce every one of these
+  // server-side too, so this is purely for showing the right UI/message
+  // up front, never the real security boundary.
+  isFreeTrial: true,
+  freeTrialLessonLimitEnabled: true,
+  freeTrialLessonLimitCount: 1,
+  freeTrialAssessmentCapEnabled: true,
+  freeTrialAssessmentMcqCap: 10,
+  freeTrialAssessmentOtherCap: 2,
+  freeTrialQuizCapEnabled: true,
+  freeTrialQuizQuestionCap: 20,
+  freeTrialPptBlocked: true,
+  // First-Online-Assessment-Free ΓÇö see includes/db.php's
+  // shspFreeFirstAssessmentEligible(). "Eligible" already factors in both
+  // the admin on/off toggle AND whether this specific signed-in user has
+  // ever deployed one before ΓÇö app.js doesn't need to re-derive either
+  // condition itself, just read this one value. quiz.php enforces the
+  // real cost/cap server-side regardless of what this says; this is
+  // purely for the popup + showing the right price up front.
+  freeFirstAssessmentEligible: false,
+  freeFirstAssessmentQuestionCap: 20,
+  // Applies to everyone, not just free-trial ΓÇö see comment above.
+  pptDisabledSubjects: [],
+  // Advert/Promo ΓÇö see includes/db.php's shspPromoConfig(). `active` is
+  // the ONLY field app.js needs to gate display on; it's already the
+  // combined "type is set AND we're inside the date window" answer, so
+  // app.js never re-derives eligibility from raw dates itself. `type`
+  // 'announcement' shows the hero banner only; 'free'/'bonus_credit' also
+  // replace the site's normal pop-ups with this one. Real pricing/bonus
+  // eligibility is still decided server-side per generation ΓÇö this block
+  // is display-only.
+  promo: {
+    active: true,
+    type: "free",
+    genType: "sow",
+    headline: "\ud83c\udf89 FREE \ud83c\udf89  SCHEME OF WORK THIS OCTOBER",
+    message: "\ud83d\udcda Generate 1 Free Scheme of Work for the Semester. \r\n\r\nEach Teacher Has 1 Free Download. \r\n\r\n\ud83d\udcc5 Offer valid until 31th October, 2026",
+    // Where the admin chose to show it: 'both' | 'banner' | 'popup' | 'none'
+    // (Advert tab > "Where to show it"). Display-only; app.js treats a
+    // missing/unknown value as 'both'.
+    display: "both",
+    // True once THIS signed-in teacher has any recorded claim for the
+    // current promo run ΓÇö app.js then never shows the promo pop-up to
+    // her again. A new promo run (Advert tab) has a new run id, so
+    // everyone becomes eligible to see the pop-up again.
+    used: false  },
+  // Set only when an admin is actively bypassing an ON maintenance mode ΓÇö
+  // never for a regular visitor, since a regular visitor never reaches
+  // this far at all when maintenance mode is on (the gate above already
+  // exited to maintenance.php for them). Purely so app.js can show an
+  // impossible-to-miss reminder ΓÇö the whole risk with a manual on/off
+  // toggle like this one is forgetting it's on, so the reminder needs to
+  // be persistent, not a one-time toast that scrolls away.
+  maintenanceBypassing: false};
+</script>
+
+<!-- Diagram engine: the ONE copy of the diagram code, shared with the Online Quiz page (q.php).
+     Must load BEFORE app.js. Its ?v= is the file's upload time, so a new upload is picked up automatically. -->
+<script src="/assets/js/diagrams.js?v=1792021843"></script>
+<!-- Main App JS (the SHSPlanner_Demo_v9 logic, adapted) -->
+<script src="/assets/js/app.js?v=10.87"></script><div id="onboard-m" class="modal hidden"><div class="mo" style="background:#fff;border-radius:16px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 18px 56px rgba(0,0,0,.22)"><div class="ob-inner"></div></div></div><div id="hlp-modal-container" class="hlp-mbd hidden"></div>
+
+<script>
+/* Install prompt: native "Install" button on Android/Chrome; a manual
+   "Share -> Add to Home Screen" hint on iPhone Safari (iOS gives no prompt).
+   Shown as a centered modal ΓÇö not a bottom bar. Two independent triggers,
+   whichever happens first: (1) this is the visitor's 2nd+ visit to the
+   site, logged in or out (see bumpVisitCount), or (2) app.js reports a
+   successful first paid generation this session via
+   window.__shspTriggerInstallPrompt() (see _gatedDownloadDeduct /
+   confirmPptGen) ΓÇö this script just owns the actual prompt UI and
+   eligibility plumbing (native prompt capture, dismiss cooldown, standalone
+   detection).
+   Hidden entirely once already installed, or dismissed within 2 days. */
+(function(){
+  function reportInstall(source){
+    try{
+      var sid = sessionStorage.getItem('shsp_sid');
+      if(!sid){ sid = Math.random().toString(36).slice(2) + Date.now().toString(36); sessionStorage.setItem('shsp_sid', sid); }
+      fetch('/tracker.php?action=install&sid=' + encodeURIComponent(sid) + '&source=' + encodeURIComponent(source),
+        { method:'GET', credentials:'same-origin' }).catch(function(){});
+    }catch(e){}
+  }
+
+  var standalone=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone===true;
+  if(standalone){ reportInstall('standalone_launch'); return; }
+
+  function recentlyDismissed(){
+    try{ var dis=+localStorage.getItem('shsp_install_dismissed')||0; return dis && (Date.now()-dis)<1728e5; }catch(e){ return false; }
+  }
+
+  // Visit counting: one increment per browser SESSION (not per page load),
+  // persisted across sessions in localStorage so it survives closing the
+  // tab/browser. Works for logged-in and logged-out visitors alike.
+  function bumpVisitCount(){
+    try{
+      if(sessionStorage.getItem('shsp_visit_counted')) return +localStorage.getItem('shsp_visit_count')||0;
+      var n=(+localStorage.getItem('shsp_visit_count')||0)+1;
+      localStorage.setItem('shsp_visit_count', String(n));
+      sessionStorage.setItem('shsp_visit_counted','1');
+      return n;
+    }catch(e){ return 0; }
+  }
+
+  var deferredPrompt=null;
+  var isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent)&&!window.MSStream;
+  var isSafari=isIOS&&/safari/i.test(navigator.userAgent)&&!/crios|fxios/i.test(navigator.userAgent);
+  // Eligible once this is the visitor's 2nd+ visit (logged in or out), OR the
+  // instant app.js reports a successful first paid generation ΓÇö whichever
+  // happens first. Both are real, independent signals of intent.
+  var eligible=(bumpVisitCount()>=2);
+  var shownOnce=false;  // don't re-show a second time in the same session after she dismisses it
+
+  function centeredModal(html){
+    var overlay=document.createElement('div');
+    overlay.id='shsp-install-overlay';
+    overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:1.2rem';
+    overlay.onclick=function(e){ if(e.target===overlay) dismiss(); };
+    var card=document.createElement('div');
+    card.id='shsp-install-banner';
+    card.style.cssText='background:#1B6B3A;color:#fff;border-radius:16px;padding:1.5rem 1.3rem;box-shadow:0 20px 60px rgba(0,0,0,.35);max-width:340px;width:100%;text-align:center;font-family:system-ui,sans-serif';
+    card.innerHTML=html;
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+    return card;
+  }
+  function dismiss(){
+    var el=document.getElementById('shsp-install-overlay');
+    if(el) el.remove();
+    try{localStorage.setItem('shsp_install_dismissed',String(Date.now()));}catch(e){}
+  }
+  window.__shspDismissInstall=dismiss;
+
+  function showAndroidPrompt(){
+    var card=centeredModal(
+      '<img src="/assets/img/icon-192.png" style="width:56px;height:56px;border-radius:14px;margin-bottom:.8rem"/>'
+      +'<div style="font-weight:800;font-size:1.08rem;margin-bottom:.5rem">Install SHS Planner</div>'
+      +'<div style="opacity:.88;font-size:.86rem;line-height:1.55;margin-bottom:1.1rem">Tap <strong>Install</strong> below to add SHSPlanner to your phone/PC for quick access.</div>'
+      +'<button id="shsp-inst-go" style="background:#C8973A;color:#fff;border:none;border-radius:10px;padding:.7rem 1.4rem;font-weight:700;font-size:.9rem;width:100%;margin-bottom:.6rem;cursor:pointer">Install</button>'
+      +'<button onclick="__shspDismissInstall()" style="background:transparent;color:#cfe8d8;border:none;font-size:.82rem;text-decoration:underline;cursor:pointer">Not now</button>'
+    );
+    var go=document.getElementById('shsp-inst-go');
+    if(go) go.onclick=function(){
+      if(!deferredPrompt) return;
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(function(){deferredPrompt=null;dismiss();}).catch(function(){deferredPrompt=null;dismiss();});
+    };
+  }
+  function showIOSPrompt(){
+    centeredModal(
+      '<img src="/assets/img/icon-192.png" style="width:56px;height:56px;border-radius:14px;margin-bottom:.8rem"/>'
+      +'<div style="font-weight:800;font-size:1.08rem;margin-bottom:.5rem">Install SHS Planner</div>'
+      +'<div style="opacity:.88;font-size:.86rem;line-height:1.55;margin-bottom:1.1rem">Tap the Share icon below, then <strong>Add to Home Screen</strong> for quick, app-like access ΓÇö no browser tabs, just tap and go.</div>'
+      +'<button onclick="__shspDismissInstall()" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:10px;padding:.65rem 1.4rem;font-weight:700;font-size:.86rem;cursor:pointer">Got it</button>'
+    );
+  }
+
+  function maybeShow(){
+    if(!eligible||shownOnce) return;
+    if(recentlyDismissed()) return; // re-checked live, not just at page-load time
+    if(document.getElementById('shsp-install-overlay')) return;
+    // BUGFIX (Sept 2026): the Advert/Promo system's Free and Bonus Credit
+    // modes are documented (see the Advert admin tab's own description) as
+    // replacing ALL of the site's normal pop-ups with the one promo pop-up ΓÇö
+    // review request, first-assessment offer, complete-your-profile, AND
+    // this install prompt. The first three were correctly wired to
+    // _promoBlocksOtherPopups() when that system was built; this one was
+    // missed, since it lives in index.php's own separate script block
+    // rather than app.js where the other three live. Real-world effect: a
+    // teacher on her 2nd visit during an active Free/Bonus promo would see
+    // the promo pop-up AND this install card stacked back to back ΓÇö two
+    // competing asks instead of the single focused message the promo
+    // system exists to show. Checked once, here, since every trigger path
+    // above (beforeinstallprompt, the 1200ms post-load timer, and
+    // __shspTriggerInstallPrompt after a paid download) already funnels
+    // through this one function before anything actually displays.
+    //
+    // typeof-guarded rather than called directly: this script block loads
+    // AFTER app.js (well before this one), so the function is
+    // always defined in the normal case ΓÇö but if app.js ever failed to
+    // load for an unrelated reason, failing OPEN (still show the install
+    // prompt) is safer than a thrown error silently breaking installs
+    // entirely for everyone.
+    // UPDATE (Oct 2026): the install prompt is no longer switched off during
+    // a promo. Instead it waits its turn in app.js's popup coordinator
+    // (shspPopupAsk) so it never appears on top of, or right after, another
+    // pop-up. If app.js failed to load, fall straight through and show it.
+    function doShow(){
+      if(shownOnce||recentlyDismissed()) return;
+      if(document.getElementById('shsp-install-overlay')) return;
+      if(isIOS&&isSafari){ shownOnce=true; showIOSPrompt(); }
+      else if(deferredPrompt){ shownOnce=true; showAndroidPrompt(); }
+      // else: Android but beforeinstallprompt hasn't fired yet ΓÇö maybeShow()
+      // will be called again the moment it does (see listener below), so
+      // this just quietly waits rather than showing nothing forever.
+    }
+    if(typeof shspPopupAsk==='function') shspPopupAsk('install', 6, doShow, { gap:45000 });
+    else doShow();
+  }
+
+  window.addEventListener('beforeinstallprompt',function(e){ e.preventDefault(); deferredPrompt=e; maybeShow(); });
+  window.addEventListener('appinstalled',function(){ reportInstall('appinstalled'); dismiss(); });
+
+  // If this visit already made them eligible (2nd+ visit), check shortly
+  // after load ΓÇö covers iOS, which never fires beforeinstallprompt.
+  if(eligible) setTimeout(maybeShow, 1200);
+
+  // Secondary trigger: app.js calls this the instant a paid download
+  // succeeds for the first time this session ΓÇö still counts as eligibility
+  // even on a visitor's very first visit. A tiny delay so it doesn't fight
+  // with whatever "download complete" UI is already on screen.
+  window.__shspTriggerInstallPrompt=function(){
+    if(eligible&&shownOnce) return; // already shown this session
+    eligible=true;
+    setTimeout(maybeShow, 1200);
+  };
+})();
+
+</script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',function(){
+    navigator.serviceWorker.register('/sw.js').catch(function(){});
+  });
+}
+</script>
+
+
+<div class="gt-hole" style="top: 269.25px; left: 9px; width: 137px; height: 54.8125px;"></div><div class="gt-card" style="top: 336.062px; left: 16px;"><div class="gt-card-hdr"><div class="gt-step-lbl">1 of 4</div><div class="gt-title">Lesson Plans</div></div><div class="gt-body"><div class="gt-desc">Generate a full NaCCA/GES-aligned lesson plan for any subject and week in the correct template with just a tap in minutes.</div><div class="gt-dots"><div class="gt-dot on"></div><div class="gt-dot"></div><div class="gt-dot"></div><div class="gt-dot"></div></div><div class="gt-foot"><button class="gt-skip" id="gt-skip-btn">Skip</button><div class="gt-sp"></div><button class="gt-next" id="gt-next-btn">Next</button></div></div></div></body></html>

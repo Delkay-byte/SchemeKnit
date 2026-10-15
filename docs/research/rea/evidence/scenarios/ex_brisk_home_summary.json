@@ -1,0 +1,4405 @@
+{
+  "evidence_id": "ev_4d9a9c4fc5995b4cfba0555e74c00504cd3ab407263bdb52bda7d44a176215b3",
+  "operation": "capture_browser_scenario",
+  "provider": {
+    "id": "rea-playwright-browser-scenario",
+    "name": "REA Playwright browser scenario capture provider",
+    "version": "1"
+  },
+  "start_origin": "https://www.briskteaching.com",
+  "browser": {
+    "mode": "launch",
+    "process_ownership": "provider-owned",
+    "cleanup": "terminated-owned-process",
+    "product": "Chromium",
+    "version": "155.0.8059.79"
+  },
+  "duration_ms": 11933,
+  "completeness": {
+    "status": "complete",
+    "equality_eligible": true,
+    "missing_sections": [],
+    "truncated_sections": []
+  },
+  "limitations": [
+    "Event sequence records provider receipt order; simultaneous browser causality is not inferred.",
+    "Network content is retained only when selected; Playwright response-body bytes are API results and are not guaranteed to match wire bytes.",
+    "Request bytes are limited to what Playwright exposes; not_exposed does not establish body absence or multipart file coverage.",
+    "Network content reads settle within 5 seconds each and the observer does not request bodies from unfinished responses.",
+    "Playwright scenario events do not expose request initiator stacks; receipt order does not prove causality.",
+    "Storage values are hashed only after declared-secret redaction."
+  ],
+  "steps": [
+    {
+      "step_id": "scenario_start",
+      "action": "goto_start",
+      "status": "completed",
+      "before_url": {
+        "url": "about:blank",
+        "origin": null,
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "after_url": {
+        "url": "https://www.briskteaching.com/",
+        "origin": "https://www.briskteaching.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "elapsed_ms": 6946,
+      "artifacts": {
+        "screenshot": {
+          "state": "not_requested"
+        },
+        "dom": {
+          "state": "not_requested"
+        },
+        "accessibility": {
+          "state": "not_requested"
+        },
+        "url": {
+          "state": "not_requested"
+        },
+        "history": {
+          "state": "not_requested"
+        },
+        "storage": {
+          "state": "not_requested"
+        }
+      },
+      "error": null
+    },
+    {
+      "step_id": "settle",
+      "action": "wait_for_timeout",
+      "status": "completed",
+      "before_url": {
+        "url": "https://www.briskteaching.com/",
+        "origin": "https://www.briskteaching.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "after_url": {
+        "url": "https://www.briskteaching.com/",
+        "origin": "https://www.briskteaching.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "elapsed_ms": 4665,
+      "artifacts": {
+        "screenshot": {
+          "file": "C:\\Users\\SAVIOUR\\AppData\\Local\\Temp\\opencode\\rea\\ex_brisk_home\\screenshot_settle.png",
+          "bytes": 348639
+        },
+        "dom": {
+          "file": "C:\\Users\\SAVIOUR\\AppData\\Local\\Temp\\opencode\\rea\\ex_brisk_home\\dom_settle.txt",
+          "bytes": 259350,
+          "text_len": 259350
+        },
+        "accessibility": {
+          "file": "C:\\Users\\SAVIOUR\\AppData\\Local\\Temp\\opencode\\rea\\ex_brisk_home\\accessibility_settle.txt",
+          "bytes": 13765,
+          "text_len": 13765
+        },
+        "url": {
+          "url": "https://www.briskteaching.com/",
+          "origin": "https://www.briskteaching.com",
+          "query_parameter_names": [],
+          "redacted": false
+        },
+        "history": {
+          "state": "not_requested"
+        },
+        "storage": {
+          "state": "not_requested"
+        }
+      },
+      "error": null
+    }
+  ],
+  "network": [
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.briskteaching.com/",
+        "origin": "https://www.briskteaching.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "document",
+      "txn": "request-1"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32/css/brisk-2026-f2cba71bd11ad71a9fb6d3940dee.webflow.shared.cd4710155.css",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "stylesheet",
+      "txn": "request-2"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css",
+        "origin": "https://cdn.jsdelivr.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "stylesheet",
+      "txn": "request-3"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://ajax.googleapis.com/ajax/libs/webfont/1.6.26/webfont.js",
+        "origin": "https://ajax.googleapis.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-4"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.klaviyo.com/onsite/js/WARuqj/klaviyo.js",
+        "origin": "https://static.klaviyo.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-5"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.jsdelivr.net/npm/@finsweet/attributes@2/attributes.js",
+        "origin": "https://cdn.jsdelivr.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-6"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js",
+        "origin": "https://cdn.jsdelivr.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-7"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.geoswap.co/geoswap.js",
+        "origin": "https://cdn.geoswap.co",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-8"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.jsdelivr.net/npm/@finsweet/attributes-cmsslider@1/cmsslider.js",
+        "origin": "https://cdn.jsdelivr.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-9"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.jsdelivr.net/npm/@finsweet/attributes-mirrorclick@1/mirrorclick.js",
+        "origin": "https://cdn.jsdelivr.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-10"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://external.vidzflow.com/vidzflow/v1.0.2/main.js",
+        "origin": "https://external.vidzflow.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-11"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/concierge-js/cjs/concierge.js",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-12"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.jsdelivr.net/npm/gsap@3.14.1/dist/gsap.min.js",
+        "origin": "https://cdn.jsdelivr.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-13"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32/6a6b7e36c7e8274794582e71_bg-teal-p-1600.png",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-14"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32/6a874a0f49d8649341d0e777_00cbb543288da5666dbe31c4154c1ca1_ChangeLevel.avif",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-15"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.jsdelivr.net/gh/idreezus/divs@main/dist/carousel/v2.0.0/carousel.min.js",
+        "origin": "https://cdn.jsdelivr.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-16"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32/6abe6e87cd8fb446d64231dc_Letter%20-%2019%20(1)-p-500.png",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-17"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://d3e54v103j8qbb.cloudfront.net/js/jquery-3.5.1.min.dc5e7f18c8.js?site=6a6b7e36c7e8274794581e32",
+        "origin": "https://d3e54v103j8qbb.cloudfront.net",
+        "query_parameter_names": [
+          "site"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-18"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32/js/webflow.schunk.f2efb3c5440a81cf.js",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-19"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32/js/webflow.schunk.970d9d45a9f93b92.js",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-20"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32/js/webflow.777efe86.036f26d7dcbd5aaa.js",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-21"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/gsap/3.15.0/gsap.min.js",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-22"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/gsap/3.15.0/ScrollTrigger.min.js",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-23"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.sliderflow.com/script.min.js",
+        "origin": "https://cdn.sliderflow.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-24"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.jsdelivr.net/npm/gsap@3.12.2/dist/gsap.min.js",
+        "origin": "https://cdn.jsdelivr.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-25"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://fonts.googleapis.com/css?family=Montserrat:100,100italic,200,200italic,300,300italic,400,400italic,500,500italic,600,600italic,700,700italic,800,800italic,900,900italic%7CInter:300,400,500,600,700,800,900%7CLeague+Spartan:100,200,300,400,500,600,700,800,900%7CLibre+Baskerville:300,400,500,600,700%7COutfit:300,400,500,600,700,800,900%7CSanchez:400%7CSanchez:400",
+        "origin": "https://fonts.googleapis.com",
+        "query_parameter_names": [
+          "family"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "stylesheet",
+      "txn": "request-26"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://connect.facebook.net/en_US/fbevents.js",
+        "origin": "https://connect.facebook.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-27"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://dev.visualwebsiteoptimizer.com/j.php?a=774157&u=https%3A%2F%2Fwww.briskteaching.com%2F&vn=2.1&x=true",
+        "origin": "https://dev.visualwebsiteoptimizer.com",
+        "query_parameter_names": [
+          "a",
+          "u",
+          "vn",
+          "x"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "xhr",
+      "txn": "request-28"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.googletagmanager.com/gtm.js?id=GTM-N2SCZFKT",
+        "origin": "https://www.googletagmanager.com",
+        "query_parameter_names": [
+          "id"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-29"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://app.posthog.com/static/array.js",
+        "origin": "https://app.posthog.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-30"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static-tracking.klaviyo.com/onsite/js/fender_analytics.231256e109566.js?cb=2",
+        "origin": "https://static-tracking.klaviyo.com",
+        "query_parameter_names": [
+          "cb"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-31"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static-tracking.klaviyo.com/onsite/js/static.538435cd80ba9.js?cb=2",
+        "origin": "https://static-tracking.klaviyo.com",
+        "query_parameter_names": [
+          "cb"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-32"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.klaviyo.com/onsite/js/runtime.dd6028046105a.js?cb=2",
+        "origin": "https://static.klaviyo.com",
+        "query_parameter_names": [
+          "cb"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-33"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.klaviyo.com/onsite/js/sharedUtils.2c9ede6ce511c.js?cb=2",
+        "origin": "https://static.klaviyo.com",
+        "query_parameter_names": [
+          "cb"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-34"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.klaviyo.com/onsite/js/vendors~fender_analytics~post_identification_sync~web_personalization~client_identity~server_side_cookies~reviews~atlas~~telemetry~static~in_app_forms~signup_forms.16c647742315e.js?cb=2",
+        "origin": "https://static.klaviyo.com",
+        "query_parameter_names": [
+          "cb"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-35"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.klaviyo.com/onsite/js/vendors~~telemetry~client_identity~onsite-personalization~onsite-triggering-v2~in_app_forms~signup_forms.c4bd31ede3deb.js?cb=2",
+        "origin": "https://static.klaviyo.com",
+        "query_parameter_names": [
+          "cb"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-36"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static-tracking.klaviyo.com/onsite/js/telemetry.f9fd65ecb54a4.js?cb=2",
+        "origin": "https://static-tracking.klaviyo.com",
+        "query_parameter_names": [
+          "cb"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-37"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.klaviyo.com/onsite/js/event_adapter.6f4b79ee7598b.js?cb=2",
+        "origin": "https://static.klaviyo.com",
+        "query_parameter_names": [
+          "cb"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-38"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static-tracking.klaviyo.com/onsite/js/post_identification_sync.8a1f42e3d6059.js?cb=2",
+        "origin": "https://static-tracking.klaviyo.com",
+        "query_parameter_names": [
+          "cb"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-39"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.klaviyo.com/onsite/js/vendors~in_app_forms~signup_forms~reviews~atlas~product_recommendations.2275e937808a4.js?cb=2",
+        "origin": "https://static.klaviyo.com",
+        "query_parameter_names": [
+          "cb"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-40"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.klaviyo.com/onsite/js/vendors~in_app_forms~signup_forms.afb5d5a88c5fa.js?cb=2",
+        "origin": "https://static.klaviyo.com",
+        "query_parameter_names": [
+          "cb"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-41"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.klaviyo.com/onsite/js/default~in_app_forms~signup_forms.6d260c6e79a2f.js?cb=2",
+        "origin": "https://static.klaviyo.com",
+        "query_parameter_names": [
+          "cb"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-42"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.klaviyo.com/onsite/js/signup_forms.783874669fbb8.js?cb=2",
+        "origin": "https://static.klaviyo.com",
+        "query_parameter_names": [
+          "cb"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-43"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32/6a6b7e36c7e8274794582dfd_DMSans-VariableFont_opsz%2Cwght.ttf",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "font",
+      "txn": "request-44"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.jsdelivr.net/npm/@finsweet/attributes@2/dist/chunk-J3PPETVR.js",
+        "origin": "https://cdn.jsdelivr.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-45"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.jsdelivr.net/npm/@finsweet/attributes@2/dist/chunk-ADKL4AJZ.js",
+        "origin": "https://cdn.jsdelivr.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-46"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.jsdelivr.net/npm/@finsweet/attributes@2/dist/chunk-VDEO3AAR.js",
+        "origin": "https://cdn.jsdelivr.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-47"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.jsdelivr.net/npm/@finsweet/attributes@2/dist/chunk-WIALCYDY.js",
+        "origin": "https://cdn.jsdelivr.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-48"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.jsdelivr.net/npm/@finsweet/attributes@2/dist/chunk-OF4NI3Y7.js",
+        "origin": "https://cdn.jsdelivr.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-49"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.jsdelivr.net/npm/@finsweet/attributes@2/dist/chunk-N2ZCN6XY.js",
+        "origin": "https://cdn.jsdelivr.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-50"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.jsdelivr.net/npm/@finsweet/attributes@2/dist/chunk-L4B2V5MO.js",
+        "origin": "https://cdn.jsdelivr.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-51"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.jsdelivr.net/npm/@finsweet/attributes@2/dist/chunk-CB6LZ537.js",
+        "origin": "https://cdn.jsdelivr.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-52"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.jsdelivr.net/npm/@finsweet/attributes@2/dist/chunk-XRTLPMPO.js",
+        "origin": "https://cdn.jsdelivr.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-53"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.jsdelivr.net/npm/@finsweet/attributes@2/dist/chunk-ZI7TAH2K.js",
+        "origin": "https://cdn.jsdelivr.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-54"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.jsdelivr.net/npm/@finsweet/attributes@2/dist/chunk-GGDEANQW.js",
+        "origin": "https://cdn.jsdelivr.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-55"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.jsdelivr.net/npm/@finsweet/attributes@2/dist/chunk-K46K3RI5.js",
+        "origin": "https://cdn.jsdelivr.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-56"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://dev.visualwebsiteoptimizer.com/collect/v.gif?cd=0&a=774157&d=briskteaching.com&u=D683BE8E4134B90DA242CE6F6DE054476&h=8400cf500806000b11d32773bc1cd22f&t=false",
+        "origin": "https://dev.visualwebsiteoptimizer.com",
+        "query_parameter_names": [
+          "cd",
+          "a",
+          "d",
+          "u",
+          "h",
+          "t"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-57"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://fonts.gstatic.com/s/montserrat/v31/JTUSjIg1_i6t8kCHKm459Wlhyw.woff2",
+        "origin": "https://fonts.gstatic.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "font",
+      "txn": "request-58"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://fonts.gstatic.com/s/montserrat/v31/JTUQjIg1_i6t8kCHKm459WxRyS7m.woff2",
+        "origin": "https://fonts.gstatic.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "font",
+      "txn": "request-59"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7.woff2",
+        "origin": "https://fonts.gstatic.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "font",
+      "txn": "request-60"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://fonts.gstatic.com/s/leaguespartan/v15/kJEqBuEW6A0lliaV_m88ja5TwvZwLZk.woff2",
+        "origin": "https://fonts.gstatic.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "font",
+      "txn": "request-61"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://fonts.gstatic.com/s/librebaskerville/v24/kmKnZrc3Hgbbcjq75U4uslyuy4kn0qNZaxM.woff2",
+        "origin": "https://fonts.gstatic.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "font",
+      "txn": "request-62"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://fonts.gstatic.com/s/outfit/v15/QGYvz_MVcBeNP4NJtEtq.woff2",
+        "origin": "https://fonts.gstatic.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "font",
+      "txn": "request-63"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://fonts.gstatic.com/s/sanchez/v17/Ycm2sZJORluHnXbIfmlR_Q.woff2",
+        "origin": "https://fonts.gstatic.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "font",
+      "txn": "request-64"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.klaviyo.com/onsite/js/vendors~ClientStore~~~onsite-back-in-stock~Render.7f58957ee9121.js?cb=2",
+        "origin": "https://static.klaviyo.com",
+        "query_parameter_names": [
+          "cb"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-65"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.klaviyo.com/onsite/js/vendors~.bf6126b032be2.js?cb=2",
+        "origin": "https://static.klaviyo.com",
+        "query_parameter_names": [
+          "cb"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-66"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.klaviyo.com/onsite/js/5663.b76fe12927edb.js?cb=2",
+        "origin": "https://static.klaviyo.com",
+        "query_parameter_names": [
+          "cb"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-67"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://fast.a.klaviyo.com/custom-fonts/api/v1/company-fonts/onsite?company_id=WARuqj",
+        "origin": "https://fast.a.klaviyo.com",
+        "query_parameter_names": [
+          "company_id"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "xhr",
+      "txn": "request-68"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.jsdelivr.net/npm/@finsweet/attributes@2/dist/src-T7SM3ONB.js",
+        "origin": "https://cdn.jsdelivr.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-69"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.jsdelivr.net/npm/@finsweet/attributes@2/dist/chunk-WL5KIXHF.js",
+        "origin": "https://cdn.jsdelivr.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-70"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.jsdelivr.net/npm/@finsweet/attributes@2/dist/chunk-T2PNG2TC.js",
+        "origin": "https://cdn.jsdelivr.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-71"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.jsdelivr.net/npm/@finsweet/attributes@2/dist/chunk-7CAOOJVW.js",
+        "origin": "https://cdn.jsdelivr.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-72"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.jsdelivr.net/npm/@finsweet/attributes@2/dist/chunk-WO4GQJHX.js",
+        "origin": "https://cdn.jsdelivr.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-73"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.jsdelivr.net/npm/@finsweet/attributes@2/dist/chunk-ZZRTGM4V.js",
+        "origin": "https://cdn.jsdelivr.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-74"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.jsdelivr.net/npm/@finsweet/attributes@2/dist/chunk-UAA7M346.js",
+        "origin": "https://cdn.jsdelivr.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-75"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "blob:https://www.briskteaching.com/019db86e-380a-4d68-b367-33a866716697",
+        "origin": "https://www.briskteaching.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-76"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "blob:https://www.briskteaching.com/6cc69569-2048-4272-ad2a-3b28619e5f41",
+        "origin": "https://www.briskteaching.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-77"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "blob:https://www.briskteaching.com/77ada1fb-cec1-4d3d-bc55-8afa17893fc5",
+        "origin": "https://www.briskteaching.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-78"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "blob:https://www.briskteaching.com/cb00b54e-a269-4dff-829e-99f1872bb7e7",
+        "origin": "https://www.briskteaching.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-79"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "blob:https://www.briskteaching.com/a2c371fa-fc35-49e2-b1ad-4e0a75f44725",
+        "origin": "https://www.briskteaching.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-80"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "blob:https://www.briskteaching.com/bd9a7634-7c24-4056-80e3-2191d350005a",
+        "origin": "https://www.briskteaching.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-81"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "blob:https://www.briskteaching.com/46b8e5b9-0e50-4656-9c86-fd689433cfc8",
+        "origin": "https://www.briskteaching.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-82"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "blob:https://www.briskteaching.com/481148b2-4de9-4df1-97f3-7f08c8086816",
+        "origin": "https://www.briskteaching.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-83"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "blob:https://www.briskteaching.com/12fe9d32-6f34-4397-98a2-5b0d14c23b5b",
+        "origin": "https://www.briskteaching.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-84"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "blob:https://www.briskteaching.com/cefe6a46-3784-453f-8c85-40e6d8480d1a",
+        "origin": "https://www.briskteaching.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-85"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "blob:https://www.briskteaching.com/6e0d8237-b6eb-4444-8403-4655f16cf73b",
+        "origin": "https://www.briskteaching.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-86"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "blob:https://www.briskteaching.com/70cd06c6-506b-4df9-b5f3-2721b20d21ce",
+        "origin": "https://www.briskteaching.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-87"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "blob:https://www.briskteaching.com/963270f2-19ea-46b1-bdd3-eedceadc0cfe",
+        "origin": "https://www.briskteaching.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-88"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "blob:https://www.briskteaching.com/c36db9a0-a3ed-443f-a049-a8a3adf20a5a",
+        "origin": "https://www.briskteaching.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-89"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "blob:https://www.briskteaching.com/a9e647ff-0469-4b88-8b7e-bb7aca9087b8",
+        "origin": "https://www.briskteaching.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-90"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "blob:https://www.briskteaching.com/35ab5f50-9f3e-4093-b7f4-a8c334ec4983",
+        "origin": "https://www.briskteaching.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-91"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "blob:https://www.briskteaching.com/1a8151f4-aaae-4706-90ce-4b9f0f518b18",
+        "origin": "https://www.briskteaching.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-92"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "blob:https://www.briskteaching.com/a9a420b2-0304-423c-9f86-6470ed2e04c6",
+        "origin": "https://www.briskteaching.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-93"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "blob:https://www.briskteaching.com/86952338-36ec-4c22-8b64-9365c337ce0a",
+        "origin": "https://www.briskteaching.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-94"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "blob:https://www.briskteaching.com/4b7517e1-323d-4425-8ada-36775a187509",
+        "origin": "https://www.briskteaching.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-95"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://connect.facebook.net/signals/config/751092553614104?v=2.9.419&r=stable&domain=www.briskteaching.com&hme=7459fa3e38c2784dbaf309537bed5fa7e8560fab51fb61e53e5ffafeb46a02a9&ex_m=118%2C241%2C171%2C27%2C82%2C83%2C162%2C78%2C77%2C11%2C181%2C102%2C20%2C153%2C141%2C46%2C85%2C90%2C149%2C176%2C183%2C8%2C4%2C5%2C7%2C6%2C3%2C103%2C115%2C32%2C17%2C31%2C18%2C33%2C34%2C35%2C37%2C55%2C163%2C87%2C126%2C22%2C24%2C51%2C47%2C49%2C48%2C95%2C104%2C108%2C124%2C160%2C164%2C53%2C125%2C29%2C26%2C133%2C79%2C43%2C166%2C165%2C167%2C157%2C155%2C30%2C42%2C66%2C123%2C178%2C80%2C21%2C128%2C93%2C76%2C23%2C97%2C98%2C130%2C96%2C151%2C150%2C154%2C109%2C177%2C180%2C41%2C56%2C127%2C54%2C161%2C72%2C185%2C110%2C184%2C210%2C255%2C84%2C274%2C273%2C272%2C14%2C25%2C28%2C40%2C62%2C117%2C68%2C10%2C73%2C111%2C112%2C113%2C119%2C144%2C38%2C36%2C146%2C147%2C148%2C143%2C142%2C172%2C86%2C175%2C173%2C174%2C57%2C69%2C67%2C137%2C19%2C179%2C52%2C324%2C325%2C326%2C323%2C339%2C361%2C248%2C237%2C70%2C238%2C236%2C364%2C355%2C59%2C249%2C121%2C145%2C92%2C135%2C61%2C134%2C140%2C139%2C65%2C74%2C168%2C88%2C89%2C129%2C44%2C39%2C60%2C63%2C114%2C182%2C1%2C138%2C16%2C136%2C12%2C2%2C64%2C105%2C15%2C75%2C71%2C132%2C101%2C100%2C187%2C188%2C106%2C107%2C9%2C116%2C186%2C58%2C158%2C99%2C91%2C81%2C131%2C120%2C169%2C50%2C159%2C0%2C94%2C152%2C156%2C170%2C45%2C122%2C13%2C189",
+        "origin": "https://connect.facebook.net",
+        "query_parameter_names": [
+          "v",
+          "r",
+          "domain",
+          "hme",
+          "ex_m"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-96"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/concierge-router/copy-of-demo-request---hubspot-form-march-16-2026?trigger=ThirdPartyForm&timezone=UTC&sourceUrl=https%3A%2F%2Fwww.briskteaching.com%2F",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [
+          "trigger",
+          "timezone",
+          "sourceUrl"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "document",
+      "txn": "request-97"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.embedly.com/widgets/media.html?src=https%3A%2F%2Fwww.youtube.com%2Fembed%2F7fLMtawWpjk%3Ffeature%3Doembed&display_name=YouTube&url=https%3A%2F%2Fwww.youtube.com%2Fshorts%2F7fLMtawWpjk%3Fundefined&image=https%3A%2F%2Fi.ytimg.com%2Fvi%2F7fLMtawWpjk%2Fhq2.jpg&type=text%2Fhtml&schema=youtube",
+        "origin": "https://cdn.embedly.com",
+        "query_parameter_names": [
+          "src",
+          "display_name",
+          "url",
+          "image",
+          "type",
+          "schema"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "document",
+      "txn": "request-98"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32/6a6b7e36c7e8274794582e47_background-aqua-lines.png",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-99"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32%2F6a70acb681dac15ee931f9cb_Home-Animation-R3_poster.0000000.jpg",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-100"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32/6a70af6d45d4db13b4f25ece_4-steps_bg.png",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-101"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32%2F6a70b7ac6558f168119c32a7_4-steps_1_poster.0000000.jpg",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-102"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32%2F6a70b7b524f330f551f449ef_4-steps_2_poster.0000000.jpg",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-103"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32%2F6a70b7bbf39502d121211a6a_4-steps_3_poster.0000000.jpg",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-104"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32%2F6a70b59f9f2ddabd1e7c04bb_4-steps_4_poster.0000000.jpg",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-105"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32%2F6a70c4809ff8cdcfbf1c7bc0_Create_poster.0000000.jpg",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-106"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32%2F6a70c5bce7b29cac1067d4bd_Give-Feedback_poster.0000000.jpg",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-107"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32%2F6a7ba6b144e4e802bb71ef23_Inspect-Writing-R2_poster.0000000.jpg",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-108"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32%2F6ab55c220eafb76e8c3b79c8_Change-Level-09-22-v2_poster.0000000.jpg",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-109"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32%2F6a7ba6be2f031c59f79499bd_BoostForStudents-R2_poster.0000000.jpg",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-110"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32/6a70e883491593adeb5194c0_blue-bg.png",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-111"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32/6a6b7e36c7e8274794582d37_Anton-Regular.ttf",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "font",
+      "txn": "request-112"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32/6a6b7e36c7e8274794582e27_BriskTeaching_Logo-p-500.png",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-113"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32/6a6b7e36c7e8274794582e48_bolt_RoundedFill.svg",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-114"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32/6a6b7e36c7e8274794582e49_award_star_RoundedFill.svg",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-115"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32/6a6b7e36c7e8274794582e4a_Security.svg",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-116"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32%2F6a70acb681dac15ee931f9cb_Home-Animation-R3_mp4.mp4",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 206,
+      "resource_type": "media",
+      "txn": "request-117"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32%2F6a70b7ac6558f168119c32a7_4-steps_1_mp4.mp4",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 206,
+      "resource_type": "media",
+      "txn": "request-118"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32%2F6a70b7b524f330f551f449ef_4-steps_2_mp4.mp4",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 206,
+      "resource_type": "media",
+      "txn": "request-119"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32%2F6a70b7bbf39502d121211a6a_4-steps_3_mp4.mp4",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 206,
+      "resource_type": "media",
+      "txn": "request-120"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32%2F6a70b59f9f2ddabd1e7c04bb_4-steps_4_mp4.mp4",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 206,
+      "resource_type": "media",
+      "txn": "request-121"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32%2F6a70c4809ff8cdcfbf1c7bc0_Create_mp4.mp4",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 206,
+      "resource_type": "media",
+      "txn": "request-122"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32%2F6a70c5bce7b29cac1067d4bd_Give-Feedback_mp4.mp4",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 206,
+      "resource_type": "media",
+      "txn": "request-123"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32%2F6a7ba6b144e4e802bb71ef23_Inspect-Writing-R2_mp4.mp4",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 206,
+      "resource_type": "media",
+      "txn": "request-124"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32%2F6a7ba6be2f031c59f79499bd_BoostForStudents-R2_mp4.mp4",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 206,
+      "resource_type": "media",
+      "txn": "request-125"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32%2F6a70c4809ff8cdcfbf1c7bc0_Create_mp4.mp4",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 206,
+      "resource_type": "media",
+      "txn": "request-126"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32%2F6a70c5bce7b29cac1067d4bd_Give-Feedback_mp4.mp4",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 206,
+      "resource_type": "media",
+      "txn": "request-127"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32%2F6a7ba6b144e4e802bb71ef23_Inspect-Writing-R2_mp4.mp4",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 206,
+      "resource_type": "media",
+      "txn": "request-128"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32%2F6ab55c220eafb76e8c3b79c8_Change-Level-09-22-v2_mp4.mp4",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 206,
+      "resource_type": "media",
+      "txn": "request-129"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32%2F6a7ba6be2f031c59f79499bd_BoostForStudents-R2_mp4.mp4",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 206,
+      "resource_type": "media",
+      "txn": "request-130"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.embedly.com/widgets/media.html?src=https%3A%2F%2Fwww.youtube.com%2Fembed%2FrHI3qQ_vt9E%3Ffeature%3Doembed&display_name=YouTube&url=https%3A%2F%2Fwww.youtube.com%2Fshorts%2FrHI3qQ_vt9E%3Fundefined&image=https%3A%2F%2Fi.ytimg.com%2Fvi%2FrHI3qQ_vt9E%2Fhq2.jpg&type=text%2Fhtml&schema=youtube",
+        "origin": "https://cdn.embedly.com",
+        "query_parameter_names": [
+          "src",
+          "display_name",
+          "url",
+          "image",
+          "type",
+          "schema"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "document",
+      "txn": "request-131"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.embedly.com/widgets/media.html?src=https%3A%2F%2Fwww.youtube.com%2Fembed%2FoeMybUm5Tuc%3Ffeature%3Doembed&display_name=YouTube&url=https%3A%2F%2Fwww.youtube.com%2Fshorts%2FoeMybUm5Tuc%3Ffeature%3Dshare&image=https%3A%2F%2Fi.ytimg.com%2Fvi%2FoeMybUm5Tuc%2Fhq2.jpg&type=text%2Fhtml&schema=youtube",
+        "origin": "https://cdn.embedly.com",
+        "query_parameter_names": [
+          "src",
+          "display_name",
+          "url",
+          "image",
+          "type",
+          "schema"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "document",
+      "txn": "request-132"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://fonts.googleapis.com/css2?family=Anton:ital,wght@0,400&family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Outfit:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900&display=swap",
+        "origin": "https://fonts.googleapis.com",
+        "query_parameter_names": [
+          "family",
+          "family",
+          "family",
+          "family",
+          "display"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "stylesheet",
+      "txn": "request-133"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static-forms.klaviyo.com/forms/api/v7/WARuqj/full-forms",
+        "origin": "https://static-forms.klaviyo.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "xhr",
+      "txn": "request-134"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://edge.geoswap.co/decide",
+        "origin": "https://edge.geoswap.co",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-135"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://edge.geoswap.co/p",
+        "origin": "https://edge.geoswap.co",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 204,
+      "resource_type": "ping",
+      "txn": "request-136"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn-cookieyes.com/client_data/8fdea4aa829dab3d989146ab/script.js",
+        "origin": "https://cdn-cookieyes.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-137"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.googletagmanager.com/gtag/js?id=G-5HBGRPX3V3&cx=c&gtm=4e6ad1",
+        "origin": "https://www.googletagmanager.com",
+        "query_parameter_names": [
+          "id",
+          "cx",
+          "gtm"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-138"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://snap.licdn.com/li.lms-analytics/insight.min.js",
+        "origin": "https://snap.licdn.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-139"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://analytics.tiktok.com/i18n/pixel/events.js?sdkid=CO7J5PRC77U1MKJ2LTT0&lib=ttq",
+        "origin": "https://analytics.tiktok.com",
+        "query_parameter_names": [
+          "sdkid",
+          "lib"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-140"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://js-na2.hs-scripts.com/244662537.js",
+        "origin": "https://js-na2.hs-scripts.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-141"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.youtube.com/iframe_api",
+        "origin": "https://www.youtube.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-142"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://fonts.gstatic.com/s/dmsans/v17/rP2Wp2ywxg089UriCZaSExd86J3t9jz86MvyyKy58Q.woff2",
+        "origin": "https://fonts.gstatic.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "font",
+      "txn": "request-143"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.youtube.com/iframe_api",
+        "origin": "https://www.youtube.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-144"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.youtube.com/iframe_api",
+        "origin": "https://www.youtube.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-145"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.jsdelivr.net/npm/@finsweet/attributes-cmscore@1/cmscore.js",
+        "origin": "https://cdn.jsdelivr.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-146"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://log.cookieyes.com/api/v1/log",
+        "origin": "https://log.cookieyes.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "ping",
+      "txn": "request-147"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn-cookieyes.com/client_data/8fdea4aa829dab3d989146ab/banner.js",
+        "origin": "https://cdn-cookieyes.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-148"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/static/canary/booking-app/assets/manifest-7a53741f.js",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-149"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/static/canary/booking-app/assets/entry.client-BEQlMzM0.js",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-150"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/static/canary/booking-app/assets/components-CCuQ1OgQ.js",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-151"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/static/canary/booking-app/assets/react-dom-B9HthSIx.js",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-152"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/static/canary/booking-app/assets/storage-CWGKDygY.js",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-153"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/static/canary/booking-app/assets/ApiRequestError-BVreWlKY.js",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-154"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/static/canary/booking-app/assets/debug-build-CXDKt6gC.js",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-155"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/static/canary/booking-app/assets/config-oOm9d6jG.js",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-156"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/static/canary/booking-app/assets/root-CnJZ_aWh.js",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-157"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/static/canary/booking-app/assets/usePageTitle-DaBnH5vN.js",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-158"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/static/canary/booking-app/assets/StartContent-Z8aqq5sU.js",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-159"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/static/canary/booking-app/assets/logger-BWMRM4Hr.js",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-160"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/static/canary/booking-app/assets/team-scheduling-BgglaSh-.js",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-161"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/static/canary/booking-app/assets/BookingContext-CDBnXzVr.js",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-162"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/static/canary/booking-app/assets/ThemeProvider-hr0250EL.js",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-163"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/static/canary/booking-app/assets/Error-f4EunlUR.js",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-164"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/static/canary/booking-app/assets/Modal-DIAw5qcA.js",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-165"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/static/canary/booking-app/assets/prop-types-V8clWQle.js",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-166"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/static/canary/booking-app/assets/layout-ptmvZ70s.js",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-167"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/static/canary/booking-app/assets/useSetRoutingIdHeader-DTJzDE3W.js",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-168"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/static/canary/booking-app/assets/ConciergeContext-DPyoUhdA.js",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-169"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/static/canary/booking-app/assets/UnstyledButton-wHAovhhd.js",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-170"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/static/canary/booking-app/assets/routing-page-BG8phLyd.js",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-171"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/static/canary/booking-app/assets/useLaunchRouting-BBzE2UAM.js",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-172"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/static/canary/booking-app/assets/helpers-DuVxo9IB.js",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-173"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/static/canary/booking-app/assets/root-eSjiHNe0.css",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "stylesheet",
+      "txn": "request-174"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap",
+        "origin": "https://fonts.googleapis.com",
+        "query_parameter_names": [
+          "family",
+          "display"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "stylesheet",
+      "txn": "request-175"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://px.ads.linkedin.com/wa/?medium=fetch&fmt=g",
+        "origin": "https://px.ads.linkedin.com",
+        "query_parameter_names": [
+          "medium",
+          "fmt"
+        ],
+        "redacted": false
+      },
+      "status": 204,
+      "resource_type": "fetch",
+      "txn": "request-176"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://px.ads.linkedin.com/collect?v=2&fmt=js&pid=7407844&time=1792022276749&li_adsId=[redacted]-2ec5-41fe-aa2e-158288b9d7e5&pageLoadId=e453b164-c7ec-44c6-a307-420b4d6b82db&url=https%3A%2F%2Fwww.briskteaching.com%2F&tm=gtmv2",
+        "origin": "https://px.ads.linkedin.com",
+        "query_parameter_names": [
+          "v",
+          "fmt",
+          "pid",
+          "time",
+          "li_adsId",
+          "pageLoadId",
+          "url",
+          "tm"
+        ],
+        "redacted": false
+      },
+      "status": 302,
+      "resource_type": "image",
+      "txn": "request-177"
+    },
+    {
+      "kind": "request-failed",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32%2F6a70c4809ff8cdcfbf1c7bc0_Create_mp4.mp4",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn-cookieyes.com/common/iab-gvl-v3.json",
+        "origin": "https://cdn-cookieyes.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "xhr",
+      "txn": "request-178"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.youtube.com/s/player/21090930/www-widgetapi.vflset/www-widgetapi.js",
+        "origin": "https://www.youtube.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-179"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.youtube.com/embed/7fLMtawWpjk?wmode=opaque&widget_referrer=https%3A%2F%2Fwww.briskteaching.com%2F&enablejsapi=1&origin=https%3A%2F%2Fcdn.embedly.com&widgetid=1&forigin=https%3A%2F%2Fcdn.embedly.com%2Fwidgets%2Fmedia.html%3Fsrc%3Dhttps%253A%252F%252Fwww.youtube.com%252Fembed%252F7fLMtawWpjk%253Ffeature%253Doembed%26display_name%3DYouTube%26url%3Dhttps%253A%252F%252Fwww.youtube.com%252Fshorts%252F7fLMtawWpjk%253Fundefined%26image%3Dhttps%253A%252F%252Fi.ytimg.com%252Fvi%252F7fLMtawWpjk%252Fhq2.jpg%26type%3Dtext%252Fhtml%26schema%3Dyoutube&aoriginsup=1&aorigins=https%3A%2F%2Fwww.briskteaching.com&gporigin=https%3A%2F%2Fwww.briskteaching.com%2F&vf=6",
+        "origin": "https://www.youtube.com",
+        "query_parameter_names": [
+          "wmode",
+          "widget_referrer",
+          "enablejsapi",
+          "origin",
+          "widgetid",
+          "forigin",
+          "aoriginsup",
+          "aorigins",
+          "gporigin",
+          "vf"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "document",
+      "txn": "request-180"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://js-na2.hs-analytics.net/analytics/1792022100000/244662537.js",
+        "origin": "https://js-na2.hs-analytics.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-181"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://js-na2.hsadspixel.net/pixels.js",
+        "origin": "https://js-na2.hsadspixel.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-182"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://js-na2.hs-banner.com/v2/244662537/banner.js",
+        "origin": "https://js-na2.hs-banner.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-183"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.youtube.com/s/player/21090930/www-widgetapi.vflset/www-widgetapi.js",
+        "origin": "https://www.youtube.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-184"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.youtube.com/embed/rHI3qQ_vt9E?wmode=opaque&widget_referrer=https%3A%2F%2Fwww.briskteaching.com%2F&enablejsapi=1&origin=https%3A%2F%2Fcdn.embedly.com&widgetid=1&forigin=https%3A%2F%2Fcdn.embedly.com%2Fwidgets%2Fmedia.html%3Fsrc%3Dhttps%253A%252F%252Fwww.youtube.com%252Fembed%252FrHI3qQ_vt9E%253Ffeature%253Doembed%26display_name%3DYouTube%26url%3Dhttps%253A%252F%252Fwww.youtube.com%252Fshorts%252FrHI3qQ_vt9E%253Fundefined%26image%3Dhttps%253A%252F%252Fi.ytimg.com%252Fvi%252FrHI3qQ_vt9E%252Fhq2.jpg%26type%3Dtext%252Fhtml%26schema%3Dyoutube&aoriginsup=1&aorigins=https%3A%2F%2Fwww.briskteaching.com&gporigin=https%3A%2F%2Fwww.briskteaching.com%2F&vf=6",
+        "origin": "https://www.youtube.com",
+        "query_parameter_names": [
+          "wmode",
+          "widget_referrer",
+          "enablejsapi",
+          "origin",
+          "widgetid",
+          "forigin",
+          "aoriginsup",
+          "aorigins",
+          "gporigin",
+          "vf"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "document",
+      "txn": "request-185"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn-cookieyes.com/client_data/8fdea4aa829dab3d989146ab/ZAgZWUNf.json",
+        "origin": "https://cdn-cookieyes.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-186"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.youtube.com/s/player/0229cd64/www-widgetapi.vflset/www-widgetapi.js",
+        "origin": "https://www.youtube.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-187"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.youtube.com/s/player/21090930/www-player.css",
+        "origin": "https://www.youtube.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "stylesheet",
+      "txn": "request-188"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.youtube.com/s/_/ytembeds/_/ss/k=ytembeds.base.RAFARmP1bTA.L.W.O/am=AAAAIA/d=1/br=1/rs=AGKMywE8B-_evQ47th2OE02LdhnLnj9dpg/m=root,base",
+        "origin": "https://www.youtube.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "stylesheet",
+      "txn": "request-189"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://fonts.gstatic.com/s/roboto/v48/KFO7CnqEu92Fr1ME7kSn66aGLdTylUAMa3yUBA.woff2",
+        "origin": "https://fonts.gstatic.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "font",
+      "txn": "request-190"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.youtube.com/s/_/ytembeds/_/js/k=ytembeds.base.en_US.PV-ftzrU6mI.es5.O/am=AAAAIA/d=1/excm=base,root/br=1/rs=AGKMywF0TafqzjqhF1aCnBZ3LyLRey0SkA/m=root,base",
+        "origin": "https://www.youtube.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-191"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.youtube.com/s/player/21090930/player_embed.vflset/en_US/base.js",
+        "origin": "https://www.youtube.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-192"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://directory.cookieyes.com/api/v1/ip",
+        "origin": "https://directory.cookieyes.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-193"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.youtube.com/s/player/21090930/www-player.css",
+        "origin": "https://www.youtube.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "stylesheet",
+      "txn": "request-194"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.youtube.com/s/_/ytembeds/_/ss/k=ytembeds.base.RAFARmP1bTA.L.W.O/am=AAAAIA/d=1/br=1/rs=AGKMywE8B-_evQ47th2OE02LdhnLnj9dpg/m=root,base",
+        "origin": "https://www.youtube.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "stylesheet",
+      "txn": "request-195"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://fonts.gstatic.com/s/roboto/v48/KFO7CnqEu92Fr1ME7kSn66aGLdTylUAMa3yUBA.woff2",
+        "origin": "https://fonts.gstatic.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "font",
+      "txn": "request-196"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://px.ads.linkedin.com/collect?v=2&fmt=js&pid=7407844&time=1792022276749&li_adsId=[redacted]-2ec5-41fe-aa2e-158288b9d7e5&pageLoadId=e453b164-c7ec-44c6-a307-420b4d6b82db&url=https%3A%2F%2Fwww.briskteaching.com%2F&tm=gtmv2&cookiesTest=true",
+        "origin": "https://px.ads.linkedin.com",
+        "query_parameter_names": [
+          "v",
+          "fmt",
+          "pid",
+          "time",
+          "li_adsId",
+          "pageLoadId",
+          "url",
+          "tm",
+          "cookiesTest"
+        ],
+        "redacted": false
+      },
+      "status": 302,
+      "resource_type": "image",
+      "txn": "request-197"
+    },
+    {
+      "kind": "request-failed",
+      "method": "POST",
+      "url": {
+        "url": "https://px.ads.linkedin.com/wa/?medium=fetch&fmt=g",
+        "origin": "https://px.ads.linkedin.com",
+        "query_parameter_names": [
+          "medium",
+          "fmt"
+        ],
+        "redacted": false
+      },
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.youtube.com/s/_/ytembeds/_/js/k=ytembeds.base.en_US.PV-ftzrU6mI.es5.O/am=AAAAIA/d=1/excm=base,root/br=1/rs=AGKMywF0TafqzjqhF1aCnBZ3LyLRey0SkA/m=root,base",
+        "origin": "https://www.youtube.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-198"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.youtube.com/s/player/21090930/player_embed.vflset/en_US/base.js",
+        "origin": "https://www.youtube.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-199"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.linkedin.com/px/li_sync?redirect=https%3A%2F%2Fpx.ads.linkedin.com%2Fcollect%3Fv%3D2%26fmt%3Djs%26pid%3D7407844%26time%3D1792022276749%26li_adsId%3D1be23cdb-2ec5-41fe-aa2e-158288b9d7e5%26pageLoadId%3De453b164-c7ec-44c6-a307-420b4d6b82db%26url%3Dhttps%253A%252F%252Fwww.briskteaching.com%252F%26tm%3Dgtmv2%26cookiesTest%3Dtrue%26liSync%3Dtrue",
+        "origin": "https://www.linkedin.com",
+        "query_parameter_names": [
+          "redirect"
+        ],
+        "redacted": false
+      },
+      "status": 302,
+      "resource_type": "image",
+      "txn": "request-200"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.klaviyo.com/onsite/js/vendors~ClientStore.71467bcdc1765.js?cb=2",
+        "origin": "https://static.klaviyo.com",
+        "query_parameter_names": [
+          "cb"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-201"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.klaviyo.com/onsite/js/default~ClientStore~~onsite-back-in-stock~Render.f4045444fa29d.js?cb=2",
+        "origin": "https://static.klaviyo.com",
+        "query_parameter_names": [
+          "cb"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-202"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.klaviyo.com/onsite/js/default~ClientStore~~Render~back-in-stock-dynamic-button-handler.348638679ae7c.js?cb=2",
+        "origin": "https://static.klaviyo.com",
+        "query_parameter_names": [
+          "cb"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-203"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.klaviyo.com/onsite/js/default~ClientStore~Render~.11c2091879658.js?cb=2",
+        "origin": "https://static.klaviyo.com",
+        "query_parameter_names": [
+          "cb"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-204"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.klaviyo.com/onsite/js/ClientStore.c4c204deaf2cb.js?cb=2",
+        "origin": "https://static.klaviyo.com",
+        "query_parameter_names": [
+          "cb"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-205"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://js-na2.hubspot.com/web-interactives-embed.js",
+        "origin": "https://js-na2.hubspot.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-206"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://us-assets.i.posthog.com/array/phc_YlV8uSDnihV5YqeVDQSVe3hdIkPCAMl9HJbvDVFq2vo/config.js",
+        "origin": "https://us-assets.i.posthog.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-207"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn-cookieyes.com/client_data/8fdea4aa829dab3d989146ab/audit-table/5CSpPQ5C.json",
+        "origin": "https://cdn-cookieyes.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-208"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://analytics.google.com/g/collect?v=2&tid=G-5HBGRPX3V3&gtm=45je6ad1v9106921824z89180829587za20gzb9180829587zd9180829587xf1&_p=1792022275438&_gaz=1&gcs=G111&gcd=13r3r3r3r5l1&npa=0&dma=0&tcfd=10000&gdid=dY2Q2ZW&ecid=663813994&_eu=AAAAAGAC&cid=475949632.1792022278&frm=0&pscdl=noapi&rcb=10&sr=1366x900&uaa=x86&uab=64&uafvl=Google%2520Chrome%3B155.0.8059.79%7CChromium%3B155.0.8059.79%7CNot(A%253ABrand%3B24.0.0.0&uam=&uamb=0&uap=Windows&uapv=19.0.0&uaw=0&ul=en-us&gaf=2&_s=1&tag_exp=115938466~115938469~118897920~118897930~120213116~120385422~120469145~120469153~121246026~121246034&sid=[redacted-session]&sct=1&seg=0&dl=https%3A%2F%2Fwww.briskteaching.com%2F&dt=Free%20AI%20Tools%20for%20Teachers%20and%20Educators%20%7C%20Brisk%20Teaching&_tu=CA&en=page_view&_fv=1&_nsi=1&_ss=1&tfd=3933",
+        "origin": "https://analytics.google.com",
+        "query_parameter_names": [
+          "v",
+          "tid",
+          "gtm",
+          "_p",
+          "_gaz",
+          "gcs",
+          "gcd",
+          "npa",
+          "dma",
+          "tcfd",
+          "gdid",
+          "ecid",
+          "_eu",
+          "cid",
+          "frm",
+          "pscdl",
+          "rcb",
+          "sr",
+          "uaa",
+          "uab",
+          "uafvl",
+          "uam",
+          "uamb",
+          "uap",
+          "uapv",
+          "uaw",
+          "ul",
+          "gaf",
+          "_s",
+          "tag_exp",
+          "sid",
+          "sct",
+          "seg",
+          "dl",
+          "dt",
+          "_tu",
+          "en",
+          "_fv",
+          "_nsi",
+          "_ss",
+          "tfd"
+        ],
+        "redacted": false
+      },
+      "status": 204,
+      "resource_type": "fetch",
+      "txn": "request-209"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://stats.g.doubleclick.net/g/collect?v=2&tid=G-5HBGRPX3V3&cid=475949632.1792022278&gtm=45je6ad1v9106921824z89180829587za20gzb9180829587zd9180829587xf1&rcb=10&aip=1&dma=0&gcs=G111&gcd=13r3r3r3r5l1&npa=0&frm=0&tag_exp=115938466~115938469~118897920~118897930~120213116~120385422~120469145~120469153~121246026~121246034",
+        "origin": "https://stats.g.doubleclick.net",
+        "query_parameter_names": [
+          "v",
+          "tid",
+          "cid",
+          "gtm",
+          "rcb",
+          "aip",
+          "dma",
+          "gcs",
+          "gcd",
+          "npa",
+          "frm",
+          "tag_exp"
+        ],
+        "redacted": false
+      },
+      "status": 204,
+      "resource_type": "ping",
+      "txn": "request-210"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://googleads.g.doubleclick.net/pagead/viewthroughconversion/16557665821/?random=1792022276964&cv=11&fst=1792022276964&bg=ffffff&guid=ON&async=1&en=gtag.config&gtm=45je6ad1v9106921824z89180829587za20gzb9180829587zd9180829587xecxf1&gcd=13r3r3r3r5l1&dma=0&tcfd=10000&tag_exp=115938466~115938469~117227715~117776796~118897920~118897930~120213116~120385422~120469145~120469153~121246026~121246034~123322201&u_w=1366&u_h=900&url=https%3A%2F%2Fwww.briskteaching.com%2F&rcb=10&frm=0&tiba=Free%20AI%20Tools%20for%20Teachers%20and%20Educators%20%7C%20Brisk%20Teaching&did=dY2Q2ZW&gdid=dY2Q2ZW&hn=www.googleadservices.com&npa=0&pscdl=noapi&auid=145373511.1792022278&uaa=x86&uab=64&uafvl=Google%2520Chrome%3B155.0.8059.79%7CChromium%3B155.0.8059.79%7CNot(A%253ABrand%3B24.0.0.0&uamb=0&uam=&uap=Windows&uapv=19.0.0&uaw=0&_tu=CA&data=event%3Dgtag.config&ept=9&rfmt=3&fmt=4",
+        "origin": "https://googleads.g.doubleclick.net",
+        "query_parameter_names": [
+          "random",
+          "cv",
+          "fst",
+          "bg",
+          "guid",
+          "async",
+          "en",
+          "gtm",
+          "gcd",
+          "dma",
+          "tcfd",
+          "tag_exp",
+          "u_w",
+          "u_h",
+          "url",
+          "rcb",
+          "frm",
+          "tiba",
+          "did",
+          "gdid",
+          "hn",
+          "npa",
+          "pscdl",
+          "auid",
+          "uaa",
+          "uab",
+          "uafvl",
+          "uamb",
+          "uam",
+          "uap",
+          "uapv",
+          "uaw",
+          "_tu",
+          "data",
+          "ept",
+          "rfmt",
+          "fmt"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-211"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://www.google.com/rmkt/collect/16557665821/?random=1792022276964&cv=11&fst=1792022276964&fmt=8&bg=ffffff&guid=ON&async=1&en=gtag.config&gtm=45je6ad1v9106921824z89180829587za20gzb9180829587zd9180829587xecxf1&gcd=13r3r3r3r5l1&dma=0&tcfd=10000&tag_exp=115938466~115938469~117227715~117776796~118897920~118897930~120213116~120385422~120469145~120469153~121246026~121246034~123322201&u_w=1366&u_h=900&url=https%3A%2F%2Fwww.briskteaching.com%2F&rcb=10&frm=0&tiba=Free%20AI%20Tools%20for%20Teachers%20and%20Educators%20%7C%20Brisk%20Teaching&did=dY2Q2ZW&gdid=dY2Q2ZW&hn=www.googleadservices.com&npa=0&pscdl=noapi&auid=145373511.1792022278&uaa=x86&uab=64&uafvl=Google%2520Chrome%3B155.0.8059.79%7CChromium%3B155.0.8059.79%7CNot(A%253ABrand%3B24.0.0.0&uamb=0&uam=&uap=Windows&uapv=19.0.0&uaw=0&_tu=CA&data=event%3Dgtag.config&ept=68&gcp=5",
+        "origin": "https://www.google.com",
+        "query_parameter_names": [
+          "random",
+          "cv",
+          "fst",
+          "fmt",
+          "bg",
+          "guid",
+          "async",
+          "en",
+          "gtm",
+          "gcd",
+          "dma",
+          "tcfd",
+          "tag_exp",
+          "u_w",
+          "u_h",
+          "url",
+          "rcb",
+          "frm",
+          "tiba",
+          "did",
+          "gdid",
+          "hn",
+          "npa",
+          "pscdl",
+          "auid",
+          "uaa",
+          "uab",
+          "uafvl",
+          "uamb",
+          "uam",
+          "uap",
+          "uapv",
+          "uaw",
+          "_tu",
+          "data",
+          "ept",
+          "gcp"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-212"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.google.com.gh/ads/ga-audiences?v=1&t=sr&slf_rd=1&_r=4&tid=G-5HBGRPX3V3&cid=475949632.1792022278&gtm=45je6ad1v9106921824z89180829587za20gzb9180829587zd9180829587xf1&rcb=10&aip=1&dma=0&gcs=G111&gcd=13r3r3r3r5l1&npa=0&frm=0&tag_exp=115938466~115938469~118897920~118897930~120213116~120385422~120469145~120469153~121246026~121246034&z=2036783504",
+        "origin": "https://www.google.com.gh",
+        "query_parameter_names": [
+          "v",
+          "t",
+          "slf_rd",
+          "_r",
+          "tid",
+          "cid",
+          "gtm",
+          "rcb",
+          "aip",
+          "dma",
+          "gcs",
+          "gcd",
+          "npa",
+          "frm",
+          "tag_exp",
+          "z"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-213"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://www.google.com/ccm/collect?rcb=10&frm=0&apvc=1&auid=145373511.1792022278&dt=Free%20AI%20Tools%20for%20Teachers%20and%20Educators%20%7C%20Brisk%20Teaching&tid=AW-16557665821&en=page_view&dl=https%3A%2F%2Fwww.briskteaching.com%2F&scrsrc=www.googletagmanager.com&rnd=389927487.1792022278&navt=n&npa=0&did=dY2Q2ZW&gdid=dY2Q2ZW&_tu=CA&gtm=45je6ad1v9106921824z89180829587za20gzb9180829587zd9180829587xecxf1&gcs=G111&gcd=13r3r3r3r5l1&dma=0&tcfd=10000&tag_exp=115938466~115938469~117227715~117776796~118897920~118897930~120213116~120385422~120469145~120469153~121246026~121246034~123322201&tft=1792022277960&tfd=3949&tids=AW-16557665821&fmt=8",
+        "origin": "https://www.google.com",
+        "query_parameter_names": [
+          "rcb",
+          "frm",
+          "apvc",
+          "auid",
+          "dt",
+          "tid",
+          "en",
+          "dl",
+          "scrsrc",
+          "rnd",
+          "navt",
+          "npa",
+          "did",
+          "gdid",
+          "_tu",
+          "gtm",
+          "gcs",
+          "gcd",
+          "dma",
+          "tcfd",
+          "tag_exp",
+          "tft",
+          "tfd",
+          "tids",
+          "fmt"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-214"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://ad.doubleclick.net/ccm/s/collect?auid=145373511.1792022278&gtm=45je6ad1v9106921824z89180829587za20gzb9180829587zd9180829587xecxf1&fmt=8",
+        "origin": "https://ad.doubleclick.net",
+        "query_parameter_names": [
+          "auid",
+          "gtm",
+          "fmt"
+        ],
+        "redacted": false
+      },
+      "status": 204,
+      "resource_type": "fetch",
+      "txn": "request-215"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://api-na2.hubapi.com/hs-script-loader-public/v2/config/pixels-and-events/json?portalId=244662537",
+        "origin": "https://api-na2.hubapi.com",
+        "query_parameter_names": [
+          "portalId"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "xhr",
+      "txn": "request-216"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.klaviyo.com/onsite/js/onsite-triggering-v2.2f57e7d62195c.js?cb=2",
+        "origin": "https://static.klaviyo.com",
+        "query_parameter_names": [
+          "cb"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-217"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://px.ads.linkedin.com/collect?v=2&fmt=js&pid=7407844&time=1792022276749&li_adsId=[redacted]-2ec5-41fe-aa2e-158288b9d7e5&pageLoadId=e453b164-c7ec-44c6-a307-420b4d6b82db&url=https%3A%2F%2Fwww.briskteaching.com%2F&tm=gtmv2&cookiesTest=true&liSync=true",
+        "origin": "https://px.ads.linkedin.com",
+        "query_parameter_names": [
+          "v",
+          "fmt",
+          "pid",
+          "time",
+          "li_adsId",
+          "pageLoadId",
+          "url",
+          "tm",
+          "cookiesTest",
+          "liSync"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-218"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/api/fire-auth/v1/public/guest-tokens",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-219"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.klaviyo.com/onsite/js/4014.ccae962fcaa72.css",
+        "origin": "https://static.klaviyo.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "stylesheet",
+      "txn": "request-220"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.klaviyo.com/onsite/js/styles.f5ac5e657987c.js?cb=2",
+        "origin": "https://static.klaviyo.com",
+        "query_parameter_names": [
+          "cb"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-221"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.klaviyo.com/onsite/js/vendors~onsite-personalization~Render.a161bd9872e71.js?cb=2",
+        "origin": "https://static.klaviyo.com",
+        "query_parameter_names": [
+          "cb"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-222"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.klaviyo.com/onsite/js/vendors~customerHubRoot~Render.1d56e966b291c.js?cb=2",
+        "origin": "https://static.klaviyo.com",
+        "query_parameter_names": [
+          "cb"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-223"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.klaviyo.com/onsite/js/vendors~Render.ef256226715f1.js?cb=2",
+        "origin": "https://static.klaviyo.com",
+        "query_parameter_names": [
+          "cb"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-224"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.klaviyo.com/onsite/js/default~onsite-personalization~in_app_forms~Render.86590b8b39bf8.js?cb=2",
+        "origin": "https://static.klaviyo.com",
+        "query_parameter_names": [
+          "cb"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-225"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.klaviyo.com/onsite/js/Render.d7a16b6db8b02.js?cb=2",
+        "origin": "https://static.klaviyo.com",
+        "query_parameter_names": [
+          "cb"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-226"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/api/sentry-tunnel",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-227"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://analytics.tiktok.com/i18n/pixel/static/main.MWFjYmVlZGY0OQ.js",
+        "origin": "https://analytics.tiktok.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-228"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.google.com/pagead/1p-user-list/16557665821/?random=1792022276964&cv=11&fst=1792018800000&bg=ffffff&guid=ON&async=1&en=gtag.config&gtm=45je6ad1v9106921824z89180829587za20gzb9180829587zd9180829587xecxf1&gcd=13r3r3r3r5l1&dma=0&tcfd=10000&tag_exp=115938466~115938469~117227715~117776796~118897920~118897930~120213116~120385422~120469145~120469153~121246026~121246034~123322201&u_w=1366&u_h=900&url=https%3A%2F%2Fwww.briskteaching.com%2F&rcb=10&frm=0&tiba=Free%20AI%20Tools%20for%20Teachers%20and%20Educators%20%7C%20Brisk%20Teaching&did=dY2Q2ZW&gdid=dY2Q2ZW&hn=www.googleadservices.com&npa=0&pscdl=noapi&auid=145373511.1792022278&uaa=x86&uab=64&uafvl=Google%2520Chrome%3B155.0.8059.79%7CChromium%3B155.0.8059.79%7CNot(A%253ABrand%3B24.0.0.0&uamb=0&uam=&uap=Windows&uapv=19.0.0&uaw=0&_tu=CA&data=event%3Dgtag.config&ept=9&rfmt=3&fmt=3&is_vtc=1&cid=CAQS1AEAQM4h3EjNBR5CIVn-ma4zoymRVck-pCkiKIoiV4furiOQs6GfaUVGMsoIh70Ry0X1jBFLyvbWdEcTbkn1bsCN-WasiC3bMIiBJB2I0UNxNPjTixpPh507UU0nFkWyUK5u05bK_KWKG92sg-NTN9VKnMcs55Q8txj3UwvLDnE_ZSAYnVI8oGHIpfFhabuyjHGyOquaXUvTmQWmAfPmY5uzFHKG7teAQGxva5GgKBGWUSF4fbmsuYaN6VmQ6GI6qeOJ2SIMR4xLrwQYlzF8hmY4MIMi-Q&random=2979536646&rmt_tld=0&ipr=y",
+        "origin": "https://www.google.com",
+        "query_parameter_names": [
+          "random",
+          "cv",
+          "fst",
+          "bg",
+          "guid",
+          "async",
+          "en",
+          "gtm",
+          "gcd",
+          "dma",
+          "tcfd",
+          "tag_exp",
+          "u_w",
+          "u_h",
+          "url",
+          "rcb",
+          "frm",
+          "tiba",
+          "did",
+          "gdid",
+          "hn",
+          "npa",
+          "pscdl",
+          "auid",
+          "uaa",
+          "uab",
+          "uafvl",
+          "uamb",
+          "uam",
+          "uap",
+          "uapv",
+          "uaw",
+          "_tu",
+          "data",
+          "ept",
+          "rfmt",
+          "fmt",
+          "is_vtc",
+          "cid",
+          "random",
+          "rmt_tld",
+          "ipr"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-229"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.google.com.gh/pagead/1p-user-list/16557665821/?random=1792022276964&cv=11&fst=1792018800000&bg=ffffff&guid=ON&async=1&en=gtag.config&gtm=45je6ad1v9106921824z89180829587za20gzb9180829587zd9180829587xecxf1&gcd=13r3r3r3r5l1&dma=0&tcfd=10000&tag_exp=115938466~115938469~117227715~117776796~118897920~118897930~120213116~120385422~120469145~120469153~121246026~121246034~123322201&u_w=1366&u_h=900&url=https%3A%2F%2Fwww.briskteaching.com%2F&rcb=10&frm=0&tiba=Free%20AI%20Tools%20for%20Teachers%20and%20Educators%20%7C%20Brisk%20Teaching&did=dY2Q2ZW&gdid=dY2Q2ZW&hn=www.googleadservices.com&npa=0&pscdl=noapi&auid=145373511.1792022278&uaa=x86&uab=64&uafvl=Google%2520Chrome%3B155.0.8059.79%7CChromium%3B155.0.8059.79%7CNot(A%253ABrand%3B24.0.0.0&uamb=0&uam=&uap=Windows&uapv=19.0.0&uaw=0&_tu=CA&data=event%3Dgtag.config&ept=9&rfmt=3&fmt=3&is_vtc=1&cid=CAQS1AEAQM4h3EjNBR5CIVn-ma4zoymRVck-pCkiKIoiV4furiOQs6GfaUVGMsoIh70Ry0X1jBFLyvbWdEcTbkn1bsCN-WasiC3bMIiBJB2I0UNxNPjTixpPh507UU0nFkWyUK5u05bK_KWKG92sg-NTN9VKnMcs55Q8txj3UwvLDnE_ZSAYnVI8oGHIpfFhabuyjHGyOquaXUvTmQWmAfPmY5uzFHKG7teAQGxva5GgKBGWUSF4fbmsuYaN6VmQ6GI6qeOJ2SIMR4xLrwQYlzF8hmY4MIMi-Q&random=2979536646&rmt_tld=1&ipr=y",
+        "origin": "https://www.google.com.gh",
+        "query_parameter_names": [
+          "random",
+          "cv",
+          "fst",
+          "bg",
+          "guid",
+          "async",
+          "en",
+          "gtm",
+          "gcd",
+          "dma",
+          "tcfd",
+          "tag_exp",
+          "u_w",
+          "u_h",
+          "url",
+          "rcb",
+          "frm",
+          "tiba",
+          "did",
+          "gdid",
+          "hn",
+          "npa",
+          "pscdl",
+          "auid",
+          "uaa",
+          "uab",
+          "uafvl",
+          "uamb",
+          "uam",
+          "uap",
+          "uapv",
+          "uaw",
+          "_tu",
+          "data",
+          "ept",
+          "rfmt",
+          "fmt",
+          "is_vtc",
+          "cid",
+          "random",
+          "rmt_tld",
+          "ipr"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-230"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/api/feature-flags/v1/guest-external/resolve",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-231"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.googletagmanager.com/gtag/js?id=AW-16557665821",
+        "origin": "https://www.googletagmanager.com",
+        "query_parameter_names": [
+          "id"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-232"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.youtube.com/embed/oeMybUm5Tuc?wmode=opaque&widget_referrer=https%3A%2F%2Fwww.briskteaching.com%2F&enablejsapi=1&origin=https%3A%2F%2Fcdn.embedly.com&widgetid=1&forigin=https%3A%2F%2Fcdn.embedly.com%2Fwidgets%2Fmedia.html%3Fsrc%3Dhttps%253A%252F%252Fwww.youtube.com%252Fembed%252FoeMybUm5Tuc%253Ffeature%253Doembed%26display_name%3DYouTube%26url%3Dhttps%253A%252F%252Fwww.youtube.com%252Fshorts%252FoeMybUm5Tuc%253Ffeature%253Dshare%26image%3Dhttps%253A%252F%252Fi.ytimg.com%252Fvi%252FoeMybUm5Tuc%252Fhq2.jpg%26type%3Dtext%252Fhtml%26schema%3Dyoutube&aoriginsup=1&aorigins=https%3A%2F%2Fwww.briskteaching.com&gporigin=https%3A%2F%2Fwww.briskteaching.com%2F&vf=6",
+        "origin": "https://www.youtube.com",
+        "query_parameter_names": [
+          "wmode",
+          "widget_referrer",
+          "enablejsapi",
+          "origin",
+          "widgetid",
+          "forigin",
+          "aoriginsup",
+          "aorigins",
+          "gporigin",
+          "vf"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "document",
+      "txn": "request-233"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/api/feature-flags/v1/guest-external/resolve",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-234"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://googleads.g.doubleclick.net/pagead/id",
+        "origin": "https://googleads.g.doubleclick.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 302,
+      "resource_type": "xhr",
+      "txn": "request-235"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.doubleclick.net/instream/ad_status.js",
+        "origin": "https://static.doubleclick.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-236"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.youtube.com/s/_/ytembeds/_/js/k=ytembeds.base.en_US.PV-ftzrU6mI.es5.O/ck=ytembeds.base.RAFARmP1bTA.L.W.O/am=AAAAIA/d=1/exm=base,root/excm=base,root/ed=1/br=1/rs=AGKMywEDpg8nFBP8PcNW4t7QRr5YcHI2SA/m=r78Drb",
+        "origin": "https://www.youtube.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-237"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://googleads.g.doubleclick.net/pagead/id",
+        "origin": "https://googleads.g.doubleclick.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 302,
+      "resource_type": "xhr",
+      "txn": "request-238"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.doubleclick.net/instream/ad_status.js",
+        "origin": "https://static.doubleclick.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-239"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.youtube.com/s/_/ytembeds/_/js/k=ytembeds.base.en_US.PV-ftzrU6mI.es5.O/ck=ytembeds.base.RAFARmP1bTA.L.W.O/am=AAAAIA/d=1/exm=base,root/excm=base,root/ed=1/br=1/rs=AGKMywEDpg8nFBP8PcNW4t7QRr5YcHI2SA/m=r78Drb",
+        "origin": "https://www.youtube.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-240"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.google.com/js/th/Soe1m5QWz3lag4rTy5QITJOnD-eWm03HjQmX2iCBADY.js",
+        "origin": "https://www.google.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-241"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.google.com/js/th/Soe1m5QWz3lag4rTy5QITJOnD-eWm03HjQmX2iCBADY.js",
+        "origin": "https://www.google.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-242"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.youtube.com/s/player/21090930/www-player.css",
+        "origin": "https://www.youtube.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "stylesheet",
+      "txn": "request-243"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.youtube.com/s/_/ytembeds/_/ss/k=ytembeds.base.RAFARmP1bTA.L.W.O/am=AAAAIA/d=1/br=1/rs=AGKMywE8B-_evQ47th2OE02LdhnLnj9dpg/m=root,base",
+        "origin": "https://www.youtube.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "stylesheet",
+      "txn": "request-244"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://fonts.gstatic.com/s/roboto/v48/KFO7CnqEu92Fr1ME7kSn66aGLdTylUAMa3yUBA.woff2",
+        "origin": "https://fonts.gstatic.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "font",
+      "txn": "request-245"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.youtube.com/s/_/ytembeds/_/js/k=ytembeds.base.en_US.PV-ftzrU6mI.es5.O/am=AAAAIA/d=1/excm=base,root/br=1/rs=AGKMywF0TafqzjqhF1aCnBZ3LyLRey0SkA/m=root,base",
+        "origin": "https://www.youtube.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-246"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.youtube.com/s/player/21090930/player_embed.vflset/en_US/base.js",
+        "origin": "https://www.youtube.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-247"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://googleads.g.doubleclick.net/pagead/id",
+        "origin": "https://googleads.g.doubleclick.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 302,
+      "resource_type": "xhr",
+      "txn": "request-248"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://static.doubleclick.net/instream/ad_status.js",
+        "origin": "https://static.doubleclick.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-249"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.youtube.com/s/_/ytembeds/_/js/k=ytembeds.base.en_US.PV-ftzrU6mI.es5.O/ck=ytembeds.base.RAFARmP1bTA.L.W.O/am=AAAAIA/d=1/exm=base,root/excm=base,root/ed=1/br=1/rs=AGKMywEDpg8nFBP8PcNW4t7QRr5YcHI2SA/m=r78Drb",
+        "origin": "https://www.youtube.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-250"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://fonts.gstatic.com/s/inter/v20/UcCo3FwrK3iLTcviYwY.woff2",
+        "origin": "https://fonts.gstatic.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "font",
+      "txn": "request-251"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://ph-proxy.chilipiper.com/static/exception-autocapture.js?v=1.275.1",
+        "origin": "https://ph-proxy.chilipiper.com",
+        "query_parameter_names": [
+          "v"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-252"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://ph-proxy.chilipiper.com/array/phc_Ygt3YTxNy3aPuU2BjFSK42G6vIMK0LQ5MPc6Uc4hM93/config.js",
+        "origin": "https://ph-proxy.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-253"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://ph-proxy.chilipiper.com/flags/?v=2&config=true&ip=0&_=1792022279178&ver=1.275.1&compression=base64",
+        "origin": "https://ph-proxy.chilipiper.com",
+        "query_parameter_names": [
+          "v",
+          "config",
+          "ip",
+          "_",
+          "ver",
+          "compression"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-254"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/api/concierge/v1/guest-external/tenant/briskteaching.com/router/copy-of-demo-request---hubspot-form-march-16-2026",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-255"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/api/concierge/v1/guest-external/tenant/briskteaching.com/pre-submission-settings",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-256"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.google.com/js/th/Soe1m5QWz3lag4rTy5QITJOnD-eWm03HjQmX2iCBADY.js",
+        "origin": "https://www.google.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-257"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://googleads.g.doubleclick.net/pagead/id?slf_rd=1",
+        "origin": "https://googleads.g.doubleclick.net",
+        "query_parameter_names": [
+          "slf_rd"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "xhr",
+      "txn": "request-258"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://i.ytimg.com/vi/rHI3qQ_vt9E/maxresdefault.jpg?sqp=-oaymwEmCIAKENAF8quKqQMa8AEB-AHOBYACgAqKAgwIABABGHIgXCg3MA8=&rs=AOn4CLABnApWUTe8mZlFVnzVz4dI8SPkow",
+        "origin": "https://i.ytimg.com",
+        "query_parameter_names": [
+          "sqp",
+          "rs"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-259"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://analytics.tiktok.com/i18n/pixel/static/identify_0504602d.js",
+        "origin": "https://analytics.tiktok.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-260"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://analytics-ipv6.tiktokw.us/ipv6/enrich_ipv6",
+        "origin": "https://analytics-ipv6.tiktokw.us",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "ping",
+      "txn": "request-261"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://analytics.tiktok.com/api/v2/pixel",
+        "origin": "https://analytics.tiktok.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "ping",
+      "txn": "request-262"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://analytics.tiktok.com/api/v2/pixel",
+        "origin": "https://analytics.tiktok.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "ping",
+      "txn": "request-263"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/api/customization-settings/v1/guest-external/tenant/briskteaching.com/smart-parameters/by-keys",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-264"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/api/chili-crm/v1/public/tenant/briskteaching.com/list?ref=PersonFirstName&ref=PersonLastName&ref=PersonEmail&ref=CompanyName&ref=9f88e364-e522-4087-878f-d7961af99f3c&ref=731d8c89-e0cf-4385-9040-391371448471&ref=cc553649-8ccd-4d22-a2dc-97d9dd3745de&ref=12b6afef-506f-4661-bfa3-4073bb374d4f&ref=264a2423-a80c-487f-b592-371204fac921&ref=e6eb3ec1-d5df-4eaa-aa86-884a44921776&ref=PersonCountry&ref=044cfb15-f395-4745-9f70-931347ec3ed3",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [
+          "ref",
+          "ref",
+          "ref",
+          "ref",
+          "ref",
+          "ref",
+          "ref",
+          "ref",
+          "ref",
+          "ref",
+          "ref",
+          "ref"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-265"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://briskteaching.chilipiper.com/api/workspaces/v3/guest-external/tenant/briskteaching.com/workspace/d57a6bcf-29cb-4085-86d7-94babcc0fd20/applied-branding",
+        "origin": "https://briskteaching.chilipiper.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-266"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://googleads.g.doubleclick.net/pagead/id?slf_rd=1",
+        "origin": "https://googleads.g.doubleclick.net",
+        "query_parameter_names": [
+          "slf_rd"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "xhr",
+      "txn": "request-267"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://i.ytimg.com/vi/7fLMtawWpjk/maxresdefault.jpg?sqp=-oaymwEmCIAKENAF8quKqQMa8AEB-AHOBYACgAqKAgwIABABGHIgTShCMA8=&rs=AOn4CLCIszpKeHVk9JWYWY4qz_KrbOz3fw",
+        "origin": "https://i.ytimg.com",
+        "query_parameter_names": [
+          "sqp",
+          "rs"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-268"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://i.ytimg.com/vi/oeMybUm5Tuc/maxresdefault.jpg?sqp=-oaymwEmCIAKENAF8quKqQMa8AEB-AHOBYACgAqKAgwIABABGGUgYShXMA8=&rs=AOn4CLDpfbE19t36b7jXsapi7uDSTwLTwA",
+        "origin": "https://i.ytimg.com",
+        "query_parameter_names": [
+          "sqp",
+          "rs"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-269"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://googleads.g.doubleclick.net/pagead/id?slf_rd=1",
+        "origin": "https://googleads.g.doubleclick.net",
+        "query_parameter_names": [
+          "slf_rd"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "xhr",
+      "txn": "request-270"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://analytics.tiktok.com/api/v2/pixel/act",
+        "origin": "https://analytics.tiktok.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "ping",
+      "txn": "request-271"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.youtube.com/generate_204?eKICgQ",
+        "origin": "https://www.youtube.com",
+        "query_parameter_names": [
+          "eKICgQ"
+        ],
+        "redacted": false
+      },
+      "status": 204,
+      "resource_type": "image",
+      "txn": "request-272"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.youtube.com/generate_204?aq-MXQ",
+        "origin": "https://www.youtube.com",
+        "query_parameter_names": [
+          "aq-MXQ"
+        ],
+        "redacted": false
+      },
+      "status": 204,
+      "resource_type": "image",
+      "txn": "request-273"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://jnn-pa.googleapis.com/$rpc/google.internal.waa.v1.Waa/GenerateIT",
+        "origin": "https://jnn-pa.googleapis.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "xhr",
+      "txn": "request-274"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://jnn-pa.googleapis.com/$rpc/google.internal.waa.v1.Waa/GenerateIT",
+        "origin": "https://jnn-pa.googleapis.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "xhr",
+      "txn": "request-275"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://www.youtube.com/generate_204?8o9Zew",
+        "origin": "https://www.youtube.com",
+        "query_parameter_names": [
+          "8o9Zew"
+        ],
+        "redacted": false
+      },
+      "status": 204,
+      "resource_type": "image",
+      "txn": "request-276"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://jnn-pa.googleapis.com/$rpc/google.internal.waa.v1.Waa/GenerateIT",
+        "origin": "https://jnn-pa.googleapis.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "xhr",
+      "txn": "request-277"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://track-na2.hubspot.com/__ptq.gif?k=1&sd=1366x900&cd=24-bit&cs=UTF-8&ln=en-us&bfp=ef8807c8b6803a5b55204ef898c2d300&v=1.1&a=244662537&rcu=https%3A%2F%2Fwww.briskteaching.com%2F&pu=https%3A%2F%2Fwww.briskteaching.com%2F&t=Free+AI+Tools+for+Teachers+and+Educators+%7C+Brisk+Teaching&cts=1792022280302&vi=4262c62b78849276bde9ecf2f7acb66a&nc=true&u=243973658.4262c62b78849276bde9ecf2f7acb66a.1792022280300.1792022280300.1792022280300.1&b=243973658.1.1792022280300&cc=15",
+        "origin": "https://track-na2.hubspot.com",
+        "query_parameter_names": [
+          "k",
+          "sd",
+          "cd",
+          "cs",
+          "ln",
+          "bfp",
+          "v",
+          "a",
+          "rcu",
+          "pu",
+          "t",
+          "cts",
+          "vi",
+          "nc",
+          "u",
+          "b",
+          "cc"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-278"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.prod.website-files.com/6a6b7e36c7e8274794581e32/6a6b7e36c7e8274794582e22_Brisk%20Logo.png",
+        "origin": "https://cdn.prod.website-files.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "other",
+      "txn": "request-279"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://www.youtube.com/youtubei/v1/log_event?alt=json",
+        "origin": "https://www.youtube.com",
+        "query_parameter_names": [
+          "alt"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "xhr",
+      "txn": "request-280"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://www.youtube.com/youtubei/v1/log_event?alt=json",
+        "origin": "https://www.youtube.com",
+        "query_parameter_names": [
+          "alt"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "xhr",
+      "txn": "request-281"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://www.youtube.com/youtubei/v1/log_event?alt=json",
+        "origin": "https://www.youtube.com",
+        "query_parameter_names": [
+          "alt"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "xhr",
+      "txn": "request-282"
+    }
+  ],
+  "console": [
+    {
+      "level": "warning",
+      "text": "Klaviyo tracking is disabled. To enable, set the cookie \"__kla_off\" to false. {is_robot: true, __kla_off: }"
+    },
+    {
+      "level": "log",
+      "text": "Concierge version 1.240.0"
+    },
+    {
+      "level": "log",
+      "text": "{data: Object, link: https://briskteaching.chilipiper.com/concierge-rouΓÇª&sourceUrl=https%3A%2F%2Fwww.briskteaching.com%2F}"
+    },
+    {
+      "level": "warning",
+      "text": "Allow attribute will take precedence over 'allowfullscreen'."
+    },
+    {
+      "level": "log",
+      "text": "1 swiper(s) initialised"
+    },
+    {
+      "level": "log",
+      "text": "no fs-richtext elements."
+    },
+    {
+      "level": "warning",
+      "text": "Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('https://www.youtube.com') does not match the recipient window's origin ('https://cdn.embedly.com')."
+    },
+    {
+      "level": "warning",
+      "text": "Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('https://www.youtube.com') does not match the recipient window's origin ('https://cdn.embedly.com')."
+    },
+    {
+      "level": "log",
+      "text": "Schedule app version: 3.366.0"
+    },
+    {
+      "level": "warning",
+      "text": "The powerPreference option is currently ignored when calling requestAdapter() on Windows. See https://crbug.com/369219127"
+    },
+    {
+      "level": "warning",
+      "text": "The powerPreference option is currently ignored when calling requestAdapter() on Windows. See https://crbug.com/369219127"
+    },
+    {
+      "level": "warning",
+      "text": "The powerPreference option is currently ignored when calling requestAdapter() on Windows. See https://crbug.com/369219127"
+    }
+  ],
+  "page_errors": [],
+  "websockets": [],
+  "downloads": [],
+  "screenshots": [
+    {
+      "step": "settle",
+      "file": "C:\\Users\\SAVIOUR\\AppData\\Local\\Temp\\opencode\\rea\\ex_brisk_home\\screenshot_settle.png",
+      "bytes": 348639
+    }
+  ],
+  "final_url": {
+    "url": "https://www.briskteaching.com/",
+    "origin": "https://www.briskteaching.com",
+    "query_parameter_names": [],
+    "redacted": false
+  }
+}

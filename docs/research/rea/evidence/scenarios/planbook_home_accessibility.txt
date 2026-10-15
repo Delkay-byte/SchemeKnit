@@ -1,0 +1,149 @@
+- document:
+  - link "Skip to Main Content":
+    - /url: "#main-content"
+  - banner:
+    - link "Planbook homepage":
+      - /url: /
+      - img "Planbook Logo"
+    - navigation:
+      - link "Navigate to Teachers page":
+        - /url: /teachers
+        - text: Teachers
+      - link "Navigate to Schools page":
+        - /url: /schools
+        - text: Schools
+      - link "Navigate to Pricing page":
+        - /url: /pricing
+        - text: Pricing
+      - link "Navigate to Mobile Apps page":
+        - /url: /mobile-apps
+        - text: Mobile Apps
+      - link "Navigate to Help page":
+        - /url: /help
+        - text: Help
+      - button "Select language": EN
+      - button "Login or register for Planbook": Login or Register
+  - main:
+    - heading "Welcome to Planbook!" [level=1]
+    - heading "The established leader in online lesson planning" [level=2]
+    - button "Start your 90 day free trial with Planbook": 90 Day Free trial >>
+    - img "Screenshot of the Planbook weekly schedule interface showing color-coded lesson blocks for different subjects"
+    - text: Why is Planbook preferred by educators?
+    - list:
+      - listitem:
+        - text: We offer the most features for
+        - link "Navigate to Teachers page":
+          - /url: /teachers
+          - text: Teachers
+        - text: and
+        - link "Navigate to Schools page":
+          - /url: /schools
+          - text: Schools
+      - listitem:
+        - text: We offer an
+        - link "Navigate to Pricing page":
+          - /url: /pricing
+          - text: unbeatable price
+      - listitem:
+        - text: Outstanding support plus
+        - link "Visit Planbook knowledge base (opens in new tab)":
+          - /url: https://help.planbook.com/
+          - text: knowledge base
+        - text: and
+        - link "Visit Planbook video tutorials (opens in new tab)":
+          - /url: https://help.planbook.com/video-library
+          - text: tutorials
+      - listitem: Our student learning standards are meticulous
+      - listitem: Our product is always improving thanks to user feedback
+    - link "Schedule a demo with Planbook (opens in new tab)":
+      - /url: https://calendly.com/planbook-success/planbook-product-demo
+      - text: Want to learn more? Schedule a Demo!
+    - text: This program has consistently adapted to the needs teachers have without sacrificing the simplicity that attracted me in the first place. The customer service is second to none. -Lea Klein I've used planbook for years! I love that I can plan things out... when, something changes, I can easily move it, bump it or delete it. One year my schedule changed 5 times, no icky eraser marks! ... -Erica Keller All the right features It's the details that matter and as you explore all the functionality we offer in terms of class scheduling, lesson development and management, teacher collaboration, administrator options, student views and more, you'll find that we offer far more capabilities than any other tool on the market. Learn more about our extensive features for
+    - link "Navigate to Teachers page":
+      - /url: /teachers
+      - text: Teachers
+    - text: and
+    - link "Navigate to Schools page":
+      - /url: /schools
+      - text: Schools
+    - text: .
+    - img "Planbook lesson planning interface"
+    - text: Best value on the market We understand how important every single dollar is to our teachers, and we take pride in the fact that our $20 annual price for a full featured toolset is the lowest on the market. There is no need to worry that it will cost extra to access the features you really need. We also provide price
+    - link "Navigate to Pricing page":
+      - /url: /pricing
+      - text: discounts
+    - text: for multi-year purchases and school accounts, to help our teachers and schools save even more. Superb documentation and support Our dedicated support team is all about teacher success. Average response time is consistently under one hour, and in most cases is less than 15 minutes. We also maintain an extensive knowledge base
+    - link "Visit Planbook knowledge base (opens in new tab)":
+      - /url: https://help.planbook.com/
+      - text: knowledge base
+    - text: with over 100 articles and a wide array of video tutorials
+    - link "Visit Planbook video tutorials (opens in new tab)":
+      - /url: https://help.planbook.com/video-library
+      - text: video tutorials
+    - text: . Finally, we offer training webinars for teachers and schools, available at no cost.
+    - img "Screenshot of the Planbook Knowledge Base showing categories like Video Tutorials and Basics"
+    - text: Meticulously vetted standards We add thousands of new standards each year, and every one is reviewed by our content team to ensure it is correct, complete, and meets our teachers' needs before it is added to our repository. There is no need to worry about incomplete, duplicate, or out of date standards added without a review process. We're always learning and growing It's fun to
+    - link "Navigate to About page":
+      - /url: /about
+      - text: look back
+    - text: at our initial product offering in August of 2010, what a long way we've come! At Planbook, we add new features, both small and large, as well as usability improvements, on a quarterly basis. We listen and have completed over 1,200 items requested by our teachers!
+    - img "Screenshot of the Planbook suggestion board where users can submit and vote on feature ideas"
+    - heading "Find out why Planbook is best online lesson planner for teachers and schools" [level=1]
+    - button "Start your 90 day free trial with Planbook": Start your 90 Day Free Trial >>
+  - contentinfo:
+    - heading "Contact Us" [level=2]
+    - link "Schedule a meeting with Planbook (opens in new tab)":
+      - /url: https://calendly.com/planbook-success
+      - text: Schedule a Meeting with Planbook!
+    - text: P.O. Box 549, Yorkville, IL 60560
+    - heading "Site Navigation" [level=3]
+    - list:
+      - listitem:
+        - link "Navigate to About page":
+          - /url: /about
+          - text: About
+      - listitem:
+        - link "Navigate to Terms of Service page":
+          - /url: /help/terms
+          - text: Terms
+      - listitem:
+        - link "Navigate to Privacy Policy page":
+          - /url: /help/privacy
+          - text: Privacy
+      - listitem:
+        - link "Navigate to Help page":
+          - /url: /help
+          - text: Help
+      - listitem:
+        - link "Navigate to Careers page":
+          - /url: /careers
+          - text: Careers
+    - heading "Product Navigation" [level=3]
+    - list:
+      - listitem:
+        - link "Navigate to Pricing page":
+          - /url: /pricing
+          - text: Pricing
+      - listitem:
+        - link "Navigate to Schools page":
+          - /url: /schools
+          - text: Schools
+      - listitem:
+        - link "Navigate to Teachers page":
+          - /url: /teachers
+          - text: Teachers
+      - listitem:
+        - link "Navigate to Mobile Apps page":
+          - /url: /mobile-apps
+          - text: Mobile Apps
+    - button "Start your 90 day free trial": Start your 90-day free trial >>
+    - text: Connect with Us
+    - link "Visit Planbook on Facebook (opens in new tab)":
+      - /url: https://www.facebook.com/planbookcom
+    - link "Follow Planbook on Instagram (opens in new tab)":
+      - /url: https://www.instagram.com/planbookcom
+    - link "Connect with Planbook on LinkedIn (opens in new tab)":
+      - /url: https://www.linkedin.com/company/planbook/
+    - link "Subscribe to Planbook on YouTube (opens in new tab)":
+      - /url: https://www.youtube.com/user/PlanbookSupport/
+    - paragraph: ┬⌐ Planbook - All rights reserved.

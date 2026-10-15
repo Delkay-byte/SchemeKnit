@@ -1,0 +1,99 @@
+- document:
+  - banner:
+    - link "Skip to content":
+      - /url: "#main-content"
+    - text: English
+    - button "Show submenu for translations"
+    - text: Hello! How can we help you?
+    - combobox "This is a search field with an auto-suggest feature attached."
+    - button "Search"
+    - listbox "term":
+      - option "There are no suggestions because the search field is empty."
+    - status
+  - main:
+    - list:
+      - listitem:
+        - link "Planbook Help Center":
+          - /url: https://help.planbook.com/
+        - text: ">"
+      - listitem:
+        - link "Lesson Layouts":
+          - /url: https://help.planbook.com/lesson-layouts
+    - heading "Lesson Layouts" [level=1]
+    - paragraph: Customize the structure of your lesson plans to meet the instructional needs of your classroom.
+    - heading "Overview" [level=2]
+    - list:
+      - listitem:
+        - link "Overview - Lesson Layouts":
+          - /url: https://help.planbook.com/knowledgebase/articles/2010419-overview-lesson-layouts
+    - heading "Videos" [level=2]
+    - list:
+      - listitem:
+        - 'link "Video Tutorial: Lesson Layouts"':
+          - /url: https://help.planbook.com/video-lesson-layouts-overview
+    - heading "Articles" [level=2]
+    - list:
+      - listitem:
+        - link "How to add a Lesson Layout":
+          - /url: https://help.planbook.com/knowledgebase/articles/2010710-how-to-add-a-lesson-layout
+      - listitem:
+        - link "How to edit a Lesson Layout":
+          - /url: https://help.planbook.com/knowledgebase/articles/2010713-how-to-edit-a-lesson-layout
+      - listitem:
+        - link "How to apply a Lesson Layout to a Class":
+          - /url: https://help.planbook.com/knowledgebase/articles/2010722-how-to-apply-a-lesson-layout-to-a-class
+      - listitem:
+        - link "How to apply a Lesson Layout to a School Year":
+          - /url: https://help.planbook.com/knowledgebase/articles/2010725-how-to-apply-a-lesson-layout-to-a-school-year
+      - listitem:
+        - link "How to delete a Lesson Layout":
+          - /url: https://help.planbook.com/knowledgebase/articles/2010719-how-to-delete-a-lesson-layout
+    - button "See more Γû╝"
+    - complementary:
+      - menu "Category menu":
+        - button "Toggle subcategory menu for New to Planbook?"
+        - menuitem "New to Planbook?"
+        - button "Toggle subcategory menu for Account Information"
+        - menuitem "Account Information"
+        - button "Toggle subcategory menu for Display & Navigation"
+        - menuitem "Display & Navigation"
+        - button "Toggle subcategory menu for School Years"
+        - menuitem "School Years"
+        - button "Toggle subcategory menu for Lesson Layouts" [expanded]
+        - menuitem "Lesson Layouts"
+        - menu:
+          - menuitem "Overview"
+          - menuitem "Videos"
+          - menuitem "Articles"
+        - button "Toggle subcategory menu for Classes"
+        - menuitem "Classes"
+        - button "Toggle subcategory menu for Lessons"
+        - menuitem "Lessons"
+        - button "Toggle subcategory menu for Templates"
+        - menuitem "Templates"
+        - button "Toggle subcategory menu for Events & Stickers"
+        - menuitem "Events & Stickers"
+        - button "Toggle subcategory menu for Share & Collaborate"
+        - menuitem "Share & Collaborate"
+        - button "Toggle subcategory menu for Units"
+        - menuitem "Units"
+        - button "Toggle subcategory menu for Students & Views"
+        - menuitem "Students & Views"
+        - button "Toggle subcategory menu for Grades & Performance"
+        - menuitem "Grades & Performance"
+        - button "Toggle subcategory menu for Notes & To Do"
+        - menuitem "Notes & To Do"
+        - button "Toggle subcategory menu for Mobile App"
+        - menuitem "Mobile App"
+        - button "Toggle subcategory menu for Integrations & SSO"
+        - menuitem "Integrations & SSO"
+        - button "Toggle subcategory menu for Video Library"
+        - menuitem "Video Library"
+        - button "Toggle subcategory menu for Contact Planbook"
+        - menuitem "Contact Planbook"
+  - contentinfo:
+    - paragraph: planbook.com Help Center
+    - paragraph: Copyright ┬⌐ 2025, Planbook
+  - region "Chat Widget":
+    - iframe
+    - img

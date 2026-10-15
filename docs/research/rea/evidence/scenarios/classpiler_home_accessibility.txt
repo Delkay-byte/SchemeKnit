@@ -1,0 +1,109 @@
+- document:
+  - navigation:
+    - link "Rootabytes Rootabytes":
+      - /url: /
+      - img "Rootabytes"
+      - text: Rootabytes
+    - link "Home":
+      - /url: /
+    - link "About":
+      - /url: /about
+    - link "Products":
+      - /url: /products
+    - link "GMP":
+      - /url: /gmp
+    - link "Contact":
+      - /url: /contact
+  - main:
+    - heading "Classpiler" [level=1]
+    - paragraph: AI-Powered Lesson Planning, Assessment Generation & Learner Diagnostics for Ghanaian Teachers
+    - paragraph: Create GES NaCCA-compliant lesson plans, assessments, and diagnostic reports in minutes. Classpiler uses Claude Haiku 4.5 to help Ghanaian educators plan better, diagnose learning gaps in real-time, generate targeted remedial lessons, and teach more effectively, all with full offline PWA support.
+    - link "Try Live Demo":
+      - /url: https://classpiler.com
+    - img "Classpiler"
+    - text: Active
+    - heading "Key Features" [level=2]
+    - heading "Complete GES NaCCA Curriculum Coverage" [level=3]
+    - paragraph: "Basic 1-9: All subjects including Mathematics, English Language, Science, Creative Arts, Physical Education, and Computing. SHS 1-3: Mathematics and English Language. Imported from official GES NaCCA PDFs and continuously updated."
+    - heading "AI-Powered Lesson Plan Generation (Claude Haiku 4.5)" [level=3]
+    - paragraph: Advanced AI creates culturally relevant, engaging lesson content with RPK (Review, Presentation, Conclusion), clear objectives, activities, and assessments tailored to Ghanaian classrooms.
+    - heading "Real-Time Learner Diagnostics System" [level=3]
+    - paragraph: "Solo Mode: Assess individual students with strand-specific diagnostics. Class Mode: Up to 28+ students join via 6-character codes using Socket.IO. Live monitoring dashboard shows completion progress in real-time."
+    - heading "Automated Gap Profiling & Remedial Plans" [level=3]
+    - paragraph: AI analyzes diagnostic results to identify specific weaknesses (well below grade, below grade, approaching grade level). Generates targeted mini-lessons for each gap with objectives, warm-ups, teaching strategies, and practice questions.
+    - heading "Term & Annual Schemes of Learning" [level=3]
+    - paragraph: Generate comprehensive schemes mapped to GES content standards with logical progression. Export to PDF or Excel for printing and sharing with head teachers.
+    - heading "GES-Aligned Assessments with Cultural Context" [level=3]
+    - paragraph: Multiple choice, short answer, and essay questions with difficulty progression. Every question includes Ghanaian names, GHΓé╡ currency, and local contexts (Makola Market, Accra, Kumasi).
+    - heading "Progressive Web App (PWA) with Offline Support" [level=3]
+    - paragraph: Install on Android, iOS, or desktop. Full offline access to cached lesson plans, assessments, and curriculum data. Service worker ensures content availability even without internet.
+    - heading "Push Notifications & Smart Alerts" [level=3]
+    - paragraph: Firebase Cloud Messaging integration for subscription expiry warnings, payment confirmations, curriculum updates, and feature announcements. Scheduled daily at 9 AM Ghana time.
+    - heading "Educational SVG Diagram Library" [level=3]
+    - paragraph: Reusable educational diagrams with AI-powered matching to lesson content. Validated for educational accuracy and automatically integrated into lesson plans.
+    - heading "Dual Payment Gateway" [level=3]
+    - paragraph: Paystack for card payments and mobile money. Hubtel for direct MTN, Vodafone, and AirtelTigo mobile money integration with webhook deduplication.
+    - heading "4+ Hours Saved Per Week" [level=3]
+    - paragraph: Automate lesson planning, assessment creation, and diagnostic analysis. Reclaim your evenings and weekends for yourself, your family, and professional development.
+    - heading "Culturally Authentic Ghanaian Content" [level=3]
+    - paragraph: Every piece of content features Ghanaian names (Kofi, Ama, Kwame, Abena), Ghana Cedis (GHΓé╡), and local places. Built by a Ghanaian educator who understands your classroom context.
+    - heading "About Classpiler" [level=2]
+    - paragraph: Classpiler is Ghana's premier AI-powered educational platform combining lesson planning, assessment generation, and learner diagnostics. Specifically designed for teachers working within the Ghana Education Service (GES) NaCCA curriculum framework, covering Basic 1-9 (all subjects) and SHS 1-3 (Mathematics and English Language).
+    - paragraph: "Built by a Ghanaian educator for Ghanaian educators, Classpiler revolutionizes teaching with three core systems: 1. **Content Generation**: AI-powered lesson plans, assessments, and schemes of learning that are culturally authentic and GES NaCCA-aligned, powered by Claude Haiku 4.5. 2. **Learner Diagnostics**: Real-time diagnostic assessments in Solo mode (individual students) or Class mode (up to 28+ students joining via 6-character codes). Automated gap profiling identifies specific learning weaknesses across literacy, numeracy, and full curriculum diagnostics. 3. **Remedial Planning**: AI-generated mini-lessons targeting each identified gap, complete with objectives, timed warm-ups, teaching strategies, guided practice, and assessment questions."
+    - paragraph: Works completely offline as a Progressive Web App, saving you over 4 hours per week on planning, assessment, and diagnostic work. All content includes Ghanaian cultural contexts, from names (Kofi, Ama, Kwame) to currency (GHΓé╡) and local references (Makola Market, Kumasi).
+    - heading "Category" [level=3]
+    - paragraph: Education
+    - heading "Built on Rootabytes' Foundation" [level=2]
+    - paragraph: Classpiler leverages cutting-edge technology to deliver a seamless experience
+    - heading "AI Engine" [level=3]
+    - paragraph: Powered by Anthropic's Claude 3.5 Haiku - the most advanced AI for educational content
+    - heading "Curriculum Database" [level=3]
+    - paragraph: MongoDB with complete GES standards library
+    - heading "Frontend" [level=3]
+    - paragraph: React 18 with responsive design for all devices
+    - heading "Backend" [level=3]
+    - paragraph: Node.js with Express for reliable performance
+    - heading "Authentication" [level=3]
+    - paragraph: Secure Firebase authentication
+    - heading "Hosting" [level=3]
+    - paragraph: Cloud infrastructure for 24/7 availability
+    - heading "Ready to Get Started?" [level=2]
+    - paragraph: Join thousands of educators and content creators who are already using Classpilerto create amazing learning experiences.
+    - link "Contact Sales":
+      - /url: /contact
+    - link "View All Products":
+      - /url: /products
+  - contentinfo:
+    - heading "Rootabytes" [level=3]
+    - paragraph: "\"Rooted in Culture. Powered by Technology.\""
+    - paragraph: Bridging the gap between culture and technology through education, creativity, and innovation.
+    - heading "Quick Links" [level=4]
+    - link "Home":
+      - /url: /
+    - link "About":
+      - /url: /about
+    - link "Products":
+      - /url: /products
+    - link "Contact":
+      - /url: /contact
+    - heading "Products" [level=4]
+    - link "Classpiler":
+      - /url: https://classpiler.com
+    - link "Kasa Quest":
+      - /url: /kasa-quest
+    - link "Learner Visibility":
+      - /url: /learner-visibility
+    - link "All Products":
+      - /url: /products
+    - heading "Connect" [level=4]
+    - text: LinkedIn Twitter Instagram YouTube
+    - heading "Legal" [level=4]
+    - link "Privacy Policy":
+      - /url: /privacy-policy
+    - link "Terms of Service":
+      - /url: /terms-of-service
+    - link "Cookie Policy":
+      - /url: /cookie-policy
+    - link "Data Retention":
+      - /url: /data-retention
+    - paragraph: ┬⌐ 2026 Rootabytes. All rights reserved.

@@ -1,0 +1,166 @@
+- document:
+  - main:
+    - navigation:
+      - link "StudyPlugHub Study Plug ≡ƒîì":
+        - /url: /
+        - img "StudyPlugHub"
+        - text: Study Plug ≡ƒîì
+      - button "Tools"
+      - button "About"
+      - link "FAQ":
+        - /url: https://studyplughub.com/faq
+      - link "Contact":
+        - /url: mailto:hello@studyplughub.com
+      - link "TikTok":
+        - /url: https://www.tiktok.com/@studyplughub
+        - img
+      - link "YouTube":
+        - /url: https://www.youtube.com/@studyplughub
+        - img
+      - text: ≡ƒæ⌐ΓÇì≡ƒÅ½ Educator Hub
+      - link "Login":
+        - /url: /login
+        - button "Login"
+      - link "Sign Up Free":
+        - /url: /signup
+        - button "Sign Up Free"
+    - text: ≡ƒîì Built for African Educators ΓÇö Powered by AI
+    - heading "The Teacher Hub for African Educators" [level=1]
+    - paragraph: AI tools built specifically for the realities of teaching in Africa. Save hours every week, teach better, and take care of yourself too.
+    - text: 54 African Countries 7 AI Tools 100% Free Access Most Popular
+    - link "≡ƒôï Lesson Planner Generate complete structured lesson plans aligned to your curriculum in seconds Open Tool ΓåÆ":
+      - /url: /lesson-planner
+      - text: ≡ƒôï
+      - heading "Lesson Planner" [level=3]
+      - paragraph: Generate complete structured lesson plans aligned to your curriculum in seconds
+      - text: Open Tool ΓåÆ
+    - paragraph: Tutorial
+    - button "Watch the Lesson Planner tutorial video": Watch tutorial
+    - text: Time Saver
+    - link "≡ƒô¥ Exam Generator Create professional exam papers with marking schemes for any subject and level Open Tool ΓåÆ":
+      - /url: /exam-generator
+      - text: ≡ƒô¥
+      - heading "Exam Generator" [level=3]
+      - paragraph: Create professional exam papers with marking schemes for any subject and level
+      - text: Open Tool ΓåÆ
+    - paragraph: Tutorial
+    - button "Watch the Exam Generator tutorial video": Watch tutorial
+    - link "≡ƒôÜ Assignment Creator Build engaging assignments with rubrics tailored to your students level Open Tool ΓåÆ":
+      - /url: /assignment-creator
+      - text: ≡ƒôÜ
+      - heading "Assignment Creator" [level=3]
+      - paragraph: Build engaging assignments with rubrics tailored to your students level
+      - text: Open Tool ΓåÆ
+    - paragraph: Tutorial
+    - button "Watch the Assignment Creator tutorial video": Watch tutorial
+    - text: Teachers Love This
+    - link "≡ƒôè Report Card Writer Write personalised professional student report comments for entire classes instantly Open Tool ΓåÆ":
+      - /url: /report-card
+      - text: ≡ƒôè
+      - heading "Report Card Writer" [level=3]
+      - paragraph: Write personalised professional student report comments for entire classes instantly
+      - text: Open Tool ΓåÆ
+    - paragraph: Tutorial
+    - button "Watch the Report Card Writer tutorial video": Watch tutorial
+    - link "ΓÜí Resource Summariser Transform any textbook content into ready-to-teach notes quizzes and discussion questions Open Tool ΓåÆ":
+      - /url: /resource-summariser
+      - text: ΓÜí
+      - heading "Resource Summariser" [level=3]
+      - paragraph: Transform any textbook content into ready-to-teach notes quizzes and discussion questions
+      - text: Open Tool ΓåÆ
+    - paragraph: Tutorial
+    - button "Watch the Resource Summariser tutorial video": Watch tutorial
+    - text: New
+    - link "≡ƒôô Student Handout Generator Generate ready-to-print lesson notes your students can copy study and revise from ΓÇö written directly to them with examples from their world Open Tool ΓåÆ":
+      - /url: /student-handout-generator
+      - text: ≡ƒôô
+      - heading "Student Handout Generator" [level=3]
+      - paragraph: Generate ready-to-print lesson notes your students can copy study and revise from ΓÇö written directly to them with examples from their world
+      - text: Open Tool ΓåÆ
+    - paragraph: Tutorial
+    - button "Watch the Student Handout Generator tutorial video": Watch tutorial
+    - link "≡ƒÆÜ Teacher Wellbeing Hub Your space to recharge. Personalised support affirmations and burnout prevention for African teachers Open Tool ΓåÆ":
+      - /url: /wellbeing
+      - text: ≡ƒÆÜ
+      - heading "Teacher Wellbeing Hub" [level=3]
+      - paragraph: Your space to recharge. Personalised support affirmations and burnout prevention for African teachers
+      - text: Open Tool ΓåÆ
+    - heading "Why African Teachers Choose StudyPlugHub" [level=2]
+    - text: ≡ƒÄ» Built for African Curricula WASSCE, JAMB, KCSE, NSC, GCE and more ΓÇö our AI knows your curriculum ΓÜí Save 10+ Hours Per Week Lesson plans exams and report cards generated in seconds not hours ≡ƒæÑ Made for Large Classes Tools designed for the realities of 60-80 student classrooms ≡ƒÆÜ Your Wellbeing Matters The only EdTech platform with a dedicated African teacher wellbeing hub ≡ƒîÉ 5 African Languages Generate content in English French Arabic Portuguese or Swahili ≡ƒåô Free Forever Every tool every feature free for all African educators ΓÇö sign up for unlimited access, library, and your private Wellbeing Hub
+    - heading "Γä╣∩╕Å About StudyPlugHub" [level=3]
+    - paragraph: StudyPlugHub is an African-first AI education platform serving students, teachers, and schools across all 54 African countries. We believe in ethical AI ΓÇö tools that teach you and your students to think, not replace thinking.
+    - paragraph: Built by an African educator for African education. Registered in Australia (ABN 98 844 353 839). Free forever for teachers.
+    - text: ≡ƒÆ¼
+    - heading "Are You a Teacher Using StudyPlugHub?" [level=3]
+    - paragraph: We are gathering feedback from our first cohort of educators. If you have been using our tools ΓÇö for lesson plans, report cards, exams, or just for a moment of wellbeing ΓÇö we would love to hear from you.
+    - paragraph: Share your experience. Tell us what is working and what is not. With your permission, we may feature your story to inspire other African educators.
+    - link "≡ƒôº Share Your Experience":
+      - /url: mailto:hello@studyplughub.com?subject=Teacher%20Feedback%20%E2%80%94%20StudyPlugHub
+    - paragraph: Are you a student? Check out our student learning tools
+    - link "Student Tools ΓåÆ":
+      - /url: https://studyplughub.com/tools/exam-master
+      - button "Student Tools ΓåÆ"
+    - img "StudyPlugHub"
+    - text: StudyPlugHub
+    - paragraph: AI tools built for African educators and students. Ethical AI that teaches you to think, not think for you.
+    - heading "Platform" [level=4]
+    - link "Student Tools":
+      - /url: https://studyplughub.com
+    - link "Teacher Hub":
+      - /url: /
+    - heading "Legal" [level=4]
+    - link "Privacy Policy":
+      - /url: https://studyplughub.com/privacy
+    - link "Terms of Service":
+      - /url: https://studyplughub.com/terms
+    - heading "Community" [level=4]
+    - link "Guidelines":
+      - /url: https://studyplughub.com/community/guidelines
+    - link "Moderation":
+      - /url: https://studyplughub.com/moderation
+    - heading "Connect" [level=4]
+    - link "hello@studyplughub.com":
+      - /url: mailto:hello@studyplughub.com
+    - paragraph: ┬⌐ 2026 StudyPlugHub ΓÇö Ethical AI Education for Africa
+    - link "TikTok":
+      - /url: https://www.tiktok.com/@studyplughub
+      - img
+    - link "YouTube":
+      - /url: https://www.youtube.com/@studyplughub
+      - img
+    - text: Talk to Armani
+    - button "Chat with Armani":
+      - img: ≡ƒÆÜ
+    - img: ≡ƒÆÜ
+    - paragraph: Armani
+    - paragraph: Teacher Hub Companion ≡ƒÆÜ
+    - paragraph: 5 languages ≡ƒîì
+    - paragraph: Auto-detects yours
+    - button "Minimise chat":
+      - img
+    - button "Attach image":
+      - img
+    - textbox "Talk to Armani..."
+    - button [disabled]:
+      - img
+    - paragraph: ≡ƒîì Armani auto-responds in your language
+  - alert
+  - text: ≡ƒì¬
+  - heading "StudyPlugHub uses cookies" [level=3]
+  - button "Dismiss": Γ£ò
+  - paragraph:
+    - text: We use essential cookies to keep you logged in and remember your preferences. We do
+    - strong: not
+    - text: use advertising cookies or track you across other websites. By continuing you accept our
+    - link "Privacy Policy":
+      - /url: /privacy
+    - text: and
+    - link "Terms of Service":
+      - /url: /terms
+    - text: .
+  - button "Essential Only"
+  - button "Accept All Γ£ô"
+  - paragraph:
+    - text: StudyPlugHub | ABN 98 844 353 839 | Registered in Australia |
+    - link "Cookie Policy":
+      - /url: /privacy#cookies

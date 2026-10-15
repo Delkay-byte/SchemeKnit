@@ -1,0 +1,240 @@
+{
+  "log": {
+    "version": "1.2",
+    "creator": {
+      "name": "REA-derived sanitized summary",
+      "version": "1.0"
+    },
+    "note": "Derived from REA capture_browser_scenario Evidence; URL query values, headers values, cookies and bodies were never retained by REA.",
+    "entries": [
+      {
+        "_id": 1,
+        "request": {
+          "method": "GET",
+          "url": "https://rootabytes.com/products/classpiler",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "document"
+      },
+      {
+        "_id": 2,
+        "request": {
+          "method": "GET",
+          "url": "https://rootabytes.com/assets/index-BvbMGZsH.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 3,
+        "request": {
+          "method": "GET",
+          "url": "https://rootabytes.com/assets/vendor-C3DRSVr_.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 4,
+        "request": {
+          "method": "GET",
+          "url": "https://rootabytes.com/assets/index-CR6zZ4FY.css",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "stylesheet"
+      },
+      {
+        "_id": 5,
+        "request": {
+          "method": "GET",
+          "url": "https://static.cloudflareinsights.com/beacon.min.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": null
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 6,
+        "request": {
+          "method": "GET",
+          "url": "https://static.cloudflareinsights.com/beacon.min.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": null
+        },
+        "_resourceType": null
+      },
+      {
+        "_id": 7,
+        "request": {
+          "method": "GET",
+          "url": "https://rootabytes.com/cdn-cgi/challenge-platform/scripts/jsd/main.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 302
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 8,
+        "request": {
+          "method": "GET",
+          "url": "https://rootabytes.com/assets/Rootabyte-logo-icon-IBAbEvPN.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 9,
+        "request": {
+          "method": "GET",
+          "url": "https://rootabytes.com/assets/Classpiler-logo-_zzWllee.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 10,
+        "request": {
+          "method": "GET",
+          "url": "https://rootabytes.com/assets/poppins-latin-700-normal-Qrb0O0WB.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 11,
+        "request": {
+          "method": "GET",
+          "url": "https://rootabytes.com/assets/poppins-latin-400-normal-cpxAROuN.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 12,
+        "request": {
+          "method": "GET",
+          "url": "https://rootabytes.com/assets/open-sans-latin-500-normal-C0rntwkW.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 13,
+        "request": {
+          "method": "GET",
+          "url": "https://rootabytes.com/assets/open-sans-latin-400-normal-Bk63H6sG.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 14,
+        "request": {
+          "method": "GET",
+          "url": "https://rootabytes.com/assets/poppins-latin-600-normal-zEkxB9Mr.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 15,
+        "request": {
+          "method": "GET",
+          "url": "https://rootabytes.com/assets/raleway-latin-300-normal-B0PjX2GJ.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 16,
+        "request": {
+          "method": "GET",
+          "url": "https://rootabytes.com/assets/open-sans-latin-ext-400-normal-URAvo6nN.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 17,
+        "request": {
+          "method": "GET",
+          "url": "https://rootabytes.com/cdn-cgi/challenge-platform/h/g/scripts/jsd/4df4a60fa397/main.js?",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 18,
+        "request": {
+          "method": "GET",
+          "url": "https://rootabytes.com/favicon.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "other"
+      },
+      {
+        "_id": 19,
+        "request": {
+          "method": "POST",
+          "url": "https://rootabytes.com/cdn-cgi/challenge-platform/h/g/jsd/oneshot/4df4a60fa397/0.42370442069390424:1792019729:3uJ0huEipi1YWZ8vxuMrK5bOPGr-ZJKcBnaIT5xR_kw/a4aa85f9a9479342",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "xhr"
+      }
+    ]
+  }
+}

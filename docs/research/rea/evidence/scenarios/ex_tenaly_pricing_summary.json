@@ -1,0 +1,678 @@
+{
+  "evidence_id": "ev_313b85e52a1a11cbd6618f6c660c7992ce08ee6053f8db3c17f6df83c87a8ad0",
+  "operation": "capture_browser_scenario",
+  "provider": {
+    "id": "rea-playwright-browser-scenario",
+    "name": "REA Playwright browser scenario capture provider",
+    "version": "1"
+  },
+  "start_origin": "https://tenaly.app",
+  "browser": {
+    "mode": "launch",
+    "process_ownership": "provider-owned",
+    "cleanup": "terminated-owned-process",
+    "product": "Chromium",
+    "version": "155.0.8059.79"
+  },
+  "duration_ms": 10005,
+  "completeness": {
+    "status": "complete",
+    "equality_eligible": true,
+    "missing_sections": [],
+    "truncated_sections": []
+  },
+  "limitations": [
+    "Event sequence records provider receipt order; simultaneous browser causality is not inferred.",
+    "Network content is retained only when selected; Playwright response-body bytes are API results and are not guaranteed to match wire bytes.",
+    "Request bytes are limited to what Playwright exposes; not_exposed does not establish body absence or multipart file coverage.",
+    "Network content reads settle within 5 seconds each and the observer does not request bodies from unfinished responses.",
+    "Playwright scenario events do not expose request initiator stacks; receipt order does not prove causality.",
+    "Storage values are hashed only after declared-secret redaction."
+  ],
+  "steps": [
+    {
+      "step_id": "scenario_start",
+      "action": "goto_start",
+      "status": "completed",
+      "before_url": {
+        "url": "about:blank",
+        "origin": null,
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "after_url": {
+        "url": "https://tenaly.app/pricing",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "elapsed_ms": 3434,
+      "artifacts": {
+        "screenshot": {
+          "state": "not_requested"
+        },
+        "dom": {
+          "state": "not_requested"
+        },
+        "accessibility": {
+          "state": "not_requested"
+        },
+        "url": {
+          "state": "not_requested"
+        },
+        "history": {
+          "state": "not_requested"
+        },
+        "storage": {
+          "state": "not_requested"
+        }
+      },
+      "error": null
+    },
+    {
+      "step_id": "settle",
+      "action": "wait_for_timeout",
+      "status": "completed",
+      "before_url": {
+        "url": "https://tenaly.app/pricing",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "after_url": {
+        "url": "https://tenaly.app/auth?redirect=%2Fgenerate",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [
+          "redirect"
+        ],
+        "redacted": false
+      },
+      "elapsed_ms": 6085,
+      "artifacts": {
+        "screenshot": {
+          "file": "C:\\Users\\SAVIOUR\\AppData\\Local\\Temp\\opencode\\rea\\ex_tenaly_pricing\\screenshot_settle.png",
+          "bytes": 44194
+        },
+        "dom": {
+          "file": "C:\\Users\\SAVIOUR\\AppData\\Local\\Temp\\opencode\\rea\\ex_tenaly_pricing\\dom_settle.txt",
+          "bytes": 25752,
+          "text_len": 25752
+        },
+        "accessibility": {
+          "file": "C:\\Users\\SAVIOUR\\AppData\\Local\\Temp\\opencode\\rea\\ex_tenaly_pricing\\accessibility_settle.txt",
+          "bytes": 565,
+          "text_len": 565
+        },
+        "url": {
+          "url": "https://tenaly.app/auth?redirect=%2Fgenerate",
+          "origin": "https://tenaly.app",
+          "query_parameter_names": [
+            "redirect"
+          ],
+          "redacted": false
+        },
+        "history": {
+          "state": "not_requested"
+        },
+        "storage": {
+          "state": "not_requested"
+        }
+      },
+      "error": null
+    }
+  ],
+  "network": [
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/pricing",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "document",
+      "txn": "request-1"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/assets/styles-DnJhZfxX.css",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "stylesheet",
+      "txn": "request-2"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap",
+        "origin": "https://fonts.googleapis.com",
+        "query_parameter_names": [
+          "family",
+          "family",
+          "display"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "stylesheet",
+      "txn": "request-3"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/assets/index-BkRjvJfS.js",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-4"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/assets/_authenticated-C6WznUlx.js",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-5"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/assets/useQuery-BCKnBfzS.js",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-6"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/assets/credits.functions-DdxkFZw9.js",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-7"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/assets/paystack.functions-C-I6f7HK.js",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-8"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/assets/crown-B1QRTZKk.js",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-9"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/assets/house-DjfLU8n6.js",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-10"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/assets/history-BnAHk1Pn.js",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-11"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/assets/calendar-range-PJB4NSGL.js",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-12"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/assets/file-question-mark-BpSbFFMI.js",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-13"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/assets/file-text-dM5TqyVN.js",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-14"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/assets/video-Dm-XGLaC.js",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-15"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/assets/book-open-Cbdcqmph.js",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-16"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/assets/mail-DoZrrAl1.js",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-17"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/assets/credit-card-DTpD_Z-B.js",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-18"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/assets/chart-column-D1DaAJSa.js",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-19"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/assets/shield-D0o5zvEy.js",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-20"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/assets/inbox-D6uZ7yJE.js",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-21"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/assets/graduation-cap-CuM8QXrx.js",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-22"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/assets/chevron-right-jJwp7qAG.js",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-23"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/assets/pricing-CUX-zJxR.js",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-24"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/assets/dialog-BRQToKWE.js",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-25"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/assets/check-CJgOWCLZ.js",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-26"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/assets/refresh-cw-BZFyHUPj.js",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-27"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/assets/index-DKXhYDvM.js",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-28"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/assets/Combination-BT5Zy1KI.js",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-29"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/assets/index-G0Y380Ss.js",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-30"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/~flock.js",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-31"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/__l5e/events.124894084da8c432.js",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-32"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://tenaly.app/__l5e/trackevents",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 202,
+      "resource_type": "fetch",
+      "txn": "request-33"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/assets/auth-CeymWSSG.js",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-34"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/assets/input-D-97tKdx.js",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-35"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/assets/index-BVjmp_zM.js",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-36"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://tenaly.app/assets/eye-CYoOcgZo.js",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-37"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7.woff2",
+        "origin": "https://fonts.gstatic.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "font",
+      "txn": "request-38"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://tenaly.app/__l5e/trackevents",
+        "origin": "https://tenaly.app",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 202,
+      "resource_type": "fetch",
+      "txn": "request-39"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://fonts.gstatic.com/s/cormorantgaramond/v21/co3bmX5slCNuHLi8bLeY9MK7whWMhyjYqXtK.woff2",
+        "origin": "https://fonts.gstatic.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "font",
+      "txn": "request-40"
+    }
+  ],
+  "console": [
+    {
+      "level": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 ()"
+    },
+    {
+      "level": "verbose",
+      "text": "[DOM] Input elements should have autocomplete attributes (suggested: \"current-password\"): (More info: https://goo.gl/9p2vKq) %o"
+    }
+  ],
+  "page_errors": [],
+  "websockets": [],
+  "downloads": [],
+  "screenshots": [
+    {
+      "step": "settle",
+      "file": "C:\\Users\\SAVIOUR\\AppData\\Local\\Temp\\opencode\\rea\\ex_tenaly_pricing\\screenshot_settle.png",
+      "bytes": 44194
+    }
+  ],
+  "final_url": {
+    "url": "https://tenaly.app/auth?redirect=%2Fgenerate",
+    "origin": "https://tenaly.app",
+    "query_parameter_names": [
+      "redirect"
+    ],
+    "redacted": false
+  }
+}

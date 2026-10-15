@@ -1,0 +1,594 @@
+{
+  "log": {
+    "version": "1.2",
+    "creator": {
+      "name": "REA-derived sanitized summary",
+      "version": "1.0"
+    },
+    "note": "Derived from REA capture_browser_scenario Evidence; URL query values, headers values, cookies and bodies were never retained by REA.",
+    "entries": [
+      {
+        "_id": 1,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "document"
+      },
+      {
+        "_id": 2,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/_next/static/media/e4af272ccee01ff0-s.p.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 3,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/ghana/traditional-kente-cloth.jpg",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 4,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/_next/static/css/b723ea57bfd6df53.css",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "stylesheet"
+      },
+      {
+        "_id": 5,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/_next/static/css/7e7d96b1e6991756.css",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "stylesheet"
+      },
+      {
+        "_id": 6,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/_next/static/css/9291fda833a21be3.css",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "stylesheet"
+      },
+      {
+        "_id": 7,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/_next/static/chunks/webpack-a363ed72a0f60b8c.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 8,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/_next/static/chunks/4bd1b696-ddc840f46a34bfd1.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 9,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/_next/static/chunks/1604-af7276ba48c30dae.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 10,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/_next/static/chunks/main-app-3db9810d01616f6f.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 11,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/_next/static/chunks/app/global-error-7876e3f244a04f82.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 12,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/_next/static/chunks/bc9e92e6-aee97443e70b10ad.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 13,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/_next/static/chunks/bbe4328c-6ac786bb26a1b5f5.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 14,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/_next/static/chunks/2619-5f724c466a940e20.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 15,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/_next/static/chunks/8514-17a87adf2d40352c.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 16,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/_next/static/chunks/app/layout-e85c1c7d1ba5ca75.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 17,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/_next/static/chunks/app/not-found-3c6c7f4f692fdee3.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 18,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/_next/static/chunks/app/ghana/layout-08ac3878018e051a.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 19,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/_next/static/chunks/5239-fe5f1d2591d58306.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 20,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/_next/static/chunks/app/ghana/page-b2657f09f2d81309.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 21,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/manifest.json",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "manifest"
+      },
+      {
+        "_id": 22,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/_next/static/media/8e9860b6e62d6359-s.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 23,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/_next/image?url=%2Ficon-192.png&w=32&q=75",
+          "queryParamNames": [
+            "url",
+            "w",
+            "q"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 24,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/ghana/tool-frema.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 25,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/ghana/ghana-2-teaching-pack-output.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 26,
+        "request": {
+          "method": "POST",
+          "url": "https://o4511274453827584.ingest.us.sentry.io/api/4511274462674944/envelope/?sentry_version=7&sentry_key=841597ee0397a10bc36c8027f8c87f58&sentry_client=sentry.javascript.nextjs%2F10.50.0",
+          "queryParamNames": [
+            "sentry_version",
+            "sentry_key",
+            "sentry_client"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 27,
+        "request": {
+          "method": "POST",
+          "url": "https://o4511274453827584.ingest.us.sentry.io/api/4511274462674944/envelope/?sentry_version=7&sentry_key=841597ee0397a10bc36c8027f8c87f58&sentry_client=sentry.javascript.nextjs%2F10.50.0",
+          "queryParamNames": [
+            "sentry_version",
+            "sentry_key",
+            "sentry_client"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 28,
+        "request": {
+          "method": "POST",
+          "url": "https://o4511274453827584.ingest.us.sentry.io/api/4511274462674944/envelope/?sentry_version=7&sentry_key=841597ee0397a10bc36c8027f8c87f58&sentry_client=sentry.javascript.nextjs%2F10.50.0",
+          "queryParamNames": [
+            "sentry_version",
+            "sentry_key",
+            "sentry_client"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 29,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/about?_rsc=aff4o",
+          "queryParamNames": [
+            "_rsc"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 30,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/faq?_rsc=aff4o",
+          "queryParamNames": [
+            "_rsc"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 31,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/contact?_rsc=aff4o",
+          "queryParamNames": [
+            "_rsc"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 32,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/sw.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 33,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/icon.svg",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "other"
+      },
+      {
+        "_id": 34,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/icon-192.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "other"
+      },
+      {
+        "_id": 35,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/_next/static/chunks/1348-3e9d00b3d6034a6a.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 36,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/_next/static/chunks/app/ghana/contact/page-0bbeba1eabe4390c.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 37,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/offline.html",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 38,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/manifest.json",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 39,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/icon-192.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 40,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/icon-512.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 41,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/_next/static/chunks/app/ghana/about/page-b4c33c032b5e8adc.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 42,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/_next/static/chunks/app/ghana/faq/page-27439fb80ed7a4b2.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 43,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/privacy?_rsc=aff4o",
+          "queryParamNames": [
+            "_rsc"
+          ]
+        },
+        "response": {
+          "status": 404
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 44,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/terms?_rsc=aff4o",
+          "queryParamNames": [
+            "_rsc"
+          ]
+        },
+        "response": {
+          "status": 404
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 45,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/privacy?_rsc=aff4o",
+          "queryParamNames": [
+            "_rsc"
+          ]
+        },
+        "response": {
+          "status": 404
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 46,
+        "request": {
+          "method": "GET",
+          "url": "https://ghana.studyplughub.com/terms?_rsc=aff4o",
+          "queryParamNames": [
+            "_rsc"
+          ]
+        },
+        "response": {
+          "status": 404
+        },
+        "_resourceType": "fetch"
+      }
+    ]
+  }
+}

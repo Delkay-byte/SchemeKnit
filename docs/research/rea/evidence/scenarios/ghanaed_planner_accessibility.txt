@@ -1,0 +1,28 @@
+- document:
+  - button "Install GhanaEd app":
+    - img
+  - paragraph: GhanaEd
+  - heading "Welcome back" [level=1]
+  - paragraph: Sign in with your username
+  - text: Username
+  - textbox "Username":
+    - /placeholder: Your username
+  - text: Password
+  - textbox "Password":
+    - /placeholder: Your password
+  - button "Show password":
+    - img
+  - link "Forgot password?":
+    - /url: /forgot-password
+  - button "Sign in"
+  - button "Use 4-digit PIN":
+    - img
+    - text: Use 4-digit PIN
+  - paragraph:
+    - text: New to GhanaEd?
+    - link "Create an account":
+      - /url: /register
+  - paragraph: or continue with
+  - group "Google":
+    - iframe
+  - status

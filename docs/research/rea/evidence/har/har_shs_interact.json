@@ -1,0 +1,456 @@
+{
+  "log": {
+    "version": "1.2",
+    "creator": {
+      "name": "REA-derived sanitized summary",
+      "version": "1.0"
+    },
+    "note": "Derived from REA capture_browser_scenario Evidence; URL query values, headers values, cookies and bodies were never retained by REA.",
+    "entries": [
+      {
+        "_id": 1,
+        "request": {
+          "method": "GET",
+          "url": "https://shsplanner.com/",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 301
+        },
+        "_resourceType": "document"
+      },
+      {
+        "_id": 2,
+        "request": {
+          "method": "GET",
+          "url": "https://www.shsplanner.com/",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "document"
+      },
+      {
+        "_id": 3,
+        "request": {
+          "method": "GET",
+          "url": "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;500;600;700&display=swap",
+          "queryParamNames": [
+            "family",
+            "family",
+            "display"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "stylesheet"
+      },
+      {
+        "_id": 4,
+        "request": {
+          "method": "GET",
+          "url": "https://www.shsplanner.com/assets/css/app.css?v=1.0",
+          "queryParamNames": [
+            "v"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "stylesheet"
+      },
+      {
+        "_id": 5,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 6,
+        "request": {
+          "method": "GET",
+          "url": "https://www.shsplanner.com/assets/js/diagrams.js?v=1792021843",
+          "queryParamNames": [
+            "v"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 7,
+        "request": {
+          "method": "GET",
+          "url": "https://www.shsplanner.com/assets/js/app.js?v=10.87",
+          "queryParamNames": [
+            "v"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 8,
+        "request": {
+          "method": "GET",
+          "url": "https://www.shsplanner.com/manifest.webmanifest",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "manifest"
+      },
+      {
+        "_id": 9,
+        "request": {
+          "method": "GET",
+          "url": "https://fonts.gstatic.com/s/dmsans/v17/rP2Yp2ywxg089UriI5-g4vlH9VoD8Cmcqbu0-K4.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 10,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 11,
+        "request": {
+          "method": "GET",
+          "url": "https://accounts.google.com/gsi/client",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 12,
+        "request": {
+          "method": "GET",
+          "url": "https://www.shsplanner.com/api/curriculum.php?action=subjects&year=1",
+          "queryParamNames": [
+            "action",
+            "year"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 13,
+        "request": {
+          "method": "GET",
+          "url": "https://www.shsplanner.com/api/curriculum.php?action=version",
+          "queryParamNames": [
+            "action"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 14,
+        "request": {
+          "method": "GET",
+          "url": "https://www.shsplanner.com/tracker.php?action=visit&sid=[redacted-session]&page=%2F&ref=",
+          "queryParamNames": [
+            "action",
+            "sid",
+            "page",
+            "ref"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 15,
+        "request": {
+          "method": "GET",
+          "url": "https://fonts.gstatic.com/s/playfairdisplay/v40/nuFiD-vYSZviVYUb_rj3ij__anPXDTzYgA.woff2",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "font"
+      },
+      {
+        "_id": 16,
+        "request": {
+          "method": "GET",
+          "url": "https://www.shsplanner.com/icon192.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "image"
+      },
+      {
+        "_id": 17,
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.es6.js?v=160610",
+          "queryParamNames": [
+            "v"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 18,
+        "request": {
+          "method": "GET",
+          "url": "https://api.onesignal.com/sync/abd02438-3dd4-4ffb-b2e7-3d8e4d0306a0/web?callback=__jp0",
+          "queryParamNames": [
+            "callback"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 19,
+        "request": {
+          "method": "GET",
+          "url": "https://www.shsplanner.com/api/curriculum.php?action=subjects&year=1",
+          "queryParamNames": [
+            "action",
+            "year"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 20,
+        "request": {
+          "method": "GET",
+          "url": "https://accounts.google.com/gsi/style",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "stylesheet"
+      },
+      {
+        "_id": 21,
+        "request": {
+          "method": "GET",
+          "url": "https://accounts.google.com/gsi/button?theme=outline&size=large&width=300&text=continue_with&is_fedcm_supported=true&client_id=557905936407-jomeaii3snonst1usfd87ip5qftah7v5.apps.googleusercontent.com&iframe_id=gsi_850861_699397&cas=OnJhvbbkt6KoNBMBRcUAyTggpcOq1BWYKVItqjOXe4c",
+          "queryParamNames": [
+            "theme",
+            "size",
+            "width",
+            "text",
+            "is_fedcm_supported",
+            "client_id",
+            "iframe_id",
+            "cas"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "document"
+      },
+      {
+        "_id": 22,
+        "request": {
+          "method": "GET",
+          "url": "https://www.shsplanner.com/favicon.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "other"
+      },
+      {
+        "_id": 23,
+        "request": {
+          "method": "GET",
+          "url": "https://www.shsplanner.com/icon192.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "other"
+      },
+      {
+        "_id": 24,
+        "request": {
+          "method": "GET",
+          "url": "https://www.shsplanner.com/sw.js",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "script"
+      },
+      {
+        "_id": 25,
+        "request": {
+          "method": "GET",
+          "url": "https://www.shsplanner.com/favicon.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "other"
+      },
+      {
+        "_id": 26,
+        "request": {
+          "method": "GET",
+          "url": "https://www.shsplanner.com/",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 27,
+        "request": {
+          "method": "GET",
+          "url": "https://www.shsplanner.com/manifest.webmanifest",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 28,
+        "request": {
+          "method": "GET",
+          "url": "https://www.shsplanner.com/icon192.png",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 29,
+        "request": {
+          "method": "GET",
+          "url": "https://www.shsplanner.com/api/curriculum.php?action=subjects&year=2",
+          "queryParamNames": [
+            "action",
+            "year"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 30,
+        "request": {
+          "method": "GET",
+          "url": "https://www.shsplanner.com/api/curriculum.php?action=subjects&year=2",
+          "queryParamNames": [
+            "action",
+            "year"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 31,
+        "request": {
+          "method": "GET",
+          "url": "https://onesignal.com/sdks/web/v16/OneSignalSDK.page.styles.css?v=160610",
+          "queryParamNames": [
+            "v"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "stylesheet"
+      },
+      {
+        "_id": 32,
+        "request": {
+          "method": "GET",
+          "url": "https://api.onesignal.com/apps/abd02438-3dd4-4ffb-b2e7-3d8e4d0306a0/icon",
+          "queryParamNames": []
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      },
+      {
+        "_id": 33,
+        "request": {
+          "method": "POST",
+          "url": "https://play.google.com/log?format=json&hasfast=true&authuser=0",
+          "queryParamNames": [
+            "format",
+            "hasfast",
+            "authuser"
+          ]
+        },
+        "response": {
+          "status": 200
+        },
+        "_resourceType": "fetch"
+      }
+    ]
+  }
+}

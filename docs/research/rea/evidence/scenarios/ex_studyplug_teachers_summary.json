@@ -1,0 +1,1437 @@
+{
+  "evidence_id": "ev_efb00368a95acf20a495c0b2eb71af5be4ea7beb0c5f8afbfaffca0baabf3f1e",
+  "operation": "capture_browser_scenario",
+  "provider": {
+    "id": "rea-playwright-browser-scenario",
+    "name": "REA Playwright browser scenario capture provider",
+    "version": "1"
+  },
+  "start_origin": "https://teachers.studyplughub.com",
+  "browser": {
+    "mode": "launch",
+    "process_ownership": "provider-owned",
+    "cleanup": "terminated-owned-process",
+    "product": "Chromium",
+    "version": "155.0.8059.79"
+  },
+  "duration_ms": 10105,
+  "completeness": {
+    "status": "complete",
+    "equality_eligible": true,
+    "missing_sections": [],
+    "truncated_sections": []
+  },
+  "limitations": [
+    "Event sequence records provider receipt order; simultaneous browser causality is not inferred.",
+    "Network content is retained only when selected; Playwright response-body bytes are API results and are not guaranteed to match wire bytes.",
+    "Request bytes are limited to what Playwright exposes; not_exposed does not establish body absence or multipart file coverage.",
+    "Network content reads settle within 5 seconds each and the observer does not request bodies from unfinished responses.",
+    "Playwright scenario events do not expose request initiator stacks; receipt order does not prove causality.",
+    "Storage values are hashed only after declared-secret redaction."
+  ],
+  "steps": [
+    {
+      "step_id": "scenario_start",
+      "action": "goto_start",
+      "status": "completed",
+      "before_url": {
+        "url": "about:blank",
+        "origin": null,
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "after_url": {
+        "url": "https://teachers.studyplughub.com/?country=ghana&curriculum=waec-secondary",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [
+          "country",
+          "curriculum"
+        ],
+        "redacted": false
+      },
+      "elapsed_ms": 3700,
+      "artifacts": {
+        "screenshot": {
+          "state": "not_requested"
+        },
+        "dom": {
+          "state": "not_requested"
+        },
+        "accessibility": {
+          "state": "not_requested"
+        },
+        "url": {
+          "state": "not_requested"
+        },
+        "history": {
+          "state": "not_requested"
+        },
+        "storage": {
+          "state": "not_requested"
+        }
+      },
+      "error": null
+    },
+    {
+      "step_id": "settle",
+      "action": "wait_for_timeout",
+      "status": "completed",
+      "before_url": {
+        "url": "https://teachers.studyplughub.com/?country=ghana&curriculum=waec-secondary",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [
+          "country",
+          "curriculum"
+        ],
+        "redacted": false
+      },
+      "after_url": {
+        "url": "https://teachers.studyplughub.com/?country=ghana&curriculum=waec-secondary",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [
+          "country",
+          "curriculum"
+        ],
+        "redacted": false
+      },
+      "elapsed_ms": 6210,
+      "artifacts": {
+        "screenshot": {
+          "file": "C:\\Users\\SAVIOUR\\AppData\\Local\\Temp\\opencode\\rea\\ex_studyplug_teachers\\screenshot_settle.png",
+          "bytes": 417424
+        },
+        "dom": {
+          "file": "C:\\Users\\SAVIOUR\\AppData\\Local\\Temp\\opencode\\rea\\ex_studyplug_teachers\\dom_settle.txt",
+          "bytes": 57868,
+          "text_len": 57868
+        },
+        "accessibility": {
+          "file": "C:\\Users\\SAVIOUR\\AppData\\Local\\Temp\\opencode\\rea\\ex_studyplug_teachers\\accessibility_settle.txt",
+          "bytes": 8555,
+          "text_len": 8555
+        },
+        "url": {
+          "url": "https://teachers.studyplughub.com/?country=ghana&curriculum=waec-secondary",
+          "origin": "https://teachers.studyplughub.com",
+          "query_parameter_names": [
+            "country",
+            "curriculum"
+          ],
+          "redacted": false
+        },
+        "history": {
+          "state": "not_requested"
+        },
+        "storage": {
+          "state": "not_requested"
+        }
+      },
+      "error": null
+    }
+  ],
+  "network": [
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/?country=ghana&curriculum=waec-secondary",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [
+          "country",
+          "curriculum"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "document",
+      "txn": "request-1"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/media/e4af272ccee01ff0-s.p.woff2",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "font",
+      "txn": "request-2"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/css/b723ea57bfd6df53.css",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "stylesheet",
+      "txn": "request-3"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/css/7e7d96b1e6991756.css",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "stylesheet",
+      "txn": "request-4"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/css/9291fda833a21be3.css",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "stylesheet",
+      "txn": "request-5"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/webpack-a363ed72a0f60b8c.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-6"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/4bd1b696-ddc840f46a34bfd1.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-7"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/1604-af7276ba48c30dae.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-8"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/main-app-3db9810d01616f6f.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-9"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/app/global-error-7876e3f244a04f82.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-10"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/bc9e92e6-aee97443e70b10ad.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-11"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/bbe4328c-6ac786bb26a1b5f5.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-12"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/2619-5f724c466a940e20.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-13"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/8514-17a87adf2d40352c.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-14"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/app/layout-e85c1c7d1ba5ca75.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-15"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/app/not-found-3c6c7f4f692fdee3.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-16"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/5239-fe5f1d2591d58306.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-17"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/9252-75be466b40777611.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-18"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/8480-db18cdec0e0f5409.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-19"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/3765-8e655274394f2f68.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-20"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/app/teachers/page-331bc99b9b243e5e.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-21"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/manifest.json",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "manifest",
+      "txn": "request-22"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/image?url=%2FStudyPlugHub-logo.png&w=48&q=75",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [
+          "url",
+          "w",
+          "q"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "image",
+      "txn": "request-23"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://o4511274453827584.ingest.us.sentry.io/api/4511274462674944/envelope/?sentry_version=7&sentry_key=841597ee0397a10bc36c8027f8c87f58&sentry_client=sentry.javascript.nextjs%2F10.50.0",
+        "origin": "https://o4511274453827584.ingest.us.sentry.io",
+        "query_parameter_names": [
+          "sentry_version",
+          "sentry_key",
+          "sentry_client"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-24"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://o4511274453827584.ingest.us.sentry.io/api/4511274462674944/envelope/?sentry_version=7&sentry_key=841597ee0397a10bc36c8027f8c87f58&sentry_client=sentry.javascript.nextjs%2F10.50.0",
+        "origin": "https://o4511274453827584.ingest.us.sentry.io",
+        "query_parameter_names": [
+          "sentry_version",
+          "sentry_key",
+          "sentry_client"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-25"
+    },
+    {
+      "kind": "response",
+      "method": "POST",
+      "url": {
+        "url": "https://o4511274453827584.ingest.us.sentry.io/api/4511274462674944/envelope/?sentry_version=7&sentry_key=841597ee0397a10bc36c8027f8c87f58&sentry_client=sentry.javascript.nextjs%2F10.50.0",
+        "origin": "https://o4511274453827584.ingest.us.sentry.io",
+        "query_parameter_names": [
+          "sentry_version",
+          "sentry_key",
+          "sentry_client"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-26"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/icon.svg",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "other",
+      "txn": "request-27"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/icon-192.png",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "other",
+      "txn": "request-28"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/sw.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-29"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/lesson-planner?_rsc=b2lk7",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [
+          "_rsc"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-30"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/exam-generator?_rsc=b2lk7",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [
+          "_rsc"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-31"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/assignment-creator?_rsc=b2lk7",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [
+          "_rsc"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-32"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/report-card?_rsc=b2lk7",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [
+          "_rsc"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-33"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/resource-summariser?_rsc=b2lk7",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [
+          "_rsc"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-34"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/offline.html",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-35"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/manifest.json",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-36"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/icon-192.png",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-37"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/icon-512.png",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-38"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/d3ac728e-736c33d66120a1a8.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-39"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/164f4fb6-89c32186f0e1d8cd.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-40"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/280273a7-f0743e61694eff89.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-41"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/6241-c0bbc6eab42b335f.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-42"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/3751-6c9e7d1854bb2848.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-43"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/d3ac728e-736c33d66120a1a8.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-44"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/164f4fb6-89c32186f0e1d8cd.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-45"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/280273a7-f0743e61694eff89.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-46"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/6241-c0bbc6eab42b335f.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-47"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/3751-6c9e7d1854bb2848.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-48"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/8960-f65933156c100e44.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-49"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/9289-a03186d332e662f4.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-50"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/3190-00f7d67685e2ec55.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-51"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/3404-3483b76b0fb4786e.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-52"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/1581-e8673284fee5fcb2.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-53"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/3450-f458219c1e68a34b.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-54"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/app/teachers/report-card/page-7fa9df36f51efbb3.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-55"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/student-handout-generator?_rsc=b2lk7",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [
+          "_rsc"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-56"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/8960-f65933156c100e44.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-57"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/9289-a03186d332e662f4.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-58"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/3190-00f7d67685e2ec55.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-59"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/3404-3483b76b0fb4786e.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-60"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/1581-e8673284fee5fcb2.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-61"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/3450-f458219c1e68a34b.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-62"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/app/teachers/report-card/page-7fa9df36f51efbb3.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-63"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/student-handout-generator?_rsc=b2lk7",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [
+          "_rsc"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-64"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/8009-039e67d0e27543e0.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-65"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/8009-039e67d0e27543e0.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-66"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/app/teachers/resource-summariser/page-ea5c5e6b7e804b96.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-67"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/login?_rsc=b2lk7",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [
+          "_rsc"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-68"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/app/teachers/resource-summariser/page-ea5c5e6b7e804b96.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-69"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/login?_rsc=b2lk7",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [
+          "_rsc"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-70"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/app/teachers/lesson-planner/page-b7f8b8b6bc1ce07a.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-71"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/app/teachers/lesson-planner/page-b7f8b8b6bc1ce07a.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-72"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/signup?_rsc=b2lk7",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [
+          "_rsc"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-73"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/signup?_rsc=b2lk7",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [
+          "_rsc"
+        ],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-74"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/app/teachers/assignment-creator/page-b6e7bb38477da726.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-75"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/app/teachers/assignment-creator/page-b6e7bb38477da726.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-76"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/app/teachers/exam-generator/page-ce14968893b4611f.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-77"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/app/teachers/exam-generator/page-ce14968893b4611f.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-78"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/privacy?_rsc=b2lk7",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [
+          "_rsc"
+        ],
+        "redacted": false
+      },
+      "status": 404,
+      "resource_type": "fetch",
+      "txn": "request-79"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/terms?_rsc=b2lk7",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [
+          "_rsc"
+        ],
+        "redacted": false
+      },
+      "status": 404,
+      "resource_type": "fetch",
+      "txn": "request-80"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/privacy?_rsc=b2lk7",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [
+          "_rsc"
+        ],
+        "redacted": false
+      },
+      "status": 404,
+      "resource_type": "fetch",
+      "txn": "request-81"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/terms?_rsc=b2lk7",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [
+          "_rsc"
+        ],
+        "redacted": false
+      },
+      "status": 404,
+      "resource_type": "fetch",
+      "txn": "request-82"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css",
+        "origin": "https://cdn.jsdelivr.net",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "stylesheet",
+      "txn": "request-83"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/aaea2bcf-2f1367264a16fad4.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-84"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/9372-a3de851061767b7c.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-85"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/app/teachers/student-handout-generator/page-29b61c1f276c76e4.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-86"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/aaea2bcf-2f1367264a16fad4.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-87"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/9372-a3de851061767b7c.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-88"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/app/teachers/student-handout-generator/page-29b61c1f276c76e4.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-89"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/app/teachers/login/page-4209a7f321b9f5f5.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-90"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/app/teachers/login/page-4209a7f321b9f5f5.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-91"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/app/teachers/signup/page-939596e1cc3ad801.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "script",
+      "txn": "request-92"
+    },
+    {
+      "kind": "response",
+      "method": "GET",
+      "url": {
+        "url": "https://teachers.studyplughub.com/_next/static/chunks/app/teachers/signup/page-939596e1cc3ad801.js",
+        "origin": "https://teachers.studyplughub.com",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": 200,
+      "resource_type": "fetch",
+      "txn": "request-93"
+    }
+  ],
+  "console": [
+    {
+      "level": "log",
+      "text": "≡ƒöÑ Firebase auth initialized successfully"
+    },
+    {
+      "level": "log",
+      "text": "≡ƒöì Auth state changed: No user"
+    },
+    {
+      "level": "log",
+      "text": "≡ƒîì Country from URL: ghana"
+    },
+    {
+      "level": "log",
+      "text": "≡ƒÄ» Demo session initialized for ghana"
+    },
+    {
+      "level": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 ()"
+    },
+    {
+      "level": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 ()"
+    }
+  ],
+  "page_errors": [],
+  "websockets": [],
+  "downloads": [],
+  "screenshots": [
+    {
+      "step": "settle",
+      "file": "C:\\Users\\SAVIOUR\\AppData\\Local\\Temp\\opencode\\rea\\ex_studyplug_teachers\\screenshot_settle.png",
+      "bytes": 417424
+    }
+  ],
+  "final_url": {
+    "url": "https://teachers.studyplughub.com/?country=ghana&curriculum=waec-secondary",
+    "origin": "https://teachers.studyplughub.com",
+    "query_parameter_names": [
+      "country",
+      "curriculum"
+    ],
+    "redacted": false
+  }
+}
