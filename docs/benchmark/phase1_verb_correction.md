@@ -70,3 +70,29 @@ quality/export/wapef/quota/autopilot slice (776 tests) stayed green.
 - Chain + negative tests: `backend/tests/test_phase1_measurable_verbs.py`
 - Frozen baselines `docs/benchmark/*.json` were NOT rewritten; rerun outputs
   recorded in this note only.
+
+## Independent re-verification (2026-10-15, execution pass) — NO-CHANGE FINDING
+
+Re-audited the canonical interpreter against every verb family named in the
+correction request, with the shipped code (no changes made):
+
+| Indicator lead | resolved action | Bloom |
+|---|---|---|
+| Add whole numbers up to 10,000 | `add` | apply |
+| Multiply two-digit numbers by two-digit numbers | `multiply` | apply |
+| Install an operating system on a computer | `install` | apply |
+| Indicate the direction of Ghana's trade routes | `indicate` | analyse |
+| Assess the changes the European presence brought to Ghana | `assess` | evaluate |
+| Relate the water cycle to local weather | `relate` | understand |
+| Recognise common farm tools | `recognise` | recall |
+| Skip count in 5,000s | `skip count` (multiword, word-boundary) | recall |
+| Écouter et identifier les sons entendus | `écouter` (French canon) | french |
+| Lire et comprendre un texte simple | `lire` (French canon) | french |
+
+Suite re-run: `tests/test_phase1_measurable_verbs.py` **18 passed**, including
+the negative pins — "learners will discuss the topic", "Learners can explore
+the topic", "Learners can learn about …" still hard-fail; a measurable word
+mid-sentence does not rescue a weak outcome slot; word boundaries hold; a
+later generic verb does not override the primary intent. **No residual gap
+found → no additional Phase 1 code change; the committed correction
+(`c9412b0`) stands as the complete fix.**
