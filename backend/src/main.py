@@ -38,6 +38,22 @@ async def lifespan(app: FastAPI):
     _seed_global_holidays()
     _seed_payment_config()
     _seed_product_plans()
+    # Crash recovery: a hard process death mid-generation skips the endpoint's
+    # failure handlers and would leave the job 'pending' forever, shadowing
+    # the scheme status endpoint. Fail any such orphaned job (age-thresholded
+    # so a multi-worker peer's live run is never touched). Non-fatal on error.
+    try:
+        from .database import SessionLocal
+        from .service import data_service
+        db = SessionLocal()
+        try:
+            reconciled = data_service.reconcile_stale_generation_jobs(db)
+            if reconciled:
+                logger.info("stale_generation_jobs_failed", count=reconciled)
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error("stale_job_reconciliation_failed", error=str(e))
     logger.info("SchemeKnit started", version=settings.APP_VERSION, debug=settings.DEBUG)
     yield
     logger.info("SchemeKnit shutting down")

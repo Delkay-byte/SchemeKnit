@@ -5,7 +5,7 @@ Bridges Pydantic models with SQLAlchemy persistence.
 Provides CRUD operations with ownership enforcement.
 """
 
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
@@ -365,6 +365,41 @@ class DataService:
         return db.query(GenerationJobDB).filter(
             GenerationJobDB.owner_id == owner_id
         ).order_by(GenerationJobDB.created_at.desc()).all()
+
+    def reconcile_stale_generation_jobs(
+        self, db: Session, older_than_minutes: int = 60
+    ) -> int:
+        """Fail non-terminal generation jobs orphaned by a process restart.
+
+        The generate endpoint sets ``failed`` on every handled exception path,
+        but a hard process death (SIGKILL, OOM, deploy restart) skips those
+        handlers and the job would stay ``pending`` forever — shadowing the
+        scheme status endpoint and the job history until a lucky rerun.
+        Called once at startup: any non-terminal job older than the threshold
+        predates this process and cannot belong to a live run on a
+        single-process deployment; the age threshold keeps multi-worker
+        restarts conservative. Lesson rows and quota units are untouched —
+        a rerun converges and unit keys are already idempotent.
+        """
+        cutoff = datetime.utcnow() - timedelta(minutes=older_than_minutes)
+        stale = (
+            db.query(GenerationJobDB)
+            .filter(
+                GenerationJobDB.status.in_(["pending", "processing"]),
+                GenerationJobDB.created_at < cutoff,
+            )
+            .all()
+        )
+        for job in stale:
+            job.status = "failed"
+            job.error_message = (
+                "Generation was interrupted by a server restart. "
+                "Please generate again."
+            )
+            job.completed_at = job.completed_at or datetime.utcnow()
+        if stale:
+            db.commit()
+        return len(stale)
 
     # ── Lesson Plans ──────────────────────────────────────────────────────────
 
