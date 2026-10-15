@@ -418,6 +418,14 @@ class DataService:
             learner_activities=[a.model_dump() for a in lp.learner_activities],
             teacher_activities=[a.model_dump() for a in lp.teacher_activities],
             assessment=lp.assessment or "",
+            # Phase 3 structured assessment — optional, additive.
+            assessment_items=[
+                (i.model_dump(mode="json") if hasattr(i, "model_dump") else dict(i))
+                for i in list(getattr(lp, "assessment_items", []) or [])
+            ],
+            assessment_rubric=(
+                lp.assessment_rubric.model_dump(mode="json")
+                if getattr(lp, "assessment_rubric", None) else None),
             conclusion=lp.conclusion or "",
             references=lp.references,
             structured_references=[

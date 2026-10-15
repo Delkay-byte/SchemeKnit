@@ -277,6 +277,11 @@ class LessonPlanDB(Base):
     learner_activities = Column(JSON, default=list)
     teacher_activities = Column(JSON, default=list)
     assessment = Column(Text, default="")
+    # Structured assessment prompts (DoK + marking guidance) and the
+    # analytic rubric for this lesson when one is needed (Phase 3). Both are
+    # additive JSON columns (v033) — legacy rows stay valid empty.
+    assessment_items = Column(JSON, default=list)
+    assessment_rubric = Column(JSON, nullable=True, default=None)
     conclusion = Column(Text, default="")
     references = Column(JSON, default=list)
     #: Structured per-lesson references: {type,title,author_publisher,page,notes}.

@@ -207,6 +207,9 @@ class DOCXExportEngine:
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         document = render_wapef_document(list(lesson_plans), context)
+        # Phase 3: additive assessment structure (DoK prompts + rubric) —
+        # the WAPEF form's own cells keep exactly what the teacher selected.
+        _append_assessment_structure(document, list(lesson_plans))
         document.save(str(output_path))
         return output_path
 
@@ -231,6 +234,10 @@ class DOCXExportEngine:
         lessons = list(lesson_plans)
         document = render_official_ges_document(spec or ges_spec_for_lessons(lessons),
                                                lessons, context)
+        # Phase 3: the form's own EVALUATION cell keeps the composed prose;
+        # the DoK prompts + rubric are appended additively so no substantive
+        # new assessment content is lost by the bundled form's fixed cells.
+        _append_assessment_structure(document, lessons)
         document.save(str(output_path))
         return output_path
 
@@ -388,6 +395,58 @@ class DOCXExportEngine:
         doc.add_heading('Assessment', level=2)
         if lp.assessment:
             doc.add_paragraph(lp.assessment)
+        # Phase 3: structured DoK prompts + marking guidance (additive;
+        # legacy lessons keep their previous 1-paragraph export verbatim).
+        items = [i for i in (lp.assessment_items or [])
+                 if (getattr(i, "prompt", "") or "").strip()]
+        if items:
+            doc.add_heading('Assessment Questions / Checks (with marking)',
+                            level=3)
+            for i in items:
+                doc.add_paragraph(
+                    f"[{i.prompt}] (DoK {i.dok_level})",
+                    style='List Bullet')
+                if getattr(i, "expected_evidence", ""):
+                    doc.add_paragraph(
+                        f"Expected evidence: {i.expected_evidence}")
+                if getattr(i, "marking_guidance", ""):
+                    doc.add_paragraph(
+                        f"Marking: {i.marking_guidance}")
+                if getattr(i, "misconception", ""):
+                    doc.add_paragraph(
+                        f"Watch for: {i.misconception}")
+                if getattr(i, "follow_up", ""):
+                    doc.add_paragraph(
+                        f"If not reached: {i.follow_up}")
+        rubric = lp.assessment_rubric
+        if rubric is not None and rubric.criteria:
+            doc.add_heading('Marking Rubric for the Learner Task', level=3)
+            if rubric.task:
+                doc.add_paragraph(rubric.task)
+            level_names = ("3 — meets the standard", "2 — developing",
+                           "1 — needs support")
+            table = doc.add_table(rows=1,
+                                  cols=1 + max(1, len(level_names)))
+            table.style = 'Table Grid'
+            header = table.rows[0].cells
+            header[0].text = 'Criterion'
+            for j, name in enumerate(level_names):
+                header[j + 1].text = name
+            for c in rubric.criteria:
+                row = table.add_row().cells
+                row[0].text = c.criterion
+                for d in c.descriptors:
+                    idx = {"3": 1, "2": 2, "1": 3}.get(
+                        (d.get("points") or "").strip(), 1)
+                    if idx - 1 < len(level_names):
+                        row[idx].text = (
+                            f"{d.get('descriptor', '')} "
+                            f"({d.get('points', '')} pt)")
+            doc.add_paragraph(f"Total marks: {rubric.total_points}")
+            if rubric.evidence_to_award:
+                doc.add_paragraph(rubric.evidence_to_award)
+            if rubric.authority_note:
+                doc.add_paragraph(rubric.authority_note)
 
     def _render_conclusion(self, doc: Document, lp: LessonPlan):
         doc.add_heading('Conclusion / Reflection', level=2)
@@ -440,6 +499,72 @@ def _educational_level_of(lesson) -> Optional[EducationalLevel]:
             if raw_class in (class_level.value, class_level.name):
                 return CLASS_LEVEL_TO_EDUCATIONAL_LEVEL.get(class_level)
     return None
+
+
+def _append_assessment_structure(document, lessons) -> None:
+    """Phase 3: append each lesson's DoK assessment prompts and analytic
+    rubric after the form content (additive; nothing in the form changes).
+
+    Used by the bundled-form paths (official GES + WAPEF) whose fixed cells
+    print only the composed assessment prose.
+    """
+    def _heading(doc, text, bold=True):
+        # Bundled form copies may not carry Word's built-in Heading styles —
+        # use a bold run instead so the append NEVER fails on a form doc.
+        p = doc.add_paragraph()
+        run = p.add_run(text)
+        run.bold = bold
+    for lp in list(lessons or []):
+        items = [i for i in (getattr(lp, "assessment_items", None) or [])
+                 if (getattr(i, "prompt", "") or "").strip()]
+        rubric = getattr(lp, "assessment_rubric", None)
+        if not items and not (rubric is not None and rubric.criteria):
+            continue
+        document.add_page_break()
+        _heading(document,
+                 f'Assessment Structure — Week {lp.week_number} '
+                 f'(Lesson {lp.lesson_sequence})')
+        if items:
+            _heading(document,
+                     'Assessment Questions / Checks (with marking)')
+            for i in items:
+                # Plain paragraphs: bundled form copies do not necessarily
+                # carry Word's 'List Bullet' style.
+                document.add_paragraph(f"• [{i.prompt}] (DoK {i.dok_level})")
+                for prefix, value in (
+                        ("Expected evidence: ", i.expected_evidence),
+                        ("Marking: ", i.marking_guidance),
+                        ("Watch for: ", getattr(i, "misconception", "")),
+                        ("If not reached: ", getattr(i, "follow_up", ""))):
+                    if value:
+                        document.add_paragraph(prefix + value)
+        if rubric is not None and rubric.criteria:
+            _heading(document, 'Marking Rubric for the Learner Task')
+            if rubric.task:
+                document.add_paragraph(rubric.task)
+            level_names = ("3 — meets the standard", "2 — developing",
+                           "1 — needs support")
+            table = document.add_table(rows=1, cols=1 + len(level_names))
+            table.style = 'Table Grid'
+            header = table.rows[0].cells
+            header[0].text = 'Criterion'
+            for j, name in enumerate(level_names):
+                header[j + 1].text = name
+            for c in rubric.criteria:
+                row = table.add_row().cells
+                row[0].text = c.criterion
+                for d in c.descriptors:
+                    idx = {"3": 1, "2": 2, "1": 3}.get(
+                        (d.get("points") or "").strip(), 1)
+                    if 0 < idx <= len(level_names):
+                        row[idx].text = (
+                            f"{d.get('descriptor', '')} "
+                            f"({d.get('points', '')} pt)")
+            document.add_paragraph(f"Total marks: {rubric.total_points}")
+            if rubric.evidence_to_award:
+                document.add_paragraph(rubric.evidence_to_award)
+            if rubric.authority_note:
+                document.add_paragraph(rubric.authority_note)
 
 
 def default_template_for_lessons(lesson_plans, template_type: TemplateType = None) -> Template:

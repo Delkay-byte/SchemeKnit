@@ -2609,6 +2609,57 @@ def build_lesson(
         class_assignment = _normalize_prose(
             class_assignment + _repeat_addendum("assignment", focus_short, prior))
 
+    # ── Phase 3 — structured assessment + analytic rubric ──────────────
+    # Deterministic, AI OFF. The items assess THIS indicator (the shared
+    # indicator-action canon supplies the primary action); DoK comes from
+    # the action's cognitive demand + class level + duration; a computed
+    # expected answer appears only where Python can compute it reliably.
+    # The rubric attaches ONLY when the assessment genuinely marks a
+    # learner-created product/performance (build_rubric returns None
+    # otherwise — never rubric theatre for a short oral check).
+    assessment_items: List[dict] = []
+    rubric_payload: Optional[dict] = None
+    if not early_years:
+        try:
+            from . import assessment_design as _assessment_design
+            _ghana_hint = "".join(activity.ghana_context[:1]).strip()
+            assessment_items = _assessment_design.build_assessment_items(
+                indicator=alloc.indicator_description or "",
+                indicator_code=alloc.indicator_code or "",
+                focus=focus_short,
+                subject=(config.subject.value if isinstance(config.subject, Subject)
+                         else str(config.subject or "")),
+                class_level=(config.class_level.value if isinstance(config.class_level, ClassLevel)
+                             else str(config.class_level or "")),
+                duration_minutes=duration,
+                context_hint=_ghana_hint,
+                is_early_years=bool(early_years),
+            )
+            rubric_payload = _assessment_design.build_rubric(
+                indicator=alloc.indicator_description or "",
+                focus=focus_short,
+                assessment_text=assessment,
+                class_level=(config.class_level.value if isinstance(config.class_level, ClassLevel)
+                             else str(config.class_level or "")),
+            )
+            if rubric_payload is not None:
+                for _crit in rubric_payload.get("criteria", []):
+                    # Nothing invented: each criterion is observable on the
+                    # learner's own work for this task.
+                    if not _crit.get("criterion"):
+                        raise ValueError("empty rubric criterion")
+        except Exception:  # assessment structure must never break a lesson
+            # Non-fatal by design, but never silent: a defect in the
+            # assessment designer must be diagnosable from the logs.
+            import logging
+            logging.getLogger(__name__).warning(
+                "assessment_structure_failed",
+                exc_info=True,
+                extra={"indicator_code": alloc.indicator_code or ""},
+            )
+            assessment_items = []
+            rubric_payload = None
+
     # ── Resources — THIS lesson's scheme TLRs first, then activity extras ──
     # SOURCE TLRs: from the scheme for this subject + source week + indicator.
     # NEVER from another subject, another week, a static profile, or AI.
@@ -2881,6 +2932,13 @@ def build_lesson(
         learner_activities=learner_activities,
         teacher_activities=teacher_activities,
         assessment=assessment,
+        # ── Phase 3: structured assessment (DoK + marking) + rubric ──
+        # Deterministic, AI OFF. Items assess THIS indicator's own action;
+        # the rubric only ever attaches when the assessment genuinely marks
+        # a learner-created product or performance (returning None stays
+        # None — short oral/written checks are NOT given a rubric).
+        assessment_items=assessment_items,
+        assessment_rubric=(rubric_payload or None),
         class_assignment=class_assignment,
         home_assignment=home_assignment,
         homework=home_assignment,

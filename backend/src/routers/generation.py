@@ -2322,6 +2322,15 @@ def _serialize_lesson(lp, scheme_db=None) -> dict:
         "learner_activities": lp.learner_activities or [],
         "teacher_activities": lp.teacher_activities or [],
         "assessment": lp.assessment,
+        # Phase 3 structured assessment: the same parse-safe path the export
+        # model uses, so the workspace read model and DOCX/PDF never diverge.
+        "assessment_items": [
+            (i.model_dump(mode="json") if hasattr(i, "model_dump") else i)
+            for i in parse_assessment_items(
+                getattr(lp, "assessment_items", None))
+        ],
+        "assessment_rubric": _rubric_json(
+            parse_assessment_rubric(getattr(lp, "assessment_rubric", None))),
         "conclusion": lp.conclusion,
         "references": normalize_text_items(lp.references),
         "structured_references": normalize_structured_references(
@@ -2363,6 +2372,52 @@ def _parse_activity_list(raw, model_cls):
         except Exception:
             continue
     return out
+
+
+def parse_assessment_items(raw) -> list:
+    """Stored assessment_items JSON → AssessmentItem models (legacy-safe)."""
+    from ..models import AssessmentItem, ContentSource
+    out = []
+    for entry in (raw or []):
+        if isinstance(entry, AssessmentItem):
+            out.append(entry)
+        elif isinstance(entry, dict) and (entry.get("prompt") or "").strip():
+            try:
+                payload = {
+                    k: entry.get(k) for k in
+                    ("prompt", "dok_level", "bloom_category",
+                     "expected_evidence", "marking_guidance",
+                     "misconception", "follow_up", "source")
+                }
+                # Hand-seeded/legacy rows without a source key stay readable
+                # instead of being dropped by enum validation.
+                if not payload.get("source"):
+                    payload["source"] = ContentSource.DETERMINISTIC
+                out.append(AssessmentItem(**payload))
+            except Exception:
+                continue
+    return out
+
+
+def _rubric_json(rubric):
+    """AnalyticRubric model (or None) → JSON-safe dict for API responses."""
+    if rubric is None:
+        return None
+    return rubric.model_dump(mode="json") if hasattr(rubric, "model_dump") \
+        else rubric
+
+
+def parse_assessment_rubric(raw):
+    """Stored assessment_rubric JSON → AnalyticRubric model (legacy-safe)."""
+    from ..models import AnalyticRubric
+    if isinstance(raw, AnalyticRubric):
+        return raw
+    if isinstance(raw, dict) and raw.get("criteria"):
+        try:
+            return AnalyticRubric(**raw)
+        except Exception:
+            return None
+    return None
 
 
 def _db_to_lesson_model(lp) -> LessonPlan:
@@ -2419,6 +2474,12 @@ def _db_to_lesson_model(lp) -> LessonPlan:
         learner_activities=_parse_activity_list(lp.learner_activities, TeachingActivity),
         teacher_activities=_parse_activity_list(lp.teacher_activities, TeachingActivity),
         assessment=lp.assessment,
+        # Phase 3 structured assessment (additive columns; legacy rows stay
+        # valid with empty list / None).
+        assessment_items=parse_assessment_items(
+            getattr(lp, "assessment_items", None)),
+        assessment_rubric=parse_assessment_rubric(
+            getattr(lp, "assessment_rubric", None)),
         conclusion=lp.conclusion,
         references=normalize_text_items(lp.references),
         structured_references=[

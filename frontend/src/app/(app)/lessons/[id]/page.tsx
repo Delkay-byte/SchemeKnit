@@ -78,6 +78,15 @@ interface LessonData {
   introduction: string | null
   starter_activity?: string | null
   assessment: string | null
+  /** Phase 3 structured assessment (read-only in the workspace). */
+  assessment_items?: { prompt: string; dok_level?: number; expected_evidence?: string; marking_guidance?: string; misconception?: string }[]
+  assessment_rubric?: {
+    task: string
+    criteria: { criterion: string; descriptors: { level: string; descriptor: string; points: number }[] }[]
+    total_points?: number
+    evidence_to_award?: string[]
+    authority_note?: string
+  } | null
   conclusion: string | null
   learning_objectives?: { description: string; indicator_code?: string }[]
   main_activities?: { phase?: string; description: string; duration_minutes?: number; resources?: string[] }[]
@@ -709,6 +718,101 @@ export default function LessonDetailPage() {
               rows={3}
             />
           </section>
+
+          {/* Phase 3 structured assessment — READ-ONLY. The deterministic
+              generator's DoK prompts and marking guidance; shown as generated
+              and exported. Editing stays with the prose field above; DOCX/PDF
+              carry the same content. */}
+          {(lesson?.assessment_items?.length ?? 0) > 0 && (
+            <section className="mt-5 border-t border-slate-100 pt-5" aria-label="Assessment tasks">
+              <h3 className="mb-2 text-sm font-semibold text-[#102A43]">
+                Assessment tasks (Depth of Knowledge)
+              </h3>
+              <ol className="space-y-3">
+                {lesson!.assessment_items!.map((item, idx) => (
+                  <li key={idx} className="rounded-md bg-slate-50 px-3 py-2">
+                    <div className="flex flex-wrap items-start gap-2">
+                      <span className="mt-0.5 rounded bg-[#102A43] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                        DoK {item.dok_level || 1}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-[#243B53]">{item.prompt}</p>
+                        {item.expected_evidence && (
+                          <p className="mt-1 text-xs text-slate-500">
+                            <span className="font-medium text-slate-600">Look for:</span>{' '}
+                            {item.expected_evidence}
+                          </p>
+                        )}
+                        {item.marking_guidance && (
+                          <p className="mt-0.5 text-xs text-slate-500">
+                            <span className="font-medium text-slate-600">Marking:</span>{' '}
+                            {item.marking_guidance}
+                          </p>
+                        )}
+                        {item.misconception && (
+                          <p className="mt-0.5 text-xs text-slate-500">
+                            <span className="font-medium text-slate-600">Watch for:</span>{' '}
+                            {item.misconception}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          )}
+
+          {/* Analytic rubric — READ-ONLY, only when the generator attached one
+              (a learner-created product/performance). */}
+          {lesson?.assessment_rubric && lesson.assessment_rubric.criteria?.length > 0 && (
+            <section className="mt-5 border-t border-slate-100 pt-5" aria-label="Marking rubric">
+              <h3 className="mb-1 text-sm font-semibold text-[#102A43]">
+                Marking rubric — {lesson.assessment_rubric.task}
+              </h3>
+              <p className="mb-2 text-xs text-slate-500">
+                Teacher guide for marking this task
+                {typeof lesson.assessment_rubric.total_points === 'number' &&
+                  ` (total ${lesson.assessment_rubric.total_points} points)`}.
+                {lesson.assessment_rubric.authority_note &&
+                  ` ${lesson.assessment_rubric.authority_note}`}
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[480px] border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-left text-slate-600">
+                      <th className="py-1.5 pr-3 font-semibold">Criterion</th>
+                      {lesson.assessment_rubric.criteria[0]?.descriptors?.map((d) => (
+                        <th key={d.level} className="py-1.5 pr-3 font-semibold">
+                          {d.level} ({d.points} pts)
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lesson.assessment_rubric.criteria.map((crit, idx) => (
+                      <tr key={idx} className="border-b border-slate-100 align-top">
+                        <td className="py-1.5 pr-3 font-medium text-[#243B53]">
+                          {crit.criterion}
+                        </td>
+                        {crit.descriptors?.map((d) => (
+                          <td key={d.level} className="py-1.5 pr-3 text-slate-600">
+                            {d.descriptor}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {(lesson.assessment_rubric.evidence_to_award?.length ?? 0) > 0 && (
+                <p className="mt-2 text-xs text-slate-500">
+                  <span className="font-medium text-slate-600">Evidence to award points:</span>{' '}
+                  {lesson.assessment_rubric.evidence_to_award!.join('; ')}
+                </p>
+              )}
+            </section>
+          )}
 
           {/* Phase 3 · Plenary */}
           <section className="mt-5 border-t border-slate-100 pt-5" aria-label="Phase 3 Plenary">

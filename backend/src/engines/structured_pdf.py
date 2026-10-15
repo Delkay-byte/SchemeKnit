@@ -481,7 +481,53 @@ class StructuredPDFEngine:
                 story.append(_activity_table(grid))
 
         story.extend(self._assignment_story(lp, family, ctx, state))
+        story.extend(self._assessment_structure_story(lp))
         story.extend(self._reference_story(lp, family, ctx, state))
+        return story
+
+    def _assessment_structure_story(self, lp) -> List[Any]:
+        """Phase 3: the lesson's DoK-levelled assessment prompts and (when
+        the lesson marks a product/performance) its analytic rubric —
+        additive after the form's own EVALUATION row."""
+        story: List[Any] = []
+        items = [i for i in (getattr(lp, "assessment_items", None) or [])
+                 if (getattr(i, "prompt", "") or "").strip()]
+        if items:
+            lines = []
+            for i in items:
+                lines.append(
+                    f"[{i.prompt}] (DoK {i.dok_level})")
+                if getattr(i, "expected_evidence", ""):
+                    lines.append(f"Expected evidence: {i.expected_evidence}")
+                if getattr(i, "marking_guidance", ""):
+                    lines.append(f"Marking: {i.marking_guidance}")
+                if getattr(i, "misconception", ""):
+                    lines.append(f"Watch for: {i.misconception}")
+                if getattr(i, "follow_up", ""):
+                    lines.append(f"If not reached: {i.follow_up}")
+            story.append(Paragraph(
+                "Assessment Questions / Checks (with marking)",
+                _SECTION_STYLE))
+            story.append(_kv_table(
+                [(f"Check {idx}", text) for idx, text in enumerate(lines, 1)]))
+        rubric = getattr(lp, "assessment_rubric", None)
+        if rubric is not None and getattr(rubric, "criteria", None):
+            story.append(Paragraph(
+                "Marking Rubric for the Learner Task", _SECTION_STYLE))
+            if rubric.task:
+                story.append(_kv_table([("Task", rubric.task)]))
+            rows = []
+            for c in rubric.criteria:
+                descriptor_lines = [
+                    f"{d.get('descriptor', '')} ({d.get('points', '')} pt)"
+                    for d in c.descriptors]
+                rows.append((c.criterion, "\n".join(descriptor_lines)))
+            rows.append(("Total marks", str(rubric.total_points)))
+            story.append(_kv_table(rows))
+            if rubric.evidence_to_award:
+                story.append(Paragraph(rubric.evidence_to_award, _CELL_STYLE))
+            if rubric.authority_note:
+                story.append(Paragraph(rubric.authority_note, _CELL_STYLE))
         return story
 
     @staticmethod
