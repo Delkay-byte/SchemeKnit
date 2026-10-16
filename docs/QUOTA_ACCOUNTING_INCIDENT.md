@@ -409,32 +409,384 @@ idempotency/free-regeneration rules (§6 table):
 | P4 hard rejection `week3:0:B9.1.1.2.1` (nothing persisted) | failed/rejected work is zero-charge; unit row released | 0 (orphan row exists only because the broken path never released it) |
 | 400 validation reject | rejected before reservation | 0 |
 
-**Proposed correction** (exactly §12.5, unchanged): delete the orphan
-`usage_units` row(s) with no matching persisted lesson, then recompute
-`usage_periods.units_used` from the unit ledger for
-`c11bde4c-a9bb-4f41-b96a-921570cf856e`, period `2026-10`.
+**Proposed correction** (semantics unchanged from §12.5; now with hard
+preconditions, `RETURNING` evidence, exact scope and a rollback path —
+re-verified against production state on 2026-10-16, see §13f):
+
+```sql
+-- PROPOSAL 1 (§13e) — incident account ONLY. NOT EXECUTED as of 2026-10-16.
+-- Scope: rows of user c11bde4c-a9bb-4f41-b96a-921570cf856e, period 2026-10.
+BEGIN;
+
+-- Hard preconditions (assertions match the 2026-10-16 read-only probes;
+-- if ANY assert fails, the transaction aborts — re-probe, re-approve).
+DO $$
+DECLARE n int;
+BEGIN
+  SELECT units_used INTO n FROM usage_periods
+   WHERE user_id = 'c11bde4c-a9bb-4f41-b96a-921570cf856e'
+     AND period_type = 'calendar_month' AND period_key = '2026-10'
+     FOR UPDATE;                      -- row lock: blocks concurrent reservation
+  ASSERT n = 0, 'precondition failed: counter is not 0';
+  SELECT count(*) INTO n FROM usage_units
+   WHERE user_id = 'c11bde4c-a9bb-4f41-b96a-921570cf856e'
+     AND period_type = 'calendar_month' AND period_key = '2026-10';
+  ASSERT n = 7, 'precondition failed: expected 7 unit rows';
+  SELECT count(*) INTO n FROM usage_units u
+   WHERE u.user_id = 'c11bde4c-a9bb-4f41-b96a-921570cf856e'
+     AND u.period_type = 'calendar_month' AND u.period_key = '2026-10'
+     AND EXISTS (SELECT 1 FROM lesson_plans l
+                  WHERE l.owner_id = u.user_id AND l.scheme_id = u.scheme_id
+                    AND jsonb_exists(l.indicator_codes::jsonb,
+                                     split_part(u.unit_key, ':', 2)));
+  ASSERT n = 6, 'precondition failed: expected 6 matched units';
+  SELECT count(*) INTO n FROM lesson_plans
+   WHERE owner_id = 'c11bde4c-a9bb-4f41-b96a-921570cf856e';
+  ASSERT n = 6, 'precondition failed: expected 6 persisted lessons';
+  SELECT count(*) INTO n FROM generation_jobs
+   WHERE owner_id = 'c11bde4c-a9bb-4f41-b96a-921570cf856e' AND status = 'failed';
+  ASSERT n = 3, 'precondition failed: expected 3 failed jobs';
+END $$;
+
+-- S1: delete the orphan unit row (work never persisted = zero charge).
+--     CAPTURE the RETURNING output — the id is required for the rollback path.
+DELETE FROM usage_units u
+ WHERE u.user_id = 'c11bde4c-a9bb-4f41-b96a-921570cf856e'
+   AND u.period_type = 'calendar_month' AND u.period_key = '2026-10'
+   AND NOT EXISTS (
+     SELECT 1 FROM lesson_plans l
+      WHERE l.owner_id = u.user_id AND l.scheme_id = u.scheme_id
+        AND jsonb_exists(l.indicator_codes::jsonb, split_part(u.unit_key, ':', 2)))
+ RETURNING u.id, u.unit_key, u.created_at;
+-- Expected: EXACTLY 1 row,
+--   unit_key = ab28233d-f87c-4753-98c1-fbb94acead7f:B9.1.1.2.1
+
+-- S2: recompute the counter from the corrected ledger.
+UPDATE usage_periods p
+   SET units_used = (
+         SELECT count(*) FROM usage_units u
+          WHERE u.user_id = p.user_id AND u.period_type = p.period_type
+            AND u.period_key = p.period_key),
+       updated_at = now()
+ WHERE p.user_id = 'c11bde4c-a9bb-4f41-b96a-921570cf856e'
+   AND p.period_type = 'calendar_month' AND p.period_key = '2026-10'
+   AND p.units_used = 0
+ RETURNING p.units_used;
+-- Expected: EXACTLY 1 row, units_used = 6
+
+-- Guard: if S1 or S2 returned anything other than the expected rows,
+-- ROLL BACK instead of committing (psql: \rollback, else ROLLBACK;).
+COMMIT;
+
+-- Post-correction verification (read-only):
+SELECT units_used FROM usage_periods
+ WHERE user_id = 'c11bde4c-a9bb-4f41-b96a-921570cf856e' AND period_key = '2026-10';
+-- Expected: 6
+SELECT count(*) FROM usage_units
+ WHERE user_id = 'c11bde4c-a9bb-4f41-b96a-921570cf856e' AND period_key = '2026-10';
+-- Expected: 6
+```
+
+**Rollback** (only if the executed change must be reverted later; uses the
+`S1` `RETURNING` values captured at execution time):
+
+```sql
+BEGIN;
+INSERT INTO usage_units
+  (id, user_id, period_type, period_key, unit_kind, unit_key, scheme_id, created_at)
+VALUES
+  ('<captured id>', 'c11bde4c-a9bb-4f41-b96a-921570cf856e', 'calendar_month', '2026-10',
+   'lesson_plan', 'ab28233d-f87c-4753-98c1-fbb94acead7f:B9.1.1.2.1',
+   'ab28233d-f87c-4753-98c1-fbb94acead7f', '<captured created_at>');
+UPDATE usage_periods
+   SET units_used = 0, updated_at = now()
+ WHERE user_id = 'c11bde4c-a9bb-4f41-b96a-921570cf856e'
+   AND period_type = 'calendar_month' AND period_key = '2026-10'
+   AND units_used = 6;
+COMMIT;
+```
 
 **Expected post-correction state:** `units_used = 6` (limit 5) → new
 distinct generations correctly **blocked until 2026-11-01**; free
 regenerations of the six counted codes remain free (unit-key conflict →
 `consumed=0`); the six accepted lessons remain saved (accepted-only
-persistence is unaffected); every other account untouched
-(`SELECT user_id, count(*) FROM usage_units GROUP BY user_id;` run first
-to confirm scope).
+persistence is unaffected); every other account untouched (the full
+all-account inventory from the 2026-10-16 probes is in §13f; correcting
+the other 14 period rows is the separate Proposal 2 in §13g).
 
 **Not executed.** Awaiting explicit owner approval; until applied, every
 quota read for this account truthfully reports the still-broken stored
 counter (`used=0`) even though the deployed code is correct — which is
 why readiness stays NO-GO.
 
+## 13f) Production read-only verification (2026-10-16 — zero writes, zero POSTs)
+
+Method: Render API (service/deploy/env **names** only; no secret values
+printed) plus three read-only database probes. Each probe ran inside a
+single `BEGIN TRANSACTION READ ONLY` transaction with
+`transaction_read_only = 'on'` asserted, `statement_timeout = 30s`, then
+`ROLLBACK` — no `INSERT/UPDATE/DELETE/migration` was issued at any point.
+No production HTTP write endpoint was called (the only HTTP requests were
+`GET` on the Render API).
+
+**Deployed-state re-verification:**
+- Live deploy is still `dep-db8aftlg1s2s739kr47g` = commit `3ef1a41`
+  (finished 2026-10-15T10:18:21Z); no newer deploy attempt exists.
+  Local `main` = `217a32c` == `origin/main`, still NOT deployed (by design).
+- Content verification (not just ancestry): `git show 3ef1a41:backend/
+  src/usage_quota.py` contains the `RETURNING`-based `_insert_ignore`;
+  `git diff --stat 3ef1a41..217a32c -- backend/src/usage_quota.py
+  backend/src/entitlements.py` is empty → **the deployed quota code is
+  byte-identical to the code verified by the local PostgreSQL gate (22
+  passed)**.
+
+**Incident account (`c11bde..856e`) — §13e re-validated against live rows:**
+- 7 `usage_units` rows for 2026-10 (`B9.1.1.1.1/.2/.3`, `B9.1.1.2.1`,
+  `B9.1.2.1.1/.2/.3`, created 00:10:34–00:22:52 on 2026-10-09); counter
+  `units_used = 0`; entitlement `free / active / limit 5`.
+- 6 persisted lessons, occurrence ids `week1:0`, `week2:0`, `week2:1`,
+  `week4:0`, `week4:1`, `week5:0` — exactly the six chargeable units.
+  All six lesson rows are currently linked to the final job `dc22da..47c1`
+  (replacement re-homes survivors to the last run).
+- Exactly 1 orphan: `ab28233d-f87c-4753-98c1-fbb94acead7f:B9.1.1.2.1`
+  (created 00:21:16 by failed job `a95852..c0e7`; scheme still exists;
+  never released because the broken path's `reserved_keys` was always
+  empty — the §13e orphan).
+- 3 failed jobs (`a95852`, `19fda9`, `571488`) all carry an **empty
+  `error_message`** (evidence limitation: the gate-rejection reason is
+  not recoverable from the job row; it is evidenced by the §4/§7-§8
+  reproduction instead). The two later failures created no new unit rows
+  (all-key conflicts → consumed 0).
+- One §13e table nuance, recorded honestly: the idempotent free
+  regeneration observed at occurrence level was `week1:0` (job
+  `581355` at 00:15:46 re-generated it with no new unit row), not
+  `week2:0` as the table line states. The line's accounting conclusion
+  (0 charge, no new unit) is confirmed either way; the chargeable-units
+  total of 6 is unaffected.
+- Concurrency recheck at probe time: still 7 units, still 6 lessons,
+  server clock 2026-10-16 (period still `2026-10`).
+
+**Full production scope — every account (all rows, complete coverage):**
+- 166 `usage_units` rows total, 15 `usage_periods` rows, 14 users with
+  units; newest unit 2026-10-09 00:22:52; **0 generation jobs created
+  after the 2026-10-15 deploy** (the fixed code has never been exercised
+  by a real run).
+- **All 15 period rows have `units_used = 0` while holding ledger rows —
+  the defect was production-wide, not incident-only.** No counter
+  without a ledger row exists (the reverse check is empty).
+- Reconciliation unit→lesson across the whole ledger: **164 matched, 2
+  orphans.** The second orphan (not in §13e's scope): user
+  `1474a7..9ed9`, period 2026-09, `unit_kind=lesson_plan`, unit created
+  2026-09-26 15:30:23 for scheme `8ffecf..b9db`, code
+  `MID-TERM (05-11-2026 to 06-11-` — its job `5638bf..89b9` completed
+  with `total_lessons = 0` (empty run), so nothing was persisted and the
+  correct code would have released the row; the broken release path
+  orphaned it. (The same user has a *matched* `MID-TERM` unit from an
+  earlier 11:04 run whose job did persist a special-week lesson — special
+  weeks that actually persist ARE chargeable, matched logic confirms it.)
+
+| user (masked) | period | ledger rows | matched | orphans | expected counter |
+|---|---|---|---|---|---|
+| 1474a7..9ed9 | 2026-09 | 28 | 27 | 1 (MID-TERM empty run) | **27** |
+| 1474a7..9ed9 | 2026-10 | 5 | 5 | 0 | **5** |
+| 206f1b..f1b9 | 2026-09 | 5 | 5 | 0 | **5** |
+| 2a9440..a3b5 | 2026-09 | 5 | 5 | 0 | **5** |
+| 2dbf6e..a25f | 2026-09 | 5 | 5 | 0 | **5** |
+| 2f62b5..320e | 2026-09 | 42 | 42 | 0 | **42** |
+| 4995a6..6364 | 2026-10 | 34 | 34 | 0 | **34** |
+| 5041ae..defd | 2026-09 | 5 | 5 | 0 | **5** |
+| 762d46..0b28 | 2026-09 | 5 | 5 | 0 | **5** |
+| b03ee7..1bf2 | 2026-09 | 5 | 5 | 0 | **5** |
+| b2303e..3dce | 2026-10 | 5 | 5 | 0 | **5** |
+| bdadee..b2d6 | 2026-09 | 5 | 5 | 0 | **5** |
+| c11bde..856e | 2026-10 | 7 | 6 | 1 (gate rejection — §13e) | **6** |
+| dbe010..68a9 | 2026-09 | 5 | 5 | 0 | **5** |
+| f801cf..5efb | 2026-10 | 5 | 5 | 0 | **5** |
+
+All 13 non-incident users are `free` tier, `limit 5` (one `revoked`
+subscription — `2f62b5..320e`, limit still 5). September rows are
+historical bookkeeping only (the API reads the current month); the
+2026-10 rows of `1474a7..9ed9`, `4995a6..6364`, `b2303e..3dce` and
+`f801cf..5efb` have **forward enforcement effect**: correcting them makes
+those accounts exhaust/block in October exactly as Free Tier policy
+describes (notably `4995a6..6364` at 34 units — already far over).
+
+## 13g) Proposal 2 — all-accounts reconciliation (SEPARATE APPROVAL — NOT EXECUTED)
+
+New evidence from §13f (the defect affected every account) widens the
+historical-reconciliation control beyond §13e. This proposal is **not**
+part of the §13e approval; it needs its own explicit owner decision.
+Semantics: delete every ledger row whose work was never persisted (2 rows
+if run before Proposal 1… — scoped here to the 1 non-incident orphan), then
+recompute each non-incident period counter from its ledger.
+
+```sql
+-- PROPOSAL 2 — all accounts EXCEPT c11bde..856e (that account is §13e/Proposal 1).
+-- Order-independent: can run before or after Proposal 1.
+-- NOT EXECUTED as of 2026-10-16.
+BEGIN;
+
+DO $$
+DECLARE n int;
+BEGIN
+  -- 14 non-incident period rows, all still counter 0
+  SELECT count(*) INTO n FROM usage_periods
+   WHERE user_id <> 'c11bde4c-a9bb-4f41-b96a-921570cf856e';
+  ASSERT n = 14, 'precondition failed: expected 14 non-incident period rows';
+  SELECT count(*) INTO n FROM usage_periods
+   WHERE user_id <> 'c11bde4c-a9bb-4f41-b96a-921570cf856e' AND units_used <> 0;
+  ASSERT n = 0, 'precondition failed: a non-incident counter is not 0';
+  -- 159 non-incident ledger rows (166 total − incident 7)
+  SELECT count(*) INTO n FROM usage_units
+   WHERE user_id <> 'c11bde4c-a9bb-4f41-b96a-921570cf856e';
+  ASSERT n = 159, 'precondition failed: expected 159 non-incident unit rows';
+  -- exactly 1 non-incident orphan (the MID-TERM empty-run row)
+  SELECT count(*) INTO n FROM usage_units u
+   WHERE u.user_id <> 'c11bde4c-a9bb-4f41-b96a-921570cf856e'
+     AND NOT EXISTS (
+       SELECT 1 FROM lesson_plans l
+        WHERE l.owner_id = u.user_id AND l.scheme_id = u.scheme_id
+          AND jsonb_exists(l.indicator_codes::jsonb, split_part(u.unit_key, ':', 2)));
+  ASSERT n = 1, 'precondition failed: expected exactly 1 non-incident orphan';
+END $$;
+
+-- S1: delete the non-incident orphan; CAPTURE RETURNING for rollback.
+DELETE FROM usage_units u
+ WHERE u.user_id <> 'c11bde4c-a9bb-4f41-b96a-921570cf856e'
+   AND NOT EXISTS (
+     SELECT 1 FROM lesson_plans l
+      WHERE l.owner_id = u.user_id AND l.scheme_id = u.scheme_id
+        AND jsonb_exists(l.indicator_codes::jsonb, split_part(u.unit_key, ':', 2)))
+ RETURNING u.id, u.user_id, u.period_key, u.unit_key, u.created_at;
+-- Expected: EXACTLY 1 row — user 1474a7..(full id), period 2026-09,
+--   code 'MID-TERM (05-11-2026 to 06-11-', created 2026-09-26 15:30:23.633320
+
+-- S2: recompute every non-incident counter from its ledger.
+UPDATE usage_periods p
+   SET units_used = sub.matched, updated_at = now()
+  FROM (
+        SELECT u.user_id, u.period_type, u.period_key,
+               count(*) FILTER (
+                 WHERE EXISTS (
+                   SELECT 1 FROM lesson_plans l
+                    WHERE l.owner_id = u.user_id AND l.scheme_id = u.scheme_id
+                      AND jsonb_exists(l.indicator_codes::jsonb,
+                                       split_part(u.unit_key, ':', 2)))
+               ) AS matched
+          FROM usage_units u
+         WHERE u.user_id <> 'c11bde4c-a9bb-4f41-b96a-921570cf856e'
+         GROUP BY u.user_id, u.period_type, u.period_key
+       ) sub
+ WHERE p.user_id = sub.user_id
+   AND p.period_type = sub.period_type
+   AND p.period_key = sub.period_key
+   AND p.units_used = 0
+ RETURNING p.user_id, p.period_key, p.units_used;
+-- Expected: EXACTLY 14 rows with values from the §13f table
+--   (27, 5, 5, 5, 5, 42, 34, 5, 5, 5, 5, 5, 5, 5).
+-- NOTE: S2's SET assigns sub.matched directly (filtered count), so the
+--   expected values are the §13f "matched" column regardless of delete order.
+
+-- Guard: if S1/S2 row counts differ from expected, ROLL BACK.
+COMMIT;
+```
+
+**Consequence the owner should accept explicitly:** after Proposal 2,
+`4995a6..6364` (34), `1474a7..9ed9` (5 in 2026-10) and two other
+October accounts sit at/over the Free Tier limit of 5 and will receive
+403s for new distinct generation until 2026-11-01 — correct Free Tier
+behaviour, but a user-visible change for those accounts.
+
+**Rollback:** captured `S1 RETURNING` row re-inserted with the same
+columns (as in §13e's rollback block) plus `UPDATE usage_periods SET
+units_used = 0 … WHERE user_id = <id> AND units_used = <returned value>`
+for the 14 rows (values listed in the §13f table).
+
+## 13h) Live enforcement test plan (APPROVAL REQUIRED — NOT EXECUTED)
+
+Control: "enforcement is verified in the production runtime" — currently
+**NOT TESTED** (no authorized POST has been issued since the deploy).
+
+**Route & payload (minimal, `ai_mode` default is already `OFF`):**
+
+```
+POST {base}/api/generation/ab28233d-f87c-4753-98c1-fbb94acead7f/generate
+Authorization: Bearer $TF_TEACHER_TOKEN        # token obtained/used by the OWNER locally
+Content-Type: application/json
+
+{
+  "scheme_of_work_id": "ab28233d-f87c-4753-98c1-fbb94acead7f",
+  "ai_mode": "OFF"
+}
+```
+
+Empty `selected_indicator_codes` = full scheme → `requested_codes` =
+every instructional indicator of the scheme (weeks 1–12 are `instruction`;
+≥ 12 codes, upload-time extraction observed 20).
+
+**Expected results:**
+- **Variant A (possible now, before §13e):** HTTP **403** at the admission
+  pre-check (`generation.py:817-830`), body
+  `"This scheme contains {N} instructional indicators. You have 5 Free
+  Tier lesson plans remaining this month. Select up to 5 indicators to
+  generate now, or upgrade to Teacher Pro for unlimited generation."`
+  (exact message built from the code; `remaining = 5`).
+- **Variant B (authoritative, after Proposal 1/§13e):** same request →
+  HTTP **403**, body `"... You have 0 Free Tier lesson plans remaining
+  this month. Select up to 0 indicators to generate now, or upgrade to
+  Teacher Pro for unlimited generation."` (`remaining = 0`, because
+  `used = 6 > limit = 5`).
+- **Zero side effects (both variants)** — asserted by a read-only probe
+  after the call: no new `generation_jobs` row (count unchanged),
+  `usage_units` count unchanged (6 after §13e), `units_used` unchanged,
+  `lesson_plans` count unchanged.
+
+**Side-effect analysis of the denial path (verified by reading the full
+handler, `generation.py:624`–`850`):**
+- The only DB write before the pre-check is a conditional
+  `db.commit()` for teacher-confirmed class level (line ~686). It cannot
+  fire: the test scheme has `class_level='Basic 9'`,
+  `detection_status='single'` (probed).
+- `require_ai_entitlement` is skipped (`ai_mode=OFF`); school/teacher
+  name resolution, calendar/allocation and quota reads are read-only;
+  `log_event` writes to stdout only (`logging_config.py:44`).
+- The pre-check raises **before** `reserve_lesson_units` (line ~831) and
+  `create_job` (line ~849) — nothing is reserved, created or counted.
+- Auth = JWT verification + user read; no session/login write per request.
+
+**What this test does NOT prove (stated honestly):** the atomic
+reserve-path guard (race window: two requests passing the pre-check
+simultaneously). That path is unreachable in a single denial test and
+can only be exercised by local concurrency tests — `PG driver gate 22
+passed (incl. threaded concurrency)` — plus, if ever needed, an approved
+two-request race test. The RETURNING fix itself is proven on the
+production driver stack locally, and §13f shows the deployed file is
+byte-identical to the locally tested file.
+
+**Execution mechanics (owner):** obtain a teacher JWT for the smoke
+account from the owner's own authenticated session (browser DevTools
+"Copy as cURL", or session storage) and run the request with the token in
+a **local** environment variable — the token must never be pasted into
+chat, issues, commits or logs. Approval requested: (1) POST of the
+denial payload above (Variant A immediately; Variant B after §13e), and
+(2) the §13e and §13g SQL transactions.
+
+**Post-test verification (read-only):** re-run the probe queries of §13f
+to confirm counts unchanged.
+
 ## 14) Residual risks / open items
 
 
 
-- Deployment + owner verification (§12) outstanding — RED/NO-GO stands until
-  the fixed build is deployed AND the counter is observed incrementing
-  (or the backfilled `used=6` is observed).
-- Owner evidence (logs, DB rows, deployed SHA) still requested (§4).
+- Deployment is DONE (§13d, 2026-10-15: `3ef1a41` live; §13f content-
+  verified 2026-10-16). RED/NO-GO stands until the §13h live denial test
+  passes AND the §13e reconciliation is approved and applied (plus an
+  owner decision on Proposal 2/§13g).
+- Owner decisions outstanding: §13e SQL, §13g SQL, §13h POST approval
+  (token stays in the owner's local environment; never in chat/logs).
+- Production-wide accounting state (§13f): all 15 period rows hold
+  `units_used = 0` with ledger rows present — enforcement under-binds
+  EVERY free account until §13e/§13g are applied.
 - Pre-existing policy (unchanged): at exhaustion the 403 pre-check refuses
   **any** generate call, including free regenerations of already-counted
   codes; pinned as current behaviour in the journey test.
