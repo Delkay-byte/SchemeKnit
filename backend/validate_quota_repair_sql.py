@@ -6,8 +6,14 @@ Proposal 2 = §13g).
 Synthetic, production-shaped data only. Refuses any non-loopback host.
 Creates and drops one scratch database per test case. Never touches
 production. The repair/rollback scripts are extracted verbatim from the
-document (markers `-- SCRIPT: P1-REPAIR` etc.), so the doc text is exactly
-what gets executed.
+document (markers `-- SCRIPT: P1-REPAIR` etc.), so the doc text is
+exactly what gets executed.
+
+State comparison uses a full-row LOGICAL fingerprint of every column of
+every table in the synthetic repair schema (usage_units, usage_periods,
+lesson_plans, generation_jobs): complete `to_jsonb(row)` representations
+aggregated in primary-key order and md5-hashed. This is a logical
+(row-content) fingerprint, not a physical database byte comparison.
 
 Usage (from repo root):
     ./venv/Scripts/python backend/validate_quota_repair_sql.py
@@ -20,6 +26,7 @@ import json
 import os
 import re
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import psycopg
@@ -35,8 +42,6 @@ MID_TERM_CODE = "MID-TERM (05-11-2026 to 06-11-"  # 30 chars → key length 67
 MID_ORPHAN_CREATED = "2026-09-26 15:30:23.633320"
 INC_NEWEST = "2026-10-09 00:22:52.201720"
 
-# Synthetic non-incident users; prefixes mirror the masked §13f evidence
-# (full values are synthetic 36-char pads — production UUIDs were masked).
 U_MID = "1474a7" + "0" * 30   # Sept 27 matched + 1 orphan, Oct 5 matched
 U_42 = "2f62b5" + "0" * 30    # Sept 42 matched
 U_O34 = "4995a6" + "0" * 30   # Oct 34 matched
@@ -54,16 +59,28 @@ SEPT5_USERS = [
 ]
 JOB_OK = "dc22da" + "0" * 30
 
+# Full-row logical fingerprint: every column of every table, complete
+# to_jsonb(row) text, aggregated in primary-key order, md5-hashed.
 FINGERPRINT_SQL = """
-SELECT md5(json_build_object(
-  'units', (SELECT count(*) FROM usage_units),
-  'units_md5', (SELECT md5(coalesce(string_agg(id || '|' || unit_key, ',' ORDER BY id), '')) FROM usage_units),
-  'periods', (SELECT count(*) FROM usage_periods),
-  'counter_sum', (SELECT coalesce(sum(units_used), 0) FROM usage_periods),
-  'periods_md5', (SELECT md5(coalesce(string_agg(id || ':' || units_used, ',' ORDER BY id), '')) FROM usage_periods),
-  'lessons', (SELECT count(*) FROM lesson_plans),
-  'jobs', (SELECT count(*) FROM generation_jobs)
-)::text)
+SELECT md5(
+  (SELECT coalesce(string_agg(to_jsonb(u)::text, E'\\n' ORDER BY u.id), '')
+     FROM usage_units u)
+  || E'\\n#\\n' ||
+  (SELECT coalesce(string_agg(to_jsonb(p)::text, E'\\n' ORDER BY p.id), '')
+     FROM usage_periods p)
+  || E'\\n#\\n' ||
+  (SELECT coalesce(string_agg(to_jsonb(l)::text, E'\\n' ORDER BY l.id), '')
+     FROM lesson_plans l)
+  || E'\\n#\\n' ||
+  (SELECT coalesce(string_agg(to_jsonb(j)::text, E'\\n' ORDER BY j.id), '')
+     FROM generation_jobs j)
+)
+"""
+
+AGGREGATE_SQL = """
+SELECT (SELECT count(*) FROM usage_units),
+       (SELECT coalesce(sum(units_used), 0) FROM usage_periods),
+       (SELECT count(*) FROM usage_periods)
 """
 
 SCHEMA_SQL = """
@@ -111,10 +128,18 @@ def scheme_of(user: str) -> str:
     return (user + "0" * 36)[:36]
 
 
-def seed_sql() -> str:
-    """Deterministic production-shaped synthetic seed; all counters are 0."""
+def seed_sql() -> tuple[str, dict]:
+    """Deterministic production-shaped synthetic seed; all counters are 0.
+
+    Every usage_periods row gets a deliberately DISTINCT original
+    updated_at (recorded in meta['period_updated_at'] keyed by
+    (user_id, period_key)) so a shared or newly generated timestamp can
+    never accidentally match the expected restored state.
+    """
     stmts: list[str] = []
+    meta: dict = {"period_updated_at": {}}
     unit_n = 0
+    period_n = 0
 
     def unit(user: str, period_key: str, scheme: str, code: str, created: str) -> None:
         nonlocal unit_n
@@ -135,10 +160,17 @@ def seed_sql() -> str:
         )
 
     def period(pid: str, user: str, key: str) -> None:
+        nonlocal period_n
+        period_n += 1
+        ts = (
+            datetime(2026, 9, 1, 8, 0, 0)
+            + timedelta(minutes=17 * period_n, microseconds=123456 * period_n)
+        ).strftime("%Y-%m-%d %H:%M:%S.%f")
+        meta["period_updated_at"][(user, key)] = ts
         stmts.append(
             "INSERT INTO usage_periods (id, user_id, period_type, period_key,"
-            f" units_used, updated_at) VALUES ('{pid}', '{user}',"
-            f" 'calendar_month', '{key}', 0, '2026-10-10 12:00:00');"
+            f" units_used, created_at, updated_at) VALUES ('{pid}', '{user}',"
+            f" 'calendar_month', '{key}', 0, '{ts}', '{ts}');"
         )
 
     def matched_group(user: str, key: str, count: int) -> None:
@@ -153,7 +185,6 @@ def seed_sql() -> str:
                 f"wk{i}:0:{code}", f"{user[:6]}job000",
             )
 
-    # incident account: 6 matched units + 1 orphan, counter row 0, 10 jobs.
     inc_codes = [
         ("B9.1.1.1.1", "week1:0:B9.1.1.1.1", "2026-10-09 00:10:34.000000"),
         ("B9.1.1.1.2", "week2:0:B9.1.1.1.2", "2026-10-09 00:12:11.000000"),
@@ -187,7 +218,6 @@ def seed_sql() -> str:
             f" '2026-10-08 1{j}:00:00.000000');"
         )
 
-    # non-incident accounts: 14 period rows, 159 units, 1 orphan.
     period("pmid09", U_MID, "2026-09")
     period("pmid10", U_MID, "2026-10")
     matched_group(U_MID, "2026-09", 27)
@@ -203,7 +233,8 @@ def seed_sql() -> str:
     for i, u in enumerate(SEPT5_USERS):
         period(f"ps5{i}", u, "2026-09")
         matched_group(u, "2026-09", 5)
-    return "\n".join(stmts)
+    assert period_n == 15, f"expected 15 period rows, built {period_n}"
+    return "\n".join(stmts), meta
 
 
 def split_statements(sql: str) -> list[str]:
@@ -286,12 +317,10 @@ def split_statements(sql: str) -> list[str]:
 
 
 def extract_script(doc_text: str, marker: str) -> str:
-    """Extract the fenced sql block whose first marker comment matches.
+    """Extract the fenced sql block containing the given marker comment.
 
     Line-based fence walk: an opening fence is a line that strips to
-    '```sql'; the next line that strips to '```' closes it. (A regex over
-    the whole document is unsafe here: a '```sql' opener line can be
-    consumed as a previous block's closer.)
+    '```sql'; the next line that strips to '```' closes it.
     """
     lines = doc_text.splitlines()
     i = 0
@@ -314,7 +343,7 @@ ALLOWED_TARGETS = {"usage_units", "usage_periods"}
 
 
 def check_repair_scope(name: str, script: str) -> None:
-    """Repair scripts must only mutate usage_units / usage_periods."""
+    """Top-level mutating statements must only target usage tables."""
     for stmt in split_statements(script):
         if not MUTATING.match(stmt):
             continue
@@ -346,7 +375,6 @@ def parse_deleted(notices: list[str], p2: bool) -> dict[str, str]:
         if not n.startswith("DELETED_ORPHAN"):
             continue
         if p2:
-            # key may contain spaces (MID-TERM code); created_at is last.
             m = re.match(
                 r"DELETED_ORPHAN id=(\S+) user=(\S+) scheme=(\S+) key=(.*)"
                 r" created_at=(.+)$", n,
@@ -367,6 +395,41 @@ def parse_ts(notices: list[str]) -> str:
         if n.startswith("REPAIRED_TS "):
             return n[len("REPAIRED_TS "):].strip()
     raise AssertionError(f"no REPAIRED_TS notice; got {notices}")
+
+
+def parse_p1_original(notices: list[str]) -> dict[str, str]:
+    for n in notices:
+        if n.startswith("P1_ORIGINAL_PERIOD "):
+            m = re.match(
+                r"P1_ORIGINAL_PERIOD user_id=(\S+) period_key=(\S+)"
+                r" updated_at=(.+)$", n,
+            )
+            assert m, f"unparseable P1_ORIGINAL_PERIOD packet: {n}"
+            return {
+                "user_id": m.group(1), "period_key": m.group(2),
+                "updated_at": m.group(3).strip(),
+            }
+    raise AssertionError(f"no P1_ORIGINAL_PERIOD notice; got {notices}")
+
+
+def parse_p2_original(notices: list[str]) -> list[tuple[str, str, str, str]]:
+    rows: list[tuple[str, str, str, str]] = []
+    for n in notices:
+        if n.startswith("P2_ORIGINAL_PERIOD "):
+            m = re.match(
+                r"P2_ORIGINAL_PERIOD user_id=(\S+) period_type=(\S+)"
+                r" period_key=(\S+) updated_at=(.+)$", n,
+            )
+            assert m, f"unparseable P2_ORIGINAL_PERIOD packet: {n}"
+            rows.append((m.group(1), m.group(2), m.group(3), m.group(4).strip()))
+    assert len(rows) == 14, f"expected 14 P2_ORIGINAL_PERIOD notices, got {len(rows)}"
+    return rows
+
+
+def p2_values_list(rows: list[tuple[str, str, str, str]]) -> str:
+    return ", ".join(
+        f"('{u}','{pt}','{pk}','{ts}')" for u, pt, pk, ts in rows
+    )
 
 
 def substitute(sql: str, mapping: dict[str, str]) -> str:
@@ -396,9 +459,12 @@ class Runner:
         }
         check_repair_scope("P1-REPAIR", self.scripts["P1-REPAIR"])
         check_repair_scope("P2-REPAIR", self.scripts["P2-REPAIR"])
-        self.seed = seed_sql()
+        self.seed, self.seed_meta = seed_sql()
         assert len(MID_TERM_CODE) == 30, "MID-TERM code must be 30 chars"
         assert len(scheme_of(U_MID)) + 1 + len(MID_TERM_CODE) == 67
+        # seed timestamps must be distinct across all 15 period rows
+        ts_list = list(self.seed_meta["period_updated_at"].values())
+        assert len(set(ts_list)) == 15, "seed period updated_at values must be distinct"
 
     def _conn(self, dbname: str):
         return psycopg.connect(
@@ -455,6 +521,9 @@ class Runner:
     def fingerprint(self, conn) -> str:
         return self.one(conn, FINGERPRINT_SQL)[0]
 
+    def aggregates(self, conn):
+        return tuple(self.one(conn, AGGREGATE_SQL))
+
     def one(self, conn, sql: str, args=None):
         with conn.cursor() as cur:
             cur.execute(sql, args)
@@ -469,12 +538,25 @@ class Runner:
         with conn.cursor() as cur:
             cur.execute(sql)
 
+    def p1_packets(self, notices: list[str]) -> dict[str, str]:
+        packet = parse_deleted(notices, p2=False)
+        packet["repaired_ts"] = parse_ts(notices)
+        packet.update(parse_p1_original(notices))
+        return packet
+
+    def p2_packets(self, notices: list[str]) -> dict:
+        packet = parse_deleted(notices, p2=True)
+        packet["repaired_ts"] = parse_ts(notices)
+        packet["originals"] = parse_p2_original(notices)
+        return packet
+
 
 def run_all() -> int:
     doc_text = DOC_PATH.read_text(encoding="utf-8")
     r = Runner(doc_text)
     results: list[tuple[str, bool, str]] = []
     dbname = "quota_rep_check"
+    orig_meta: dict = r.seed_meta["period_updated_at"]
 
     def case(name: str, fn) -> None:
         try:
@@ -487,31 +569,82 @@ def run_all() -> int:
         finally:
             r.drop(dbname)
 
+    def sub_p1(packet: dict[str, str]) -> dict[str, str]:
+        return {
+            "ORPHAN_ID": packet["id"],
+            "ORPHAN_CREATED_AT": packet["created_at"],
+            "REPAIRED_TS": packet["repaired_ts"],
+            "ORIGINAL_PERIOD_TS": packet["updated_at"],
+        }
+
+    def sub_p2(packet: dict) -> dict[str, str]:
+        return {
+            "ORPHAN_ID": packet["id"],
+            "ORPHAN_USER_ID": packet["user"],
+            "ORPHAN_SCHEME_ID": packet["scheme"],
+            "ORPHAN_UNIT_KEY": packet["key"],
+            "ORPHAN_CREATED_AT": packet["created_at"],
+            "REPAIRED_TS": packet["repaired_ts"],
+            "P2_ORIGINAL_PERIODS": p2_values_list(packet["originals"]),
+        }
+
+    def original_ts(user: str, key: str) -> datetime:
+        return datetime.fromisoformat(orig_meta[(user, key)])
+
+    # 1 — P1 repair valid; all three packets emitted ----------------------
     def case1(db: str) -> None:
         conn = r.seed_fresh(db)
-        fp0 = r.fingerprint(conn)
         notices, err = r.run_script(conn, "P1-REPAIR")
         expect(err is None, f"P1-REPAIR failed: {err}")
-        packet = parse_deleted(notices, p2=False)
+        packet = r.p1_packets(notices)
         expect(packet["key"] == INC_ORPHAN_KEY, f"wrong key {packet['key']}")
-        expect(r.one(conn, "SELECT count(*) FROM usage_units")[0] == 165,
-               "expected 165 total units after P1")
+        expect(packet["user_id"] == INC and packet["period_key"] == "2026-10",
+               f"unexpected P1_ORIGINAL_PERIOD identity: {packet}")
+        expect(
+            datetime.fromisoformat(packet["updated_at"])
+            == original_ts(INC, "2026-10"),
+            "P1_ORIGINAL_PERIOD ts does not match the seed's original value",
+        )
         expect(r.one(conn, f"SELECT count(*) FROM usage_units WHERE user_id='{INC}'")[0] == 6,
                "incident units != 6")
         expect(r.one(conn, f"SELECT units_used FROM usage_periods WHERE user_id='{INC}'")[0] == 6,
                "incident counter != 6")
-        expect(r.one(conn, f"SELECT count(*) FROM usage_units WHERE unit_key='{INC_ORPHAN_KEY}'")[0] == 0,
-               "orphan still present")
-        expect(r.fingerprint(conn) != fp0, "fingerprint unchanged after P1")
         conn.close()
 
+    # 2 — P1 rollback restores the complete original full-row fingerprint --
     def case2(db: str) -> None:
+        conn = r.seed_fresh(db)
+        fp0 = r.fingerprint(conn)
+        notices, err = r.run_script(conn, "P1-REPAIR")
+        expect(err is None, f"P1-REPAIR failed: {err}")
+        packet = r.p1_packets(notices)
+        rb = substitute(r.scripts["P1-ROLLBACK"], sub_p1(packet))
+        _, err = r.run_script(conn, "P1-ROLLBACK", sql=rb)
+        expect(err is None, f"P1-ROLLBACK failed: {err}")
+        expect(r.fingerprint(conn) == fp0,
+               "P1 rollback did not restore the complete original fingerprint")
+        restored_ts = r.one(conn, (
+            f"SELECT updated_at FROM usage_periods WHERE user_id='{INC}'"
+            " AND period_key='2026-10'"
+        ))[0]
+        expect(restored_ts == original_ts(INC, "2026-10"),
+               f"incident period updated_at not restored: {restored_ts}")
+        conn.close()
+
+    # 3 — P2 repair valid; 14 distinct original-period packets ------------
+    def case3(db: str) -> None:
         conn = r.seed_fresh(db)
         notices, err = r.run_script(conn, "P2-REPAIR")
         expect(err is None, f"P2-REPAIR failed: {err}")
-        packet = parse_deleted(notices, p2=True)
-        expect(packet["created_at"].startswith("2026-09-26 15:30:23"),
-               f"unexpected created_at {packet['created_at']}")
+        packet = r.p2_packets(notices)
+        identities = {(u, pt, pk) for u, pt, pk, _ in packet["originals"]}
+        expect(len(identities) == 14, "P2 original-period packets not distinct")
+        expected = {(u, "calendar_month", k) for (u, k) in orig_meta if u != INC}
+        expect(identities == expected,
+               f"packet identities do not match the 14 non-incident rows: {identities ^ expected}")
+        for u, pt, pk, ts in packet["originals"]:
+            expect(datetime.fromisoformat(ts) == original_ts(u, pk),
+                   f"captured original ts mismatch for {u}/{pk}")
         sept = [row[0] for row in r.rows(conn, (
             f"SELECT units_used FROM usage_periods WHERE user_id<>'{INC}'"
             " AND period_key='2026-09' ORDER BY units_used"))]
@@ -522,21 +655,31 @@ def run_all() -> int:
         expect(oct_ == [5, 5, 5, 34], f"Oct counters {oct_}")
         expect(r.one(conn, f"SELECT count(*) FROM usage_units WHERE user_id<>'{INC}'")[0] == 158,
                "non-incident units != 158")
-        unmatched = r.one(conn, (
-            f"SELECT count(*) FROM usage_units u WHERE u.user_id <> '{INC}'"
-            " AND NOT EXISTS (SELECT 1 FROM lesson_plans l"
-            "  WHERE l.owner_id = u.user_id AND l.scheme_id = u.scheme_id"
-            "  AND jsonb_exists(l.indicator_codes::jsonb, split_part(u.unit_key, ':', 2)))"
-        ))[0]
-        expect(unmatched == 0, f"{unmatched} unmatched non-incident units remain")
-        inc = r.one(conn, (
-            f"SELECT (SELECT count(*) FROM usage_units WHERE user_id='{INC}'),"
-            f" (SELECT units_used FROM usage_periods WHERE user_id='{INC}')"
-        ))
-        expect(tuple(inc) == (7, 0), f"incident account changed: {tuple(inc)}")
         conn.close()
 
-    def case3(db: str) -> None:
+    # 4 — P2 rollback restores the complete original full-row fingerprint --
+    def case4(db: str) -> None:
+        conn = r.seed_fresh(db)
+        fp0 = r.fingerprint(conn)
+        notices, err = r.run_script(conn, "P2-REPAIR")
+        expect(err is None, f"P2-REPAIR failed: {err}")
+        packet = r.p2_packets(notices)
+        rb = substitute(r.scripts["P2-ROLLBACK"], sub_p2(packet))
+        _, err = r.run_script(conn, "P2-ROLLBACK", sql=rb)
+        expect(err is None, f"P2-ROLLBACK failed: {err}")
+        expect(r.fingerprint(conn) == fp0,
+               "P2 rollback did not restore the complete original fingerprint")
+        for u, pt, pk, _ in packet["originals"]:
+            restored = r.one(conn, (
+                "SELECT updated_at FROM usage_periods"
+                f" WHERE user_id='{u}' AND period_key='{pk}'"
+            ))[0]
+            expect(restored == original_ts(u, pk),
+                   f"updated_at not restored for {u}/{pk}: {restored}")
+        conn.close()
+
+    # 5 — both execution orders converge ----------------------------------
+    def case5(db: str) -> None:
         finals = []
         for order in (["P1-REPAIR", "P2-REPAIR"], ["P2-REPAIR", "P1-REPAIR"]):
             conn = r.seed_fresh(db)
@@ -551,44 +694,25 @@ def run_all() -> int:
             )))
             finals.append(state)
             conn.close()
-        # (total units, sum of ALL counters = 6 incident + 158 non-incident,
-        #  incident counter)
         expect(finals[0] == finals[1] == (164, 164, 6), f"orders diverged: {finals}")
 
-    def case4(db: str) -> None:
-        conn = r.seed_fresh(db)
-        r.exec(conn, f"UPDATE usage_periods SET units_used=1 WHERE user_id='{INC}'")
-        fp = r.fingerprint(conn)
-        _, err = r.run_script(conn, "P1-REPAIR")
-        expect_sqlstate(err, "TP001")
-        expect(r.fingerprint(conn) == fp, "DB changed after refused P1 run")
-        conn.close()
-        conn = r.seed_fresh(db)
-        r.exec(conn, f"UPDATE usage_periods SET units_used=1 WHERE user_id='{U_42}'")
-        fp = r.fingerprint(conn)
-        _, err = r.run_script(conn, "P2-REPAIR")
-        expect_sqlstate(err, "TP001")
-        expect(r.fingerprint(conn) == fp, "DB changed after refused P2 run")
-        conn.close()
-
-    def case5(db: str) -> None:
-        conn = r.seed_fresh(db)
-        r.exec(conn, f"DELETE FROM usage_units WHERE unit_key='{INC_ORPHAN_KEY}'")
-        fp = r.fingerprint(conn)
-        _, err = r.run_script(conn, "P1-REPAIR")
-        expect_sqlstate(err, "TP001")
-        expect(r.fingerprint(conn) == fp, "DB changed after refused P1 run")
-        conn.close()
-        conn = r.seed_fresh(db)
-        r.exec(conn, "DELETE FROM usage_units"
-                     f" WHERE created_at='{MID_ORPHAN_CREATED}'")
-        fp = r.fingerprint(conn)
-        _, err = r.run_script(conn, "P2-REPAIR")
-        expect_sqlstate(err, "TP001")
-        expect(r.fingerprint(conn) == fp, "DB changed after refused P2 run")
-        conn.close()
-
+    # 6 — precondition aborts; full fingerprint unchanged after each ------
     def case6(db: str) -> None:
+        scenarios = [
+            ("P1-REPAIR", f"UPDATE usage_periods SET units_used=1 WHERE user_id='{INC}'"),
+            ("P1-REPAIR", f"DELETE FROM usage_units WHERE unit_key='{INC_ORPHAN_KEY}'"),
+            ("P2-REPAIR", f"UPDATE usage_periods SET units_used=1 WHERE user_id='{U_42}'"),
+            ("P2-REPAIR", f"DELETE FROM usage_units WHERE created_at='{MID_ORPHAN_CREATED}'"),
+        ]
+        for script, tamper in scenarios:
+            conn = r.seed_fresh(db)
+            r.exec(conn, tamper)
+            fp = r.fingerprint(conn)
+            _, err = r.run_script(conn, script)
+            expect_sqlstate(err, "TP001")
+            expect(r.fingerprint(conn) == fp, f"DB changed after refused {script} ({tamper[:40]})")
+            conn.close()
+        # extra orphan
         conn = r.seed_fresh(db)
         r.exec(conn, (
             "INSERT INTO usage_units (id, user_id, period_type, period_key,"
@@ -599,7 +723,7 @@ def run_all() -> int:
         fp = r.fingerprint(conn)
         _, err = r.run_script(conn, "P1-REPAIR")
         expect_sqlstate(err, "TP001")
-        expect(r.fingerprint(conn) == fp, "DB changed after refused P1 run")
+        expect(r.fingerprint(conn) == fp, "DB changed after refused P1 (extra orphan)")
         conn.close()
         conn = r.seed_fresh(db)
         r.exec(conn, (
@@ -611,10 +735,9 @@ def run_all() -> int:
         fp = r.fingerprint(conn)
         _, err = r.run_script(conn, "P2-REPAIR")
         expect_sqlstate(err, "TP001")
-        expect(r.fingerprint(conn) == fp, "DB changed after refused P2 run")
+        expect(r.fingerprint(conn) == fp, "DB changed after refused P2 (extra orphan)")
         conn.close()
-
-    def case7(db: str) -> None:
+        # changed orphan identity
         conn = r.seed_fresh(db)
         r.exec(conn, (
             "UPDATE usage_units SET created_at='2026-10-09 00:21:17.000000'"
@@ -623,7 +746,7 @@ def run_all() -> int:
         fp = r.fingerprint(conn)
         _, err = r.run_script(conn, "P1-REPAIR")
         expect_sqlstate(err, "TP001")
-        expect(r.fingerprint(conn) == fp, "DB changed after refused P1 run")
+        expect(r.fingerprint(conn) == fp, "DB changed after refused P1 (changed identity)")
         conn.close()
         conn = r.seed_fresh(db)
         r.exec(conn, (
@@ -633,10 +756,11 @@ def run_all() -> int:
         fp = r.fingerprint(conn)
         _, err = r.run_script(conn, "P2-REPAIR")
         expect_sqlstate(err, "TP001")
-        expect(r.fingerprint(conn) == fp, "DB changed after refused P2 run")
+        expect(r.fingerprint(conn) == fp, "DB changed after refused P2 (changed identity)")
         conn.close()
 
-    def case8(db: str) -> None:
+    # 7 — tampered scripts abort; no partial commit -----------------------
+    def case7(db: str) -> None:
         conn = r.seed_fresh(db)
         tampered = r.scripts["P1-REPAIR"].replace(
             "-- B2: repaired counter",
@@ -662,45 +786,12 @@ def run_all() -> int:
         expect(r.fingerprint(conn) == fp, "partial commit leaked after tampered P2")
         conn.close()
 
-    def case9(db: str) -> None:
-        conn = r.seed_fresh(db)
-        fp0 = r.fingerprint(conn)
-        notices, err = r.run_script(conn, "P1-REPAIR")
-        expect(err is None, f"P1-REPAIR failed: {err}")
-        packet = parse_deleted(notices, p2=False)
-        rb = substitute(r.scripts["P1-ROLLBACK"], {
-            "ORPHAN_ID": packet["id"],
-            "ORPHAN_CREATED_AT": packet["created_at"],
-            "REPAIRED_TS": parse_ts(notices),
-        })
-        _, err = r.run_script(conn, "P1-ROLLBACK", sql=rb)
-        expect(err is None, f"P1-ROLLBACK failed: {err}")
-        expect(r.fingerprint(conn) == fp0, "P1 rollback did not restore seed state")
-        conn.close()
-        conn = r.seed_fresh(db)
-        fp0 = r.fingerprint(conn)
-        notices, err = r.run_script(conn, "P2-REPAIR")
-        expect(err is None, f"P2-REPAIR failed: {err}")
-        packet = parse_deleted(notices, p2=True)
-        rb = substitute(r.scripts["P2-ROLLBACK"], {
-            "ORPHAN_ID": packet["id"],
-            "ORPHAN_USER_ID": packet["user"],
-            "ORPHAN_SCHEME_ID": packet["scheme"],
-            "ORPHAN_UNIT_KEY": packet["key"],
-            "ORPHAN_CREATED_AT": packet["created_at"],
-            "REPAIRED_TS": parse_ts(notices),
-        })
-        _, err = r.run_script(conn, "P2-ROLLBACK", sql=rb)
-        expect(err is None, f"P2-ROLLBACK failed: {err}")
-        expect(r.fingerprint(conn) == fp0, "P2 rollback did not restore seed state")
-        conn.close()
-
-    def case10(db: str) -> None:
+    # 8 — rollback refuses after intervening activity; DB unchanged -------
+    def case8(db: str) -> None:
         conn = r.seed_fresh(db)
         notices, err = r.run_script(conn, "P1-REPAIR")
         expect(err is None, f"P1-REPAIR failed: {err}")
-        packet = parse_deleted(notices, p2=False)
-        ts = parse_ts(notices)
+        packet = r.p1_packets(notices)
         r.exec(conn, (
             "INSERT INTO usage_units (id, user_id, period_type, period_key,"
             " unit_kind, unit_key, scheme_id, created_at) VALUES"
@@ -709,67 +800,148 @@ def run_all() -> int:
         ))
         r.exec(conn, f"UPDATE usage_periods SET units_used=7 WHERE user_id='{INC}'")
         fp = r.fingerprint(conn)
-        rb = substitute(r.scripts["P1-ROLLBACK"], {
-            "ORPHAN_ID": packet["id"],
-            "ORPHAN_CREATED_AT": packet["created_at"],
-            "REPAIRED_TS": ts,
-        })
+        rb = substitute(r.scripts["P1-ROLLBACK"], sub_p1(packet))
         _, err = r.run_script(conn, "P1-ROLLBACK", sql=rb)
         expect_sqlstate(err, "TP003")
         expect(r.fingerprint(conn) == fp, "refused P1 rollback modified the DB")
         conn.close()
-
         conn = r.seed_fresh(db)
         notices, err = r.run_script(conn, "P2-REPAIR")
         expect(err is None, f"P2-REPAIR failed: {err}")
-        packet = parse_deleted(notices, p2=True)
-        ts = parse_ts(notices)
+        packet = r.p2_packets(notices)
         r.exec(conn, f"UPDATE usage_periods SET units_used=6 WHERE user_id='{U_O34}'")
         fp = r.fingerprint(conn)
-        rb = substitute(r.scripts["P2-ROLLBACK"], {
-            "ORPHAN_ID": packet["id"], "ORPHAN_USER_ID": packet["user"],
-            "ORPHAN_SCHEME_ID": packet["scheme"], "ORPHAN_UNIT_KEY": packet["key"],
-            "ORPHAN_CREATED_AT": packet["created_at"], "REPAIRED_TS": ts,
-        })
+        rb = substitute(r.scripts["P2-ROLLBACK"], sub_p2(packet))
         _, err = r.run_script(conn, "P2-ROLLBACK", sql=rb)
         expect_sqlstate(err, "TP003")
-        expect(r.fingerprint(conn) == fp, "refused P2 rollback (drift) modified the DB")
+        expect(r.fingerprint(conn) == fp, "refused P2 rollback (activity) modified the DB")
         conn.close()
 
+    # 9 — rollback refuses after counter / repair-timestamp drift ---------
+    def case9(db: str) -> None:
+        # P1: repair-timestamp drift only (counter still 6)
+        conn = r.seed_fresh(db)
+        notices, err = r.run_script(conn, "P1-REPAIR")
+        expect(err is None, f"P1-REPAIR failed: {err}")
+        packet = r.p1_packets(notices)
+        r.exec(conn, (
+            "UPDATE usage_periods SET updated_at = updated_at + interval '1 second'"
+            f" WHERE user_id='{INC}'"
+        ))
+        fp = r.fingerprint(conn)
+        rb = substitute(r.scripts["P1-ROLLBACK"], sub_p1(packet))
+        _, err = r.run_script(conn, "P1-ROLLBACK", sql=rb)
+        expect_sqlstate(err, "TP003")
+        expect(r.fingerprint(conn) == fp, "refused P1 rollback (ts drift) modified the DB")
+        conn.close()
+        # P2: counter drift
         conn = r.seed_fresh(db)
         notices, err = r.run_script(conn, "P2-REPAIR")
         expect(err is None, f"P2-REPAIR failed: {err}")
-        packet = parse_deleted(notices, p2=True)
-        ts = parse_ts(notices)
+        packet = r.p2_packets(notices)
+        r.exec(conn, f"UPDATE usage_periods SET units_used=6 WHERE user_id='{U_O34}'")
+        fp = r.fingerprint(conn)
+        rb = substitute(r.scripts["P2-ROLLBACK"], sub_p2(packet))
+        _, err = r.run_script(conn, "P2-ROLLBACK", sql=rb)
+        expect_sqlstate(err, "TP003")
+        expect(r.fingerprint(conn) == fp, "refused P2 rollback (counter drift) modified the DB")
+        conn.close()
+        # P2: repair-timestamp drift only
+        conn = r.seed_fresh(db)
+        notices, err = r.run_script(conn, "P2-REPAIR")
+        expect(err is None, f"P2-REPAIR failed: {err}")
+        packet = r.p2_packets(notices)
         r.exec(conn, (
             "UPDATE usage_periods SET updated_at = updated_at + interval '1 second'"
             f" WHERE user_id='{U_O5A}'"
         ))
         fp = r.fingerprint(conn)
-        rb = substitute(r.scripts["P2-ROLLBACK"], {
-            "ORPHAN_ID": packet["id"], "ORPHAN_USER_ID": packet["user"],
-            "ORPHAN_SCHEME_ID": packet["scheme"], "ORPHAN_UNIT_KEY": packet["key"],
-            "ORPHAN_CREATED_AT": packet["created_at"], "REPAIRED_TS": ts,
-        })
+        rb = substitute(r.scripts["P2-ROLLBACK"], sub_p2(packet))
         _, err = r.run_script(conn, "P2-ROLLBACK", sql=rb)
         expect_sqlstate(err, "TP003")
         expect(r.fingerprint(conn) == fp, "refused P2 rollback (ts drift) modified the DB")
         conn.close()
 
-    case("1  P1 valid commit", case1)
-    case("2  P2 valid commit", case2)
-    case("3  both orders converge", case3)
-    case("4  wrong starting counter refuses", case4)
-    case("5  missing orphan refuses", case5)
-    case("6  extra orphan refuses", case6)
-    case("7  changed orphan identity refuses", case7)
-    case("8  tampered script aborts, no partial commit", case8)
-    case("9  rollback restores faithfully", case9)
-    case("10 rollback refuses after activity/drift", case10)
+    # 10 — rollback refuses on a bad captured packet; DB unchanged --------
+    def case10(db: str) -> None:
+        # duplicated capture entry (15 rows)
+        conn = r.seed_fresh(db)
+        notices, err = r.run_script(conn, "P2-REPAIR")
+        expect(err is None, f"P2-REPAIR failed: {err}")
+        packet = r.p2_packets(notices)
+        values = p2_values_list(packet["originals"])
+        rb = substitute(r.scripts["P2-ROLLBACK"], sub_p2(packet))
+        rb = rb.replace(values, values + ", " + values.split(", ", 1)[0], 1)
+        fp = r.fingerprint(conn)
+        _, err = r.run_script(conn, "P2-ROLLBACK", sql=rb)
+        expect_sqlstate(err, "TP003")
+        expect(r.fingerprint(conn) == fp, "refused P2 rollback (dup capture) modified the DB")
+        conn.close()
+        # missing capture entry (13 rows)
+        conn = r.seed_fresh(db)
+        notices, err = r.run_script(conn, "P2-REPAIR")
+        expect(err is None, f"P2-REPAIR failed: {err}")
+        packet = r.p2_packets(notices)
+        values = p2_values_list(packet["originals"])
+        rb = substitute(r.scripts["P2-ROLLBACK"], sub_p2(packet))
+        rb = rb.replace(values, ", ".join(values.split(", ")[:2]), 1)
+        fp = r.fingerprint(conn)
+        _, err = r.run_script(conn, "P2-ROLLBACK", sql=rb)
+        expect_sqlstate(err, "TP003")
+        expect(r.fingerprint(conn) == fp, "refused P2 rollback (missing capture) modified the DB")
+        conn.close()
+        # wrong identity (14 distinct entries, one does not match a row)
+        conn = r.seed_fresh(db)
+        notices, err = r.run_script(conn, "P2-REPAIR")
+        expect(err is None, f"P2-REPAIR failed: {err}")
+        packet = r.p2_packets(notices)
+        mutated = list(packet["originals"])
+        u, pt, pk, ts = mutated[0]
+        mutated[0] = (u, pt, "2099-12", ts)
+        rb = substitute(r.scripts["P2-ROLLBACK"], sub_p2({**packet, "originals": mutated}))
+        fp = r.fingerprint(conn)
+        _, err = r.run_script(conn, "P2-ROLLBACK", sql=rb)
+        expect_sqlstate(err, "TP003")
+        expect(r.fingerprint(conn) == fp, "refused P2 rollback (wrong identity) modified the DB")
+        conn.close()
+
+    # 11 — fingerprint sensitivity: omitted-by-count fields change it -----
+    def case11(db: str) -> None:
+        mutations = [
+            "UPDATE usage_units SET created_at = created_at + interval '1 second' WHERE id = 'u0001'",
+            f"UPDATE usage_units SET scheme_id = 'deadbeef00' WHERE id = 'u0001'",
+            "UPDATE usage_periods SET updated_at = updated_at + interval '1 second' WHERE id = 'pinc'",
+        ]
+        for sql in mutations:
+            conn = r.seed_fresh(db)
+            fp0 = r.fingerprint(conn)
+            agg0 = r.aggregates(conn)
+            r.exec(conn, sql)
+            fp1 = r.fingerprint(conn)
+            agg1 = r.aggregates(conn)
+            expect(fp1 != fp0, f"fingerprint did not change after: {sql}")
+            expect(agg0 == agg1,
+                   f"aggregates changed (unexpected) after: {sql}: {agg0} vs {agg1}")
+            conn.close()
+
+    case("1  P1 repair valid + 3 packets", case1)
+    case("2  P1 rollback restores full fingerprint", case2)
+    case("3  P2 repair valid + 14 packets", case3)
+    case("4  P2 rollback restores full fingerprint", case4)
+    case("5  both orders converge", case5)
+    case("6  precondition aborts, fingerprint unchanged", case6)
+    case("7  tampered scripts abort, no partial commit", case7)
+    case("8  rollback refuses after activity", case8)
+    case("9  rollback refuses after counter/ts drift", case9)
+    case("10 rollback refuses on bad captured packet", case10)
+    case("11 fingerprint sensitive to every column", case11)
 
     width = max(len(name) for name, _, _ in results)
     print(f"Doc: {DOC_PATH}")
     print(f"Host: {r.host}:{r.port}  user={r.user}  (scratch DB per case, dropped after)")
+    print("Fingerprint: full-row logical (all columns of usage_units,")
+    print("  usage_periods, lesson_plans, generation_jobs; to_jsonb per row,")
+    print("  aggregated in primary-key order, md5)")
     print()
     failed = 0
     for name, ok, detail in results:

@@ -446,10 +446,20 @@ zone is UTC (the default of Neon and the docker test image) — the repair
 through `timestamp '<REPAIRED_TS>'`, which is interpreted in the session
 time zone.
 
-**Execution:** run start-to-end in one session. **Save the two
-`NOTICE` lines** (`DELETED_ORPHAN …` and `REPAIRED_TS …`) — they are the
-rollback packet (full primary key, creation timestamp, repair
-timestamp). Substitutions: none.
+**Execution:** run start-to-end in one session (the repair itself needs
+no substitutions). It emits three `NOTICE` packets, all **before**
+`COMMIT` — record all three verbatim; they are the complete rollback
+packet:
+
+| Packet | Emitted by | Fields | Used by rollback as |
+|---|---|---|---|
+| `DELETED_ORPHAN …` | Phase B B1 | `id`, `key`, `created_at` | `<ORPHAN_ID>`, `<ORPHAN_CREATED_AT>` |
+| `REPAIRED_TS …` | Phase B B2 | repair timestamp | `<REPAIRED_TS>` |
+| `P1_ORIGINAL_PERIOD …` | Phase B B4 (after all post-conditions) | `user_id`, `period_key`, `updated_at` (the period row's exact pre-repair timestamp) | `<ORIGINAL_PERIOD_TS>` |
+
+If `COMMIT` does not succeed, or any packet line is missing or
+unreadable, **stop and investigate read-only — do not attempt a
+best-effort rollback.**
 
 ```sql
 -- SCRIPT: P1-REPAIR
@@ -584,6 +594,7 @@ DECLARE
   v_rows  int;
   v_ledger int;
   v_ts    timestamp := now();
+  v_orig_ts timestamp;
 BEGIN
   -- B1: delete exactly the verified orphan row.
   DELETE FROM usage_units u
@@ -607,6 +618,15 @@ BEGIN
   IF v_ledger <> 6 THEN
     RAISE EXCEPTION USING ERRCODE = 'TP002', MESSAGE =
       format('post-deletion ledger is %s rows, expected 6 — aborting', v_ledger);
+  END IF;
+  -- Capture the exact original period timestamp BEFORE the counter update
+  -- (the row is already locked from Phase A; this re-read is in-transaction).
+  SELECT p.updated_at INTO v_orig_ts FROM usage_periods p
+   WHERE p.user_id = v_uid AND p.period_type = 'calendar_month'
+     AND p.period_key = '2026-10' FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP002', MESSAGE =
+      'period row vanished before the counter update — aborting';
   END IF;
   UPDATE usage_periods p
      SET units_used = v_ledger, updated_at = v_ts
@@ -645,6 +665,11 @@ BEGIN
   IF v_ledger <> 6 THEN
     RAISE EXCEPTION USING ERRCODE = 'TP002', MESSAGE = 'post-condition failed: accepted lessons must remain 6 and unchanged';
   END IF;
+  -- B4: emit the original-period-timestamp packet only after every
+  --     post-condition has passed (this is the last statement before the
+  --     operator-review SELECTs and COMMIT).
+  RAISE NOTICE 'P1_ORIGINAL_PERIOD user_id=% period_key=% updated_at=%',
+    v_uid, '2026-10', v_orig_ts;
 END $$;
 
 -- Operator review only (cannot affect safety — checks above already passed):
@@ -656,13 +681,19 @@ COMMIT;
 ```
 
 **Rollback (P1).** Permitted **only immediately after the repair and
-before any account activity**, and only with the packet captured from the
-repair `NOTICE` lines. It is fully guarded: if the counter, ledger, or
-`updated_at` differ from the repaired state (i.e. anything touched the
-account since the repair), it **raises and refuses** — it never
-overwrites newer accounting. Substitute `<ORPHAN_ID>`,
-`<ORPHAN_CREATED_AT>` (from `DELETED_ORPHAN …`) and `<REPAIRED_TS>`
-(from `REPAIRED_TS …`).
+before any account activity**, and only with the full packet captured
+from the repair `NOTICE` lines (packet table in the Execution note
+above). It is fully guarded: if the counter, ledger, or `updated_at`
+differ from the repaired state (i.e. anything touched the account since
+the repair), it **raises and refuses** — it never overwrites newer
+accounting. On success it restores the orphan row **and** the period row
+(`units_used = 0` and the **original** `updated_at` captured by the
+repair) to their exact pre-repair values. Substitute `<ORPHAN_ID>`,
+`<ORPHAN_CREATED_AT>` (from `DELETED_ORPHAN …`), `<REPAIRED_TS>` (from
+`REPAIRED_TS …`) and `<ORIGINAL_PERIOD_TS>` (from `P1_ORIGINAL_PERIOD …`).
+If any packet line is missing or the values cannot be established,
+**stop and investigate read-only — do not attempt a best-effort
+rollback.**
 
 ```sql
 -- SCRIPT: P1-ROLLBACK
@@ -677,7 +708,9 @@ DECLARE
   v_id      constant text := '<ORPHAN_ID>';
   v_created constant timestamp := timestamp '<ORPHAN_CREATED_AT>';
   v_ts      constant timestamp := timestamp '<REPAIRED_TS>';
+  v_orig    constant timestamp := timestamp '<ORIGINAL_PERIOD_TS>';
   n int;
+  v_check_ts timestamp;
 BEGIN
   -- G1: still exactly the repaired state, untouched since the repair.
   SELECT p.units_used INTO n FROM usage_periods p
@@ -727,25 +760,34 @@ BEGIN
   IF n <> 1 THEN
     RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE = 'rollback failed: restore insert affected no rows';
   END IF;
-  -- R2: restore the original counter 0 (guarded: only from the repaired value).
+  -- R2: restore the original counter 0 AND the original period timestamp
+  --     (guarded: only from the repaired value/timestamp, never over
+  --     anything newer).
   UPDATE usage_periods
-     SET units_used = 0, updated_at = now()
+     SET units_used = 0, updated_at = v_orig
    WHERE user_id = v_uid AND period_type = 'calendar_month'
      AND period_key = '2026-10' AND units_used = 6 AND updated_at = v_ts;
   GET DIAGNOSTICS n = ROW_COUNT;
   IF n <> 1 THEN
     RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE = 'rollback failed: counter restore affected no rows';
   END IF;
-  -- Post: original state fully restored.
+  -- Post: original state fully restored (counters AND timestamps AND rows).
   SELECT count(*) INTO n FROM usage_units
    WHERE user_id = v_uid AND period_type = 'calendar_month' AND period_key = '2026-10';
   IF n <> 7 THEN
     RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE = 'rollback post-check failed: expected 7 ledger rows';
   END IF;
-  SELECT units_used INTO n FROM usage_periods
+  IF NOT EXISTS (SELECT 1 FROM usage_units WHERE id = v_id
+                  AND user_id = v_uid AND unit_key = v_key
+                  AND scheme_id = v_scheme AND created_at = v_created) THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE =
+      'rollback post-check failed: orphan row not restored with its captured values';
+  END IF;
+  SELECT units_used, updated_at INTO n, v_check_ts FROM usage_periods
    WHERE user_id = v_uid AND period_type = 'calendar_month' AND period_key = '2026-10';
-  IF n <> 0 THEN
-    RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE = 'rollback post-check failed: counter must be 0';
+  IF n <> 0 OR v_check_ts IS DISTINCT FROM v_orig THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE =
+      'rollback post-check failed: period row must be counter 0 with the original updated_at';
   END IF;
 END $$;
 SELECT units_used AS restored_counter FROM usage_periods
@@ -1022,6 +1064,7 @@ DECLARE
   v_ts    timestamp := now();
   v_id    text; v_user text; v_scheme text; v_key text;
   v_rows  int; n int;
+  r       record;
   v_sept  int[]; v_oct int[];
   v_inc_units int; v_inc_counter int; v_inc_expected int;
 BEGIN
@@ -1046,6 +1089,26 @@ BEGIN
   END IF;
   RAISE NOTICE 'DELETED_ORPHAN id=% user=% scheme=% key=% created_at=%',
     v_id, v_user, v_scheme, v_key, v_created;
+
+  -- B1b: capture the exact original updated_at of every non-incident
+  --      period row BEFORE the counter update (rows already locked in
+  --      Phase A) and emit one parseable packet per row. The rollback
+  --      script restores each row's own captured timestamp.
+  n := 0;
+  FOR r IN (SELECT user_id, period_type, period_key, updated_at
+              FROM usage_periods
+             WHERE user_id <> v_inc
+             ORDER BY user_id, period_key
+             FOR UPDATE)
+  LOOP
+    n := n + 1;
+    RAISE NOTICE 'P2_ORIGINAL_PERIOD user_id=% period_type=% period_key=% updated_at=%',
+      r.user_id, r.period_type, r.period_key, r.updated_at;
+  END LOOP;
+  IF n <> 14 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP002', MESSAGE =
+      format('captured %s original period row(s), expected exactly 14', n);
+  END IF;
 
   -- B2: recompute all 14 non-incident counters from their ledgers.
   UPDATE usage_periods p
@@ -1141,13 +1204,32 @@ COMMIT;
 ```
 
 **Rollback (P2).** Same window rule as P1: **only immediately after the
-repair and before any account activity**, using the packet from the
-repair `NOTICE` lines (`DELETED_ORPHAN …` carries the full primary key,
-`user_id`, `scheme_id`, `unit_key`; `REPAIRED_TS …` carries the repair
-timestamp). Fully guarded — refuses (raises) if any of the 14 rows moved
-off the repaired state. Substitute `<ORPHAN_ID>`, `<ORPHAN_USER_ID>`,
-`<ORPHAN_SCHEME_ID>`, `<ORPHAN_UNIT_KEY>`, `<ORPHAN_CREATED_AT>`,
-`<REPAIRED_TS>`.
+repair and before any account activity**, using the full packet from the
+repair `NOTICE` lines:
+
+| Packet | Emitted by | Fields |
+|---|---|---|
+| `DELETED_ORPHAN …` | P2-REPAIR B1 | `id`, `user`, `scheme`, `key`, `created_at` |
+| `REPAIRED_TS …` | P2-REPAIR B2 | repair timestamp |
+| `P2_ORIGINAL_PERIOD …` ×14 | P2-REPAIR B1b | `user_id`, `period_type`, `period_key`, `updated_at` (one line per affected period row, captured **before** the counter update) |
+
+Fully guarded — refuses (raises) if any of the 14 rows moved off the
+repaired state, or if the captured packet is incomplete. On success it
+restores the orphan row **and** each of the 14 period rows to its exact
+pre-repair state (`units_used = 0` and **that row's own** captured
+`updated_at` — no shared or current timestamp is used). Substitute
+`<ORPHAN_ID>`, `<ORPHAN_USER_ID>`, `<ORPHAN_SCHEME_ID>`,
+`<ORPHAN_UNIT_KEY>`, `<ORPHAN_CREATED_AT>`, `<REPAIRED_TS>`, and build
+`<P2_ORIGINAL_PERIODS>` as a SQL `VALUES` list from all 14
+`P2_ORIGINAL_PERIOD` lines, e.g.
+`('<user1>','calendar_month','2026-09','<ts1>'), ('<user2>',…)` — the
+same placeholder text must be substituted at **every** occurrence in the
+script. The rollback verifies the list has exactly 14 distinct
+account-period identities, that every captured identity maps to a
+current non-incident period row and vice versa, and restores each row
+individually (row-count enforced per row). If any of the 14 lines is
+missing, duplicated, or cannot be matched — **stop and investigate
+read-only; do not attempt a best-effort rollback.**
 
 ```sql
 -- SCRIPT: P2-ROLLBACK
@@ -1163,10 +1245,30 @@ DECLARE
   v_key  constant text := '<ORPHAN_UNIT_KEY>';
   v_created constant timestamp := timestamp '<ORPHAN_CREATED_AT>';
   v_ts   constant timestamp := timestamp '<REPAIRED_TS>';
-  r record; n int; v_sept int[]; v_oct int[];
+  r record; n int; m int; v_sept int[]; v_oct int[];
 BEGIN
+  -- V0: the captured original-period packet must be exactly 14 rows with
+  --     14 distinct account-period identities (missing/duplicate refuse).
+  SELECT count(*) INTO n
+    FROM (VALUES <P2_ORIGINAL_PERIODS>)
+         AS t(user_id, period_type, period_key, orig_ts);
+  IF n <> 14 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE =
+      format('rollback refused: captured original-period packet has %s row(s), expected 14', n);
+  END IF;
+  SELECT count(*) INTO n FROM (
+    SELECT DISTINCT user_id, period_type, period_key
+      FROM (VALUES <P2_ORIGINAL_PERIODS>)
+           AS t(user_id, period_type, period_key, orig_ts)
+  ) d;
+  IF n <> 14 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE =
+      'rollback refused: captured original-period packet has duplicate account-period identities';
+  END IF;
+
   -- G1: lock all 14 rows (stable order); every row must still be exactly
-  --     the repaired state (corrected value AND untouched repair timestamp).
+  --     the repaired state (corrected value AND untouched repair
+  --     timestamp) and must have a captured packet entry.
   FOR r IN (SELECT user_id, period_type, period_key, units_used, updated_at
               FROM usage_periods
              WHERE user_id <> v_inc
@@ -1189,6 +1291,16 @@ BEGIN
     THEN
       RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE =
         format('rollback refused: counter drift for user %s since the repair', r.user_id);
+    END IF;
+    IF NOT EXISTS (
+      SELECT 1 FROM (VALUES <P2_ORIGINAL_PERIODS>)
+           AS t(user_id, period_type, period_key, orig_ts)
+       WHERE t.user_id = r.user_id AND t.period_type = r.period_type
+         AND t.period_key = r.period_key
+    ) THEN
+      RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE =
+        format('rollback refused: no captured original timestamp for period %s/%s/%s',
+               r.user_id, r.period_type, r.period_key);
     END IF;
   END LOOP;
   SELECT array_agg(units_used ORDER BY units_used) INTO v_sept
@@ -1230,24 +1342,65 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE =
       'rollback failed: restore insert affected no rows';
   END IF;
-  -- R2: restore all 14 counters to 0 (guarded by the repair timestamp).
-  UPDATE usage_periods
-     SET units_used = 0, updated_at = now()
-   WHERE user_id <> v_inc AND updated_at = v_ts;
-  GET DIAGNOSTICS n = ROW_COUNT;
+  -- R2: restore every counter to 0 WITH ITS OWN captured original
+  --     timestamp (identity + repair-timestamp guarded, per-row
+  --     row-count enforced; never one shared timestamp).
+  n := 0;
+  FOR r IN (SELECT t.user_id, t.period_type, t.period_key, t.orig_ts
+              FROM (VALUES <P2_ORIGINAL_PERIODS>)
+                   AS t(user_id, period_type, period_key, orig_ts)
+             ORDER BY t.user_id, t.period_type, t.period_key)
+  LOOP
+    IF NOT EXISTS (SELECT 1 FROM usage_periods p
+                    WHERE p.user_id = r.user_id AND p.period_type = r.period_type
+                      AND p.period_key = r.period_key AND p.user_id <> v_inc) THEN
+      RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE =
+        format('rollback refused: captured period %s/%s/%s has no matching period row',
+               r.user_id, r.period_type, r.period_key);
+    END IF;
+    UPDATE usage_periods
+       SET units_used = 0, updated_at = r.orig_ts::timestamp
+     WHERE user_id = r.user_id AND period_type = r.period_type
+       AND period_key = r.period_key AND user_id <> v_inc
+       AND updated_at = v_ts;
+    GET DIAGNOSTICS m = ROW_COUNT;
+    IF m <> 1 THEN
+      RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE =
+        format('rollback failed: restore for %s/%s/%s affected %s row(s), expected 1',
+               r.user_id, r.period_type, r.period_key, m);
+    END IF;
+    n := n + 1;
+  END LOOP;
   IF n <> 14 THEN
     RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE =
-      format('rollback failed: counter restore affected %s row(s), expected 14', n);
+      format('rollback failed: restored %s row(s), expected 14', n);
   END IF;
-  -- Post: original state fully restored.
+  -- Post: original state fully restored — counters 0 AND each row carries
+  --       its own captured original timestamp.
+  FOR r IN (SELECT t.user_id, t.period_type, t.period_key, t.orig_ts
+              FROM (VALUES <P2_ORIGINAL_PERIODS>)
+                   AS t(user_id, period_type, period_key, orig_ts))
+  LOOP
+    IF NOT EXISTS (SELECT 1 FROM usage_periods p
+                    WHERE p.user_id = r.user_id AND p.period_type = r.period_type
+                      AND p.period_key = r.period_key AND p.user_id <> v_inc
+                      AND p.units_used = 0
+                      AND p.updated_at = r.orig_ts::timestamp) THEN
+      RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE =
+        format('rollback post-check failed: %s/%s/%s must be counter 0 with its original updated_at',
+               r.user_id, r.period_type, r.period_key);
+    END IF;
+  END LOOP;
   SELECT count(*) INTO n FROM usage_units WHERE user_id <> v_inc;
   IF n <> 159 THEN
     RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE =
       'rollback post-check failed: expected 159 non-incident ledger rows';
   END IF;
-  IF EXISTS (SELECT 1 FROM usage_periods WHERE user_id <> v_inc AND units_used <> 0) THEN
+  IF NOT EXISTS (SELECT 1 FROM usage_units WHERE id = v_id
+                  AND user_id = v_user AND unit_key = v_key
+                  AND scheme_id = v_scheme AND created_at = v_created) THEN
     RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE =
-      'rollback post-check failed: all non-incident counters must be 0';
+      'rollback post-check failed: orphan row not restored with its captured values';
   END IF;
 END $$;
 SELECT count(*) AS restored_nonincident_units FROM usage_units
@@ -1259,7 +1412,7 @@ COMMIT;
 the `DO` block — if any counter or `updated_at` differs from the repair
 packet, do not roll back; investigate read-only instead.
 
-### Verification of §13e/§13g SQL (2026-10-16 — disposable local PostgreSQL, synthetic data)
+### Verification of §13e/§13g SQL (disposable local PostgreSQL, synthetic data)
 
 Both proposals and both rollback scripts were executed verbatim (extracted
 from this document by their `-- SCRIPT:` markers) against a scratch
@@ -1267,30 +1420,62 @@ database on the local docker `postgres:16-alpine` instance
 (`127.0.0.1:54329`), seeded with synthetic production-shaped data
 (166 units / 15 period rows / 164 lessons / 14 users / 10 jobs matching
 the §13f table's exact per-month ledger shapes and both orphan
-identities). The validator refuses non-loopback hosts and creates+drops
-one scratch database per case.
+identities; every period row now carries a deliberately **distinct**
+original `updated_at`). The validator refuses non-loopback hosts and
+creates+drops one scratch database per case.
 
 Command:
 `./venv/Scripts/python backend/validate_quota_repair_sql.py`
 
-Result — **10/10 cases passed**:
+**Run 1 — 2026-10-16, commit `2782a8f` (superseded):** 10/10 cases
+passed with a limited fingerprint (row counts, unit ids/keys, counter
+sums, lesson/job counts) and rollbacks that restored counters but set
+`usage_periods.updated_at` to the rollback time. That timestamp gap and
+the fingerprint's column coverage are corrected in the current scripts
+(captured original timestamps + full-row logical fingerprint below).
+
+**Run 2 — 2026-10-16, current scripts: 11/11 cases passed.**
+
+State comparison is a **full-row logical fingerprint** covering every
+column of every table in the synthetic repair schema —
+`usage_units` (`id`, `user_id`, `period_type`, `period_key`,
+`unit_kind`, `unit_key`, `scheme_id`, `created_at`), `usage_periods`
+(`id`, `user_id`, `period_type`, `period_key`, `units_used`,
+`created_at`, `updated_at`), `lesson_plans` (`id`, `owner_id`,
+`scheme_id`, `indicator_codes`, `source_occurrence_id`, `job_id`) and
+`generation_jobs` (`id`, `owner_id`, `status`, `error_message`,
+`created_at`) — complete `to_jsonb(row)` representations aggregated in
+primary-key order and md5-hashed. It is a logical (row-content)
+fingerprint, **not** a physical byte-for-byte database comparison. Case
+11 confirms the fingerprint changes when a single previously-uncovered
+field (`usage_units.created_at`, `usage_units.scheme_id` or
+`usage_periods.updated_at`) changes while row counts and counter sums
+stay identical.
 
 | # | Case | Result |
 |---|---|---|
-| 1 | P1 valid commit (orphan deleted, counter→6, packet NOTICEs) | PASS |
-| 2 | P2 valid commit (14 counters → {5×8,27,42}/{5,5,5,34}, 158 units, incident untouched) | PASS |
-| 3 | P1→P2 and P2→P1 orders converge to the same final state | PASS |
-| 4 | Wrong starting counter → TP001 abort, DB fingerprint unchanged | PASS |
-| 5 | Missing orphan → TP001 abort, DB unchanged | PASS |
-| 6 | Extra orphan → TP001 abort, DB unchanged | PASS |
-| 7 | Changed orphan identity → TP001 abort, DB unchanged | PASS |
-| 8 | Tampered (extra DELETE mid-Phase-B) → TP002 abort, no partial commit | PASS |
-| 9 | Rollback under safe conditions restores the seed state exactly | PASS |
-| 10 | Rollback after counter drift / newer activity / `updated_at` drift → TP003 refuse, DB unchanged | PASS |
+| 1 | P1 repair valid; `DELETED_ORPHAN` + `REPAIRED_TS` + `P1_ORIGINAL_PERIOD` packets (original ts = seed value) | PASS |
+| 2 | P1 rollback restores the **complete original full-row fingerprint**, incl. the original period `updated_at` | PASS |
+| 3 | P2 repair valid; 14 distinct `P2_ORIGINAL_PERIOD` packets matching the 14 non-incident rows + captured values | PASS |
+| 4 | P2 rollback restores the **complete original full-row fingerprint**, incl. each row's own `updated_at` | PASS |
+| 5 | P1→P2 and P2→P1 orders converge to the same final state | PASS |
+| 6 | Wrong counter / missing orphan / extra orphan / changed identity → TP001, full fingerprint unchanged after every abort | PASS |
+| 7 | Tampered (extra DELETE mid-Phase-B, both proposals) → TP002, no partial commit, fingerprint unchanged | PASS |
+| 8 | Rollback refuses after intervening activity (P1 and P2) → TP003, fingerprint unchanged | PASS |
+| 9 | Rollback refuses after counter drift or repair-`updated_at` drift (P1 and P2) → TP003, fingerprint unchanged | PASS |
+| 10 | Rollback refuses on a bad captured packet (P2: duplicated entry, missing entry, wrong identity) → TP003, fingerprint unchanged | PASS |
+| 11 | Fingerprint changes when `usage_units.created_at`, `usage_units.scheme_id` or `usage_periods.updated_at` is altered (counts/sums identical) | PASS |
 
-This validates the scripts' internal logic only — synthetic tests are
-**not** production verification. Production execution still requires the
-explicit owner approvals described above, and remains **not executed**.
+**Limitations (stated honestly):** the rollback scripts verify the
+packet's internal consistency (restored state must equal the provided
+values; all drift guards apply) but cannot detect a *mistyped but
+plausible* packet value against external truth — the operator must copy
+the raw `NOTICE` output verbatim and retain it. (`updated_at` is
+informational for quota enforcement; only `units_used` drives gating.)
+These synthetic tests validate the scripts' internal logic only — they
+are **not** production verification. Production execution still requires
+the explicit owner approvals described above (§13e and §13g remain
+separate decisions), and remains **not executed**.
 
 ## 13h) Live enforcement test plan (APPROVAL REQUIRED — NOT EXECUTED)
 
