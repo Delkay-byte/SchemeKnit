@@ -165,6 +165,23 @@ class TestSubjectPedagogy:
         assert "support" in text or "extension" in text
         assert "family" in " ".join(a.description for a in lp.main_activities).lower()
 
+    def test_differentiation_uses_ma_hp_ns_and_is_woven(self):
+        """Backlog item 3: GES MA/HP/NS tiers + a woven cue in the practice
+        learner activity (not only a labelled trailing block)."""
+        scheme, config, job = _run(
+            Subject.MATHEMATICS, MATH_CODES, "Number", "Whole Numbers")
+        lp = sorted(job._lesson_plans, key=lambda x: x.lesson_sequence)[0]
+        diff = lp.differentiation
+        assert "Needs Support (NS):" in diff, diff
+        assert "High Performing (HP):" in diff, diff
+        assert "More Able (MA):" in diff, diff
+        assert "Grouping:" in diff, diff
+        assert "\nSupport:" not in diff and "\nCore:" not in diff, diff
+        practice = [a.description for a in lp.learner_activities
+                    if "PLENARY" not in a.phase]
+        assert practice, "no practice learner activities"
+        assert "NS:" in practice[-1] and "MA:" in practice[-1], practice[-1]
+
     def test_previous_and_next_context_used(self):
         scheme, config, job = _run(
             Subject.MATHEMATICS, MATH_CODES, "Number", "Whole Numbers")

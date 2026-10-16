@@ -46,6 +46,23 @@ class TestUploadOneAction:
         # between); the intent is consumed there, exactly once.
         assert "router.push(`/generate/${result.scheme_id}`)" in src
 
+    def test_confirm_path_also_hands_to_autopilot(self):
+        """Backlog item 5: after the teacher resolves the one genuine
+        ambiguity (subject/class), the confirm path records the same intent
+        and hands off to Autopilot — no dead-end at /review."""
+        src = _upload()
+        # The confirm handler must set the intent flag…
+        assert "schemeknit.autopilot_intent" in src
+        # …and route to /generate (not /review) after a successful confirm.
+        # handleConfirmSubject is the only place confirmSubjectSection is
+        # called; its success branch must push to /generate.
+        i = src.index("handleConfirmSubject")
+        handler = src[i:i + 1400]
+        assert "confirmSubjectSection" in handler
+        assert "schemeknit.autopilot_intent" in handler
+        assert "router.push(`/generate/" in handler
+        assert "router.push(`/review/" not in handler
+
     def test_review_and_dashboard_remain_secondary(self):
         src = _upload()
         assert "Review Curriculum" in src

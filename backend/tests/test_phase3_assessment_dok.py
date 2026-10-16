@@ -168,8 +168,8 @@ def test_rubric_for_extended_product_is_concrete():
     assert r["total_points"] == weights
     assert len(r["criteria"]) <= 4
     for c in r["criteria"]:
-        assert len(c["descriptors"]) == 3
-        assert [d["points"] for d in c["descriptors"]] == ["3", "2", "1"]
+        assert len(c["descriptors"]) == 4
+        assert [d["points"] for d in c["descriptors"]] == ["4", "3", "2", "1"]
 
 
 def test_no_invented_official_grading_claims():
@@ -256,7 +256,8 @@ def test_save_and_reload_assessment_structure(db):
     assert fresh.assessment_items
     reloaded = parse_assessment_rubric(fresh.assessment_rubric)
     assert isinstance(reloaded, AnalyticRubric)
-    assert reloaded.total_points == 12
+    # "create" category → 4 criteria × 4 points (4-band rubric) = 16.
+    assert reloaded.total_points == 16
     items = parse_assessment_items(fresh.assessment_items)
     assert isinstance(items[0], AssessmentItem)
     assert items[0].dok_level >= 1

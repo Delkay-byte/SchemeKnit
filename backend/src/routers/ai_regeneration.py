@@ -5,12 +5,17 @@ Allows regenerating individual sections of a lesson plan
 while preserving all other content.
 """
 
+import hashlib
+
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 
-from ..database import get_db, User, LessonPlanDB, AIEnrichmentCacheDB, generate_id
+from ..database import (
+    get_db, User, LessonPlanDB, AIEnrichmentCacheDB, AIUsageEventDB,
+    generate_id,
+)
 from ..auth import get_current_user
 from ..models import AIMode, ContentSource, SectionRegenerationRequest
 from ..engines.ai_provider import (
@@ -145,15 +150,18 @@ class SectionRegenerateResponse(BaseModel):
     section: str
     previous_content: str
     new_content: str
-    #: Structured activities for ``main_activities`` (PART F/X). None for every
-    #: other section. The frontend renders this array directly — it never has to
-    #: parse provider JSON itself.
+    #: Structured activities for ``main_activities`` (PART F/X). None for
+    #: every other section. The frontend renders this array directly — it
+    #: never has to parse provider JSON itself.
     new_activities: Optional[List[dict]] = None
     provider: str
     model: str
     mode: str
     timestamp: str
     source: str
+    #: True when this response is a cached/replayed generation (double-submit
+    #: guard) rather than a fresh provider call.
+    already_generated: bool = False
 
 
 @router.post("/regenerate-section")
@@ -208,6 +216,53 @@ async def regenerate_section(
                 f"AI provider '{resolved}' is not available (state: {state}). "
                 "No real AI provider is configured on the server."
             ),
+        )
+
+    # ── Double-submit guard + cache read path (backlog item 4) ──────────
+    # A replayed client action (same request_id already recorded in the
+    # usage ledger) or an identical input (same lesson section, same
+    # provider, unchanged content hash) returns the cached generation
+    # without calling the provider again and without consuming quota.
+    _provider_name = provider.get_name()
+    if _request_already_consumed(db, user.id, req.request_id or ""):
+        _last = (
+            db.query(AIEnrichmentCacheDB)
+            .filter(
+                AIEnrichmentCacheDB.lesson_plan_id == lp.id,
+                AIEnrichmentCacheDB.section == req.section,
+            )
+            .order_by(AIEnrichmentCacheDB.created_at.desc())
+            .first()
+        )
+        log_event("section_regen_duplicate_request", user_id=user.id,
+                  lesson_plan_id=lp.id, section=req.section)
+        return SectionRegenerateResponse(
+            section=req.section,
+            previous_content=previous_content,
+            new_content=(_last.content or "") if _last else previous_content,
+            provider=provider.get_name(),
+            model=getattr(provider, "model", "unknown"),
+            mode=mode_label,
+            timestamp=datetime.utcnow().isoformat(),
+            source=ContentSource.AI.value,
+            already_generated=True,
+        )
+    _input_hash = _enrichment_cache_hash(
+        lp.id, req.section, previous_content, _provider_name)
+    _cached = _load_enrichment_cache(db, lp.id, req.section, _input_hash)
+    if _cached:
+        log_event("section_regen_cache_hit", user_id=user.id,
+                  lesson_plan_id=lp.id, section=req.section)
+        return SectionRegenerateResponse(
+            section=req.section,
+            previous_content=previous_content,
+            new_content=_cached,
+            provider=provider.get_name(),
+            model=getattr(provider, "model", "unknown"),
+            mode=mode_label,
+            timestamp=datetime.utcnow().isoformat(),
+            source=ContentSource.AI.value,
+            already_generated=True,
         )
 
     try:
@@ -301,7 +356,8 @@ async def regenerate_section(
                 ),
             )
 
-        _save_enrichment_cache(db, lp.id, req.section, new_content, provider.__class__.__name__, mode_label)
+        _save_enrichment_cache(db, lp.id, req.section, new_content, provider.__class__.__name__, mode_label,
+                               indicator_hash=_input_hash)
 
         # Only a SUCCESSFUL generation consumes one lifetime AI generation.
         # Failed/empty/provider-unavailable attempts above never reach here.
@@ -849,6 +905,51 @@ async def enrich_lesson(
                 "or start local Ollama to enable AI enrichment."
             ),
         )
+
+    # ── Double-submit guard + cache read path (backlog item 4) ──────────
+    # A replayed enrich action (same request_id already recorded) or an
+    # identical input snapshot returns the cached enrichment without a
+    # second provider call or a second quota consumption.
+    if _request_already_consumed(db, user.id, req.request_id or ""):
+        _last = (
+            db.query(AIEnrichmentCacheDB)
+            .filter(
+                AIEnrichmentCacheDB.lesson_plan_id == lp.id,
+                AIEnrichmentCacheDB.section == "enrich-lesson",
+            )
+            .order_by(AIEnrichmentCacheDB.created_at.desc())
+            .first()
+        )
+        log_event("enrich_duplicate_request", user_id=user.id,
+                  lesson_plan_id=lp.id)
+        return {
+            "lesson_plan_id": lp.id,
+            "written": [],
+            "provider": provider.get_name(),
+            "mode": mode,
+            "already_generated": True,
+            "cached": (_last.content or "") if _last else "",
+        }
+    _enrich_input = "|".join([
+        lp.subject or "", lp.class_level or "", lp.strand or "",
+        lp.sub_strand or "", lp.lesson_topic or "",
+        ",".join((lp.indicators or [])[:3]),
+    ])
+    _enrich_hash = _enrichment_cache_hash(
+        lp.id, "enrich-lesson", _enrich_input, provider.get_name())
+    _cached_enrich = _load_enrichment_cache(
+        db, lp.id, "enrich-lesson", _enrich_hash)
+    if _cached_enrich:
+        log_event("enrich_cache_hit", user_id=user.id, lesson_plan_id=lp.id)
+        return {
+            "lesson_plan_id": lp.id,
+            "written": [],
+            "provider": provider.get_name(),
+            "mode": mode,
+            "already_generated": True,
+            "cached": _cached_enrich,
+        }
+
     gen = getattr(provider, "generate_structured", None)
     if gen is None:
         raise HTTPException(
@@ -952,7 +1053,8 @@ async def enrich_lesson(
 
     lp.teacher_edited = True
     _save_enrichment_cache(db, lp.id, "enrich-lesson", _json.dumps(validated)[:2000],
-                           provider.__class__.__name__, mode)
+                           provider.__class__.__name__, mode,
+                           indicator_hash=_enrich_hash)
     # One successful generation consumes one lifetime AI generation.
     consume_ai_generation(user, db, request_id=req.request_id or None)
     log_event("lesson_enriched", user_id=user.id, lesson_plan_id=lp.id,
@@ -963,13 +1065,61 @@ async def enrich_lesson(
             "provider": provider.get_name(), "mode": mode}
 
 
-def _save_enrichment_cache(db, lesson_plan_id: str, section: str, content: str, provider: str, mode: str):
+def _enrichment_cache_hash(lesson_plan_id: str, section: str,
+                           content: str, provider: str) -> str:
+    """Content-identity key for the enrichment cache.
+
+    Hashes the lesson/section INPUT the provider was asked to rewrite plus
+    the provider name, so a duplicate submit with the same input resolves to
+    the same cache row while any teacher edit (new input) misses cleanly.
+    """
+    payload = f"{lesson_plan_id}|{section}|{provider}|{content or ''}"
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _load_enrichment_cache(db, lesson_plan_id: str, section: str,
+                           indicator_hash: str):
+    """Return the cached content for this exact input, or None (read path)."""
+    if not indicator_hash:
+        return None
+    row = (
+        db.query(AIEnrichmentCacheDB)
+        .filter(
+            AIEnrichmentCacheDB.lesson_plan_id == lesson_plan_id,
+            AIEnrichmentCacheDB.section == section,
+            AIEnrichmentCacheDB.indicator_hash == indicator_hash,
+        )
+        .order_by(AIEnrichmentCacheDB.created_at.desc())
+        .first()
+    )
+    return (row.content or "") if row else None
+
+
+def _request_already_consumed(db, user_id: str, request_id: str) -> bool:
+    """True when this client action already succeeded (idempotency ledger)."""
+    if not request_id:
+        return False
+    return (
+        db.query(AIUsageEventDB.id)
+        .filter(
+            AIUsageEventDB.user_id == user_id,
+            AIUsageEventDB.request_id == request_id,
+        )
+        .first()
+        is not None
+    )
+
+
+def _save_enrichment_cache(db, lesson_plan_id: str, section: str, content: str, provider: str, mode: str,
+                           indicator_hash: str = ""):
     cache = AIEnrichmentCacheDB(
         id=generate_id(),
         lesson_plan_id=lesson_plan_id,
         section=section,
         content=content,
         provider=provider,
+        indicator_hash=indicator_hash or _enrichment_cache_hash(
+            lesson_plan_id, section, content, provider),
         created_at=datetime.utcnow(),
     )
     db.add(cache)

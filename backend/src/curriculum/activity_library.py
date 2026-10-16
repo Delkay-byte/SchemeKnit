@@ -1010,35 +1010,134 @@ def assessment_for_verb(verb: str, focus: str) -> str:
 # ── Ghanaian context bank (Priority 2 §13) ──────────────────────────────────
 #
 # Used only where the framing adds instruction. One bounded clause per lesson,
-# keyed by subject — never sprinkled into every sentence.
+# keyed by subject — never sprinkled into every sentence. Each profile carries
+# multiple examples so a batch of lessons on the same subject does not repeat
+# one clause; ``ghana_context_for`` picks deterministically by variant.
 
 GHANA_CONTEXT_BY_SUBJECT: Dict[str, Tuple[str, ...]] = {
-    "mathematics": ("Use Ghanaian market prices, cedi amounts and local "
-                    "distances as the numbers in the examples.",),
-    "science": ("Use locally available household and community materials "
-                "for the observation or investigation.",),
-    "english": ("Set the exchange in familiar Ghanaian family and community "
-                "situations so the language use stays meaningful.",),
-    "ict": ("Where devices are shared, use the unplugged steps first "
-            "and let every learner touch the real device once.",),
-    "creative_arts": ("Draw the design examples from local craft — kente, "
-                      "adinkra, pottery, household objects.",),
-    "social_studies": ("Anchor the discussion in Ghanaian community and "
-                       "national examples learners know first.",),
-    "rme": ("Use everyday Ghanaian family and community situations as the "
-            "cases for the value discussed.",),
-    "phe": ("Use local games, playground activities and everyday physical "
-            "tasks as the practice context.",),
-    "career_technology": ("Use local tools, materials and trades learners "
-                          "see in their community.",),
+    "mathematics": (
+        "Use Ghanaian market prices, cedi amounts and local "
+        "distances as the numbers in the examples.",
+        "Set the problems in everyday Ghanaian money — pocket money, "
+        "market change, or sharing provisions at home.",
+        "Use locally familiar quantities — distances between school and "
+        "home, heights of classroom walls, or sizes of farm plots.",
+    ),
+    "science": (
+        "Use locally available household and community materials "
+        "for the observation or investigation.",
+        "Observe a real local phenomenon — weather, plants around the "
+        "school compound, or water from the community source.",
+        "Base the investigation on food, water or household items "
+        "learners can name from their own homes.",
+    ),
+    "english": (
+        "Set the exchange in familiar Ghanaian family and community "
+        "situations so the language use stays meaningful.",
+        "Use Ghanaian names, greetings and marketplace exchanges as "
+        "the listening and speaking contexts.",
+        "Draw the reading passage from Ghanaian folktales, local news "
+        "headlines or community announcements.",
+    ),
+    "ict": (
+        "Where devices are shared, use the unplugged steps first "
+        "and let every learner touch the real device once.",
+        "Frame the task around a real community need — a school "
+        "register, a market inventory or a clinic queue.",
+        "Use shared-device routines: one learner operates while the "
+        "partner narrates the steps, then they swap.",
+    ),
+    "creative_arts": (
+        "Draw the design examples from local craft — kente, "
+        "adinkra, pottery, household objects.",
+        "Use local patterns and symbols — kente strips, adinkra "
+        "shapes or clay pots from nearby markets — as the design source.",
+        "Let learners collect one household object to reuse or "
+        "redesign as the lesson's art material.",
+    ),
+    "social_studies": (
+        "Anchor the discussion in Ghanaian community and "
+        "national examples learners know first.",
+        "Start from the learners' own region, district and "
+        "tradition area before naming the national picture.",
+        "Use a current local issue — market days, water supply, "
+        "or town festivals — as the discussion case.",
+    ),
+    "rme": (
+        "Use everyday Ghanaian family and community situations as the "
+        "cases for the value discussed.",
+        "Ground the value in a familiar Ghanaian proverb, family "
+        "duty or community practice learners recognise.",
+        "Use a school or village scenario — sharing, honesty at the "
+        "market, or helping a neighbour — as the moral case.",
+    ),
+    "phe": (
+        "Use local games, playground activities and everyday physical "
+        "tasks as the practice context.",
+        "Adapt the drill to spaces and equipment actually available — "
+        "compound ground, rope, stones or locally made balls.",
+        "Use Ghanaian playground games or dance steps as the "
+        "warm-up so every learner joins without special kit.",
+    ),
+    "career_technology": (
+        "Use local tools, materials and trades learners "
+        "see in their community.",
+        "Base the project on a real community trade — farming, "
+        "tailoring, carpentry or food processing nearby.",
+        "Use locally available materials (cardboard, cloth scraps, "
+        "reused containers) for the practical build.",
+    ),
+    "early_childhood": (
+        "Use counting and naming from the child's own world — "
+        "household objects, family members and market items.",
+        "Set every story and song in familiar Ghanaian family "
+        "and community scenes children recognise.",
+        "Draw the art and movement tasks from local songs, "
+        "playground games and household materials.",
+    ),
+    "nursery": (
+        "Use the child's own body, family and classroom objects "
+        "for every naming and counting task.",
+        "Frame the rhyme or story in a familiar Ghanaian home "
+        "or compound setting children know.",
+        "Use sticks, stones, cloth scraps and bottle caps from "
+        "the local environment as the play materials.",
+    ),
+    "generic": (
+        "Anchor the examples in Ghanaian family, community and "
+        "market situations learners meet daily.",
+        "Use local names, places and materials so every example "
+        "sounds like the learners' own world.",
+        "Draw one case from a current community event learners "
+        "have witnessed that term.",
+    ),
 }
 
 
-def ghana_context_for(subject_key: str) -> str:
-    """One apt Ghanaian context framing for this subject, or ""."""
-    for key, options in GHANA_CONTEXT_BY_SUBJECT.items():
-        if subject_key == key or subject_key.startswith(key):
-            return options[0] if options else ""
+def ghana_context_for(subject_key: str, variant: int = 0) -> str:
+    """One apt Ghanaian context framing for this subject, or "".
+
+    ``variant`` rotates the example deterministically so a batch of lessons
+    on the same subject does not repeat a single clause (Priority 2 §13:
+    one bounded clause per lesson, never sprinkled into every sentence).
+    Accepts raw subject values ("Social Studies") or profile keys
+    ("social_studies") — spaces and hyphens normalise to underscores.
+    """
+    key = (subject_key or "").strip().lower().replace(" ", "_").replace("-", "_")
+    if not key:
+        return ""
+    for bank_key, options in GHANA_CONTEXT_BY_SUBJECT.items():
+        if key == bank_key or key.startswith(bank_key + "_"):
+            if not options:
+                return ""
+            return options[variant % len(options)]
+    # Fallback: profile keys whose subject aliases differ ("language and
+    # literacy" → early_childhood, "numeracy" → mathematics, …).
+    from .pedagogy import SUBJECT_TO_PROFILE
+    profile_key = SUBJECT_TO_PROFILE.get(key.replace("_", " "))
+    if profile_key and profile_key in GHANA_CONTEXT_BY_SUBJECT:
+        options = GHANA_CONTEXT_BY_SUBJECT[profile_key]
+        return options[variant % len(options)] if options else ""
     return ""
 
 

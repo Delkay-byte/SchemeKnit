@@ -733,11 +733,11 @@ class GenerationPipeline:
         if isinstance(diff, dict):
             parts = []
             if diff.get("support"):
-                parts.append(f"Support: {diff['support']}")
+                parts.append(f"Needs Support (NS): {diff['support']}")
             if diff.get("core"):
-                parts.append(f"Core: {diff['core']}")
+                parts.append(f"High Performing (HP): {diff['core']}")
             if diff.get("extension"):
-                parts.append(f"Extension: {diff['extension']}")
+                parts.append(f"More Able (MA): {diff['extension']}")
             lp.differentiation = "\n".join(parts)
         elif isinstance(diff, str):
             lp.differentiation = diff

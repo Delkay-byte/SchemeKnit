@@ -395,122 +395,148 @@ def _follow_up_for(category: str) -> str:
                     "same week.")
 
 
-_RUBRIC_CRITERIA: Dict[str, Tuple[Tuple[str, Tuple[str, str, str]], ...]] = {
-    # category → ((criterion, (full, developing, needs-support) descriptors), …)
+_RUBRIC_CRITERIA: Dict[str, Tuple[Tuple[str, Tuple[str, str, str, str]], ...]] = {
+    # category → ((criterion, (exceeds, meets, developing, needs-support)
+    # descriptors), …) — the 4-band shape SHS Planner uses.
     "create": (
         ("Meets the stated criteria of the task", (
+            "All criteria met and one exceeded with purpose",
             "All stated criteria met",
             "Most criteria met; one gap",
             "Criteria not yet met")),
         ("Originality / purposeful modification", (
+            "Inventive; clearly the learner's own strong idea",
             "Clearly the learner's own idea or a purposeful change",
             "Some own choices visible",
             "Copied or unrelated to the task")),
         ("Explanation of the design/work", (
+            "Justifies every choice with reasons tied to the task",
             "Justifies the choices with reasons tied to the task",
             "Partial explanation",
             "Cannot explain the choices")),
         ("Presentation and completeness", (
+            "Complete, clear, usable — could be shared as a model",
             "Complete, clear, usable",
             "Mostly complete",
             "Incomplete or unclear")),
     ),
     "evaluate": (
         ("Judgement backed by evidence", (
+            "Judgement + specific, well-chosen evidence",
             "Judgement + specific evidence",
             "Judgement with weak evidence",
             "Judgement without evidence")),
         ("Use of the agreed criteria", (
+            "Applies the criteria exactly and explains the fit",
             "Applies the criteria exactly",
             "Applies some criteria",
             "Criteria not applied")),
         ("Clarity of the reasoned position", (
+            "Fully clear, organised, persuasive",
             "Fully clear and organised",
             "Understandable but thin",
             "Unclear")),
     ),
     "analyse": (
         ("Pattern/relationship identified", (
+            "Correct pattern stated with a supporting example",
             "Correct pattern stated",
             "Partly correct",
             "Not stated")),
         ("Evidence used from the source/work", (
+            "Evidence quoted or shown and interpreted",
             "Evidence quoted or shown",
             "General reference only",
             "No evidence")),
         ("Accuracy of the recorded analysis", (
+            "Accurate, complete, and insightfully noted",
             "Accurate and complete",
             "Minor slips",
             "Inaccurate/incomplete")),
     ),
     "apply": (
         ("Correct method followed", (
+            "Method correct throughout, efficiently",
             "Method correct throughout",
             "Method mostly correct",
             "Method not followed")),
         ("Correct result/evidence", (
+            "Result correct and verified",
             "Result correct",
             "Small slip in the result",
             "Result incorrect")),
         ("Working / process shown", (
+            "Every step shown clearly and explained",
             "Every step shown clearly",
             "Some steps shown",
             "No working shown")),
     ),
     "understand": (
         ("Key idea stated", (
+            "Idea stated accurately with a fresh example",
             "Idea stated accurately in own words",
             "Partly accurate",
             "Not the lesson's idea")),
         ("Use of the lesson's key terms", (
+            "Terms used correctly and in context",
             "Terms used correctly",
             "Some terms misplaced",
             "Terms not used")),
         ("Response completeness", (
+            "Full response plus an extension beyond what was asked",
             "Full response (e.g. 2+2 items as asked)",
             "Partial response",
             "Missing parts")),
     ),
     "practice": (
         ("Accuracy of the performance/skill", (
+            "Accurate and fluent to the agreed standard",
             "Accurate to the agreed standard",
             "Mostly accurate",
             "Not yet accurate")),
         ("Confidence / independence", (
+            "Independent; helps a peer",
             "Independent, no prompting",
             "Needed light prompting",
             "Needed full support")),
     ),
     "recall": (
         ("Correct recognition/naming", (
+            "All check items correct, unprompted, and quick",
             "All check items correct, unprompted",
             "Most correct",
             "Few correct")),
         ("Response independence", (
+            "No prompt needed; answers extend the item",
             "No prompt needed",
             "Needed one prompt",
             "Needed repeated prompting")),
     ),
     "communicate": (
         ("Relevance to the task", (
+            "On task throughout; elevates the message",
             "On task throughout",
             "Partly on task",
             "Off task")),
         ("Language accuracy/clarity", (
+            "Clear, accurate, and engaging",
             "Clear and accurate",
             "Minor errors only",
             "Blocks understanding")),
         ("Completion", (
+            "Fully complete and polished",
             "Fully complete",
             "Partly complete",
             "Incomplete")),
     ),
     "french": (
         ("Target expressions used correctly", (
+            "Expressions correct, natural, and varied",
             "Expressions correct and natural",
             "Some errors that do not block meaning",
             "Meaning blocked")),
         ("Response in the target language", (
+            "Fully in the target language with spontaneous additions",
             "Fully in the target language",
             "Mixed with English",
             "Only English")),
@@ -518,11 +544,11 @@ _RUBRIC_CRITERIA: Dict[str, Tuple[Tuple[str, Tuple[str, str, str]], ...]] = {
 }
 
 
-_LEVEL_NAMES = ("3 — meets the standard", "2 — developing",
-                "1 — needs support")
+_LEVEL_NAMES = ("4 — exceeds the standard", "3 — meets the standard",
+                "2 — developing", "1 — needs support")
 
 
-def _rubric_criteria_for(category: str, action: str) -> Tuple[Tuple[str, Tuple[str, str, str]], ...]:
+def _rubric_criteria_for(category: str, action: str) -> Tuple[Tuple[str, Tuple[str, str, str, str]], ...]:
     """The small, task-relevant criterion set for THIS action's category."""
     criteria = _RUBRIC_CRITERIA.get(category) or _RUBRIC_CRITERIA["apply"]
     # At most four criteria — an ordinary teacher can hold four in view.
@@ -562,7 +588,7 @@ def build_rubric(
     criteria: List[dict] = []
     total = 0
     for criterion, descriptors in _rubric_criteria_for(category, action):
-        points_max = 3
+        points_max = 4
         entries = []
         for name, desc in zip(_LEVEL_NAMES, descriptors):
             entries.append({"level": name, "descriptor": desc,
@@ -571,9 +597,9 @@ def build_rubric(
         criteria.append({
             "criterion": criterion,
             "descriptors": entries,
-            "points": 3,
+            "points": 4,
         })
-        total += 3
+        total += 4
     if not criteria:
         return None
 
