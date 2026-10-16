@@ -181,7 +181,13 @@ export default function UploadPage() {
       const detected: string = result?.class_level || ''
       const teacherLevel = detectClassOk(detected) ? undefined : (confirmClass || undefined)
       await api.confirmSubjectSection(result.scheme_id, subject, teacherLevel)
-      router.push(`/review/${result.scheme_id}`)
+      // Backlog item 5: after the teacher resolves the one genuine ambiguity
+      // (subject/class), hand off to Autopilot exactly like the unambiguous
+      // upload path. The generate page re-plans server-side and only auto-fires
+      // when genuinely ready — WAPEF / class / quota / needs_review blockers
+      // still interrupt, so nothing is bypassed.
+      window.sessionStorage.setItem('schemeknit.autopilot_intent', '1')
+      router.push(`/generate/${result.scheme_id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not confirm that subject')
     } finally {

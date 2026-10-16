@@ -2582,21 +2582,56 @@ def build_lesson(
     # Tier templates that do not interpolate the focus are anchored on THIS
     # indicator's task, so a support/challenge line never reads as a generic
     # subject sentence reused across every lesson ("Support: Provide a word
-    # bank…" with no mention of what is being supported).
+    # bank…" with no mention of what is being supported). Labels follow the
+    # GES convention the reference planner uses: NS (Needs Support), HP (High
+    # Performing — the expected standard), MA (More Able — extension).
     def _anchor_tier(tmpl: str, text: str) -> str:
         if not text or not focus_short or "{focus" in (tmpl or ""):
             return text
         return f"{text.rstrip('. ')} on {focus_short}."
 
+    _support_text = _anchor_tier(_support_tmpl, _safe_format(_support_tmpl, **fmt).strip())
+    _challenge_text = _anchor_tier(_challenge_tmpl, _challenge)
+    _hp_text = (
+        f"all learners complete the main task on {focus_short}; the "
+        f"teacher checks that {_core_evidence}") if _core_evidence else (
+        f"all learners complete the main task on {focus_short} "
+        "independently with standard guidance.")
+
     differentiation = "\n".join([
-        f"Support: {_anchor_tier(_support_tmpl, _safe_format(_support_tmpl, **fmt).strip())}",
-        (f"Core: all learners complete the main task on {focus_short}; the "
-         f"teacher checks that {_core_evidence}") if _core_evidence else
-        (f"Core: all learners complete the main task on {focus_short} "
-         "independently with standard guidance."),
-        f"Challenge: {_anchor_tier(_challenge_tmpl, _challenge)}",
+        f"Needs Support (NS): {_support_text}",
+        f"High Performing (HP): {_hp_text}",
+        f"More Able (MA): {_challenge_text}",
         f"Grouping: {profile.grouping}",
     ])
+
+    # Weave a compact differentiation cue into the LAST practice learner
+    # activity (backlog item 3) — SHS Planner puts the tier moves inside the
+    # activity text so a teacher reading the flow sees them in context, not
+    # only in a trailing block. The full tiers stay in ``differentiation``
+    # for templates and exports; this is an additive, short parenthetical.
+    if not early_years and learner_activities:
+        _practice_idx = next(
+            (i for i in range(len(learner_activities) - 1, -1, -1)
+             if "PLENARY" not in learner_activities[i].phase),
+            None,
+        )
+        if _practice_idx is not None:
+            def _short_clause(text: str, cap: int = 70) -> str:
+                first = re.split(r"(?<=[.!?])\s", (text or "").strip())[0]
+                first = first.rstrip(". ")
+                if len(first) <= cap:
+                    return first
+                clipped = first[:cap].rsplit(" ", 1)[0]
+                return (clipped or first[:cap]).rstrip(",;:") + "…"
+            _ns_cue = _short_clause(_support_text)
+            _ma_cue = _short_clause(_challenge_text)
+            if _ns_cue and _ma_cue:
+                _woven = (f" (NS: {_ns_cue}; MA: {_ma_cue}).")
+                learner_activities[_practice_idx].description = (
+                    learner_activities[_practice_idx].description.rstrip(". ")
+                    + _woven
+                )
 
     # ── Assignments (PART 15) — class work and follow-up home work ──────
     # Both follow the indicator's OWN activity type: a classification lesson
@@ -2638,6 +2673,18 @@ def build_lesson(
         try:
             from . import assessment_design as _assessment_design
             _ghana_hint = "".join(activity.ghana_context[:1]).strip()
+            if not _ghana_hint:
+                # Subject-level fallback (Priority 2 §13): activities that
+                # carry no task-specific Ghanaian framing borrow ONE bounded
+                # clause for this subject — deterministic, rotated by the
+                # lesson's sequence position so a batch never repeats it.
+                from .activity_library import ghana_context_for as _gc_for
+                try:
+                    _subj_key = (config.subject.value if isinstance(config.subject, Subject)
+                                 else str(config.subject or ""))
+                except Exception:
+                    _subj_key = str(config.subject or "")
+                _ghana_hint = _gc_for(_subj_key, variant=(alloc.period_index or 1) - 1)
             assessment_items = _assessment_design.build_assessment_items(
                 indicator=alloc.indicator_description or "",
                 indicator_code=alloc.indicator_code or "",

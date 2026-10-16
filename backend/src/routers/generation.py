@@ -774,6 +774,23 @@ async def generate_lesson_plans(
                     else "Some of the selected lessons could not be found in this scheme."
                 ),
             )
+        # Server-side needs_review gate (backlog item 5). The Autopilot plan
+        # already excludes uncertain occurrences, but /generate is a public
+        # surface and must never silently generate a placement the allocation
+        # engine could not confirm — a client-supplied id cannot bypass it.
+        unsafe = [
+            o for o in selected_occ
+            if bool(getattr(resolved_by_occ[o], "needs_review", False))
+        ]
+        if unsafe:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Some selected lessons are flagged for review and cannot "
+                    "be generated automatically. Review them first, then "
+                    "generate the confirmed lessons."
+                ),
+            )
 
     if (supplied_selection and not selected_occ and not indicatorless
             and not (selected_set & set(available_codes))):
@@ -802,6 +819,44 @@ async def generate_lesson_plans(
             status_code=422,
             detail="This scheme contains no instructional indicators to generate.",
         )
+
+    # ── Double-submit guard (backlog item 4) ─────────────────────────────
+    # A second click while this scheme is still generating must not start a
+    # competing run (which would race the lesson replacement and reserve a
+    # second quota). The in-flight job is returned as a 409 with its id so
+    # the UI can keep polling it instead of resubmitting.
+    for _j in data_service.list_jobs(db, user.id):
+        if _j.scheme_id == scheme_id and _j.status in ("pending", "processing"):
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "A generation for this scheme is already running. "
+                    f"Waiting for job {_j.id} to finish."
+                ),
+            )
+
+    # ── Already-generated info (backlog item 4) ──────────────────────────
+    # Which requested occurrences already have a persisted lesson, so the
+    # response (and the status endpoint) can tell the UI what a re-run
+    # would replace rather than silently duplicating state in the browser.
+    already_generated_occurrence_ids: list = []
+    _existing_by_scheme = data_service.get_lesson_plans_for_scheme(
+        db, scheme_id, user.id)
+    _existing_occ = {
+        (getattr(lp, "source_occurrence_id", "") or "")
+        for lp in _existing_by_scheme
+    }
+    _existing_occ.discard("")
+    if selected_occ:
+        already_generated_occurrence_ids = [
+            o for o in selected_occ if o in _existing_occ
+        ]
+    elif requested_codes:
+        _existing_codes = {
+            c for lp in _existing_by_scheme for c in (lp.indicator_codes or [])
+        }
+        if set(requested_codes) <= _existing_codes:
+            already_generated_occurrence_ids = sorted(_existing_occ)
 
     reservation = None
     if gen_limit > 0:
@@ -1112,6 +1167,7 @@ async def generate_lesson_plans(
             "total_lessons": scheme_total,
             "completed_lessons": scheme_total,
             "generated_indicator_codes": requested_codes,
+            "already_generated_occurrence_ids": already_generated_occurrence_ids,
             "quota": quota_after,
             "ai_credits_remaining": ai_credit_remaining,
             "ai": ai_info,
@@ -1236,6 +1292,15 @@ async def get_latest_job_for_scheme(
     for job in jobs:
         if job.scheme_id == scheme_id:
             snapshot = job.config_snapshot or {}
+            # Already-generated info (backlog item 4): which source occurrences
+            # already carry a persisted lesson, so the restored page can mark
+            # them instead of inviting a blind duplicate submission.
+            _lessons = data_service.get_lesson_plans_for_scheme(
+                db, scheme_id, user.id)
+            _occ = sorted({
+                (getattr(lp, "source_occurrence_id", "") or "")
+                for lp in _lessons
+            } - {""})
             return {
                 "id": job.id,
                 "status": job.status,
@@ -1252,6 +1317,7 @@ async def get_latest_job_for_scheme(
                 "coverage": {
                     "total_generated_lessons": job.completed_lessons,
                 },
+                "already_generated_occurrence_ids": _occ,
             }
     return None
 

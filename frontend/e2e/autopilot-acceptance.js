@@ -121,6 +121,8 @@ async function upload(page, file) {
 
 // Confirm screen: the doc states no class, so the teacher picks it FIRST —
 // that unlocks the subject chip. Both choices are the §17 genuine interrupts.
+// After confirming, the page hands off to Autopilot (/generate) — backlog
+// item 5 — where remaining blockers still interrupt if any remain.
 async function confirmSubject(page) {
   await page.locator('[data-confirm-class]').waitFor({ timeout: 30000 });
   await page.waitForFunction(() => {
@@ -136,8 +138,8 @@ async function confirmSubject(page) {
   }, null, { timeout: 20000 });
   page.__classPromptOk = prompted;
   await page.locator('[data-multi-subject] button').first().click();
-  await page.waitForURL(/\/review\//, { timeout: 30000 });
-  return page.url().split('/review/')[1].split(/[?#]/)[0];
+  await page.waitForURL(/\/generate\//, { timeout: 30000 });
+  return page.url().split('/generate/')[1].split(/[?#]/)[0];
 }
 
 // Review Curriculum (never sets the autopilot intent) → scheme id.
@@ -317,23 +319,39 @@ async function gotoGenerate(page, schemeId) {
     await shot(pb, '07-capped-plain-visit.png');
 
     // ══ Scenario 5b: class confirmation (genuine interruption) ═════════
+    // Backlog item 5: after the teacher resolves the one ambiguity, the
+    // confirm path hands off to Autopilot and auto-fires (capped at the
+    // Free Tier allowance) — no repeated class question, no extra click.
     const cMode = await upload(pb, CODELESS);
     log(cMode === 'confirm', 'scenario 5b: a scheme that states no class interrupts at upload', cMode);
     const schemeClass = cMode === 'confirm'
-      ? await confirmSubject(pb)      // class prompt → class choice → subject chip → /review
+      ? await confirmSubject(pb)      // class prompt → class choice → subject chip → /generate (auto-fires)
       : await schemeViaReview(pb);
     log(pb.__classPromptOk !== false,
       'scenario 5b: the class prompt is the focused interrupt (§17)',
       'does not state the class level');
-    await gotoGenerate(pb, schemeClass);
-    const noClassBlock = (await pb.locator('[data-autopilot-blocker][data-blocker-code="class_confirmation"]').count()) === 0;
-    log(noClassBlock,
-      'scenario 5b: confirmed class flows through — no repeated question on generate');
-    const classCounts = await waitCounts(pb, ['8 lesson plans found'], 60000);
-    log(Boolean(classCounts),
-      'scenario 5b: plan now covers the whole scheme (8 pending)',
-      String(classCounts).slice(0, 120));
-    await shot(pb, '08-class-confirmed.png');
+    if (cMode === 'confirm') {
+      // The confirm → generate handoff auto-fires: wait for the results card.
+      await pb.locator('[data-autopilot-results]').waitFor({ timeout: 120000 });
+      const cRes = await pb.locator('[data-autopilot-results]').innerText();
+      log(cRes.includes('5 lesson plans ready'),
+        'scenario 5b: confirm-path handoff auto-fires and caps at 5 (Free Tier)',
+        cRes.replace(/\s+/g, ' ').slice(0, 90));
+      const classBlockerAfter = (await pb.locator('[data-autopilot-blocker][data-blocker-code="class_confirmation"]').count()) === 0;
+      log(classBlockerAfter,
+        'scenario 5b: confirmed class flows through — no repeated question on generate');
+      await shot(pb, '08-class-confirmed.png');
+    } else {
+      await gotoGenerate(pb, schemeClass);
+      const noClassBlock = (await pb.locator('[data-autopilot-blocker][data-blocker-code="class_confirmation"]').count()) === 0;
+      log(noClassBlock,
+        'scenario 5b: confirmed class flows through — no repeated question on generate');
+      const classCounts = await waitCounts(pb, ['8 lesson plans found'], 60000);
+      log(Boolean(classCounts),
+        'scenario 5b: plan now covers the whole scheme (8 pending)',
+        String(classCounts).slice(0, 120));
+      await shot(pb, '08-class-confirmed.png');
+    }
 
     // Change settings scrolls back to the config surface (§19: advanced
     // settings never leave the screen behind the card).

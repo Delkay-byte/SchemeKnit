@@ -502,3 +502,75 @@ class TestAutopilotApi:
             assert confirmed["ready"] is True
             db.refresh(scheme)
             assert scheme.class_level == "Basic 7"
+
+    def test_generate_rejects_needs_review_occurrence_server_side(self, db):
+        """Backlog item 5: /generate must never silently generate an
+        occurrence the allocation engine flagged needs_review — a client-
+        supplied id cannot bypass the plan's exclusion."""
+        from fastapi.testclient import TestClient
+
+        user = make_user(db)
+        # Nursery-style scheme: weeks with NO indicators (indicatorless path).
+        # Week 1 sits inside the term window (gets a teaching date);
+        # week 2 sits outside it (no calendar days → needs_review=True).
+        scheme = SchemeDB(
+            id=generate_id(), owner_id=user.id, filename="Nursery Scheme.docx",
+            subject="Our World Our People", class_level="Nursery 1", term="First Term",
+            academic_year="2026/2027", status="extracted", detection_status="single",
+        )
+        db.add(scheme)
+        db.flush()
+        db.add(WeekDB(
+            id=generate_id(), scheme_id=scheme.id, week_number=1,
+            start_date=date(2026, 9, 7), end_date=date(2026, 9, 11),
+            week_type="instruction", strand="Personal Development",
+            sub_strand="Self-Care", content_standards=[], indicators=[],
+            resources=["Cloth"],
+        ))
+        db.add(WeekDB(
+            id=generate_id(), scheme_id=scheme.id, week_number=2,
+            start_date=date(2027, 1, 4), end_date=date(2027, 1, 8),
+            week_type="instruction", strand="Personal Development",
+            sub_strand="Self-Care", content_standards=[], indicators=[],
+            resources=["Cloth"],
+        ))
+        db.commit()
+
+        config = _config(
+            scheme.id, class_level="Nursery 1", subject="Our World Our People",
+        )
+        # Occurrence ids from the nursery path: weekN:0:row
+        safe_occ = "week1:0:row"
+        unsafe_occ = "week2:0:row"
+
+        with TestClient(_app(db, user)) as client:
+            # The SAFE occurrence is not blocked by the needs_review gate.
+            # (It may still fail later at the quality gate for sparse synthetic
+            # content — that is a different mechanism; what matters here is
+            # that the gate itself does not fire 409 for a safe occurrence.)
+            resp = client.post(
+                f"/api/generation/{scheme.id}/generate",
+                json={**config.model_dump(mode="json"),
+                      "selected_occurrence_ids": [safe_occ]},
+            )
+            assert resp.status_code != 409, resp.text
+
+            # Supplying the needs_review occurrence is rejected server-side
+            # with 409, regardless of what the client claims.
+            resp = client.post(
+                f"/api/generation/{scheme.id}/generate",
+                json={**config.model_dump(mode="json"),
+                      "selected_occurrence_ids": [unsafe_occ]},
+            )
+            assert resp.status_code == 409, resp.text
+            assert "flagged for review" in resp.json()["detail"]
+
+            # A mixed batch (safe + unsafe) is also rejected — no partial
+            # silent generation of the uncertain occurrence.
+            resp = client.post(
+                f"/api/generation/{scheme.id}/generate",
+                json={**config.model_dump(mode="json"),
+                      "selected_occurrence_ids": [safe_occ, unsafe_occ]},
+            )
+            assert resp.status_code == 409, resp.text
+            assert "flagged for review" in resp.json()["detail"]

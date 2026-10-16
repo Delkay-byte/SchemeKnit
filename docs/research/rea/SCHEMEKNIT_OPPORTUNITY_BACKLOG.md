@@ -158,3 +158,21 @@ convert the dominant `SUBSTANTIVE EDIT` into `MINOR EDIT`. 4 then removes rework
 
 *Related: ../REA_LESSON_PLANNER_BENCHMARK.md · UX_FLOW_MATRIX.md ·
 NETWORK_AND_CLIENT_EVIDENCE.md · LESSON_QUALITY_COMPARISON.md*
+
+---
+
+## Completion status (mission pass, 2026-10-16)
+
+All five backlog items are now closed with pinned tests. Evidence:
+
+| Item | Change | Evidence |
+|---|---|---|
+| 1 — prose/timing | Already shipped in prior passes (slot-fill, real topic, duration invariant). | Frozen corpora 11/40/19 still 100% first-pass, timing_integrity 5.0. |
+| 2 — Ghana bank | `GHANA_CONTEXT_BY_SUBJECT` expanded to all 12 pedagogy profiles × 3 examples; `ghana_context_for(subject, variant)` normalises spaces/aliases and rotates deterministically; wired as the fallback `context_hint` for activities that carry no task-specific framing (`lesson_builder.py`). | `tests/test_ghana_context_bank.py` (10 tests: coverage, resolution, stability, builder wiring). |
+| 3 — rubric/differentiation | Rubric is now 4-band ("4 — exceeds" / "3 — meets" / "2 — developing" / "1 — needs support"), 4 points per criterion. Differentiation uses GES labels Needs Support (NS) / High Performing (HP) / More Able (MA), and a compact `(NS: …; MA: …)` cue is woven into the last practice learner activity. AI enrichment path labels updated to match. | `test_phase3_assessment_dok.py` (28 pass; total_points 16 for the create-category rubric); `test_differentiation_uses_ma_hp_ns_and_is_woven` in `test_generation_quality_v3.py`. |
+| 4 — cache/double-submit | `ai_enrichment_cache.indicator_hash` now populated (sha256 of lesson+section+input+provider). Read path: regenerate-section / enrich-lesson return the cached generation for an identical input or a replayed `request_id` (`already_generated: true`) without a second provider call or quota consumption. `/generate` 409s while a scheme job is in flight; generate response and scheme/status report `already_generated_occurrence_ids`. | `tests/test_ai_cache_double_submit.py` (6 tests). |
+| 5 — zero-click | Confirm-subject hands to autopilot (`/generate/{id}` with intent flag); server-side needs_review gate on `/generate` rejects uncertain occurrences with 409. | `test_autopilot_generation.py::test_generate_rejects_needs_review_occurrence_server_side`; `test_autopilot_ui_source.py::test_confirm_path_also_hands_to_autopilot`. |
+
+Regression gate at closure: frozen corpora 11/40/19 = 100% first-pass / 100%
+teacher-ready (mean rubric 74.2 / 73.3 / 72.3 of 75); P4 + quality-gate suites
+131 passed; quota/entitlement suites 123 passed (4 PG-only skipped).
