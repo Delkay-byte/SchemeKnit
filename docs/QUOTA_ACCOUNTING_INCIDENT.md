@@ -3,9 +3,16 @@
 **Incident:** production accepted **6 distinct Free Tier lessons against the
 monthly limit of 5** while every quota read returned `used=0`.
 **Status:** root cause **identified, reproduced, and fixed** in `70738f8`;
-pending deployment to production and owner-side verification.
+the fix was **deployed to production** in commit `3ef1a41` on 2026-10-15
+(owner-approved one-time deploy — §13d) and the deployed quota
+implementation was **content-verified** on 2026-10-16 (§13f). Live
+production enforcement has **not yet been tested** through the guarded
+generation endpoint (§13h), and historical quota accounting remains
+**unreconciled** — Proposal 1 (§13e) and Proposal 2 (§13g) are separate
+owner-approval decisions, **neither executed**. Production readiness
+remains **RED / NO-GO**.
 **Detected:** 2026-10-09 during final production smoke (docs commit `51b7987`).
-**Severity:** P1 — RED/NO-GO criterion (Free Tier cap unenforceable).
+**Severity:** P1 — RED/NO-GO criterion (Free Tier cap was unenforceable on the pre-fix build).
 
 ---
 
