@@ -237,8 +237,12 @@ deploy has been triggered from this side:
    ```
 5. **Counter remediation (owner decision — recommended for exactness):**
    without action the counter restarts from 0 and permits up to 5 MORE
-   distinct lessons this month (self-heals 2026-11-01). Recommended: make
-   the ledger reflect what was actually accepted:
+   distinct lessons this month (self-heals 2026-11-01). **This §12 sketch is
+   SUPERSEDED — do not execute it.** It relies on a broad `NOT EXISTS`
+   predicate with no server-side guards. The authoritative, hardened
+   proposals are §13e (incident account) and §13g (all other accounts),
+   each with enforced preconditions, exact-row deletion, row-count
+   enforcement and a guarded rollback.
    ```sql
    -- (a) drop the orphan unit row(s) whose lesson was gate-rejected/never persisted
    DELETE FROM usage_units u
@@ -409,102 +413,350 @@ idempotency/free-regeneration rules (§6 table):
 | P4 hard rejection `week3:0:B9.1.1.2.1` (nothing persisted) | failed/rejected work is zero-charge; unit row released | 0 (orphan row exists only because the broken path never released it) |
 | 400 validation reject | rejected before reservation | 0 |
 
-**Proposed correction** (semantics unchanged from §12.5; now with hard
-preconditions, `RETURNING` evidence, exact scope and a rollback path —
-re-verified against production state on 2026-10-16, see §13f):
+**Proposed correction (HARDENED 2026-10-16 — server-side enforced; NOT
+EXECUTED).** Design: every precondition, row count and post-condition is
+enforced inside the transaction by `IF … RAISE EXCEPTION` (PL/pgSQL
+evaluates these unconditionally at runtime; no configuration disables
+them — `ASSERT` is deliberately not relied upon). Any failure aborts the
+whole transaction **before** `COMMIT`, so a blind run of the script can
+never leave a partially applied repair. The deletion targets the exact
+verified orphan by its full identity (`user`, `period_type`, `period_key`,
+`unit_kind`, `unit_key`, `scheme_id`, `created_at`) and still requires
+the established zero-charge classification (`NOT EXISTS` a persisted
+lesson) — never a broad `NOT EXISTS`-only predicate. Mutations and their
+enforced checks live in two `DO` blocks; the informational `SELECT`s
+after them are for operator review only and cannot affect safety.
+
+**Locking & concurrency.** Phase A takes `FOR UPDATE` on the single
+`usage_periods` row of the account+period. The deployed reservation path
+(`reserve_lesson_units` in `usage_quota.py`) ends in a guarded
+`UPDATE usage_periods SET units_used = units_used + n …` and the release
+path (`release_lesson_units`) similarly updates the same row, so our
+row lock fully serialises the repair against any concurrent reservation
+or release for this account+period. `SET LOCAL lock_timeout = '10s'`
+converts a lock conflict into a clean abort instead of a hang.
+Remaining assumptions: (1) no DDL on the four tables during the repair;
+(2) the operator runs the script start-to-end in ONE session; (3) if any
+reservation/release commits between the 2026-10-16 investigation and
+execution, the preconditions (counter = 0, exactly 7 units, max
+`created_at` unchanged) fail and the transaction stops — requiring fresh
+read-only investigation, never a silent weaker repair; (4) session time
+zone is UTC (the default of Neon and the docker test image) — the repair
+`NOTICE` prints a wall-clock timestamp that the rollback script feeds back
+through `timestamp '<REPAIRED_TS>'`, which is interpreted in the session
+time zone.
+
+**Execution:** run start-to-end in one session. **Save the two
+`NOTICE` lines** (`DELETED_ORPHAN …` and `REPAIRED_TS …`) — they are the
+rollback packet (full primary key, creation timestamp, repair
+timestamp). Substitutions: none.
 
 ```sql
--- PROPOSAL 1 (§13e) — incident account ONLY. NOT EXECUTED as of 2026-10-16.
--- Scope: rows of user c11bde4c-a9bb-4f41-b96a-921570cf856e, period 2026-10.
+-- SCRIPT: P1-REPAIR
+-- PROPOSAL 1 (§13e) — incident account ONLY. NOT EXECUTED.
+-- Scope: usage_units + usage_periods rows of
+--   user c11bde4c-a9bb-4f41-b96a-921570cf856e, calendar_month 2026-10.
+-- No lesson/scheme/job/entitlement row is inserted, updated or deleted.
+-- Phase A locks + verifies every precondition; Phase B deletes the exact
+-- verified orphan, repairs the counter, and re-verifies the final state —
+-- all server-side. Any failure raises and aborts BEFORE COMMIT.
 BEGIN;
+SET LOCAL statement_timeout = '60s';
+SET LOCAL lock_timeout = '10s';
 
--- Hard preconditions (assertions match the 2026-10-16 read-only probes;
--- if ANY assert fails, the transaction aborts — re-probe, re-approve).
+-- Phase A: lock + preconditions (aborts on any mismatch).
+
 DO $$
-DECLARE n int;
+DECLARE
+  v_uid     constant text      := 'c11bde4c-a9bb-4f41-b96a-921570cf856e';
+  v_scheme  constant text      := 'ab28233d-f87c-4753-98c1-fbb94acead7f';
+  v_key     constant text      := 'ab28233d-f87c-4753-98c1-fbb94acead7f:B9.1.1.2.1';
+  v_created constant timestamp := timestamp '2026-10-09 00:21:16.294309';
+  v_newest  constant timestamp := timestamp '2026-10-09 00:22:52.201720';
+  v_units   int;
+  v_matched int;
+  v_ts      timestamp;
 BEGIN
-  SELECT units_used INTO n FROM usage_periods
-   WHERE user_id = 'c11bde4c-a9bb-4f41-b96a-921570cf856e'
-     AND period_type = 'calendar_month' AND period_key = '2026-10'
-     FOR UPDATE;                      -- row lock: blocks concurrent reservation
-  ASSERT n = 0, 'precondition failed: counter is not 0';
-  SELECT count(*) INTO n FROM usage_units
-   WHERE user_id = 'c11bde4c-a9bb-4f41-b96a-921570cf856e'
-     AND period_type = 'calendar_month' AND period_key = '2026-10';
-  ASSERT n = 7, 'precondition failed: expected 7 unit rows';
-  SELECT count(*) INTO n FROM usage_units u
-   WHERE u.user_id = 'c11bde4c-a9bb-4f41-b96a-921570cf856e'
-     AND u.period_type = 'calendar_month' AND u.period_key = '2026-10'
+  SELECT p.units_used INTO v_units FROM usage_periods p
+   WHERE p.user_id = v_uid AND p.period_type = 'calendar_month'
+     AND p.period_key = '2026-10' FOR UPDATE;
+  IF NOT FOUND OR v_units <> 0 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP001', MESSAGE =
+      'precondition failed: period row missing or units_used is not 0';
+  END IF;
+  SELECT count(*) INTO v_units FROM usage_units
+   WHERE user_id = v_uid AND period_type = 'calendar_month' AND period_key = '2026-10';
+  IF v_units <> 7 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP001', MESSAGE =
+      'precondition failed: expected 7 incident unit rows';
+  END IF;
+  SELECT count(*) INTO v_matched FROM usage_units u
+   WHERE u.user_id = v_uid AND u.period_type = 'calendar_month' AND u.period_key = '2026-10'
      AND EXISTS (SELECT 1 FROM lesson_plans l
                   WHERE l.owner_id = u.user_id AND l.scheme_id = u.scheme_id
-                    AND jsonb_exists(l.indicator_codes::jsonb,
-                                     split_part(u.unit_key, ':', 2)));
-  ASSERT n = 6, 'precondition failed: expected 6 matched units';
-  SELECT count(*) INTO n FROM lesson_plans
-   WHERE owner_id = 'c11bde4c-a9bb-4f41-b96a-921570cf856e';
-  ASSERT n = 6, 'precondition failed: expected 6 persisted lessons';
-  SELECT count(*) INTO n FROM generation_jobs
-   WHERE owner_id = 'c11bde4c-a9bb-4f41-b96a-921570cf856e' AND status = 'failed';
-  ASSERT n = 3, 'precondition failed: expected 3 failed jobs';
+                    AND jsonb_exists(l.indicator_codes::jsonb, split_part(u.unit_key, ':', 2)));
+  IF v_matched <> 6 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP001', MESSAGE =
+      'precondition failed: expected 6 lesson-matched incident units';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM usage_units u
+     WHERE u.user_id = v_uid AND u.period_type = 'calendar_month' AND u.period_key = '2026-10'
+       AND u.unit_kind = 'lesson_plan' AND u.unit_key = v_key AND u.scheme_id = v_scheme
+       AND u.created_at = v_created
+       AND NOT EXISTS (SELECT 1 FROM lesson_plans l
+                        WHERE l.owner_id = u.user_id AND l.scheme_id = u.scheme_id
+                          AND jsonb_exists(l.indicator_codes::jsonb, split_part(u.unit_key, ':', 2)))
+  ) THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP001', MESSAGE =
+      'precondition failed: expected orphan row missing or identity changed';
+  END IF;
+  SELECT count(*) INTO v_units FROM usage_units u
+   WHERE u.user_id = v_uid AND u.period_type = 'calendar_month' AND u.period_key = '2026-10'
+     AND NOT EXISTS (SELECT 1 FROM lesson_plans l
+                      WHERE l.owner_id = u.user_id AND l.scheme_id = u.scheme_id
+                        AND jsonb_exists(l.indicator_codes::jsonb, split_part(u.unit_key, ':', 2)));
+  IF v_units <> 1 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP001', MESSAGE =
+      'precondition failed: incident ledger has other unmatched units';
+  END IF;
+  SELECT count(*) INTO v_units FROM lesson_plans WHERE owner_id = v_uid;
+  IF v_units <> 6 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP001', MESSAGE =
+      'precondition failed: expected 6 persisted incident lessons';
+  END IF;
+  SELECT count(*) INTO v_units FROM lesson_plans
+   WHERE owner_id = v_uid AND source_occurrence_id IN
+     ('week1:0:B9.1.1.1.1','week2:0:B9.1.1.1.2','week2:1:B9.1.1.1.3',
+      'week4:0:B9.1.2.1.1','week4:1:B9.1.2.1.2','week5:0:B9.1.2.1.3');
+  IF v_units <> 6 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP001', MESSAGE =
+      'precondition failed: incident lessons no longer carry the six verified occurrence ids';
+  END IF;
+  IF EXISTS (SELECT 1 FROM lesson_plans
+              WHERE owner_id = v_uid AND jsonb_exists(indicator_codes::jsonb, 'B9.1.1.2.1')) THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP001', MESSAGE =
+      'precondition failed: a persisted lesson now exists for the rejected code';
+  END IF;
+  SELECT count(DISTINCT job_id) INTO v_units FROM lesson_plans WHERE owner_id = v_uid;
+  IF v_units <> 1 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP001', MESSAGE =
+      'precondition failed: incident lessons no longer share a single job';
+  END IF;
+  IF EXISTS (SELECT 1 FROM lesson_plans l JOIN generation_jobs j ON j.id = l.job_id
+              WHERE l.owner_id = v_uid AND j.status <> 'completed') THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP001', MESSAGE =
+      'precondition failed: the shared incident job is not completed';
+  END IF;
+  SELECT count(*) INTO v_units FROM generation_jobs
+   WHERE owner_id = v_uid AND status = 'failed' AND error_message = ''
+     AND date_trunc('second', created_at)::time
+         IN (time '00:21:16', time '00:22:19', time '00:36:41');
+  IF v_units <> 3 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP001', MESSAGE =
+      'precondition failed: the three verified failed jobs are not intact';
+  END IF;
+  SELECT count(*) INTO v_units FROM generation_jobs WHERE owner_id = v_uid AND status = 'failed';
+  IF v_units <> 3 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP001', MESSAGE =
+      'precondition failed: unexpected number of failed jobs';
+  END IF;
+  SELECT count(*) INTO v_units FROM generation_jobs WHERE owner_id = v_uid;
+  IF v_units <> 10 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP001', MESSAGE =
+      'precondition failed: incident job count changed (expected 10)';
+  END IF;
+  SELECT max(created_at) INTO v_ts FROM usage_units WHERE user_id = v_uid;
+  IF v_ts IS DISTINCT FROM v_newest THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP001', MESSAGE =
+      'precondition failed: ledger activity changed since investigation (newest unit moved)';
+  END IF;
 END $$;
 
--- S1: delete the orphan unit row (work never persisted = zero charge).
---     CAPTURE the RETURNING output — the id is required for the rollback path.
-DELETE FROM usage_units u
- WHERE u.user_id = 'c11bde4c-a9bb-4f41-b96a-921570cf856e'
-   AND u.period_type = 'calendar_month' AND u.period_key = '2026-10'
-   AND NOT EXISTS (
-     SELECT 1 FROM lesson_plans l
-      WHERE l.owner_id = u.user_id AND l.scheme_id = u.scheme_id
-        AND jsonb_exists(l.indicator_codes::jsonb, split_part(u.unit_key, ':', 2)))
- RETURNING u.id, u.unit_key, u.created_at;
--- Expected: EXACTLY 1 row,
---   unit_key = ab28233d-f87c-4753-98c1-fbb94acead7f:B9.1.1.2.1
+-- Phase B: exact-row deletion + counter repair + enforced post-conditions.
+DO $$
+DECLARE
+  v_uid     constant text      := 'c11bde4c-a9bb-4f41-b96a-921570cf856e';
+  v_scheme  constant text      := 'ab28233d-f87c-4753-98c1-fbb94acead7f';
+  v_key     constant text      := 'ab28233d-f87c-4753-98c1-fbb94acead7f:B9.1.1.2.1';
+  v_created constant timestamp := timestamp '2026-10-09 00:21:16.294309';
+  v_id    text;
+  v_rows  int;
+  v_ledger int;
+  v_ts    timestamp := now();
+BEGIN
+  -- B1: delete exactly the verified orphan row.
+  DELETE FROM usage_units u
+   WHERE u.user_id = v_uid AND u.period_type = 'calendar_month' AND u.period_key = '2026-10'
+     AND u.unit_kind = 'lesson_plan' AND u.unit_key = v_key AND u.scheme_id = v_scheme
+     AND u.created_at = v_created
+     AND NOT EXISTS (SELECT 1 FROM lesson_plans l
+                      WHERE l.owner_id = u.user_id AND l.scheme_id = u.scheme_id
+                        AND jsonb_exists(l.indicator_codes::jsonb, split_part(u.unit_key, ':', 2)))
+  RETURNING u.id INTO v_id;
+  GET DIAGNOSTICS v_rows = ROW_COUNT;
+  IF v_rows <> 1 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP002', MESSAGE =
+      format('orphan deletion affected %s row(s), expected exactly 1', v_rows);
+  END IF;
+  RAISE NOTICE 'DELETED_ORPHAN id=% key=% created_at=%', v_id, v_key, v_created;
 
--- S2: recompute the counter from the corrected ledger.
-UPDATE usage_periods p
-   SET units_used = (
-         SELECT count(*) FROM usage_units u
-          WHERE u.user_id = p.user_id AND u.period_type = p.period_type
-            AND u.period_key = p.period_key),
-       updated_at = now()
- WHERE p.user_id = 'c11bde4c-a9bb-4f41-b96a-921570cf856e'
-   AND p.period_type = 'calendar_month' AND p.period_key = '2026-10'
-   AND p.units_used = 0
- RETURNING p.units_used;
--- Expected: EXACTLY 1 row, units_used = 6
+  -- B2: repaired counter = post-deletion ledger count, which must be 6.
+  SELECT count(*) INTO v_ledger FROM usage_units
+   WHERE user_id = v_uid AND period_type = 'calendar_month' AND period_key = '2026-10';
+  IF v_ledger <> 6 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP002', MESSAGE =
+      format('post-deletion ledger is %s rows, expected 6 — aborting', v_ledger);
+  END IF;
+  UPDATE usage_periods p
+     SET units_used = v_ledger, updated_at = v_ts
+   WHERE p.user_id = v_uid AND p.period_type = 'calendar_month'
+     AND p.period_key = '2026-10' AND p.units_used = 0;
+  GET DIAGNOSTICS v_rows = ROW_COUNT;
+  IF v_rows <> 1 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP002', MESSAGE =
+      format('counter update affected %s row(s), expected exactly 1', v_rows);
+  END IF;
+  RAISE NOTICE 'REPAIRED_TS %', v_ts;
 
--- Guard: if S1 or S2 returned anything other than the expected rows,
--- ROLL BACK instead of committing (psql: \rollback, else ROLLBACK;).
+  -- B3: enforced post-conditions (state must be exactly the approved result).
+  SELECT count(*) INTO v_ledger FROM usage_units
+   WHERE user_id = v_uid AND period_type = 'calendar_month' AND period_key = '2026-10';
+  IF v_ledger <> 6 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP002', MESSAGE = 'post-condition failed: expected 6 ledger rows';
+  END IF;
+  SELECT count(*) INTO v_ledger FROM usage_units u
+   WHERE u.user_id = v_uid AND u.period_type = 'calendar_month' AND u.period_key = '2026-10'
+     AND EXISTS (SELECT 1 FROM lesson_plans l
+                  WHERE l.owner_id = u.user_id AND l.scheme_id = u.scheme_id
+                    AND jsonb_exists(l.indicator_codes::jsonb, split_part(u.unit_key, ':', 2)));
+  IF v_ledger <> 6 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP002', MESSAGE = 'post-condition failed: all 6 remaining units must match lessons';
+  END IF;
+  SELECT units_used INTO v_ledger FROM usage_periods
+   WHERE user_id = v_uid AND period_type = 'calendar_month' AND period_key = '2026-10';
+  IF v_ledger <> 6 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP002', MESSAGE = 'post-condition failed: counter must be 6';
+  END IF;
+  IF EXISTS (SELECT 1 FROM usage_units WHERE user_id = v_uid AND unit_key = v_key) THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP002', MESSAGE = 'post-condition failed: orphan row still present';
+  END IF;
+  SELECT count(*) INTO v_ledger FROM lesson_plans WHERE owner_id = v_uid;
+  IF v_ledger <> 6 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP002', MESSAGE = 'post-condition failed: accepted lessons must remain 6 and unchanged';
+  END IF;
+END $$;
+
+-- Operator review only (cannot affect safety — checks above already passed):
+SELECT units_used AS counter FROM usage_periods
+ WHERE user_id = 'c11bde4c-a9bb-4f41-b96a-921570cf856e' AND period_key = '2026-10';
+SELECT split_part(unit_key, ':', 2) AS code, created_at FROM usage_units
+ WHERE user_id = 'c11bde4c-a9bb-4f41-b96a-921570cf856e' ORDER BY created_at;
 COMMIT;
-
--- Post-correction verification (read-only):
-SELECT units_used FROM usage_periods
- WHERE user_id = 'c11bde4c-a9bb-4f41-b96a-921570cf856e' AND period_key = '2026-10';
--- Expected: 6
-SELECT count(*) FROM usage_units
- WHERE user_id = 'c11bde4c-a9bb-4f41-b96a-921570cf856e' AND period_key = '2026-10';
--- Expected: 6
 ```
 
-**Rollback** (only if the executed change must be reverted later; uses the
-`S1` `RETURNING` values captured at execution time):
+**Rollback (P1).** Permitted **only immediately after the repair and
+before any account activity**, and only with the packet captured from the
+repair `NOTICE` lines. It is fully guarded: if the counter, ledger, or
+`updated_at` differ from the repaired state (i.e. anything touched the
+account since the repair), it **raises and refuses** — it never
+overwrites newer accounting. Substitute `<ORPHAN_ID>`,
+`<ORPHAN_CREATED_AT>` (from `DELETED_ORPHAN …`) and `<REPAIRED_TS>`
+(from `REPAIRED_TS …`).
 
 ```sql
+-- SCRIPT: P1-ROLLBACK
 BEGIN;
-INSERT INTO usage_units
-  (id, user_id, period_type, period_key, unit_kind, unit_key, scheme_id, created_at)
-VALUES
-  ('<captured id>', 'c11bde4c-a9bb-4f41-b96a-921570cf856e', 'calendar_month', '2026-10',
-   'lesson_plan', 'ab28233d-f87c-4753-98c1-fbb94acead7f:B9.1.1.2.1',
-   'ab28233d-f87c-4753-98c1-fbb94acead7f', '<captured created_at>');
-UPDATE usage_periods
-   SET units_used = 0, updated_at = now()
- WHERE user_id = 'c11bde4c-a9bb-4f41-b96a-921570cf856e'
-   AND period_type = 'calendar_month' AND period_key = '2026-10'
-   AND units_used = 6;
+SET LOCAL statement_timeout = '60s';
+SET LOCAL lock_timeout = '10s';
+DO $$
+DECLARE
+  v_uid     constant text := 'c11bde4c-a9bb-4f41-b96a-921570cf856e';
+  v_scheme  constant text := 'ab28233d-f87c-4753-98c1-fbb94acead7f';
+  v_key     constant text := 'ab28233d-f87c-4753-98c1-fbb94acead7f:B9.1.1.2.1';
+  v_id      constant text := '<ORPHAN_ID>';
+  v_created constant timestamp := timestamp '<ORPHAN_CREATED_AT>';
+  v_ts      constant timestamp := timestamp '<REPAIRED_TS>';
+  n int;
+BEGIN
+  -- G1: still exactly the repaired state, untouched since the repair.
+  SELECT p.units_used INTO n FROM usage_periods p
+   WHERE p.user_id = v_uid AND p.period_type = 'calendar_month'
+     AND p.period_key = '2026-10' FOR UPDATE;
+  IF NOT FOUND OR n <> 6 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE =
+      'rollback refused: counter is not the repaired value 6 (activity or drift since repair)';
+  END IF;
+  IF (SELECT p.updated_at FROM usage_periods p
+       WHERE p.user_id = v_uid AND p.period_type = 'calendar_month'
+         AND p.period_key = '2026-10') <> v_ts THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE =
+      'rollback refused: period row changed after the repair (updated_at moved)';
+  END IF;
+  SELECT count(*) INTO n FROM usage_units
+   WHERE user_id = v_uid AND period_type = 'calendar_month' AND period_key = '2026-10';
+  IF n <> 6 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE =
+      'rollback refused: ledger no longer the repaired 6 rows';
+  END IF;
+  IF (SELECT max(created_at) FROM usage_units WHERE user_id = v_uid)
+     IS DISTINCT FROM timestamp '2026-10-09 00:22:52.201720' THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE =
+      'rollback refused: newer ledger activity exists since the repair';
+  END IF;
+  SELECT count(*) INTO n FROM lesson_plans WHERE owner_id = v_uid;
+  IF n <> 6 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE =
+      'rollback refused: lesson set changed since the repair';
+  END IF;
+  -- G2: the captured row is truly absent (no double-restore).
+  IF EXISTS (SELECT 1 FROM usage_units WHERE id = v_id)
+     OR EXISTS (SELECT 1 FROM usage_units
+                 WHERE user_id = v_uid AND period_type = 'calendar_month'
+                   AND period_key = '2026-10' AND unit_kind = 'lesson_plan'
+                   AND unit_key = v_key) THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE =
+      'rollback refused: orphan row (id or key) already present';
+  END IF;
+  -- R1: restore the captured row faithfully (all original values).
+  INSERT INTO usage_units (id, user_id, period_type, period_key,
+                           unit_kind, unit_key, scheme_id, created_at)
+  VALUES (v_id, v_uid, 'calendar_month', '2026-10',
+          'lesson_plan', v_key, v_scheme, v_created);
+  GET DIAGNOSTICS n = ROW_COUNT;
+  IF n <> 1 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE = 'rollback failed: restore insert affected no rows';
+  END IF;
+  -- R2: restore the original counter 0 (guarded: only from the repaired value).
+  UPDATE usage_periods
+     SET units_used = 0, updated_at = now()
+   WHERE user_id = v_uid AND period_type = 'calendar_month'
+     AND period_key = '2026-10' AND units_used = 6 AND updated_at = v_ts;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  IF n <> 1 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE = 'rollback failed: counter restore affected no rows';
+  END IF;
+  -- Post: original state fully restored.
+  SELECT count(*) INTO n FROM usage_units
+   WHERE user_id = v_uid AND period_type = 'calendar_month' AND period_key = '2026-10';
+  IF n <> 7 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE = 'rollback post-check failed: expected 7 ledger rows';
+  END IF;
+  SELECT units_used INTO n FROM usage_periods
+   WHERE user_id = v_uid AND period_type = 'calendar_month' AND period_key = '2026-10';
+  IF n <> 0 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE = 'rollback post-check failed: counter must be 0';
+  END IF;
+END $$;
+SELECT units_used AS restored_counter FROM usage_periods
+ WHERE user_id = 'c11bde4c-a9bb-4f41-b96a-921570cf856e' AND period_key = '2026-10';
 COMMIT;
 ```
+
+**Safe recheck (read-only, optional, before attempting a rollback):**
+the `G1`/`G2` guard queries above, without the `DO` block — if any value
+differs from the repaired state, do not run the rollback; investigate
+read-only instead.
 
 **Expected post-correction state:** `units_used = 6` (limit 5) → new
 distinct generations correctly **blocked until 2026-11-01**; free
@@ -611,96 +863,434 @@ historical bookkeeping only (the API reads the current month); the
 those accounts exhaust/block in October exactly as Free Tier policy
 describes (notably `4995a6..6364` at 34 units — already far over).
 
+**Clarification (pre- vs post-repair counts).** The table above is the
+**pre-deletion** picture: 166 total ledger rows = incident 7 +
+non-incident 159, of which 164 match lessons and 2 are orphans. After
+§13e+§13g run (each deletes its one zero-charge orphan), the ledger is
+**164 rows, every one matched to a persisted lesson** (6 incident +
+158 non-incident); the orphan columns of the table collapse to 0. The
+chargeable-unit total of the surviving ledger (158 matched units) is
+unchanged by the repair — the two deleted rows were never chargeable.
+
 ## 13g) Proposal 2 — all-accounts reconciliation (SEPARATE APPROVAL — NOT EXECUTED)
 
 New evidence from §13f (the defect affected every account) widens the
 historical-reconciliation control beyond §13e. This proposal is **not**
 part of the §13e approval; it needs its own explicit owner decision.
-Semantics: delete every ledger row whose work was never persisted (2 rows
-if run before Proposal 1… — scoped here to the 1 non-incident orphan), then
-recompute each non-incident period counter from its ledger.
+**HARDENED 2026-10-16** with the same server-side enforcement model as
+§13e (every precondition, row count and post-condition raises and aborts
+before `COMMIT`; `ASSERT` is not relied upon).
+
+**Identity of the target row.** The full `user_id`/`scheme_id` UUIDs of
+the MID-TERM orphan were **masked in the recorded 2026-10-16 evidence**
+and are not established anywhere in this repository — they are therefore
+NOT invented here. The deletion is narrowed to every identity property
+that *is* recorded, and the transaction verifies all of them plus
+uniqueness: period `calendar_month`/`2026-09`, `unit_kind=lesson_plan`,
+`created_at = 2026-09-26 15:30:23.633320` (globally unique in the
+evidence), indicator code exactly `MID-TERM (05-11-2026 to 06-11-`,
+`scheme_id` equal to the `unit_key` prefix, `unit_key` length 67, the
+established zero-charge classification (`NOT EXISTS` a persisted lesson),
+and exactly one such row. The repair `NOTICE` prints the full primary
+key, `user_id` and `scheme_id` for the owner's review before `COMMIT`.
+
+**Locking & concurrency.** Phase A locks all 14 non-incident
+`usage_periods` rows `FOR UPDATE` in stable `(user_id, period_key)`
+order. The deployed reservation/release paths update exactly one period
+row per call, so they serialise against whichever row they touch;
+`lock_timeout = '10s'` turns any wait into a clean abort. Assumptions:
+no DDL; one session; the two proposals are NOT run simultaneously (they
+are separate approvals — run them sequentially); any counter or ledger
+change since the investigation trips a precondition.
 
 ```sql
--- PROPOSAL 2 — all accounts EXCEPT c11bde..856e (that account is §13e/Proposal 1).
--- Order-independent: can run before or after Proposal 1.
--- NOT EXECUTED as of 2026-10-16.
+-- SCRIPT: P2-REPAIR
+-- PROPOSAL 2 (§13g) — all accounts EXCEPT c11bde4c-a9bb-4f41-b96a-921570cf856e.
+-- Order-independent w.r.t. Proposal 1 (incident rows are snapshotted and
+-- re-asserted untouched). NOT EXECUTED.
+-- Scope: usage_units + usage_periods rows of the 13 other users.
+-- No lesson/scheme/job/entitlement row is inserted, updated or deleted.
 BEGIN;
+SET LOCAL statement_timeout = '60s';
+SET LOCAL lock_timeout = '10s';
 
+-- Phase A: stable-order locks + preconditions (aborts on any mismatch).
 DO $$
-DECLARE n int;
+DECLARE
+  v_inc   constant text := 'c11bde4c-a9bb-4f41-b96a-921570cf856e';
+  v_code  constant text := 'MID-TERM (05-11-2026 to 06-11-';
+  v_created constant timestamp := timestamp '2026-09-26 15:30:23.633320';
+  r       record;
+  n       int;
+  v_inc_units  int;
+  v_inc_counter int;
+  v_inc_expected int;
+  v_sept int[];
+  v_oct  int[];
 BEGIN
-  -- 14 non-incident period rows, all still counter 0
-  SELECT count(*) INTO n FROM usage_periods
-   WHERE user_id <> 'c11bde4c-a9bb-4f41-b96a-921570cf856e';
-  ASSERT n = 14, 'precondition failed: expected 14 non-incident period rows';
-  SELECT count(*) INTO n FROM usage_periods
-   WHERE user_id <> 'c11bde4c-a9bb-4f41-b96a-921570cf856e' AND units_used <> 0;
-  ASSERT n = 0, 'precondition failed: a non-incident counter is not 0';
-  -- 159 non-incident ledger rows (166 total − incident 7)
-  SELECT count(*) INTO n FROM usage_units
-   WHERE user_id <> 'c11bde4c-a9bb-4f41-b96a-921570cf856e';
-  ASSERT n = 159, 'precondition failed: expected 159 non-incident unit rows';
-  -- exactly 1 non-incident orphan (the MID-TERM empty-run row)
+  -- A0: snapshot the incident account (order-independence w.r.t. §13e).
+  SELECT count(*) INTO v_inc_units FROM usage_units WHERE user_id = v_inc;
+  SELECT units_used INTO v_inc_counter FROM usage_periods
+   WHERE user_id = v_inc AND period_type = 'calendar_month' AND period_key = '2026-10';
+  -- (CASE computed into a variable: plpgsql's IF scanner would otherwise
+  --  treat the CASE's own THEN as the end of the IF condition.)
+  v_inc_expected := CASE WHEN v_inc_units = 7 THEN 0 ELSE 6 END;
+  IF v_inc_units NOT IN (6, 7) OR v_inc_counter IS DISTINCT FROM v_inc_expected THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP001', MESSAGE =
+      'precondition failed: incident account is not in a clean pre- or post-Proposal-1 state';
+  END IF;
+
+  -- A1: lock all 14 non-incident period rows in stable order; all counters 0.
+  FOR r IN (SELECT user_id, units_used FROM usage_periods
+             WHERE user_id <> v_inc
+             ORDER BY user_id, period_key
+             FOR UPDATE)
+  LOOP
+    IF r.units_used <> 0 THEN
+      RAISE EXCEPTION USING ERRCODE = 'TP001', MESSAGE =
+        'precondition failed: a non-incident counter is not 0';
+    END IF;
+  END LOOP;
+  SELECT count(*) INTO n FROM usage_periods WHERE user_id <> v_inc;
+  IF n <> 14 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP001', MESSAGE =
+      'precondition failed: expected 14 non-incident period rows';
+  END IF;
+
+  -- A2: 159 non-incident ledger rows, with the recorded per-month shape.
+  SELECT count(*) INTO n FROM usage_units WHERE user_id <> v_inc;
+  IF n <> 159 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP001', MESSAGE =
+      'precondition failed: expected 159 non-incident unit rows';
+  END IF;
+  SELECT array_agg(c ORDER BY c) INTO v_sept FROM (
+    SELECT count(*)::int AS c FROM usage_units u
+     WHERE u.user_id <> v_inc AND u.period_type = 'calendar_month'
+       AND u.period_key = '2026-09' GROUP BY u.user_id) s;
+  IF v_sept IS DISTINCT FROM ARRAY[5,5,5,5,5,5,5,5,28,42]::int[] THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP001', MESSAGE =
+      'precondition failed: September non-incident ledger shape changed';
+  END IF;
+  SELECT array_agg(c ORDER BY c) INTO v_oct FROM (
+    SELECT count(*)::int AS c FROM usage_units u
+     WHERE u.user_id <> v_inc AND u.period_type = 'calendar_month'
+       AND u.period_key = '2026-10' GROUP BY u.user_id) s;
+  IF v_oct IS DISTINCT FROM ARRAY[5,5,5,34]::int[] THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP001', MESSAGE =
+      'precondition failed: October non-incident ledger shape changed';
+  END IF;
+
+  -- A3: exactly one non-incident orphan, and it is the recorded MID-TERM row.
   SELECT count(*) INTO n FROM usage_units u
-   WHERE u.user_id <> 'c11bde4c-a9bb-4f41-b96a-921570cf856e'
-     AND NOT EXISTS (
-       SELECT 1 FROM lesson_plans l
-        WHERE l.owner_id = u.user_id AND l.scheme_id = u.scheme_id
-          AND jsonb_exists(l.indicator_codes::jsonb, split_part(u.unit_key, ':', 2)));
-  ASSERT n = 1, 'precondition failed: expected exactly 1 non-incident orphan';
+   WHERE u.user_id <> v_inc
+     AND NOT EXISTS (SELECT 1 FROM lesson_plans l
+                      WHERE l.owner_id = u.user_id AND l.scheme_id = u.scheme_id
+                        AND jsonb_exists(l.indicator_codes::jsonb, split_part(u.unit_key, ':', 2)));
+  IF n <> 1 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP001', MESSAGE =
+      'precondition failed: expected exactly 1 non-incident orphan';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM usage_units u
+     WHERE u.user_id <> v_inc
+       AND u.period_type = 'calendar_month' AND u.period_key = '2026-09'
+       AND u.unit_kind = 'lesson_plan'
+       AND u.created_at = v_created
+       AND split_part(u.unit_key, ':', 2) = v_code
+       AND u.scheme_id = split_part(u.unit_key, ':', 1)
+       AND length(u.unit_key) = 67
+       AND NOT EXISTS (SELECT 1 FROM lesson_plans l
+                        WHERE l.owner_id = u.user_id AND l.scheme_id = u.scheme_id
+                          AND jsonb_exists(l.indicator_codes::jsonb, split_part(u.unit_key, ':', 2)))
+  ) THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP001', MESSAGE =
+      'precondition failed: the recorded MID-TERM orphan is missing or its identity changed';
+  END IF;
+  SELECT count(*) INTO n FROM usage_units WHERE created_at = v_created;
+  IF n <> 1 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP001', MESSAGE =
+      'precondition failed: the recorded orphan created_at is no longer globally unique';
+  END IF;
 END $$;
 
--- S1: delete the non-incident orphan; CAPTURE RETURNING for rollback.
-DELETE FROM usage_units u
- WHERE u.user_id <> 'c11bde4c-a9bb-4f41-b96a-921570cf856e'
-   AND NOT EXISTS (
-     SELECT 1 FROM lesson_plans l
-      WHERE l.owner_id = u.user_id AND l.scheme_id = u.scheme_id
-        AND jsonb_exists(l.indicator_codes::jsonb, split_part(u.unit_key, ':', 2)))
- RETURNING u.id, u.user_id, u.period_key, u.unit_key, u.created_at;
--- Expected: EXACTLY 1 row — user 1474a7..(full id), period 2026-09,
---   code 'MID-TERM (05-11-2026 to 06-11-', created 2026-09-26 15:30:23.633320
+-- Phase B: exact-row deletion + 14-counter repair + enforced post-conditions.
+DO $$
+DECLARE
+  v_inc   constant text := 'c11bde4c-a9bb-4f41-b96a-921570cf856e';
+  v_code  constant text := 'MID-TERM (05-11-2026 to 06-11-';
+  v_created constant timestamp := timestamp '2026-09-26 15:30:23.633320';
+  v_ts    timestamp := now();
+  v_id    text; v_user text; v_scheme text; v_key text;
+  v_rows  int; n int;
+  v_sept  int[]; v_oct int[];
+  v_inc_units int; v_inc_counter int; v_inc_expected int;
+BEGIN
+  -- B1: delete exactly the recorded orphan row.
+  DELETE FROM usage_units u
+   WHERE u.user_id <> v_inc
+     AND u.period_type = 'calendar_month' AND u.period_key = '2026-09'
+     AND u.unit_kind = 'lesson_plan'
+     AND u.created_at = v_created
+     AND split_part(u.unit_key, ':', 2) = v_code
+     AND u.scheme_id = split_part(u.unit_key, ':', 1)
+     AND length(u.unit_key) = 67
+     AND NOT EXISTS (SELECT 1 FROM lesson_plans l
+                      WHERE l.owner_id = u.user_id AND l.scheme_id = u.scheme_id
+                        AND jsonb_exists(l.indicator_codes::jsonb, split_part(u.unit_key, ':', 2)))
+  RETURNING u.id, u.user_id, u.scheme_id, u.unit_key
+  INTO v_id, v_user, v_scheme, v_key;
+  GET DIAGNOSTICS v_rows = ROW_COUNT;
+  IF v_rows <> 1 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP002', MESSAGE =
+      format('orphan deletion affected %s row(s), expected exactly 1', v_rows);
+  END IF;
+  RAISE NOTICE 'DELETED_ORPHAN id=% user=% scheme=% key=% created_at=%',
+    v_id, v_user, v_scheme, v_key, v_created;
 
--- S2: recompute every non-incident counter from its ledger.
-UPDATE usage_periods p
-   SET units_used = sub.matched, updated_at = now()
-  FROM (
-        SELECT u.user_id, u.period_type, u.period_key,
-               count(*) FILTER (
-                 WHERE EXISTS (
-                   SELECT 1 FROM lesson_plans l
-                    WHERE l.owner_id = u.user_id AND l.scheme_id = u.scheme_id
-                      AND jsonb_exists(l.indicator_codes::jsonb,
-                                       split_part(u.unit_key, ':', 2)))
-               ) AS matched
-          FROM usage_units u
-         WHERE u.user_id <> 'c11bde4c-a9bb-4f41-b96a-921570cf856e'
-         GROUP BY u.user_id, u.period_type, u.period_key
-       ) sub
- WHERE p.user_id = sub.user_id
-   AND p.period_type = sub.period_type
-   AND p.period_key = sub.period_key
-   AND p.units_used = 0
- RETURNING p.user_id, p.period_key, p.units_used;
--- Expected: EXACTLY 14 rows with values from the §13f table
---   (27, 5, 5, 5, 5, 42, 34, 5, 5, 5, 5, 5, 5, 5).
--- NOTE: S2's SET assigns sub.matched directly (filtered count), so the
---   expected values are the §13f "matched" column regardless of delete order.
+  -- B2: recompute all 14 non-incident counters from their ledgers.
+  UPDATE usage_periods p
+     SET units_used = sub.matched, updated_at = v_ts
+    FROM (
+          SELECT u.user_id, u.period_type, u.period_key,
+                 count(*) FILTER (
+                   WHERE EXISTS (
+                     SELECT 1 FROM lesson_plans l
+                      WHERE l.owner_id = u.user_id AND l.scheme_id = u.scheme_id
+                        AND jsonb_exists(l.indicator_codes::jsonb,
+                                         split_part(u.unit_key, ':', 2)))
+                 ) AS matched
+            FROM usage_units u
+           WHERE u.user_id <> v_inc
+           GROUP BY u.user_id, u.period_type, u.period_key
+         ) sub
+   WHERE p.user_id = sub.user_id AND p.period_type = sub.period_type
+     AND p.period_key = sub.period_key AND p.units_used = 0;
+  GET DIAGNOSTICS v_rows = ROW_COUNT;
+  IF v_rows <> 14 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP002', MESSAGE =
+      format('counter update affected %s row(s), expected exactly 14', v_rows);
+  END IF;
+  RAISE NOTICE 'REPAIRED_TS %', v_ts;
 
--- Guard: if S1/S2 row counts differ from expected, ROLL BACK.
+  -- B3: enforced post-conditions — per-row and per-month, not just totals.
+  SELECT count(*) INTO n FROM usage_units WHERE user_id <> v_inc;
+  IF n <> 158 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP002', MESSAGE =
+      format('post-deletion non-incident ledger is %s rows, expected 158', n);
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM usage_units u
+     WHERE u.user_id <> v_inc
+       AND NOT EXISTS (SELECT 1 FROM lesson_plans l
+                        WHERE l.owner_id = u.user_id AND l.scheme_id = u.scheme_id
+                          AND jsonb_exists(l.indicator_codes::jsonb, split_part(u.unit_key, ':', 2)))
+  ) THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP002', MESSAGE =
+      'post-condition failed: unmatched non-incident units remain';
+  END IF;
+  -- Every counter equals its own recomputed ledger-matched count.
+  IF EXISTS (
+    SELECT 1 FROM usage_periods p
+     WHERE p.user_id <> v_inc
+       AND p.units_used <> (
+         SELECT count(*) FROM usage_units u
+          WHERE u.user_id = p.user_id AND u.period_type = p.period_type
+            AND u.period_key = p.period_key
+            AND EXISTS (SELECT 1 FROM lesson_plans l
+                         WHERE l.owner_id = u.user_id AND l.scheme_id = u.scheme_id
+                           AND jsonb_exists(l.indicator_codes::jsonb,
+                                            split_part(u.unit_key, ':', 2))))
+  ) THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP002', MESSAGE =
+      'post-condition failed: a repaired counter does not equal its ledger-matched count';
+  END IF;
+  -- Exact per-month counter multisets (September distinct from October).
+  SELECT array_agg(units_used ORDER BY units_used) INTO v_sept
+    FROM usage_periods WHERE user_id <> v_inc AND period_key = '2026-09';
+  IF v_sept IS DISTINCT FROM ARRAY[5,5,5,5,5,5,5,5,27,42]::int[] THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP002', MESSAGE =
+      format('post-condition failed: September counters are %s, expected {5,5,5,5,5,5,5,5,27,42}', v_sept);
+  END IF;
+  SELECT array_agg(units_used ORDER BY units_used) INTO v_oct
+    FROM usage_periods WHERE user_id <> v_inc AND period_key = '2026-10';
+  IF v_oct IS DISTINCT FROM ARRAY[5,5,5,34]::int[] THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP002', MESSAGE =
+      format('post-condition failed: October counters are %s, expected {5,5,5,34}', v_oct);
+  END IF;
+  SELECT sum(units_used) INTO n FROM usage_periods WHERE user_id <> v_inc;
+  IF n <> 158 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP002', MESSAGE =
+      'post-condition failed: repaired counters must total 158';
+  END IF;
+  -- Incident account untouched (snapshot from Phase A).
+  SELECT count(*) INTO v_inc_units FROM usage_units WHERE user_id = v_inc;
+  SELECT units_used INTO v_inc_counter FROM usage_periods
+   WHERE user_id = v_inc AND period_type = 'calendar_month' AND period_key = '2026-10';
+  v_inc_expected := CASE WHEN v_inc_units = 7 THEN 0 ELSE 6 END;
+  IF v_inc_units NOT IN (6, 7) OR v_inc_counter IS DISTINCT FROM v_inc_expected THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP002', MESSAGE =
+      'post-condition failed: incident account rows changed during Proposal 2';
+  END IF;
+END $$;
+
+-- Operator review only (cannot affect safety — checks above already passed):
+SELECT period_key, units_used FROM usage_periods
+ WHERE user_id <> 'c11bde4c-a9bb-4f41-b96a-921570cf856e'
+ ORDER BY period_key, units_used;
 COMMIT;
 ```
 
-**Consequence the owner should accept explicitly:** after Proposal 2,
-`4995a6..6364` (34), `1474a7..9ed9` (5 in 2026-10) and two other
-October accounts sit at/over the Free Tier limit of 5 and will receive
-403s for new distinct generation until 2026-11-01 — correct Free Tier
-behaviour, but a user-visible change for those accounts.
+**Rollback (P2).** Same window rule as P1: **only immediately after the
+repair and before any account activity**, using the packet from the
+repair `NOTICE` lines (`DELETED_ORPHAN …` carries the full primary key,
+`user_id`, `scheme_id`, `unit_key`; `REPAIRED_TS …` carries the repair
+timestamp). Fully guarded — refuses (raises) if any of the 14 rows moved
+off the repaired state. Substitute `<ORPHAN_ID>`, `<ORPHAN_USER_ID>`,
+`<ORPHAN_SCHEME_ID>`, `<ORPHAN_UNIT_KEY>`, `<ORPHAN_CREATED_AT>`,
+`<REPAIRED_TS>`.
 
-**Rollback:** captured `S1 RETURNING` row re-inserted with the same
-columns (as in §13e's rollback block) plus `UPDATE usage_periods SET
-units_used = 0 … WHERE user_id = <id> AND units_used = <returned value>`
-for the 14 rows (values listed in the §13f table).
+```sql
+-- SCRIPT: P2-ROLLBACK
+BEGIN;
+SET LOCAL statement_timeout = '60s';
+SET LOCAL lock_timeout = '10s';
+DO $$
+DECLARE
+  v_inc constant text := 'c11bde4c-a9bb-4f41-b96a-921570cf856e';
+  v_id  constant text := '<ORPHAN_ID>';
+  v_user constant text := '<ORPHAN_USER_ID>';
+  v_scheme constant text := '<ORPHAN_SCHEME_ID>';
+  v_key  constant text := '<ORPHAN_UNIT_KEY>';
+  v_created constant timestamp := timestamp '<ORPHAN_CREATED_AT>';
+  v_ts   constant timestamp := timestamp '<REPAIRED_TS>';
+  r record; n int; v_sept int[]; v_oct int[];
+BEGIN
+  -- G1: lock all 14 rows (stable order); every row must still be exactly
+  --     the repaired state (corrected value AND untouched repair timestamp).
+  FOR r IN (SELECT user_id, period_type, period_key, units_used, updated_at
+              FROM usage_periods
+             WHERE user_id <> v_inc
+             ORDER BY user_id, period_key
+             FOR UPDATE)
+  LOOP
+    IF r.updated_at <> v_ts THEN
+      RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE =
+        format('rollback refused: period row %s/%s changed after the repair',
+               r.user_id, r.period_key);
+    END IF;
+    IF r.units_used <> (
+         SELECT count(*) FROM usage_units u
+          WHERE u.user_id = r.user_id AND u.period_type = r.period_type
+            AND u.period_key = r.period_key
+            AND EXISTS (SELECT 1 FROM lesson_plans l
+                         WHERE l.owner_id = u.user_id AND l.scheme_id = u.scheme_id
+                           AND jsonb_exists(l.indicator_codes::jsonb,
+                                            split_part(u.unit_key, ':', 2))))
+    THEN
+      RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE =
+        format('rollback refused: counter drift for user %s since the repair', r.user_id);
+    END IF;
+  END LOOP;
+  SELECT array_agg(units_used ORDER BY units_used) INTO v_sept
+    FROM usage_periods WHERE user_id <> v_inc AND period_key = '2026-09';
+  IF v_sept IS DISTINCT FROM ARRAY[5,5,5,5,5,5,5,5,27,42]::int[] THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE =
+      'rollback refused: September counters are not the repaired values';
+  END IF;
+  SELECT array_agg(units_used ORDER BY units_used) INTO v_oct
+    FROM usage_periods WHERE user_id <> v_inc AND period_key = '2026-10';
+  IF v_oct IS DISTINCT FROM ARRAY[5,5,5,34]::int[] THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE =
+      'rollback refused: October counters are not the repaired values';
+  END IF;
+  SELECT count(*) INTO n FROM usage_units WHERE user_id <> v_inc;
+  IF n <> 158 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE =
+      'rollback refused: non-incident ledger no longer the repaired 158 rows';
+  END IF;
+  -- G2: captured row truly absent (no double-restore).
+  IF EXISTS (SELECT 1 FROM usage_units WHERE id = v_id) THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE =
+      'rollback refused: a unit row with the captured id already exists';
+  END IF;
+  IF EXISTS (SELECT 1 FROM usage_units
+              WHERE user_id = v_user AND period_type = 'calendar_month'
+                AND period_key = '2026-09' AND unit_kind = 'lesson_plan'
+                AND unit_key = v_key) THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE =
+      'rollback refused: a unit row with the captured key already exists';
+  END IF;
+  -- R1: restore the captured row faithfully.
+  INSERT INTO usage_units (id, user_id, period_type, period_key,
+                           unit_kind, unit_key, scheme_id, created_at)
+  VALUES (v_id, v_user, 'calendar_month', '2026-09',
+          'lesson_plan', v_key, v_scheme, v_created);
+  GET DIAGNOSTICS n = ROW_COUNT;
+  IF n <> 1 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE =
+      'rollback failed: restore insert affected no rows';
+  END IF;
+  -- R2: restore all 14 counters to 0 (guarded by the repair timestamp).
+  UPDATE usage_periods
+     SET units_used = 0, updated_at = now()
+   WHERE user_id <> v_inc AND updated_at = v_ts;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  IF n <> 14 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE =
+      format('rollback failed: counter restore affected %s row(s), expected 14', n);
+  END IF;
+  -- Post: original state fully restored.
+  SELECT count(*) INTO n FROM usage_units WHERE user_id <> v_inc;
+  IF n <> 159 THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE =
+      'rollback post-check failed: expected 159 non-incident ledger rows';
+  END IF;
+  IF EXISTS (SELECT 1 FROM usage_periods WHERE user_id <> v_inc AND units_used <> 0) THEN
+    RAISE EXCEPTION USING ERRCODE = 'TP003', MESSAGE =
+      'rollback post-check failed: all non-incident counters must be 0';
+  END IF;
+END $$;
+SELECT count(*) AS restored_nonincident_units FROM usage_units
+ WHERE user_id <> 'c11bde4c-a9bb-4f41-b96a-921570cf856e';
+COMMIT;
+```
+
+**Safe recheck (read-only, optional):** the `G1` guard queries without
+the `DO` block — if any counter or `updated_at` differs from the repair
+packet, do not roll back; investigate read-only instead.
+
+### Verification of §13e/§13g SQL (2026-10-16 — disposable local PostgreSQL, synthetic data)
+
+Both proposals and both rollback scripts were executed verbatim (extracted
+from this document by their `-- SCRIPT:` markers) against a scratch
+database on the local docker `postgres:16-alpine` instance
+(`127.0.0.1:54329`), seeded with synthetic production-shaped data
+(166 units / 15 period rows / 164 lessons / 14 users / 10 jobs matching
+the §13f table's exact per-month ledger shapes and both orphan
+identities). The validator refuses non-loopback hosts and creates+drops
+one scratch database per case.
+
+Command:
+`./venv/Scripts/python backend/validate_quota_repair_sql.py`
+
+Result — **10/10 cases passed**:
+
+| # | Case | Result |
+|---|---|---|
+| 1 | P1 valid commit (orphan deleted, counter→6, packet NOTICEs) | PASS |
+| 2 | P2 valid commit (14 counters → {5×8,27,42}/{5,5,5,34}, 158 units, incident untouched) | PASS |
+| 3 | P1→P2 and P2→P1 orders converge to the same final state | PASS |
+| 4 | Wrong starting counter → TP001 abort, DB fingerprint unchanged | PASS |
+| 5 | Missing orphan → TP001 abort, DB unchanged | PASS |
+| 6 | Extra orphan → TP001 abort, DB unchanged | PASS |
+| 7 | Changed orphan identity → TP001 abort, DB unchanged | PASS |
+| 8 | Tampered (extra DELETE mid-Phase-B) → TP002 abort, no partial commit | PASS |
+| 9 | Rollback under safe conditions restores the seed state exactly | PASS |
+| 10 | Rollback after counter drift / newer activity / `updated_at` drift → TP003 refuse, DB unchanged | PASS |
+
+This validates the scripts' internal logic only — synthetic tests are
+**not** production verification. Production execution still requires the
+explicit owner approvals described above, and remains **not executed**.
 
 ## 13h) Live enforcement test plan (APPROVAL REQUIRED — NOT EXECUTED)
 
