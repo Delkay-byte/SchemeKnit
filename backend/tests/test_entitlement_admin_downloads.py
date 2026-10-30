@@ -93,7 +93,7 @@ class TestFreeDefault:
         assert res["status"] == "active"
         assert res["plan_source"] == "free"
         assert res["source"] == "free"  # legacy key unchanged
-        assert res["lesson_quota_limit"] == 5
+        assert res["lesson_quota_limit"] == 2
 
     def test_user_with_no_row_but_subscription_flag_is_still_free(self, db):
         """A client-visible flag must never confer PRO on its own."""

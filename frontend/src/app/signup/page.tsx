@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -21,6 +21,22 @@ export default function IndividualSignupPage() {
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [referralCode, setReferralCode] = useState('')
+
+  // Referral attribution: capture the code from the link and keep it for a
+  // later registration in this browser. It is submitted once, at signup.
+  useEffect(() => {
+    const fromUrl = new URLSearchParams(window.location.search).get('ref') || ''
+    const stored = (() => {
+      try { return localStorage.getItem('teachflow_referral') || '' } catch { return '' }
+    })()
+    const code = (fromUrl || stored).trim().toUpperCase()
+    if (code) {
+      setReferralCode(code)
+      try { localStorage.setItem('teachflow_referral', code) } catch { /* storage unavailable */ }
+      if (fromUrl) api.trackReferral(code).catch(() => {})
+    }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -48,9 +64,9 @@ export default function IndividualSignupPage() {
     setLoading(true)
 
     try {
-      const res = await api.registerIndividual(email, password, fullName.trim())
+      const res = await api.registerIndividual(email, password, fullName.trim(), referralCode)
       if (res.access_token) {
-        await login(email, password)
+        await login(email, password, 'teacher')
       }
       router.push('/dashboard')
     } catch (err) {
@@ -64,7 +80,7 @@ export default function IndividualSignupPage() {
     <AuthShell
       role="register"
       title="Create your SchemeKnit account"
-      description="Start your professional lesson-planning workspace — no school required. Free Tier includes 5 lesson plans per month."
+      description="Start your professional lesson-planning workspace — no school or payment required. The Free plan includes 2 lesson-plan generations per month."
       steps={[
         { label: 'Your details', active: true },
         { label: 'Secure password' },
@@ -144,6 +160,17 @@ export default function IndividualSignupPage() {
 
         <PasswordMatchIndicator password={password} confirm={confirm} />
 
+        <AuthField id="signup-referral" label="Referral code (optional)">
+          <Input
+            id="signup-referral"
+            type="text"
+            value={referralCode}
+            onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+            placeholder="From your invite link"
+            autoComplete="off"
+          />
+        </AuthField>
+
         <AuthError message={error} />
 
         <Button
@@ -164,7 +191,9 @@ export default function IndividualSignupPage() {
 
       <div className="mt-5 rounded-xl border border-border bg-[#F4F7FA] p-4 shadow-sm">
         <p className="text-xs leading-relaxed text-muted-foreground text-center">
-          Free Tier includes 5 lesson plans per calendar month, individual DOCX and            PDF export, 1 custom template and 5 AI generations per month.
+          Free plan: 2 indicator-level lesson plans per calendar month, individual DOCX and
+          PDF export, and no payment information required. Paid packages are prepaid by
+          Bank Transfer or Mobile Money.
         </p>
       </div>
     </AuthShell>

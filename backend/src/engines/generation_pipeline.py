@@ -31,7 +31,7 @@ from ..models import (
     CurriculumCoverage, LessonPlan, GenerationJob, JobStatus,
     LessonStatus, TemplateType, AIMode, ValidationIssue, ValidationSeverity,
     Holiday, EducationalLevel, CLASS_LEVEL_TO_EDUCATIONAL_LEVEL,
-    Subject, ClassLevel,
+    Subject, ClassLevel, GenerationMethod,
 )
 from .calendar_engine import CalendarEngine
 from ..ai_resource_text import normalize_structured_references
@@ -46,6 +46,51 @@ from .template_engine import (
     get_template_by_id, get_templates_for_level, get_profile_for_class_level,
 )
 from .ai_provider import get_provider, resolve_provider_mode
+from .zeli_generation import (
+    ZeliGenerationError,
+    generate_zeli_content,
+    get_zeli_provider,
+    zeli_lesson_context,
+)
+
+
+_PLACEHOLDER_RESOURCES = frozenset({
+    "none", "n/a", "na", "null", "nil", "-", "—", "...", "no resources",
+})
+
+
+def _clean_resources(values: Any) -> List[str]:
+    """Provider resource lists without placeholder junk.
+
+    Models occasionally write ``"None"``/``"N/A"``/``"null"`` instead of an
+    empty array. That is not a teaching resource, and printing it made the
+    quality gate flag the lesson as filler text. Real named resources are kept
+    verbatim.
+    """
+    if not isinstance(values, (list, tuple)):
+        return []
+    out: List[str] = []
+    for value in values:
+        text = str(value).strip() if value is not None else ""
+        if text and text.lower() not in _PLACEHOLDER_RESOURCES:
+            out.append(text)
+    return out
+
+
+def _compose_prose(primary: Any, *extras: Any) -> str:
+    """Join provider-authored prose parts, dropping empty/placeholder ones.
+
+    Provider V2 payloads carry the main prose (``activity``) plus the
+    teacher/learner actions and success criteria. Those extra fields were
+    previously discarded, which lost the explicit evidence a teacher needs and
+    left the lesson text weaker than the model's own output.
+    """
+    parts: List[str] = []
+    for value in (primary,) + extras:
+        text = str(value).strip() if value is not None else ""
+        if text and text.lower() not in _PLACEHOLDER_RESOURCES:
+            parts.append(text)
+    return " ".join(parts)
 
 
 def _dedupe_activities(activities: List[Any]) -> List[Any]:
@@ -133,6 +178,7 @@ class GenerationPipeline:
         include_special_weeks: bool = False,
         selected_weeks: Optional[List[int]] = None,
         template_id: Optional[str] = None,
+        db=None,
     ) -> GenerationJob:
         """Run the full generation pipeline."""
         job = GenerationJob(
@@ -140,6 +186,7 @@ class GenerationPipeline:
             config=config,
             status=JobStatus.PROCESSING,
         )
+        lesson_plans: List[LessonPlan] = []
 
         try:
             calendar = self.calendar_engine.build_calendar(
@@ -239,7 +286,13 @@ class GenerationPipeline:
 
             job.progress = 60
 
-            if config.ai_mode != AIMode.OFF:
+            if config.generation_method == GenerationMethod.ZELI:
+                # Generate with Zeli: the provider produces the WHOLE lesson.
+                # There is no deterministic substitute — a failure marks the job
+                # failed and the router reports it truthfully, so a teacher can
+                # never be shown deterministic prose labelled "Zeli".
+                self._generate_with_zeli(lesson_plans, config, job, db=db)
+            elif config.ai_mode != AIMode.OFF:
                 try:
                     self._enrich_with_ai(lesson_plans, config, job)
                 except Exception as e:
@@ -271,6 +324,11 @@ class GenerationPipeline:
         except Exception as e:
             job.status = JobStatus.FAILED
             job.error_message = str(e)
+            # Preserve the classified, teacher-safe Zeli failure so the HTTP
+            # layer can answer 429/503/504 instead of a generic 500.
+            if isinstance(e, ZeliGenerationError):
+                job._zeli_error = e
+            job._lesson_plans = lesson_plans
 
         return job
 
@@ -281,12 +339,14 @@ class GenerationPipeline:
         template_type: TemplateType = TemplateType.GES_STYLE,
         output_path: Path = Path("exports/lesson_plans.docx"),
         template_id: Optional[str] = None,
+        context: Optional[dict] = None,
     ) -> Path:
         if template_id:
             template = get_template_by_id(template_id)
         else:
             template = default_template_for_lessons(lesson_plans, template_type)
-        return self.docx_engine.export_combined(lesson_plans, template, output_path)
+        return self.docx_engine.export_combined(lesson_plans, template, output_path,
+                                                context=context)
 
     def export_docx_batch(
         self,
@@ -377,6 +437,134 @@ class GenerationPipeline:
         context: dict = None,
     ) -> List[Path]:
         return self.docx_engine.export_batch_custom(lesson_plans, structure, output_dir, context=context)
+
+    def _complete_zeli_timeline(self, lp: LessonPlan) -> None:
+        """Place the provider's starter/plenary into the lesson timeline.
+
+        The V2 provider returns the starter and plenary as separate sections,
+        while SchemeKnit's lesson layout (and its quality gate) expects a
+        single timeline whose phase rows include a PHASE 1 and a PHASE 3
+        boundary and whose minutes sum exactly to the lesson duration.
+
+        This is structural normalisation, not invented content: every row's
+        text comes verbatim from the provider's own starter/conclusion. The
+        remainder is distributed deterministically so the printed timetable is
+        always arithmetically possible.
+        """
+        from ..curriculum.lesson_rubric import phase_rows
+        from ..models import TeachingActivity
+
+        duration = int(lp.duration_minutes or 0)
+        if duration <= 0:
+            return
+
+        activities = list(lp.main_activities or [])
+        p1, _p2, p3 = phase_rows(lp)
+        spent = sum(int(a.duration_minutes or 0) for a in activities)
+        if spent > duration:
+            activities = _fit_activity_durations(activities, duration)
+            spent = sum(int(a.duration_minutes or 0) for a in activities)
+
+        remainder = max(duration - spent, 0)
+
+        if not p1 and remainder > 0 and (lp.starter_activity or "").strip():
+            minutes = max(1, min(10, remainder // 4))
+            activities.insert(0, TeachingActivity(
+                phase="STARTER",
+                description=lp.starter_activity,
+                duration_minutes=minutes,
+            ))
+            remainder -= minutes
+
+        if not p3 and remainder > 0 and (lp.conclusion or "").strip():
+            activities.append(TeachingActivity(
+                phase="PLENARY",
+                description=lp.conclusion,
+                duration_minutes=remainder,
+            ))
+            remainder = 0
+
+        if remainder > 0 and activities:
+            activities[-1].duration_minutes = (
+                int(activities[-1].duration_minutes or 0) + remainder)
+
+        lp.main_activities = activities
+
+    def _generate_with_zeli(
+        self,
+        lesson_plans: List[LessonPlan],
+        config: TermConfig,
+        job: GenerationJob,
+        db=None,
+    ):
+        """Generate whole lesson content with Zeli (the 'Generate with Zeli' method).
+
+        Every lesson goes through the SAME provider contract the rest of the
+        product uses (``generate_lesson_v2``), then through SchemeKnit's strict
+        whole-lesson validator and the existing quality gate (run later by the
+        router). Teacher- and curriculum-owned fields are still applied through
+        ``_apply_v2_content``, so curriculum authority, Ghanaian context,
+        assessment structure and differentiation are preserved.
+
+        Unlike the optional enrichment path, a failure NEVER silently falls
+        back to deterministic content: it raises ``ZeliGenerationError`` and the
+        whole run fails with a teacher-safe reason, leaving existing lessons and
+        quota untouched. A special period (no instructional content) is skipped,
+        exactly as in the enrichment path.
+        """
+        provider = get_zeli_provider()
+        provider_name = provider.get_name() if hasattr(provider, "get_name") else "zeli"
+        model = str(getattr(provider, "model", "") or "")
+
+        sorted_plans = sorted(lesson_plans, key=lambda lp: lp.lesson_sequence)
+        for idx, lp in enumerate(sorted_plans):
+            if bool(getattr(lp, "special_period_label", "") or ""):
+                logger.info(
+                    "Skipping Zeli generation for special-period lesson %s (%s)",
+                    lp.id, lp.special_period_label,
+                )
+                continue
+
+            prev_context = None
+            next_context = None
+            if idx > 0:
+                prev_lp = sorted_plans[idx - 1]
+                prev_context = (
+                    f"Previous lesson: {prev_lp.strand} - {prev_lp.sub_strand}. "
+                    f"Indicator: {prev_lp.indicators[0] if prev_lp.indicators else 'N/A'}"
+                )
+            if idx < len(sorted_plans) - 1:
+                next_lp = sorted_plans[idx + 1]
+                next_context = (
+                    f"Next lesson: {next_lp.strand} - {next_lp.sub_strand}. "
+                    f"Indicator: {next_lp.indicators[0] if next_lp.indicators else 'N/A'}"
+                )
+
+            context = zeli_lesson_context(
+                lp, config,
+                previous_lesson_context=prev_context,
+                next_lesson_context=next_context,
+            )
+            job.ai_enrichment_total_attempted += 1
+
+            content = generate_zeli_content(
+                provider=provider, context=context, db=db)
+
+            # Apply the validated whole-lesson content. Curriculum fields and
+            # teacher-owned metadata are protected inside _apply_v2_content.
+            self._apply_v2_content(lp, content, config)
+            self._complete_zeli_timeline(lp)
+
+            lp.ai_generated = True
+            lp.generation_method = "zeli"
+            lp.ai_provider = provider_name
+            lp.ai_model = model
+            job.ai_enrichment_succeeded += 1
+
+        logger.info(
+            "Zeli generated %d lesson(s) with provider=%s for job %s",
+            job.ai_enrichment_succeeded, provider_name, job.id,
+        )
 
     def _enrich_with_ai(
         self,
@@ -654,10 +842,17 @@ class GenerationPipeline:
         elif teacher_keywords:
             lp.keywords = _merge_unique(lp.keywords, teacher_keywords)
 
-        # Starter
+        # Starter — keep the provider's teacher/learner actions with it so the
+        # opening is a complete teaching move, not a lone instruction.
         starter = content.get("starter", {})
         if isinstance(starter, dict):
-            lp.starter_activity = starter.get("activity", "")
+            teacher_action = starter.get("teacher_action")
+            learner_action = starter.get("learner_action")
+            lp.starter_activity = _compose_prose(
+                starter.get("activity"),
+                f"Teacher: {teacher_action}" if teacher_action else "",
+                f"Learners: {learner_action}" if learner_action else "",
+            )
         elif isinstance(starter, str):
             lp.starter_activity = starter
 
@@ -672,7 +867,7 @@ class GenerationPipeline:
                         phase=phase.get("name", phase_key).upper(),
                         description=phase.get("activity", ""),
                         duration_minutes=phase.get("duration_minutes", 15),
-                        resources=phase.get("resources_used", []),
+                        resources=_clean_resources(phase.get("resources_used", [])),
                     ))
             if activities:
                 lp.main_activities = _fit_activity_durations(
@@ -686,7 +881,7 @@ class GenerationPipeline:
                         phase=item.get("phase", "MAIN").upper(),
                         description=item.get("description", item.get("activity", "")),
                         duration_minutes=item.get("duration_minutes", 15),
-                        resources=item.get("resources_used", []),
+                        resources=_clean_resources(item.get("resources_used", [])),
                     ))
             if activities:
                 lp.main_activities = _fit_activity_durations(
@@ -714,17 +909,68 @@ class GenerationPipeline:
                 if activities:
                     lp.learner_activities = _dedupe_activities(activities)
 
-        # Assessment
+        # Teacher/learner columns: the deterministic builder supplies these for
+        # every lesson, so the provider's per-phase actions are used only to
+        # fill genuinely empty columns (e.g. a provider-only path). Replacing
+        # curriculum-grounded rows with looser model prose would weaken them.
+        if isinstance(main, dict):
+            if not getattr(lp, "teacher_activities", None):
+                from ..models import TeachingActivity
+                rows = []
+                for phase_key, phase in main.items():
+                    if not isinstance(phase, dict):
+                        continue
+                    action = str(phase.get("teacher_action") or "").strip()
+                    if not action:
+                        continue
+                    rows.append(TeachingActivity(
+                        phase=str(phase.get("name", phase_key)).upper(),
+                        description=_compose_prose(
+                            phase.get("activity"), f"Teacher: {action}"),
+                        duration_minutes=phase.get("duration_minutes", 15),
+                    ))
+                if rows:
+                    lp.teacher_activities = _dedupe_activities(rows)
+            if not getattr(lp, "learner_activities", None):
+                from ..models import TeachingActivity
+                rows = []
+                for phase_key, phase in main.items():
+                    if not isinstance(phase, dict):
+                        continue
+                    action = str(phase.get("learner_action") or "").strip()
+                    if not action:
+                        continue
+                    rows.append(TeachingActivity(
+                        phase=str(phase.get("name", phase_key)).upper(),
+                        description=_compose_prose(
+                            phase.get("activity"), f"Learners: {action}"),
+                        duration_minutes=phase.get("duration_minutes", 15),
+                    ))
+                if rows:
+                    lp.learner_activities = _dedupe_activities(rows)
+
+        # Assessment — the provider's success criteria are the evidence the
+        # teacher checks, so they belong with the task (never dropped).
         assessment = content.get("assessment", {})
         if isinstance(assessment, dict):
-            lp.assessment = assessment.get("activity", assessment.get("method", ""))
+            task = assessment.get("activity") or assessment.get("method") or ""
+            criteria = assessment.get("success_criteria")
+            lp.assessment = _compose_prose(
+                task, f"Success criteria: {criteria}" if criteria else "")
         elif isinstance(assessment, str):
             lp.assessment = assessment
 
-        # Plenary / conclusion
+        # Plenary / conclusion — keep the provider's closing actions and exit
+        # check so the lesson ends with evidence, not just a summary.
         plenary = content.get("plenary", {})
         if isinstance(plenary, dict):
-            lp.conclusion = plenary.get("activity", "")
+            teacher_action = plenary.get("teacher_action")
+            learner_action = plenary.get("learner_action")
+            lp.conclusion = _compose_prose(
+                plenary.get("activity"),
+                f"Teacher: {teacher_action}" if teacher_action else "",
+                f"Learners: {learner_action}" if learner_action else "",
+            )
         elif isinstance(plenary, str):
             lp.conclusion = plenary
 
@@ -796,10 +1042,12 @@ class GenerationPipeline:
         if isinstance(main, dict):
             for phase in main.values():
                 if isinstance(phase, dict):
-                    ai_resources.extend(phase.get("resources_used", []) or [])
+                    ai_resources.extend(
+                        _clean_resources(phase.get("resources_used", [])))
         resources_block = content.get("resources", {})
         if isinstance(resources_block, dict):
-            ai_resources.extend(resources_block.get("suggested_alternatives", []) or [])
+            ai_resources.extend(_clean_resources(
+                resources_block.get("suggested_alternatives", [])))
         # Do NOT pull "source_resources" from AI — source comes from the scheme.
         if ai_resources:
             lp.teaching_learning_resources = _merge_unique(

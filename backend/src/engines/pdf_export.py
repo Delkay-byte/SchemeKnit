@@ -231,10 +231,13 @@ class PDFExportEngine:
         """Convert and verify. Raises PDFConversionError if no valid PDF results."""
         # Explicit labels: `fn.__name__` is unavailable when a backend is
         # patched out in tests, and a label is what an operator needs anyway.
-        # Order: Word (desktop maturity) -> LibreOffice (best server fidelity).
+        # Order: LibreOffice (supported cross-platform converter) -> Word COM
+        # (optional desktop fallback only). Running Word first made a flaky
+        # local Word/COM installation poison otherwise valid exports and was
+        # the source of the Windows fatal-exception diagnostics.
         attempts = [
-            ("docx2pdf", self._try_docx2pdf),
             ("libreoffice", self._try_libreoffice),
+            ("docx2pdf", self._try_docx2pdf),
         ]
         errors: List[str] = []
 

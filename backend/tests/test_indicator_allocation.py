@@ -410,7 +410,9 @@ class TestEditIsolation:
         act3 = plans[2].main_activities[0].description
 
         assert "nature of matter" in act1
-        assert "Classify materials" in act2
+        # The focus is embedded mid-sentence ("learners ... classify
+        # materials"), so sentence casing is lower-case by design.
+        assert "classify materials" in act2.lower()
         assert "mixtures" in act3
         assert act1 != act2 != act3
 

@@ -248,6 +248,17 @@ class TestAIStatusTruth:
 # ── AI QUOTA: monthly bucket (PART 16-19) ────────────────────────────────────
 
 class TestMonthlyAIQuota:
+    def _user(self, db, uid):
+        """Real user row — the ledger tables have FKs to `users` (PostgreSQL)."""
+        from src.database import User
+        user = User(
+            id=uid, email=f"{uid}@t.test", full_name="Quota Test",
+            hashed_password="x", is_active=True,
+        )
+        db.add(user)
+        db.commit()
+        return user
+
     def _entitlement(self, db, user_id, credits=5):
         from src.database import EntitlementDB
         ent = EntitlementDB(
@@ -265,11 +276,13 @@ class TestMonthlyAIQuota:
     def test_new_month_starts_at_zero(self, db):
         from src.ai_quota import get_ai_units_used
         user_id = "quota-user-1"
+        self._user(db, user_id)
         assert get_ai_units_used(db, user_id, "2099-01") == 0
 
     def test_successful_generation_consumes_one_unit(self, db):
         from src.ai_quota import consume_ai_generation, get_ai_units_used
         user_id = "quota-user-2"
+        self._user(db, user_id)
         remaining = consume_ai_generation(db, user_id, credits=5, period_key="2099-02")
         assert remaining == 4
         assert get_ai_units_used(db, user_id, "2099-02") == 1
@@ -277,6 +290,7 @@ class TestMonthlyAIQuota:
     def test_second_generation_consumes_exactly_one_more(self, db):
         from src.ai_quota import consume_ai_generation, get_ai_units_used
         user_id = "quota-user-3"
+        self._user(db, user_id)
         consume_ai_generation(db, user_id, credits=5, period_key="2099-03")
         consume_ai_generation(db, user_id, credits=5, period_key="2099-03")
         assert get_ai_units_used(db, user_id, "2099-03") == 2
@@ -284,6 +298,7 @@ class TestMonthlyAIQuota:
     def test_never_exceeds_the_monthly_cap(self, db):
         from src.ai_quota import consume_ai_generation, get_ai_units_used
         user_id = "quota-user-4"
+        self._user(db, user_id)
         for _ in range(7):
             consume_ai_generation(db, user_id, credits=5, period_key="2099-04")
         assert get_ai_units_used(db, user_id, "2099-04") == 5
@@ -291,17 +306,21 @@ class TestMonthlyAIQuota:
     def test_other_calendar_month_resets_usage(self, db):
         from src.ai_quota import consume_ai_generation, get_ai_units_used
         user_id = "quota-user-5"
+        self._user(db, user_id)
         consume_ai_generation(db, user_id, credits=5, period_key="2099-05")
         assert get_ai_units_used(db, user_id, "2099-06") == 0
 
     def test_unlimited_credits_never_consume(self, db):
         from src.ai_quota import consume_ai_generation, get_ai_units_used
         user_id = "quota-user-6"
+        self._user(db, user_id)
         assert consume_ai_generation(db, user_id, credits=0, period_key="2099-07") == -1
         assert get_ai_units_used(db, user_id, "2099-07") == 0
 
     def test_quota_isolated_per_user(self, db):
         from src.ai_quota import consume_ai_generation, get_ai_units_used
+        self._user(db, "quota-user-7a")
+        self._user(db, "quota-user-7b")
         consume_ai_generation(db, "quota-user-7a", credits=5, period_key="2099-08")
         assert get_ai_units_used(db, "quota-user-7b", "2099-08") == 0
 
@@ -309,6 +328,7 @@ class TestMonthlyAIQuota:
         from src.entitlements import _entitlement_ai_decision
         from src.ai_quota import consume_ai_generation
         user_id = "quota-user-8"
+        self._user(db, user_id)
         ent = self._entitlement(db, user_id, credits=5)
         assert _entitlement_ai_decision(db, ent)[0] is True
         for _ in range(5):
@@ -324,6 +344,7 @@ class TestMonthlyAIQuota:
             hashed_password="x", is_active=True,
         )
         db.add(user)
+        db.commit()
         self._entitlement(db, user.id, credits=5)
         consume_ai_generation(db, user.id, credits=5)
         resolved = resolve_entitlement(db, user)
@@ -342,6 +363,7 @@ class TestMonthlyAIQuota:
         """PART 19: 429/503/fallback → quota consumed: 0."""
         from src.ai_quota import get_ai_units_used
         user_id = "quota-user-10"
+        self._user(db, user_id)
         # Simulate: only the failure happened — nothing was ever recorded.
         assert get_ai_units_used(db, user_id) == 0
 

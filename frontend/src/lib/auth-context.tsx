@@ -17,7 +17,7 @@ interface User {
 interface AuthContextType {
   user: User | null
   token: string | null
-  login: (email: string, password: string) => Promise<void>
+  login: (email: string, password: string, entry: 'teacher' | 'school_admin' | 'platform_admin') => Promise<void>
   logout: () => void
   loading: boolean
 }
@@ -44,8 +44,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false)
   }, [])
 
-  const login = async (email: string, password: string) => {
-    const response = await api.login(email, password)
+  const login = async (email: string, password: string, entry: 'teacher' | 'school_admin' | 'platform_admin') => {
+    const response = await api.login(email, password, entry)
     setToken(response.access_token)
     setUser(response.user)
     sessionStorage.setItem('teachflow_token', response.access_token)
@@ -54,6 +54,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = () => {
+    // Revoke this token server-side first (headers are captured synchronously
+    // before the token is cleared). Failures never block the local sign-out.
+    api.logout().catch(() => {})
     setToken(null)
     setUser(null)
     sessionStorage.removeItem('teachflow_token')

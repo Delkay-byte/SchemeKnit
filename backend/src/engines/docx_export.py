@@ -129,7 +129,8 @@ class DOCXExportEngine:
         for index, lp in enumerate(lesson_plans):
             if index > 0:
                 doc.add_page_break()
-            render_custom_template(doc, lp, structure, context)
+            render_custom_template(doc, lp, structure, context,
+                                   first_lesson=(index == 0))
         output_path.parent.mkdir(parents=True, exist_ok=True)
         doc.save(str(output_path))
         return output_path
@@ -165,17 +166,19 @@ class DOCXExportEngine:
         lesson_plans: List[LessonPlan],
         template: Optional[Template] = None,
         output_path: Path = Path("exports/lesson_plans.docx"),
+        context: dict = None,
     ) -> Path:
         """Generate one DOCX containing all lesson plans, each on its own page."""
         if template is None:
             template = default_template_for_lessons(lesson_plans, TemplateType.GES_STYLE)
 
         if is_wapef_template(template):
-            return self.export_wapef(lesson_plans, output_path)
+            return self.export_wapef(lesson_plans, output_path, context=context)
 
         if is_ges_form_template(template):
             return self.export_official_ges(lesson_plans, output_path,
-                                            spec=spec_for_template_id(template.id))
+                                            spec=spec_for_template_id(template.id),
+                                            context=context)
 
         doc = Document()
         self._setup_styles(doc)
@@ -300,7 +303,8 @@ class DOCXExportEngine:
             ("School", lp.school_name or "________________"),
             ("Teacher", lp.teacher_name or "________________"),
             ("Subject", subject_val),
-            ("Class", f"{class_val}  |  Size: {lp.class_size}"),
+            ("Class", (f"{class_val}  |  Size: {lp.class_size}"
+                       if lp.class_size else class_val)),
             ("Date", lp.lesson_date.strftime("%d %B %Y") if lp.lesson_date else ""),
             ("Duration", f"{lp.duration_minutes} minutes"),
         ]
@@ -428,13 +432,14 @@ class DOCXExportEngine:
             # Emitted as text lines, not a table: an extra rubric TABLE breaks
             # the approved-source topology contract (generated table count must
             # be an exact multiple of the source's — docx_structure_compare).
-            level_names = ("3 — meets the standard", "2 — developing",
+            level_names = ("4 — exceeds the standard",
+                           "3 — meets the standard", "2 — developing",
                            "1 — needs support")
             for c in rubric.criteria:
                 doc.add_paragraph(f"Criterion: {c.criterion}")
                 for d in c.descriptors:
                     pts = (d.get("points") or "").strip()
-                    label = {p: n for p, n in zip(("3", "2", "1"), level_names)}.get(
+                    label = {p: n for p, n in zip(("4", "3", "2", "1"), level_names)}.get(
                         pts, f"{pts} points")
                     doc.add_paragraph(
                         f"  {label}: {d.get('descriptor', '')} ({pts} pt)")
@@ -504,22 +509,29 @@ def _append_assessment_structure(document, lessons) -> None:
     Used by the bundled-form paths (official GES + WAPEF) whose fixed cells
     print only the composed assessment prose.
     """
-    def _heading(doc, text, bold=True):
+    def _heading(doc, text, bold=True, page_break_before=False):
         # Bundled form copies may not carry Word's built-in Heading styles —
         # use a bold run instead so the append NEVER fails on a form doc.
         p = doc.add_paragraph()
+        if page_break_before:
+            # A page-break PARAGRAPH at the top of a page creates a blank
+            # page when the preceding form filled the previous page exactly.
+            # A break-before property starts the heading on a new page only
+            # when it is not already there.
+            p.paragraph_format.page_break_before = True
         run = p.add_run(text)
         run.bold = bold
+        return p
     for lp in list(lessons or []):
         items = [i for i in (getattr(lp, "assessment_items", None) or [])
                  if (getattr(i, "prompt", "") or "").strip()]
         rubric = getattr(lp, "assessment_rubric", None)
         if not items and not (rubric is not None and rubric.criteria):
             continue
-        document.add_page_break()
         _heading(document,
                  f'Assessment Structure — Week {lp.week_number} '
-                 f'(Lesson {lp.lesson_sequence})')
+                 f'(Lesson {lp.lesson_sequence})',
+                 page_break_before=True)
         if items:
             _heading(document,
                      'Assessment Questions / Checks (with marking)')
@@ -541,13 +553,14 @@ def _append_assessment_structure(document, lessons) -> None:
             # Text lines, never a table: bundled forms must keep the source's
             # table topology exactly (extra tables fail the approved-source
             # compare — generated count must be an exact multiple of source).
-            level_names = ("3 — meets the standard", "2 — developing",
+            level_names = ("4 — exceeds the standard",
+                           "3 — meets the standard", "2 — developing",
                            "1 — needs support")
             for c in rubric.criteria:
                 document.add_paragraph(f"Criterion: {c.criterion}")
                 for d in c.descriptors:
                     pts = (d.get("points") or "").strip()
-                    label = {p: n for p, n in zip(("3", "2", "1"), level_names)}.get(
+                    label = {p: n for p, n in zip(("4", "3", "2", "1"), level_names)}.get(
                         pts, f"{pts} points")
                     document.add_paragraph(
                         f"  {label}: {d.get('descriptor', '')} ({pts} pt)")
@@ -706,7 +719,30 @@ def _set_cell_text(cell, text: str, bold: bool = False, size: int = 10):
     run.font.size = Pt(size)
 
 
-def render_custom_template(doc: Document, lp, structure: dict, render_context: dict = None):
+def _day_row_value(label: str, field: Optional[str], lp, ctx: dict) -> Optional[str]:
+    """Value for a DATE / DAY: row — the selected teaching DAYS, no dates.
+
+    The GES form's ``DATE / DAY:`` row identifies the days on which the
+    subject is taught. It must never show calendar dates beside the day
+    names (Phase 2.1G), so a day-labelled date cell renders the configured
+    teaching-day names in weekday order. Returns None when the cell is not a
+    day row or no days are configured (the label then stays blank — never
+    invented).
+    """
+    if not ctx:
+        return None
+    label_l = (label or "").lower()
+    if "day" not in label_l:
+        return None
+    days = ctx.get("teaching_days") or []
+    names = [d for d in days if isinstance(d, str) and d.strip()]
+    if names:
+        return ", ".join(names)
+    return None
+
+
+def render_custom_template(doc: Document, lp, structure: dict, render_context: dict = None,
+                           first_lesson: bool = True):
     """Render a lesson plan through a saved sample TemplateStructure.
 
     Rules (presentation vs content separation):
@@ -730,31 +766,51 @@ def render_custom_template(doc: Document, lp, structure: dict, render_context: d
         doc.add_page_break()
         return
 
-    # Optional title from sample meta; approved templates use title_lines
-    # with {term} / {week} placeholders. Scheme context (term) is supplied by
-    # the caller when known; otherwise the line is skipped rather than invented.
+    # Required GES header (Phase 5): the FIRST page shows exactly
+    #   School name / Teacher's name / WEEK n
+    # in that order; every later page shows ONLY its own week heading. The
+    # sample's own title lines are used only when no real school/teacher
+    # identity exists — one is never fabricated.
     meta = (structure or {}).get("meta") or {}
-    title_lines = meta.get("title_lines") or ([meta.get("title")] if meta.get("title") else [])
+    school = _lesson_field_value(lp, "school_name")
+    teacher = _lesson_field_value(lp, "teacher_name")
+    week_no = _lesson_field_value(lp, "week_number")
+    if school or teacher:
+        title_lines = []
+        if first_lesson:
+            if school:
+                title_lines.append(school)
+            if teacher:
+                title_lines.append(teacher)
+        if week_no:
+            title_lines.append(f"WEEK {week_no}")
+    else:
+        title_lines = meta.get("title_lines") or ([meta.get("title")] if meta.get("title") else [])
+        if title_lines:
+            context = render_context or {}
+            def _field(name, default=""):
+                v = _lesson_field_value(lp, name)
+                return v if v else default
+            term = str(context.get("term") or _field("term") or _field("academic_year") or "").upper()
+            mapping = {
+                "term": term,
+                "week": str(_field("week_number") or ""),
+                "subject": str(_field("subject") or ""),
+                "class": str(_field("class_level") or ""),
+            }
+            resolved = []
+            for line in title_lines:
+                try:
+                    text = str(line).format(**mapping)
+                except Exception:
+                    text = str(line)
+                if text.strip():
+                    resolved.append(text.strip())
+            title_lines = resolved
     if title_lines:
-        context = render_context or {}
-        def _field(name, default=""):
-            v = _lesson_field_value(lp, name)
-            return v if v else default
-        term = str(context.get("term") or _field("term") or _field("academic_year") or "").upper()
-        mapping = {
-            "term": term,
-            "week": str(_field("week_number") or ""),
-            "subject": str(_field("subject") or ""),
-            "class": str(_field("class_level") or ""),
-        }
         for line in title_lines:
-            try:
-                text = str(line).format(**mapping)
-            except Exception:
-                text = str(line)
-            if text.strip():
-                h = doc.add_heading(text.strip(), level=1)
-                h.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            h = doc.add_heading(line, level=1)
+            h.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
     for table in tables:
         rows, cols = int(table.get("rows", 0)), int(table.get("cols", 0))
@@ -784,7 +840,11 @@ def render_custom_template(doc: Document, lp, structure: dict, render_context: d
             elif role == "resource_content":
                 _set_cell_text(cell, _lesson_field_value(lp, "teaching_learning_resources"))
             elif label and field:
-                val = _lesson_field_value(lp, field)
+                day_val = _day_row_value(label, field, lp, render_context or {})
+                if day_val is not None:
+                    val = day_val
+                else:
+                    val = _lesson_field_value(lp, field)
                 _set_cell_text(cell, f"{label}: {val}" if val else f"{label}:", bold=False)
                 # bold the label run only
                 try:

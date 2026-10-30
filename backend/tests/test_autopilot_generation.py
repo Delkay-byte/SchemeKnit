@@ -298,7 +298,7 @@ class TestAutopilotApi:
         from fastapi.testclient import TestClient
 
         user = make_user(db)
-        scheme = _multi_scheme(db, user.id, weeks=3, code_for=lambda n: f"B7.1.1.{n}.1")
+        scheme = _multi_scheme(db, user.id, weeks=2, code_for=lambda n: f"B7.1.1.{n}.1")
         config = _config(scheme.id)
 
         with TestClient(_app(db, user)) as client:
@@ -306,13 +306,13 @@ class TestAutopilotApi:
             assert plan["ready"] is True
             assert plan["blockers"] == []
             assert plan["counts"] == {
-                "pending_count": 3, "safe_pending_count": 3,
-                "needs_review_count": 0, "selected_count": 3,
+                "pending_count": 2, "safe_pending_count": 2,
+                "needs_review_count": 0, "selected_count": 2,
                 "generated_count": 0, "quota_skipped_count": 0,
             }
             # Source order: earliest week first.
-            assert [r["week_number"] for r in plan["selected_rows"]] == [1, 2, 3]
-            assert plan["quota"]["remaining"] == 5
+            assert [r["week_number"] for r in plan["selected_rows"]] == [1, 2]
+            assert plan["quota"]["remaining"] == 2
             assert plan["wapef"]["required"] is False
             # Deterministic default: the plan never implies AI.
             blob = str(plan).lower()
@@ -329,17 +329,17 @@ class TestAutopilotApi:
             plan = _select_via(client, scheme, config)
             assert plan["ready"] is True
             assert plan["counts"]["pending_count"] == 7
-            assert plan["counts"]["selected_count"] == 5
-            assert plan["counts"]["quota_skipped_count"] == 2
-            assert len(plan["selected_indicator_codes"]) == 5
+            assert plan["counts"]["selected_count"] == 2
+            assert plan["counts"]["quota_skipped_count"] == 5
+            assert len(plan["selected_indicator_codes"]) == 2
             # The capped batch is generation-ready through the REAL endpoint:
-            # 5 codes fit the remaining 5 units, so no 403 and no job-less failure.
+            # 2 codes fit the remaining 2 units, so no 403 and no job-less failure.
             _generate(
                 client, scheme, config,
                 selected_occurrence_ids=plan["selected_occurrence_ids"],
                 selected_indicator_codes=plan["selected_indicator_codes"],
             )
-            assert len(_lessons(client, scheme)) == 5
+            assert len(_lessons(client, scheme)) == 2
 
     def test_matrix_c_unlimited_account_generates_everything(self, db):
         from fastapi.testclient import TestClient
@@ -361,12 +361,12 @@ class TestAutopilotApi:
         from fastapi.testclient import TestClient
 
         user = make_user(db)
-        scheme = _multi_scheme(db, user.id, weeks=4, code_for=lambda n: f"B7.4.{n}.1.1")
+        scheme = _multi_scheme(db, user.id, weeks=2, code_for=lambda n: f"B7.4.{n}.1.1")
         config = _config(scheme.id)
 
         with TestClient(_app(db, user)) as client:
             plan = _select_via(client, scheme, config)
-            assert plan["counts"]["selected_count"] == 4
+            assert plan["counts"]["selected_count"] == 2
             assert plan["counts"]["quota_skipped_count"] == 0
             assert plan["ready"] is True
 
@@ -400,10 +400,14 @@ class TestAutopilotApi:
         config = _config(scheme.id)
 
         with TestClient(_app(db, user)) as client:
+            # Exhaust the allowance with codes that are NOT the scheme's three
+            # unpaid indicators. Charging a scheme's own code is idempotent
+            # (a regeneration of already-paid work consumes no new unit), so
+            # it cannot model "no allowance left for this run".
             reservation = reserve_lesson_units(
                 db, user.id, scheme.id,
-                ["B7.6.1.1.1", "B7.6.2.1.1", "B7.6.3.1.1",
-                 "B7.6.9.1.1", "B7.6.8.1.1"],
+                ["B7.6.4.1.1", "B7.6.5.1.1", "B7.6.6.1.1",
+                 "B7.6.7.1.1", "B7.6.8.1.1"],
                 5,
             )
             assert reservation.allowed
@@ -574,3 +578,52 @@ class TestAutopilotApi:
             )
             assert resp.status_code == 409, resp.text
             assert "flagged for review" in resp.json()["detail"]
+
+    def test_generate_rejects_needs_review_without_occurrence_ids(self, db):
+        """Omitting occurrence ids must not bypass the needs_review gate.
+
+        A full/code-only request has no occurrence list to check, so the gate
+        must resolve the same allocations the pipeline would generate.
+        """
+        from fastapi.testclient import TestClient
+        from src.database import GenerationJobDB
+
+        user = make_user(db)
+        scheme = SchemeDB(
+            id=generate_id(), owner_id=user.id, filename="Nursery Scheme.docx",
+            subject="Our World Our People", class_level="Nursery 1",
+            term="First Term", academic_year="2026/2027", status="extracted",
+            detection_status="single",
+        )
+        db.add(scheme)
+        db.flush()
+        db.add(WeekDB(
+            id=generate_id(), scheme_id=scheme.id, week_number=1,
+            start_date=date(2026, 9, 7), end_date=date(2026, 9, 11),
+            week_type="instruction", strand="Personal Development",
+            sub_strand="Self-Care", content_standards=[], indicators=[],
+            resources=["Cloth"],
+        ))
+        db.add(WeekDB(
+            id=generate_id(), scheme_id=scheme.id, week_number=2,
+            start_date=date(2027, 1, 4), end_date=date(2027, 1, 8),
+            week_type="instruction", strand="Personal Development",
+            sub_strand="Self-Care", content_standards=[], indicators=[],
+            resources=["Cloth"],
+        ))
+        db.commit()
+
+        config = _config(
+            scheme.id, class_level="Nursery 1", subject="Our World Our People",
+        )
+        with TestClient(_app(db, user)) as client:
+            resp = client.post(
+                f"/api/generation/{scheme.id}/generate",
+                json=config.model_dump(mode="json"),
+            )
+            assert resp.status_code == 409, resp.text
+            assert "flagged for review" in resp.json()["detail"]
+
+        # The gate fires before the job row / quota reservation exists.
+        assert db.query(GenerationJobDB).filter_by(
+            owner_id=user.id, scheme_id=scheme.id).count() == 0

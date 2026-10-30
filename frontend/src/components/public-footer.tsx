@@ -47,18 +47,28 @@ export function PublicFooter() {
             </h3>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link href="/#teachers" className="text-white/70 hover:text-white">
-                  Teachers
+                <Link href="/features" className="text-white/70 hover:text-white">
+                  Features
                 </Link>
               </li>
               <li>
-                <Link href="/#schools" className="text-white/70 hover:text-white">
-                  Schools
+                <Link href="/how-it-works" className="text-white/70 hover:text-white">
+                  How It Works
                 </Link>
               </li>
               <li>
-                <Link href="/#individual" className="text-white/70 hover:text-white">
-                  Individual Teacher
+                <Link href="/pricing" className="text-white/70 hover:text-white">
+                  Pricing
+                </Link>
+              </li>
+              <li>
+                <Link href="/help" className="text-white/70 hover:text-white">
+                  Help &amp; FAQ
+                </Link>
+              </li>
+              <li>
+                <Link href="/about" className="text-white/70 hover:text-white">
+                  About
                 </Link>
               </li>
             </ul>

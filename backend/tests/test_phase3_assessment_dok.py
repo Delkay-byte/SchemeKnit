@@ -288,6 +288,34 @@ def test_wapef_unaffected():
     assert lp.wapef_deep_hope == "" and lp.wapef_through_lines == []
 
 
+def test_assessment_appendix_uses_break_before_without_a_blank_page(tmp_path):
+    """Starting the appendix must not insert a page-break paragraph.
+
+    A break paragraph at the top of a page produces a blank page when the
+    preceding GES form filled the previous page exactly. The heading carries
+    page_break_before instead, which is blank-page-safe.
+    """
+    from docx import Document
+    from src.engines.docx_export import (
+        DOCXExportEngine, default_template_for_lessons,
+    )
+
+    lp = _model_with_structure()
+    out = DOCXExportEngine().export_combined(
+        [lp], default_template_for_lessons([lp]), tmp_path / "p3-combined.docx")
+    paragraphs = Document(str(out)).paragraphs
+    index = next(
+        i for i, p in enumerate(paragraphs)
+        if p.text.startswith("Assessment Structure")
+    )
+    assert paragraphs[index].paragraph_format.page_break_before is True
+    if index:
+        previous = paragraphs[index - 1]
+        assert 'w:type="page"' not in previous._p.xml or previous.text.strip(), (
+            "an empty page-break paragraph sits before the assessment appendix"
+        )
+
+
 def test_docx_export_contains_assessment_structure(tmp_path):
     lp = _model_with_structure()
     from src.engines.docx_export import DOCXExportEngine
@@ -301,6 +329,12 @@ def test_docx_export_contains_assessment_structure(tmp_path):
     assert "Marking Rubric for the Learner Task" in text
     assert f"Total marks: {lp.assessment_rubric.total_points}" in text
     assert "not an official" in text.lower()
+    # All four bands must keep their names in the export: the descriptor
+    # points are 4/3/2/1, so a legacy 3-band label map silently printed
+    # "4 points" for the top band.
+    for band in ("4 — exceeds the standard", "3 — meets the standard",
+                 "2 — developing", "1 — needs support"):
+        assert band in text, band
     # the prompts themselves survive export
     first_prompt = lp.assessment_items[0].prompt
     assert first_prompt[:40] in text
@@ -318,6 +352,8 @@ def test_structured_pdf_contains_assessment_structure(tmp_path):
     assert "Assessment Questions" in text
     assert "Marking Rubric" in text
     assert str(lp.assessment_rubric.total_points) in text
+    assert "exceeds the standard" in text
+    assert "needs support" in text
 
 
 def test_legacy_pdf_export_path_still_works(tmp_path):

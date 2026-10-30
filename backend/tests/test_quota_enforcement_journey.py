@@ -1,7 +1,7 @@
 """Quota enforcement through the REAL endpoints — production incident suite.
 
 Regression suite for the production quota-accounting incident (Oct 2026):
-the ledger accepted 6 distinct lessons against the Free Tier limit of 5 while
+the ledger accepted 6 distinct lessons against the Adesua free limit of 2 while
 every quota read returned ``used=0``. Root cause: ``_insert_ignore`` relied on
 ``rowcount == 1`` for ``INSERT ... ON CONFLICT DO NOTHING``, but PostgreSQL +
 psycopg3 reports ``rowcount == -1`` for that statement, so every insert was
@@ -10,7 +10,7 @@ aggregate counter never incremented.
 
 These tests pin the incident invariants END TO END (the browser's API):
 
-  A/E. Five distinct generations succeed; the sixth is rejected 403 BEFORE
+  A/E. Two distinct generations succeed; the third is rejected 403 BEFORE
        any job, any lesson row, or any counter movement.
   H.   Read-after-write: the generate response, ``GET /quota`` and the
        persisted ledger agree on every run.
@@ -125,9 +125,9 @@ def _generate_one(client, scheme, config, row):
     return resp
 
 
-class TestSixthGenerationRejectedBeforeAnySideEffect:
-    def test_five_accepted_sixth_403_no_job_no_lesson_no_counter_move(self, db):
-        """Invariants A, E, H: allowance of 5 is exact, end to end."""
+class TestThirdGenerationRejectedBeforeAnySideEffect:
+    def test_two_accepted_third_403_no_job_no_lesson_no_counter_move(self, db):
+        """Invariants A, E, H: allowance of 2 is exact, end to end."""
         from fastapi.testclient import TestClient
 
         user = make_user(db)
@@ -138,15 +138,15 @@ class TestSixthGenerationRejectedBeforeAnySideEffect:
             rows = _preview(client, scheme, config)
             assert len(rows) == WEEKS
 
-            for i, row in enumerate(rows[:5], start=1):
+            for i, row in enumerate(rows[:2], start=1):
                 resp = _generate_one(client, scheme, config, row)
                 assert resp.status_code == 200, resp.text
                 body = resp.json()
                 assert body["quota"]["used"] == i, "read-after-write in body"
-                assert body["quota"]["remaining"] == 5 - i
+                assert body["quota"]["remaining"] == 2 - i
                 # The endpoint agrees with the response (invariant H).
                 q = _quota(client)
-                assert q["used"] == i and q["remaining"] == 5 - i
+                assert q["used"] == i and q["remaining"] == 2 - i
 
                 if i == 3:
                     # Invariant C while allowance remains: regenerating an
@@ -156,31 +156,40 @@ class TestSixthGenerationRejectedBeforeAnySideEffect:
                     assert regen.json()["quota"]["used"] == 3
                     assert len(_lessons(client, scheme)) == 3
 
-            assert len(_lessons(client, scheme)) == 5
-            assert _quota(client)["used"] == 5
+            assert len(_lessons(client, scheme)) == 2
+            assert _quota(client)["used"] == 2
 
-            # Sixth distinct code: rejected BEFORE any job or persistence.
+            # Third distinct code: rejected BEFORE any job or persistence.
             before = _job_status(client, scheme)
-            resp = _generate_one(client, scheme, config, rows[5])
+            resp = _generate_one(client, scheme, config, rows[2])
             assert resp.status_code == 403, resp.text
-            assert "Free Tier" in resp.json()["detail"]
+            assert "Adesua" in resp.json()["detail"]
             assert _job_status(client, scheme) == before, "no job created"
 
             lessons = _lessons(client, scheme)
-            assert len(lessons) == 5, "rejected run persisted nothing"
-            assert rows[5]["source_occurrence_id"] not in {
+            assert len(lessons) == 2, "rejected run persisted nothing"
+            assert rows[2]["source_occurrence_id"] not in {
                 l.get("source_occurrence_id") for l in lessons
             }
-            assert _quota(client)["used"] == 5, "rejected run moved nothing"
+            assert _quota(client)["used"] == 2, "rejected run moved nothing"
 
-            # At exhaustion the pre-check refuses ANY further generate call
-            # (conservative policy that predates the incident): no charge,
-            # no job, no persistence — and never a silent over-allowance.
-            resp = _generate_one(client, scheme, config, rows[0])
-            assert resp.status_code == 403, resp.text
-            assert _quota(client)["used"] == 5
-            assert len(_lessons(client, scheme)) == 5
-            assert _job_status(client, scheme) == before
+            # At exhaustion, regenerating an ALREADY-PAID occurrence is still
+            # allowed: its unit key is idempotent, so it consumes zero units
+            # and replaces the lesson in place. It must never add a sixth
+            # lesson or bypass the allowance for a new indicator.
+            regen = _generate_one(client, scheme, config, rows[0])
+            assert regen.status_code == 200, regen.text
+            regen_body = regen.json()
+            assert regen_body["quota"]["used"] == 2
+            assert regen_body["quota"]["remaining"] == 0
+            assert rows[0]["source_occurrence_id"] in regen_body[
+                "generated_occurrence_ids"]
+            assert _quota(client)["used"] == 2
+            lessons = _lessons(client, scheme)
+            assert len(lessons) == 2
+            assert len({
+                l.get("source_occurrence_id") for l in lessons
+            }) == 2, "regeneration must replace, never duplicate"
 
 
 class TestAutopilotConsistencyAfterSingles:
@@ -194,9 +203,9 @@ class TestAutopilotConsistencyAfterSingles:
 
         with TestClient(_app(db, user)) as client:
             rows = _preview(client, scheme, config)
-            for row in rows[:5]:
+            for row in rows[:2]:
                 assert _generate_one(client, scheme, config, row).status_code == 200
-            assert _quota(client)["used"] == 5
+            assert _quota(client)["used"] == 2
 
             plan = client.post(
                 f"/api/generation/{scheme.id}/autopilot-selection",
@@ -231,7 +240,7 @@ class TestIdentityAndPeriodScope:
             app.dependency_overrides[get_current_user] = lambda: user_b
             app.dependency_overrides[require_teacher_workflow] = lambda: user_b
             q = _quota(client)
-            assert q["used"] == 0 and q["remaining"] == 5
+            assert q["used"] == 0 and q["remaining"] == 2
 
             app.dependency_overrides[get_current_user] = lambda: user_a
             app.dependency_overrides[require_teacher_workflow] = lambda: user_a

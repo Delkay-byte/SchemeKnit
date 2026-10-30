@@ -48,6 +48,7 @@ from .pedagogy import profile_for_subject, SubjectPedagogy
 from ..ai_resource_text import normalize_text_items
 from .lesson_evidence import build_evidence, primary_verb as _indicator_primary_verb
 from . import activity_library
+from . import text_hygiene
 
 #: Layer 3/4 integration — imported lazily inside ``build_lesson`` to avoid an
 #: import cycle (patterns imports nothing from the builder; the typing-only
@@ -887,7 +888,10 @@ STARTER_MODE_TEMPLATES: Dict[str, str] = {
         "and have the class read it together."
     ),
     "object_observation": (
-        "Show a real object or a picture connected to {focus_short} and ask "
+        # Two sentences: an indicator focus that itself contains "and" must
+        # not produce a doubled conjunction ("connected to … and discuss
+        # their use and ask learners …").
+        "Show a real object or a picture connected to {focus_short}. Ask "
         "learners to say three things they notice about it before any "
         "explanation."
     ),
@@ -961,7 +965,7 @@ PLENARY_MODE_TEMPLATES: Dict[str, str] = {
     ),
     "one_minute_summary": (
         "One-minute summary: each learner writes one sentence about "
-        "{focus_short}; two read theirs aloud and the class agrees the best "
+        "{focus_short}; two read theirs aloud and the class agrees on the best "
         "statement."
     ),
     "teach_a_peer": (
@@ -1004,7 +1008,7 @@ PLENARY_MODE_TEMPLATES: Dict[str, str] = {
     ),
     "report_findings": (
         "Two groups report their findings on {focus_short}; the class agrees "
-        "the strongest evidence and one open question."
+        "on the strongest evidence and identifies one open question."
     ),
     "conclusion_check": (
         "Ask the class to answer the question that opened the lesson about "
@@ -1299,6 +1303,10 @@ def _learner_phrase(indicator: str, subject_name: str = "") -> str:
       6. a genuine lead verb is kept verbatim (source authority).
     """
     clean = strip_indicator_code(indicator)
+    # Fragmented source cells ("… techniques. . Summarise …") leave stacked
+    # full stops; the objective is composed prose, not the verbatim cell.
+    clean = re.sub(r"\.\s*\.+", ".", clean)
+    clean = re.sub(r"\.\s*[:;]\s*", ". ", clean)
     lower = clean.lower()
     for prefix in _LEARNER_PREFIXES:
         if lower.startswith(prefix):
@@ -1388,6 +1396,98 @@ def _learner_phrase(indicator: str, subject_name: str = "") -> str:
     return f"Learners can {phrase[0].upper()}{phrase[1:]}".strip()
 
 
+def _clean_focus_text(text: str) -> str:
+    """An indicator phrase safe to embed inside a sentence template.
+
+    Scheme cells arrive with a leading curriculum code and separator
+    (``"B6.1.3.1.1 : Relate …"``), a terminal full stop, or fragmented
+    sentence marks from split cells (``"… techniques. . Summarise …"``).
+    Templates add their own punctuation, so the focus phrase must carry none
+    of those artefacts. This is composition cleanup only — the words are the
+    source's own.
+    """
+    text = strip_indicator_code(text or "")
+    if not text:
+        return ""
+    # Orphan code fragments left by the strip ("B9.2.1.1 .2 Reflect").
+    text = re.sub(r"^(?:[BbKk]?\d+(?:\.\d+)*\.?\s*)+", "", text).strip()
+    # Leading separator/dots from "CODE : prose" and "CODE . prose".
+    text = re.sub(r"^[.:;,)\]\-\u2013\u2014\s]+", "", text).strip()
+    # Dotted artefacts from fragmented cells.
+    text = re.sub(r"\.\s*\.+", ".", text)
+    # A source sentence followed by an orphan separator ("world. : Generate").
+    text = re.sub(r"\.\s*[:;]\s*", ". ", text)
+    text = re.sub(r"\s{2,}", " ", text).strip()
+    # Callers embed the phrase mid-sentence; drop terminal punctuation.
+    return text.rstrip(" .;:,")
+
+
+def _noun_focus(text: str) -> str:
+    """A noun/gerund-safe focus for mid-sentence phase templates.
+
+    Many templates already supply the action verb ("learners investigate
+    {focus_short}", "state the rule for {focus_short}").  Passing the source's
+    imperative ("Investigate the properties...") produced "learners
+    investigate Investigate..." and "for Use place value...".  This function
+    removes the leading curriculum command while preserving the source's
+    content words, proper nouns and capitalisation.
+    """
+    original = _clean_focus_text(text or "")
+    if not original:
+        return ""
+    focus = original
+
+    # "Round (off, up, down) whole numbers" -> the phrase after the mode
+    # parenthetical. The command itself is already in the template.
+    focus = re.sub(r"^\([^)]*\)\s*", "", focus).strip()
+
+    # "Identify by name binary compounds" -> "binary compounds". The
+    # assessment template already says "learners identify the elements of".
+    focus = re.sub(r"(?i)^identify\s+by\s+name\s+", "", focus).strip()
+
+    lexicon = _lead_verb_lexicon()
+    # Strip at most two stacked source commands ("Read and compare...").
+    for _ in range(2):
+        words = focus.split()
+        if len(words) < 2:
+            break
+        lead = re.sub(r"[^A-Za-z\u00c0-\u024f']", "", words[0]).lower()
+        if not lead:
+            break
+        if not (lead in lexicon or lead in _EXTRA_LEAD_VERBS
+                or _indicator_primary_verb(focus)):
+            break
+        rest = " ".join(words[1:]).strip()
+        rest = re.sub(
+            r"^(?:and|or|to|about|between|of|for|with|by|in|on|at)\s+",
+            "", rest, flags=re.I,
+        ).strip()
+        if not rest:
+            break
+        focus = rest
+
+    # A source cell can end on a connector or a noun-dependent adjective;
+    # templates add their own "and".
+    focus = re.sub(
+        r"\s+(?:and|or|to|of|for|with|between|by|the|a|an|nearest|next|"
+        r"following|given|same|different|various|several|above|below|"
+        r"respective)\s*$",
+        "", focus, flags=re.I,
+    ).strip()
+    # If the command was followed by a mode parenthetical ("Round (off, up,
+    # down) whole numbers"), the noun phrase is what follows it.
+    focus = re.sub(r"^\([^)]*\)\s*", "", focus).strip()
+    focus = re.sub(r"\.\s*[:;]\s*", ". ", focus)
+    focus = re.sub(r"\s{2,}", " ", focus).strip(" .;:,")
+
+    if not focus:
+        return original
+    first = focus.split(" ", 1)[0].rstrip(":").lower()
+    if focus[:1].isupper() and first not in _PROPER_NOUN_STARTS:
+        focus = focus[:1].lower() + focus[1:]
+    return focus
+
+
 def _derive_topic(alloc: AllocatedIndicator, exemplar=None) -> str:
     """A teachable lesson topic derived from THIS occurrence's evidence.
 
@@ -1403,10 +1503,8 @@ def _derive_topic(alloc: AllocatedIndicator, exemplar=None) -> str:
     """
     raw = alloc.indicator_description or ""
     if raw and not _is_code_only(raw):
-        text = strip_indicator_code(raw)
+        text = _clean_focus_text(raw)
         clause = re.split(r"[.;]", text)[0].strip() or text
-        # Drop any orphan leading code fragment the strip left behind.
-        clause = re.sub(r"^(?:[BbKk]?\d+(?:\.\d+)*\.?\s*)+", "", clause).strip() or clause
         words = clause.split()
         if len(words) > 12:
             clause = " ".join(_trim_dangling_tail(words[:12])).rstrip(",:;")
@@ -1449,6 +1547,27 @@ def _normalize_prose(text: str) -> str:
         return text
     text = _DANGLING_CONNECTOR_RE.sub(r"\2", text)
     text = re.sub(r"\s+([,.;:!?])", r"\1", text)
+    # "experiences.. Read" / "techniques. . Summarise": fragmented source cells
+    # leave stacked full stops. Collapse them to one sentence break.
+    text = re.sub(r"\.\s*\.+", ".", text)
+    # "... world. : Generate ..." - a source cell's terminal stop followed by
+    # a stray separator. Keep the sentence break, drop the orphan marker.
+    text = re.sub(r"\.\s*[:;]\s*", ". ", text)
+    # Template + source can both contribute the same connector or command
+    # ("to to", "and and", "describe Describe"). Collapse the duplicate.
+    text = re.sub(
+        r"\b(and|or|to|of|for|with|between|the|a|an)\s+\1\b", r"\1", text,
+        flags=re.I)
+    text = re.sub(
+        r"\b(use|describe|investigate|relate|study|identify|classify|"
+        r"compare|create|design|read|write|solve|apply|discuss|explain|"
+        r"state|recognise|recognize|round|add|multiply|interpret|install|"
+        r"assess|écouter|regarder|lire|parler|écrire|chanter)\s+\1\b",
+        r"\1", text, flags=re.I)
+    # A truncated source focus can leave "… 100,000 to the and state …";
+    # drop the dangling preposition/determiner before the conjunction.
+    text = re.sub(
+        r"\b(?:to|the|of|for|with)\s+(?=(?:and|or)\b)", "", text, flags=re.I)
     text = re.sub(r"([,;])\s*\1+", r"\1", text)
     text = re.sub(r"\(\s*\)", "", text)
     text = re.sub(r"\s{2,}", " ", text)
@@ -1542,7 +1661,59 @@ _DANGLING_TAIL_WORDS = frozenset((
     "or", "at", "as", "into", "about", "through", "that", "which", "the",
     "a", "an", "their", "our", "is", "are", "be", "can", "will", "would",
     "should", "may", "does", "do", "how", "when", "what", "why",
+    # Adjectives/determiners that cannot end a standalone focus phrase: cutting
+    # "… to the nearest ten thousand" at max_words left "… to the nearest",
+    # which templates then joined to their own "and" ("to the nearest and
+    # state …"). Trim back to the last noun instead.
+    "nearest", "next", "following", "given", "same", "different",
+    "various", "several", "above", "below", "respective",
 ))
+
+
+def _normalize_composed_value(value):
+    """Recursively normalize composed prose models/lists/dicts.
+
+    Source-verbatim fields are deliberately not passed here; callers choose
+    only teacher-visible composed fields so provenance strings stay untouched.
+    """
+    if isinstance(value, str):
+        value = _normalize_prose(value)
+        # Phase 6/7 hygiene: capitalisation of ordinary words, drafting-label
+        # removal and safe punctuation repairs — never source rewording.
+        return text_hygiene.hygiene_pass(value)
+    if isinstance(value, list):
+        return [_normalize_composed_value(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _normalize_composed_value(v) for k, v in value.items()}
+    model_fields = getattr(type(value), "model_fields", None)
+    if model_fields is not None:
+        for field in model_fields:
+            setattr(value, field, _normalize_composed_value(
+                getattr(value, field, None)))
+        return value
+    return value
+
+
+def _normalize_lesson_text(lp) -> None:
+    """Last composition pass for every teacher-visible generated field."""
+    for field in (
+        "lesson_topic", "previous_knowledge", "introduction",
+        "starter_activity", "assessment", "conclusion", "class_assignment",
+        "home_assignment", "homework", "remarks",
+        "learning_objectives", "main_activities", "learner_activities",
+        "teacher_activities", "assessment_items", "assessment_rubric",
+        "essential_questions",
+    ):
+        if hasattr(lp, field):
+            setattr(lp, field, _normalize_composed_value(
+                getattr(lp, field, None)))
+    # ``differentiation`` keeps its own pass WITHOUT the Phase 6/7 hygiene:
+    # its "Needs Support (NS):"-style tier labels are the approved
+    # teacher-facing presentation the tests pin, and the capitalisation fix
+    # would rewrite them. Mechanical prose cleanup still applies.
+    if hasattr(lp, "differentiation"):
+        setattr(lp, "differentiation", _normalize_prose(
+            getattr(lp, "differentiation", None)))
 
 
 def _trim_dangling_tail(words: List[str], min_words: int = 3) -> List[str]:
@@ -1577,13 +1748,11 @@ def _resource_is_available(resource: str, subject_name: str) -> bool:
 
 def _first_clause(text: str, max_words: int = 12) -> str:
     """Short, human-readable focus phrase from the indicator text."""
-    clean = strip_indicator_code(text or "").strip()
+    # Also strips fragmented codes ("B9.2.1.1 .2 Reflect …") and leading
+    # separators so the lesson never says "about B9" or "about .2".
+    clean = _clean_focus_text(text or "")
     if not clean:
         return ""
-    # Real schemes often carry fragmented codes ("B9.2.1.1 .2 Reflect …",
-    # "5.1.1.1 B9. Investigate …"). Strip any orphan code fragment the code
-    # regex leaves behind so the lesson never says "about B9" or "about .2".
-    clean = re.sub(r"^(?:[Bb]?\d+(?:\.\d+)*\.?\s*)+", "", clean).strip() or clean
     # Stop at the first sentence break or semicolon.
     part = re.split(r"[.;]", clean)[0].strip() or clean
     # Drop a leading lone fragment like ".2", "1)", ":" left by the split.
@@ -1836,14 +2005,29 @@ _MEASURABLE_OBJECTIVE_VERBS = {
 }
 
 
+#: Leads the quality gate hard-rejects as a vague objective. The curriculum
+#: corpus lists them as actions (they are discussion/exploration activities),
+#: but they cannot state an assessable OUTCOME — so objective construction must
+#: pick another verb the same exemplar supports instead of emitting a form the
+#: gate will reject. Kept in sync with lesson_rubric._GENERIC_OBJECTIVE_RE.
+_GENERIC_OBJECTIVE_LEADS = frozenset({
+    "discuss", "explore", "understand", "learn", "talk about", "know",
+    "be aware",
+})
+
+
 def _objective_verb(exemplar) -> str:
-    """The exemplar's most measurable action verb (falling back to its first)."""
+    """The exemplar's most measurable non-generic action verb."""
     verbs = [str(v).strip().lower() for v in (exemplar.curriculum_action_verbs or [])
              if str(v).strip()]
     for verb in verbs:
-        if verb in _MEASURABLE_OBJECTIVE_VERBS:
+        if (verb in _MEASURABLE_OBJECTIVE_VERBS
+                and verb not in _GENERIC_OBJECTIVE_LEADS):
             return verb
-    return verbs[0] if verbs else "explain"
+    for verb in verbs:
+        if verb not in _GENERIC_OBJECTIVE_LEADS:
+            return verb
+    return "explain"
 
 
 def _exemplar_phases(exemplar, fmt: Dict[str, str]) -> List[Tuple[str, str, float]]:
@@ -2041,7 +2225,7 @@ def build_lesson(
         from .pedagogy import SUBJECT_PROFILES
         profile = SUBJECT_PROFILES["nursery"]
 
-    skill = strip_indicator_code(alloc.indicator_description)
+    skill = _clean_focus_text(alloc.indicator_description)
     # KG-style rows whose indicator cell holds ONLY a code / code range (e.g.
     # "K2.1.1.1.1-3") carry no teachable prose. Like Nursery rows, the source
     # row itself (sub-strand) is the honest curriculum focus — the bare code
@@ -2082,6 +2266,12 @@ def build_lesson(
     if not skill and alloc.sub_strand:
         skill = alloc.sub_strand
         focus_short = alloc.sub_strand
+    # Final composition guard: exemplar/sub-strand sources can also carry a
+    # terminal stop or separator; templates embed these phrases mid-sentence.
+    # ``focus_short`` follows a template's own verb ("learners investigate",
+    # "state the rule for"), so it must be the noun form, not a second command.
+    skill = _clean_focus_text(skill)
+    focus_short = _noun_focus(focus_short)
     topic = _derive_topic(alloc, exemplar=exemplar)
     duration = int(config.lesson_duration_minutes or 60)
 
@@ -2117,6 +2307,19 @@ def build_lesson(
     lesson_ev = build_evidence(
         subject=subject_name, class_level=class_level, alloc=alloc,
         exemplar=exemplar, interp=interp)
+    # Code-only sources carry no prose for the interpreter, which falls back
+    # to the placeholder "the lesson focus". The resolved focus (exemplar or
+    # sub-strand) is now known — never leave that placeholder in a starter's
+    # "What to look for" cue.
+    if (focus_short and "lesson focus" in
+            (lesson_ev.expected_performance or "").lower()):
+        from dataclasses import replace as _dc_replace
+        _ev_verb = (_objective_verb(exemplar) if exemplar is not None
+                    else _noun_lead_verb(subject_name))
+        lesson_ev = _dc_replace(
+            lesson_ev,
+            expected_performance=f"Learners can {_ev_verb} {focus_short}.",
+        )
     early_years = profile.key in ("early_childhood", "nursery")
     # Occurrence stage for REPEATED indicators (Priority 2 §18): the same
     # indicator in a later source week keeps its content but shifts emphasis
@@ -2153,13 +2356,15 @@ def build_lesson(
     # the scheme's own wording survives on ``source_tlrs`` below (§F).
     _resource_pool: List[str] = []
     for _r in normalize_text_items(list(getattr(alloc, "source_resources", []) or [])):
-        _r = (_r or "").strip()
+        # Display-list normalisation: "Charts And Pictures" → "Charts and
+        # Pictures". The verbatim source wording stays on source_tlrs (§F).
+        _r = text_hygiene.fix_resource_capitalisation((_r or "").strip())
         if (_r and _resource_is_available(_r, subject_name)
                 and _r.lower() not in [x.lower() for x in _resource_pool]):
             _resource_pool.append(_r)
     if not _resource_pool:
         for _r in list(activity.materials) + list(profile.resources):
-            _r = (_r or "").strip()
+            _r = text_hygiene.fix_resource_capitalisation((_r or "").strip())
             if (_r and _resource_is_available(_r, subject_name)
                     and _r.lower() not in [x.lower() for x in _resource_pool]):
                 _resource_pool.append(_r)
@@ -2168,7 +2373,7 @@ def build_lesson(
         # source entry still beats an empty "{resource}" substitution.
         for _r in normalize_text_items(
                 list(getattr(alloc, "source_resources", []) or [])):
-            _r = (_r or "").strip()
+            _r = text_hygiene.fix_resource_capitalisation((_r or "").strip())
             if _r and _r.lower() not in [x.lower() for x in _resource_pool]:
                 _resource_pool.append(_r)
     fmt = dict(
@@ -2218,6 +2423,15 @@ def build_lesson(
             starter = f"Build on the previous lesson ('{prev_short}'). " + starter
         if misconceptions and "Monitor for general" not in misconceptions:
             starter += f" Watch for: {misconceptions}"
+    # A code-only/exemplar starter can be a concrete activity that never names
+    # the lesson's focus (e.g. a list of devices for "input devices"). Name
+    # the focus explicitly so the opening is anchored to THIS occurrence and
+    # the quality gate's focus check can see it.
+    if focus_short:
+        _focus_tokens = {w for w in re.findall(r"[a-z]{3,}", focus_short.lower())}
+        _starter_tokens = {w for w in re.findall(r"[a-z]{3,}", starter.lower())}
+        if _focus_tokens and not (_focus_tokens & _starter_tokens):
+            starter = f"Today's focus: {focus_short}. " + starter
     # Phase 1 must answer WHAT THE TEACHER LOOKS FOR (Priority 2 §7): when the
     # selected starter carries no monitoring cue of its own, attach the
     # indicator's own evidence of achievement — the starter then links
@@ -2229,11 +2443,33 @@ def build_lesson(
             _look_for = _safe_format(activity.evidence, **fmt)
         _look_for = _look_for.strip()
         if _look_for:
-            if len(_look_for.split()) > 22:
-                _look_for = " ".join(_look_for.split()[:22]).rstrip(".;") + "."
-            if not _look_for.endswith("."):
-                _look_for += "."
-            starter = f"{starter} What to look for: {_look_for}"
+            # Teacher-facing phrasing (Phase 7): "What to look for:" is an
+            # internal drafting label. The cue is phrased as a direct
+            # observation instruction, and a "Learners can ..." evidence
+            # sentence is folded into it so the two never double up.
+            _tail = re.sub(r"^Learners\s+can\s+", "", _look_for,
+                           flags=re.I).strip()
+            if len(_tail.split()) > 22:
+                _tail = " ".join(_tail.split()[:22]).rstrip(".;,") + "."
+            if not _tail.endswith("."):
+                _tail += "."
+            _first_word = _tail.split(" ", 1)[0]
+            if _first_word.lower() in text_hygiene._ORDINARY_CAP_WORDS:
+                _tail = _first_word.lower() + _tail[len(_first_word):]
+            starter = (f"{starter} As learners respond, check that each "
+                       f"learner can {_tail}")
+    # ── Early-years localization ─────────────────────────────────────────
+    # KG/Nursery skip the assessment-context path, so the subject's Ghanaian
+    # context bank never reached their lessons. Add ONE bounded clause to the
+    # opening activity (the teacher action), rotated deterministically by the
+    # source week so a term of lessons does not repeat one sentence.
+    if early_years:
+        _ghana_clause = activity_library.ghana_context_for(
+            profile.key,
+            variant=(int(alloc.week_number or 1) + int(position_index or 0)),
+        )
+        if _ghana_clause and _ghana_clause not in starter:
+            starter = f"{starter.rstrip()} {_ghana_clause}"
     starter = _normalize_prose(starter)
     # A starter that recurs inside this batch gets one alternate instruction
     # appended (Priority 2.1 §E): the FIRST lesson with this opener keeps the
@@ -2407,8 +2643,10 @@ def build_lesson(
             else:
                 # Named per step: two middle steps of one lesson never carry
                 # the same check sentence (padding), and the teacher reads
-                # which step the check belongs to.
-                _ev = (f"Step {idx + 1} · {phase_name.capitalize()}: check each "
+                # which step the check belongs to. The mid-dot phase label
+                # ("Step 2 · Classify:") is internal drafting language and
+                # never prints (Phase 7).
+                _ev = (f"Step {idx + 1}: check each "
                        f"learner's work on {focus_short} and note anyone who "
                        "needs help before the next step.")
             _ev = _ev.strip()
@@ -2500,6 +2738,9 @@ def build_lesson(
             if not re.search(r"[.!?]$", _succ):
                 _succ += "."
             assessment = f"{assessment} Success = {_succ}"
+    # Last mechanical step, matching every other composed field: fragmented
+    # source cells and template joins must not surface as ".." or ". .".
+    assessment = _normalize_prose(assessment)
 
     # ── PLENARY — consolidates THIS indicator ───────────────────────────
     if pattern is not None and pattern.plenary_mode in PLENARY_MODE_TEMPLATES:
@@ -2523,8 +2764,8 @@ def build_lesson(
     #   * a CONSOLIDATION cue — the closing move that ends the learning.
     if not early_years and not _EVIDENCE_CUE.search(conclusion):
         conclusion += (
-            " Exit check: each learner answers one question about "
-            f"{focus_short} and the teacher marks each answer before leaving."
+            " Before the class leaves, each learner answers one question about "
+            f"{focus_short} and the teacher marks each answer."
         )
     if not early_years and not _CLOSURE_CUE.search(conclusion):
         conclusion += (
@@ -2618,16 +2859,23 @@ def build_lesson(
         )
         if _practice_idx is not None:
             def _short_clause(text: str, cap: int = 70) -> str:
+                # A clause is shortened at a word boundary and CLOSED with a
+                # full stop — never left as "…" (the fixture's "plus two key
+                # words from the…" defect came from ellipsis truncation).
                 first = re.split(r"(?<=[.!?])\s", (text or "").strip())[0]
                 first = first.rstrip(". ")
                 if len(first) <= cap:
                     return first
                 clipped = first[:cap].rsplit(" ", 1)[0]
-                return (clipped or first[:cap]).rstrip(",;:") + "…"
+                return (clipped or first[:cap]).rstrip(",;:") + "."
             _ns_cue = _short_clause(_support_text)
             _ma_cue = _short_clause(_challenge_text)
             if _ns_cue and _ma_cue:
-                _woven = (f" (NS: {_ns_cue}; MA: {_ma_cue}).")
+                # Teacher-facing wording (Phase 7): raw "NS:" / "MA:" band
+                # markers stay inside the differentiation field, where the
+                # template defines them; the woven cue is plain prose.
+                _woven = (f" (For learners needing support: {_ns_cue}. "
+                          f"For learners ready for more: {_ma_cue}.)")
                 learner_activities[_practice_idx].description = (
                     learner_activities[_practice_idx].description.rstrip(". ")
                     + _woven
@@ -2776,6 +3024,10 @@ def build_lesson(
     if not _teachable:
         _teachable = list(profile.resources)
     resources = _teachable or resources
+    # Phase 6.4: the DISPLAY list is teacher-facing content — ordinary
+    # resource names print with consistent capitalisation ("Charts and
+    # Pictures"). ``source_tlrs`` above keeps the scheme's wording verbatim.
+    resources = [text_hygiene.fix_resource_capitalisation(r) for r in resources]
 
     # ── Lived experience (Priority 2 §16) — a Ghanaian lesson is taught in a
     # real place ──────────────────────────────────────────────────────────
@@ -2841,6 +3093,9 @@ def build_lesson(
             continue
         if kl not in [x.lower() for x in keywords]:
             keywords.append(k)
+    # Phase 6.4: keywords print as the plan's "New words" row — ordinary
+    # resource names carry consistent capitalisation ("Charts and Pictures").
+    keywords = [text_hygiene.fix_resource_capitalisation(k) for k in keywords]
 
     # ── Core competencies — PER-LESSON, activity-derived (PART H) ───────
     # AI-suggested + teacher-editable. ONLY the competencies meaningful for
@@ -3011,6 +3266,11 @@ def build_lesson(
         status=LessonStatus.GENERATED,
         ai_generated=False,
     )
+
+    # Final composition guard: no teacher-visible field may carry a duplicated
+    # command/connector or a stray source separator. Source-verbatim fields
+    # (indicators, content standard, source TLRs) are intentionally excluded.
+    _normalize_lesson_text(lp)
 
     # ── Layer 4: record this lesson's fingerprint for anti-repetition ────
     # The history is optional and NEVER changes this lesson's text; it only

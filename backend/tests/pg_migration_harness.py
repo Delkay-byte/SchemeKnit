@@ -152,6 +152,19 @@ def main() -> int:
             print(json.dumps({"ok": False, "summary": summary}))
             return 1
 
+    # v034: the liveness lease must exist on PostgreSQL and stay nullable so
+    # legacy rows (which have no heartbeat) remain valid.
+    job_cols = {c["name"]: c for c in insp.get_columns("generation_jobs")}
+    if "heartbeat_at" not in job_cols:
+        summary["error"] = "generation_jobs.heartbeat_at missing"
+        print(json.dumps({"ok": False, "summary": summary}))
+        return 1
+    if not job_cols["heartbeat_at"].get("nullable", False):
+        summary["error"] = "generation_jobs.heartbeat_at must be nullable"
+        print(json.dumps({"ok": False, "summary": summary}))
+        return 1
+    summary["steps"].append("v034_heartbeat_column")
+
     with engine.connect() as conn:
         week_default = conn.execute(text(
             "SELECT column_default FROM information_schema.columns "

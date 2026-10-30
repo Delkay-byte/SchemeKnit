@@ -180,7 +180,12 @@ class TestSubjectPedagogy:
         practice = [a.description for a in lp.learner_activities
                     if "PLENARY" not in a.phase]
         assert practice, "no practice learner activities"
-        assert "NS:" in practice[-1] and "MA:" in practice[-1], practice[-1]
+        # Phase 7 (guidance §B): the woven cue is TEACHER-FACING prose — the
+        # raw "NS:" / "MA:" band markers stay inside the differentiation
+        # field only, never in the activity flow.
+        assert "NS:" not in practice[-1] and "MA:" not in practice[-1], practice[-1]
+        assert "For learners needing support:" in practice[-1], practice[-1]
+        assert "For learners ready for more:" in practice[-1], practice[-1]
 
     def test_previous_and_next_context_used(self):
         scheme, config, job = _run(

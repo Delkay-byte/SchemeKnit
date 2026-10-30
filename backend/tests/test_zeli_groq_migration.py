@@ -87,10 +87,12 @@ def _capture_posts(status_sequence, content="{}"):
 
 def _make_lesson_row(db, owner):
     """A stored lesson with WAPEF + the assignment chain filled in."""
-    from src.database import GenerationJobDB, generate_id
-    from tests.conftest import make_school
+    from src.database import GenerationJobDB, SchemeDB, generate_id
 
-    scheme = make_school(db)
+    scheme = SchemeDB(id=generate_id(), owner_id=owner.id, filename="s.docx",
+                      subject="Mathematics", class_level="Basic 7")
+    db.add(scheme)
+    db.flush()
     job = GenerationJobDB(id=generate_id(), owner_id=owner.id, scheme_id=scheme.id,
                           status="completed")
     db.add(job)

@@ -180,12 +180,13 @@ async def list_ai_modes():
 
 
 @router.get("/ai-status")
-async def ai_status(ai_mode: str = "OFF"):
+async def ai_status(ai_mode: str = "OFF", generation_method: str = "standard"):
     """Resolve and report the ACTUAL AI mode / provider for a requested mode.
 
     The UI must be able to show what will actually happen — never a label that
     disagrees with backend behaviour. This reports:
       mode        — the teacher-facing mode that was requested (OFF/BASIC/ENHANCED)
+      generation_method — standard | zeli
       active      — whether a real provider will be used
       provider    — the resolved provider name (or null)
       provider_key— the provider key (or null)
@@ -193,6 +194,23 @@ async def ai_status(ai_mode: str = "OFF"):
       reason      — a short, secret-free explanation when AI is inactive
     Secrets, keys and model IDs are never returned.
     """
+    # "Generate with Zeli" is a distinct method: report ITS availability, never
+    # the OFF/BASIC/ENHANCED enrichment resolution, and never a key or model id.
+    if (generation_method or "standard").strip().lower() == "zeli":
+        from ..engines.zeli_generation import zeli_availability
+
+        state = zeli_availability()
+        return {
+            "mode": "ZELI",
+            "generation_method": "zeli",
+            "active": bool(state.get("available")),
+            "provider": None,
+            "provider_key": None,
+            "state": state.get("state", "NOT_CONFIGURED"),
+            "provider_label": None,
+            "reason": state.get("reason"),
+        }
+
     from ..engines.ai_provider import (
         get_provider, resolve_provider_mode, provider_status, NAMED_PROVIDERS,
     )
@@ -200,7 +218,8 @@ async def ai_status(ai_mode: str = "OFF"):
     requested = (ai_mode or "OFF").strip()
     if requested.upper() == "OFF":
         return {
-            "mode": "OFF", "active": False, "provider": None,
+            "mode": "OFF", "generation_method": "standard",
+            "active": False, "provider": None,
             "provider_key": None, "state": "OFF", "provider_label": None,
             "reason": "AI is off — lessons come from the deterministic engine.",
         }
@@ -208,7 +227,8 @@ async def ai_status(ai_mode: str = "OFF"):
     resolved = resolve_provider_mode(requested)
     if resolved == "OFF":
         return {
-            "mode": requested, "active": False, "provider": None,
+            "mode": requested, "generation_method": "standard",
+            "active": False, "provider": None,
             "provider_key": None, "state": "OFF", "provider_label": None,
             "reason": "AI is off — lessons come from the deterministic engine.",
         }
@@ -218,7 +238,8 @@ async def ai_status(ai_mode: str = "OFF"):
         # that get_provider maps it to. Reporting "mock" as an active
         # provider would be exactly the lie this endpoint exists to prevent.
         return {
-            "mode": requested, "active": False, "provider": None,
+            "mode": requested, "generation_method": "standard",
+            "active": False, "provider": None,
             "provider_key": None, "state": "NOT_CONFIGURED",
             "provider_label": None,
             "reason": (
@@ -246,6 +267,7 @@ async def ai_status(ai_mode: str = "OFF"):
     }.get(resolved, provider_name)
     return {
         "mode": requested,
+        "generation_method": "standard",
         "active": available,
         "provider": provider_name,
         "provider_key": resolved if resolved in NAMED_PROVIDERS else None,

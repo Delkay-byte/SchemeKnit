@@ -501,24 +501,30 @@ class TestHDocxExport:
 # ── I. Persistence round-trip through the DB columns ────────────────────────
 
 class TestIPersistence:
+    @staticmethod
+    def _persist_wapef_lesson(db, user, job_id):
+        """Real scheme+job chain — the lesson FKs require both (PostgreSQL)."""
+        from src.service import DataService
+        from src.database import GenerationJobDB, SchemeDB, generate_id
+        scheme = SchemeDB(id=generate_id(), owner_id=user.id, filename="s.docx",
+                          subject="Mathematics", class_level="Basic 7")
+        db.add(scheme)
+        db.flush()
+        db.add(GenerationJobDB(
+            id=job_id, owner_id=user.id, scheme_id=scheme.id,
+            status="completed", total_lessons=1,
+        ))
+        db.commit()
+        return DataService().create_lesson_plan(db, user.id, job_id, scheme.id,
+                                                _wapef_lesson())
+
     def test_create_and_reload_lesson_keeps_wapef_fields(self, db):
         from tests.conftest import make_user
-        from src.service import DataService
-        from src.database import GenerationJobDB
+        from src.database import LessonPlanDB
         user = make_user(db)
-        job = GenerationJobDB(
-            id="job-wapef", owner_id=user.id, scheme_id="s1",
-            status="completed", total_lessons=1,
-        )
-        db.add(job)
-        db.commit()
-
-        service = DataService()
-        created = service.create_lesson_plan(db, user.id, "job-wapef", "s1",
-                                             _wapef_lesson())
+        created = self._persist_wapef_lesson(db, user, "job-wapef")
         assert created.wapef_deep_hope == wf.WAPEF_DEEP_HOPES[0]
 
-        from src.database import LessonPlanDB
         row = db.query(LessonPlanDB).filter(
             LessonPlanDB.id == created.id).first()
         assert row is not None
@@ -530,17 +536,9 @@ class TestIPersistence:
     def test_update_lesson_plan_normalizes_wapef_payload(self, db):
         from tests.conftest import make_user
         from src.service import DataService
-        from src.database import GenerationJobDB
         user = make_user(db)
-        db.add(GenerationJobDB(
-            id="job-wapef-2", owner_id=user.id, scheme_id="s1",
-            status="completed", total_lessons=1,
-        ))
-        db.commit()
-        service = DataService()
-        created = service.create_lesson_plan(db, user.id, "job-wapef-2", "s1",
-                                             _wapef_lesson())
-        updated = service.update_lesson_plan(
+        created = self._persist_wapef_lesson(db, user, "job-wapef-2")
+        updated = DataService().update_lesson_plan(
             db, created.id, user.id,
             {"wapef_deep_hope": wf.WAPEF_DEEP_HOPES[0],
              "wapef_through_lines": ["Earth keeper", "Beauty creator"],

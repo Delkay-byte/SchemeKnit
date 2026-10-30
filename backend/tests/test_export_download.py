@@ -15,6 +15,7 @@ the reported bug hard to diagnose:
 """
 
 import os
+import subprocess
 import sys
 from datetime import date, timedelta
 from pathlib import Path
@@ -175,11 +176,12 @@ class TestPdfEngineContract:
                    return_value=str(fake_soffice)):
             assert PDFExportEngine.is_available() is True
 
-    def test_backend_order_prefers_word_then_libreoffice(self, tmp_path):
-        """Word first (desktop maturity), LibreOffice second (server fidelity).
+    def test_backend_order_prefers_libreoffice_then_word(self, tmp_path):
+        """LibreOffice first; Word COM is the optional desktop fallback.
 
-        Exactly two backends are attempted: a third pip-only library would only
-        ever produce the flattened text dump this renderer replaced.
+        The cross-platform converter is the documented supported production
+        path. Word is only attempted when LibreOffice is absent or fails, so a
+        flaky Word installation cannot break the normal export.
         """
         eng = PDFExportEngine()
         order = []
@@ -199,7 +201,60 @@ class TestPdfEngineContract:
         with patch.object(eng, "_try_docx2pdf", side_effect=make("word")), \
              patch.object(eng, "_try_libreoffice", side_effect=make("lo", ok=True)):
             eng._convert_docx_to_pdf(docx, pdf)
-        assert order == ["word", "lo"]
+        assert order == ["lo"]
+
+    def test_word_is_the_fallback_when_libreoffice_fails(self, tmp_path):
+        eng = PDFExportEngine()
+        order = []
+        pdf = tmp_path / "fallback.pdf"
+
+        def lo(docx_path, pdf_path):
+            order.append("lo")
+            raise RuntimeError("LibreOffice crashed")
+
+        def word(docx_path, pdf_path):
+            order.append("word")
+            pdf_path.write_bytes(b"%PDF-1.4 converted")
+            return pdf_path
+
+        docx = tmp_path / "fallback.docx"
+        docx.write_bytes(b"PK\x03\x04")
+        with patch.object(eng, "_try_libreoffice", side_effect=lo), \
+             patch.object(eng, "_try_docx2pdf", side_effect=word):
+            eng._convert_docx_to_pdf(docx, pdf)
+        assert order == ["lo", "word"]
+
+    def test_libreoffice_missing_binary_fails_loudly(self, tmp_path):
+        eng = PDFExportEngine()
+        docx = tmp_path / "missing.docx"
+        docx.write_bytes(b"PK\x03\x04")
+        with patch("src.engines.pdf_export._resolve_libreoffice",
+                   return_value=None):
+            with pytest.raises(RuntimeError, match="not installed"):
+                eng._try_libreoffice(docx, tmp_path / "missing.pdf")
+
+    @pytest.mark.parametrize("failure", [
+        subprocess.CalledProcessError(1, "soffice"),
+        subprocess.TimeoutExpired("soffice", 120),
+    ])
+    def test_libreoffice_failure_cleans_isolated_profile(
+            self, tmp_path, failure):
+        """Nonzero exit and timeout both remove the per-conversion profile."""
+        eng = PDFExportEngine()
+        docx = tmp_path / "fail.docx"
+        docx.write_bytes(b"PK\x03\x04")
+        profile = tmp_path / "profile"
+        profile.mkdir()
+        with patch("src.engines.pdf_export._resolve_libreoffice",
+                   return_value=str(tmp_path / "soffice.exe")), \
+             patch("src.engines.pdf_export.tempfile.mkdtemp",
+                   return_value=str(profile)), \
+             patch("src.engines.pdf_export.subprocess.run",
+                   side_effect=failure):
+            with pytest.raises(type(failure)):
+                eng._try_libreoffice(docx, tmp_path / "fail.pdf")
+        assert not profile.exists(), (
+            "LibreOffice's isolated profile leaked after a failed conversion")
 
     def test_batch_raises_when_every_conversion_fails(self, tmp_path):
         eng = PDFExportEngine()
@@ -533,10 +588,10 @@ class TestDownloadHeaderContract:
             await gen_router.export_zip(job.id, "GES-style", TEMPLATE_ID, u, db),
             await gen_router.export_xlsx(job.id, u, db),
         ]
-        real_pdf = tmp_path / "out.pdf"
-        real_pdf.write_bytes(b"%PDF-1.4\n%%EOF\n")
-        with patch.object(PDFExportEngine, "is_available", return_value=True), \
-             patch.object(gen_router.pipeline, "export_pdf_batch", return_value=[real_pdf]):
+        # The filename-header contract is independent of which PDF renderer
+        # runs. Use the always-available structured path here so this test
+        # stays fast and does not depend on the host converter.
+        with patch.object(PDFExportEngine, "is_available", return_value=False):
             responses.append(
                 await gen_router.export_pdf(job.id, "GES-style", None, u, db))
 

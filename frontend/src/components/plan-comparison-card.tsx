@@ -10,20 +10,17 @@ interface Feature {
 
 const FEATURES: Feature[] = [
   { label: 'Account', free: true, pro: true },
-  { label: 'Upload scheme', free: true, pro: true },
-  { label: 'Review curriculum', free: true, pro: true },
+  { label: 'Upload DOCX or PDF scheme', free: true, pro: true },
+  { label: 'Review extracted curriculum', free: true, pro: true },
   { label: 'Configure lessons', free: true, pro: true },
-  { label: 'Generate individual lesson', free: '5 per month', pro: 'Unlimited' },
-  { label: 'Generate full batch / term', free: false, pro: true },
-  { label: 'Download individual DOCX', free: true, pro: true },
-  { label: 'Download full batch / ZIP', free: false, pro: true },
-  { label: 'PDF export', free: true, pro: true },
-  { label: 'Custom templates', free: '1 saved', pro: '10 saved' },
-  { label: 'Approved GES templates', free: true, pro: true },
-  { label: 'AI assistance', free: '5 AI generations / month', pro: 'Full (50 credits)' },
-  { label: 'Lesson history', free: '10 lessons', pro: '100 lessons' },
-  { label: 'Advanced analytics', free: false, pro: true },
-  { label: 'Priority features', free: false, pro: true },
+  { label: 'Generate indicator-level plans', free: '2 per month', pro: '20–480 credits' },
+  { label: 'Multiple plans from one scheme week', free: true, pro: true },
+  { label: 'Download individual DOCX / PDF', free: true, pro: true },
+  { label: 'Batch generation within credits', free: 'Within 2 credits', pro: 'Within package credits' },
+  { label: 'Flexible credits that never expire', free: false, pro: 'GH₵12 pack' },
+  { label: 'Saved work after package ends', free: true, pro: true },
+  { label: 'Payment methods', free: 'None needed', pro: 'Bank Transfer / Mobile Money' },
+  { label: 'Automatic renewal', free: false, pro: false },
 ]
 
 function CellIcon({ value }: { value: boolean | string }) {
@@ -46,8 +43,8 @@ export function PlanComparisonCard() {
         {/* Free Tier Card */}
         <div className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm">
           <div className="text-center mb-4">
-            <h4 className="text-xl font-bold text-gray-800">Free Tier</h4>
-            <p className="text-sm text-gray-500 mt-1">For teachers exploring SchemeKnit</p>
+            <h4 className="text-xl font-bold text-gray-800">Free</h4>
+            <p className="text-sm text-gray-500 mt-1">Two plans every month</p>
           </div>
           <div className="space-y-3">
             {FEATURES.map((f) => (
@@ -65,8 +62,8 @@ export function PlanComparisonCard() {
             RECOMMENDED
           </div>
           <div className="text-center mb-4">
-            <h4 className="text-xl font-bold text-emerald-700">Teacher Pro</h4>
-            <p className="text-sm text-gray-500 mt-1">For teachers using SchemeKnit independently</p>
+            <h4 className="text-xl font-bold text-emerald-700">Prepaid packages</h4>
+            <p className="text-sm text-gray-500 mt-1">Buy credits when you need more</p>
           </div>
           <div className="space-y-3">
             {FEATURES.map((f) => (

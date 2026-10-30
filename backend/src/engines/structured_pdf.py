@@ -344,11 +344,12 @@ def _reference_table(entries: Sequence[Any]) -> Table:
 # ── lesson content ───────────────────────────────────────────────────────────
 
 def _header_rows(family: str, lp, ctx: Dict[str, Any],
-                 declared: Set[str]) -> List[Tuple[str, str]]:
+                 declared: Set[str],
+                 skip_fields: Optional[Set[str]] = None) -> List[Tuple[str, str]]:
     """Administrative values the template does not declare itself."""
     rows = []
     for label, field in HEADER_FIELDS:
-        if field in declared:
+        if field in declared or (skip_fields and field in skip_fields):
             continue
         raw = getattr(lp, field, None)
         if isinstance(raw, (int, float)) and raw <= 0:
@@ -421,7 +422,8 @@ class StructuredPDFEngine:
         for index, lp in enumerate(lessons):
             if index:
                 story.append(PageBreak())
-            story.extend(self._lesson_story(lp, sections, family, ctx))
+            story.extend(self._lesson_story(lp, sections, family, ctx,
+                                            first=(index == 0)))
 
         doc = SimpleDocTemplate(
             str(output_path),
@@ -443,13 +445,37 @@ class StructuredPDFEngine:
     # ── Story assembly ────────────────────────────────────────────────────
 
     def _lesson_story(self, lp, sections, family: str,
-                      ctx: Dict[str, Any]) -> List[Any]:
-        story: List[Any] = [Paragraph(_TITLE_TEXT, _TITLE_STYLE)]
+                      ctx: Dict[str, Any], first: bool = False) -> List[Any]:
+        # Phase 5 header contract: the FIRST page of the plan titles itself
+        # School / Teacher / Week N; later pages carry only their own week
+        # heading. Without a real school/teacher identity the generic title
+        # is kept — one is never fabricated.
+        school = _text(ctx.get("school_name")
+                       or getattr(lp, "school_name", "") or "")
+        teacher = _text(ctx.get("teacher_name")
+                        or getattr(lp, "teacher_name", "") or "")
+        week = getattr(lp, "week_number", 0) or 0
+        skip_header_fields: Set[str] = set()
+        if school or teacher:
+            lines = []
+            if first:
+                if school:
+                    lines.append(school)
+                if teacher:
+                    lines.append(teacher)
+                skip_header_fields.update({"school_name", "teacher_name"})
+            if week:
+                lines.append(f"Week {week}")
+            title = chr(10).join(lines)
+        else:
+            title = _TITLE_TEXT
+        story: List[Any] = [Paragraph(title, _TITLE_STYLE)]
         state: Dict[str, Any] = {"shown": set(), "resources": False}
         declared = _declared_fields(sections)
 
         if not any(s["name"] in HEADER_SECTION_NAMES for s in sections):
-            rows = _header_rows(family, lp, ctx, declared)
+            rows = _header_rows(family, lp, ctx, declared,
+                                skip_fields=skip_header_fields)
             if rows:
                 story.append(Paragraph("Lesson Plan Header", _SECTION_STYLE))
                 story.append(_kv_table(rows))
@@ -467,7 +493,8 @@ class StructuredPDFEngine:
             else:
                 rows = self._field_rows(section, lp, family, ctx, state)
                 if name in HEADER_SECTION_NAMES:
-                    rows.extend(_header_rows(family, lp, ctx, declared))
+                    rows.extend(_header_rows(family, lp, ctx, declared,
+                                             skip_fields=skip_header_fields))
                 elif name == "introduction":
                     rows.extend(self._starter_row(lp, family, ctx, state))
                 if not rows and self._section_fully_shown(section, state):
@@ -519,7 +546,8 @@ class StructuredPDFEngine:
             rows = []
             for c in rubric.criteria:
                 descriptor_lines = [
-                    f"{d.get('descriptor', '')} ({d.get('points', '')} pt)"
+                    f"{d.get('level', '')}: {d.get('descriptor', '')} "
+                    f"({d.get('points', '')} pt)"
                     for d in c.descriptors]
                 rows.append((c.criterion, "\n".join(descriptor_lines)))
             rows.append(("Total marks", str(rubric.total_points)))

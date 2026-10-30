@@ -16,15 +16,21 @@
 
 ## Revenue Streams
 
-### 1. School Licenses
-Primary revenue source. Schools pay annual subscription for multi-teacher access.
+### 1. Individual Teacher Packages
+Primary customer-facing revenue source. All packages are one-time prepaid
+purchases; there is no automatic renewal.
 
-| Plan | Price (GH₵) | Teacher Seats | Duration |
-|------|-------------|---------------|----------|
-| TeachFlow Free | 0 | 1 | Unlimited |
-| TeachFlow Teacher Pro | 200/year | 1 | 365 days |
-| TeachFlow School | 800/year | 20 | 365 days |
-| TeachFlow School Plus | 1,500/year | 50 | 365 days |
+| Package | Price (GH₵) | Lesson-plan credits | Validity |
+|---------|------------|---------------------|----------|
+| Free | 0 | 2 per calendar month | Monthly reset |
+| Flexible Credit Pack | 12 | 20 | Credits do not expire |
+| Teacher Monthly | 22 | 40 | 30 days |
+| Teacher Term Pass | 50 | 160 | 120 days |
+| Academic Year Pass | 120 | 480 | 365 days |
+
+One credit = one successfully generated, independently teachable,
+indicator-level lesson plan. School package pricing remains unapproved and the
+legacy school catalogue row is inactive for new purchases.
 
 ### 2. Content Packs
 Additional curriculum content available for purchase.
@@ -37,18 +43,19 @@ Advanced template designs and formatting options.
 
 ## Payment Methods
 
-Manual payment only (no payment gateway integration):
+Payments are processed online by Paystack. Only two customer-facing methods are
+offered:
 
-**MTN Mobile Money:**
-- Number: 0553976334
-- Account Name: Kobla Saviour Amegayie
+1. **Bank Transfer** — Paystack Ghana Pay with Transfer, returning a temporary
+   account and expiry.
+2. **Mobile Money** — MTN, Telecel or AirtelTigo, authorised on the customer's
+   phone.
 
-**GCB Bank:**
-- Account: 5151010019541
-- Branch: Abor
-- Account Name: Kobla Saviour Amegayie
+Card checkout is not offered. Both methods are one-time prepaid payments; no
+automatic renewal or recurring charge is initiated. A package activates only
+after Paystack confirms the payment and TeachFlow verifies it.
 
-All transactions in GH₵ (Ghana Cedis).
+All transactions are in GH₵ (Ghana Cedis).
 
 ## Licensing Model
 

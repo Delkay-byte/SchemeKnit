@@ -1,0 +1,491 @@
+.track {
+  position: relative;
+  /* Hero + the “Inside the lesson” copy share one particle stage. */
+  min-height: 100vh;
+  min-height: 100svh;
+  background: #071826;
+}
+
+.stage {
+  position: relative;
+  z-index: 0;
+  min-height: 100vh;
+  min-height: 100svh;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    radial-gradient(860px 460px at 50% 30%, rgba(4, 169, 206, 0.17), transparent 66%),
+    radial-gradient(920px 520px at 78% 68%, rgba(4, 169, 206, 0.07), transparent 64%),
+    #071826;
+  color: #f4f7fb;
+}
+
+/* A quiet blueprint texture, static so it is reduced-motion safe. */
+.stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(to right, rgba(126, 220, 240, 0.055) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(126, 220, 240, 0.045) 1px, transparent 1px);
+  background-size: 52px 52px;
+  mask-image: radial-gradient(ellipse 72% 62% at 50% 42%, #000 22%, transparent 74%);
+  -webkit-mask-image: radial-gradient(ellipse 72% 62% at 50% 42%, #000 22%, transparent 74%);
+  pointer-events: none;
+}
+
+.particleLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.particleCanvas {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0;
+  will-change: opacity;
+}
+
+.inner {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  width: 100%;
+  max-width: 1080px;
+  min-height: 100vh;
+  min-height: 100svh;
+  margin: 0 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.25rem 3.4rem;
+  text-align: center;
+}
+
+/* The next content belongs to the same particle stage (not a separate card). */
+.lessonIntro {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 3.1rem 1.25rem 5.5rem;
+  text-align: center;
+}
+
+.lessonIntro::before {
+  content: "";
+  position: absolute;
+  inset: 0.75rem 0.25rem 1.5rem;
+  z-index: -1;
+  background: radial-gradient(
+    ellipse 62% 56% at 50% 52%,
+    rgba(7, 24, 38, 0.76) 0%,
+    rgba(7, 24, 38, 0.44) 54%,
+    transparent 78%
+  );
+  pointer-events: none;
+}
+
+.lessonEyebrow {
+  margin: 0;
+  color: #7edcf0;
+  font-size: 0.7rem;
+  font-weight: 650;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.lessonHeading {
+  margin: 0.8rem auto 0;
+  max-width: 760px;
+  color: #ffffff;
+  font-size: clamp(1.9rem, 3.7vw, 3.1rem);
+  font-weight: 650;
+  letter-spacing: -0.035em;
+  line-height: 1.04;
+  text-wrap: balance;
+}
+
+.lessonSupport {
+  margin: 1.1rem auto 0;
+  max-width: 720px;
+  color: #c5d2df;
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.logoLockup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.8rem, 2.2vw, 1.35rem);
+  margin-bottom: clamp(1.15rem, 2.6vh, 1.8rem);
+  will-change: opacity, transform;
+}
+
+.markPlate {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: clamp(116px, 13.5vw, 176px);
+  height: clamp(116px, 13.5vw, 176px);
+  padding: clamp(13px, 1.7vw, 23px);
+  border: 1px solid rgba(4, 169, 206, 0.38);
+  border-radius: 27%;
+  background: linear-gradient(145deg, #ffffff 0%, #f1f7fa 100%);
+  box-shadow:
+    0 0 0 1px rgba(4, 169, 206, 0.16),
+    0 22px 55px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+.mark {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.wordmark {
+  color: #f8fbfd;
+  font-size: clamp(2.15rem, 4.9vw, 4.35rem);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 0.92;
+  text-wrap: balance;
+}
+
+.wordmarkKnit {
+  color: #04a9ce;
+}
+
+.copy {
+  position: relative;
+  width: 100%;
+  max-width: 850px;
+  will-change: opacity, transform;
+}
+
+/* Keep the copy legible while the particle field crosses behind it. The
+   gradient has no hard edge, so it reads as depth rather than a card. */
+.copy::before {
+  content: "";
+  position: absolute;
+  inset: -1.1rem -1.75rem;
+  z-index: -1;
+  background: radial-gradient(
+    ellipse 64% 58% at 50% 54%,
+    rgba(7, 24, 38, 0.78) 0%,
+    rgba(7, 24, 38, 0.48) 52%,
+    transparent 78%
+  );
+  pointer-events: none;
+}
+
+.eyebrow {
+  margin: 0 0 0.9rem;
+  color: #7edcf0;
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.headline {
+  margin: 0 auto;
+  max-width: 900px;
+  color: #ffffff;
+  font-size: clamp(2.15rem, 4.5vw, 4.1rem);
+  font-weight: 650;
+  letter-spacing: -0.04em;
+  line-height: 0.99;
+  text-wrap: balance;
+}
+
+.line {
+  display: block;
+}
+
+.support {
+  margin: 1.15rem auto 0;
+  max-width: 650px;
+  color: #c5d2df;
+  font-size: 1.03rem;
+  line-height: 1.62;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 1.6rem;
+}
+
+.primary,
+.secondary {
+  display: inline-flex;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.7rem 1.35rem;
+  border-radius: 999px;
+  font-size: 0.98rem;
+  font-weight: 650;
+  text-decoration: none;
+  transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.primary {
+  background: #04a9ce;
+  color: #071826;
+}
+
+.primary:hover {
+  background: #1ab6d8;
+}
+
+.secondary {
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: transparent;
+  color: #ffffff;
+}
+
+.secondary:hover {
+  border-color: rgba(255, 255, 255, 0.52);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.primary:focus-visible,
+.secondary:focus-visible {
+  outline: 2px solid #7edcf0;
+  outline-offset: 3px;
+}
+
+.cue {
+  position: absolute;
+  bottom: 1.2rem;
+  left: 50%;
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: #9fb4c6;
+  font-size: 0.69rem;
+  font-weight: 650;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.cueArrow {
+  display: inline-block;
+  color: #7edcf0;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+/* If the canvas or source image cannot initialise, keep the static hero. */
+.track[data-fallback="true"] {
+  height: auto;
+  min-height: 0;
+}
+
+.track[data-fallback="true"] .stage {
+  height: auto;
+  min-height: 0;
+}
+
+.track[data-fallback="true"] .inner {
+  min-height: 0;
+}
+
+.track[data-fallback="true"] .particleCanvas,
+.track[data-fallback="true"] .cue {
+  display: none;
+}
+
+.track[data-fallback="true"] .logoLockup,
+.track[data-fallback="true"] .copy {
+  visibility: visible !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+@media (max-width: 767px) {
+  .track {
+    min-height: 600px;
+  }
+
+  .inner {
+    padding: 1.5rem 1rem 2.6rem;
+  }
+
+  .lessonIntro {
+    padding: 2.2rem 1rem 4rem;
+  }
+
+  .lessonHeading {
+    font-size: clamp(1.8rem, 8vw, 2.5rem);
+  }
+
+  .lessonSupport {
+    font-size: 0.97rem;
+    line-height: 1.58;
+  }
+
+  .logoLockup {
+    gap: 0.8rem;
+    margin-bottom: 1.1rem;
+  }
+
+  .markPlate {
+    width: 106px;
+    height: 106px;
+    padding: 13px;
+    border-radius: 25%;
+  }
+
+  .wordmark {
+    font-size: clamp(1.9rem, 8.2vw, 2.6rem);
+  }
+
+  .headline {
+    font-size: clamp(2rem, 8.6vw, 2.8rem);
+  }
+
+  .support {
+    margin-top: 1rem;
+    font-size: 0.97rem;
+    line-height: 1.55;
+  }
+
+  .actions {
+    width: 100%;
+    margin-top: 1.3rem;
+  }
+
+  .primary,
+  .secondary {
+    flex: 1 1 13rem;
+  }
+
+  .cue {
+    bottom: 0.85rem;
+    font-size: 0.62rem;
+  }
+}
+
+@media (max-width: 380px) {
+  .markPlate {
+    width: 92px;
+    height: 92px;
+    padding: 11px;
+  }
+
+  .wordmark {
+    font-size: 1.75rem;
+  }
+
+  .headline {
+    font-size: 1.95rem;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+
+  .primary,
+  .secondary {
+    width: 100%;
+    flex-basis: auto;
+  }
+}
+
+@media (max-height: 640px) {
+  .stage {
+    min-height: 100svh;
+  }
+
+  .inner {
+    padding-top: calc(var(--site-header-h, 76px) + 0.8rem);
+    padding-bottom: 1rem;
+  }
+
+  .markPlate {
+    width: 84px;
+    height: 84px;
+    padding: 10px;
+  }
+
+  .wordmark {
+    font-size: 1.8rem;
+  }
+
+  .logoLockup {
+    margin-bottom: 0.7rem;
+  }
+
+  .headline {
+    font-size: clamp(1.65rem, 4.6vw, 2.5rem);
+  }
+
+  .support {
+    margin-top: 0.75rem;
+    font-size: 0.92rem;
+  }
+
+  .actions {
+    margin-top: 0.9rem;
+  }
+
+  .cue {
+    display: none;
+  }
+}
+
+/*
+ * Reduced motion: no pinned scene, no canvas, no scroll-scrub. The complete
+ * logo, heading, copy and CTAs remain in normal flow from first paint.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .track {
+    height: auto;
+    min-height: 0;
+  }
+
+  .stage {
+    height: auto;
+    min-height: 0;
+  }
+
+  .inner {
+    min-height: 0;
+    padding-top: calc(var(--site-header-h, 76px) + 2rem);
+    padding-bottom: 3rem;
+  }
+
+  .particleCanvas,
+  .cue {
+    display: none !important;
+  }
+
+  .logoLockup,
+  .copy {
+    visibility: visible !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}

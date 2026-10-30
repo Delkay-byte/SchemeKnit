@@ -56,7 +56,7 @@ class TestFreeTierLifetimeAllowance:
         assert reason == "free_trial"
         from src.entitlements import resolve_entitlement
         resolved = resolve_entitlement(db, user)
-        assert resolved["plan_name"] == "Free Tier"
+        assert resolved["plan_name"] == "Adesua — Free"
         assert resolved["ai_credits"] == 5
         assert resolved["ai_credits_used"] == 0
 

@@ -8,8 +8,9 @@ Provides CRUD operations with ownership enforcement.
 from datetime import datetime, date, timedelta
 from typing import List, Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, func
 
+from .config import get_settings
 from .database import (
     SchemeDB, WeekDB, TermConfigDB, GenerationJobDB, LessonPlanDB,
     HolidayDB, UserPreferencesDB, TemplateDefinitionDB, ExportEventDB,
@@ -352,13 +353,17 @@ class DataService:
             and_(GenerationJobDB.id == job_id, GenerationJobDB.owner_id == owner_id)
         ).first()
 
-    def update_job(self, db: Session, job_id: str, **kwargs) -> Optional[GenerationJobDB]:
+    def update_job(self, db: Session, job_id: str, commit: bool = True,
+                   **kwargs) -> Optional[GenerationJobDB]:
         job = db.query(GenerationJobDB).filter(GenerationJobDB.id == job_id).first()
         if job:
             for key, value in kwargs.items():
                 setattr(job, key, value)
-            db.commit()
-            db.refresh(job)
+            if commit:
+                db.commit()
+                db.refresh(job)
+            else:
+                db.flush()
         return job
 
     def list_jobs(self, db: Session, owner_id: str) -> List[GenerationJobDB]:
@@ -366,44 +371,88 @@ class DataService:
             GenerationJobDB.owner_id == owner_id
         ).order_by(GenerationJobDB.created_at.desc()).all()
 
+    def heartbeat_job(
+        self, db: Session, job_id: str, at: Optional[datetime] = None
+    ) -> bool:
+        """Refresh the last-activity timestamp of a live generation job.
+
+        Only ``pending``/``processing`` jobs are touched: a heartbeat that
+        arrives after the worker finished must never resurrect a terminal job
+        or overwrite a recovered one. Returns True when a row was updated.
+        """
+        job = db.query(GenerationJobDB).filter(
+            GenerationJobDB.id == job_id
+        ).first()
+        if job is None or job.status not in ("pending", "processing"):
+            return False
+        job.heartbeat_at = at or datetime.utcnow()
+        db.commit()
+        return True
+
     def reconcile_stale_generation_jobs(
-        self, db: Session, older_than_minutes: int = 60
+        self,
+        db: Session,
+        older_than_minutes: Optional[int] = None,
+        now: Optional[datetime] = None,
     ) -> int:
-        """Fail non-terminal generation jobs orphaned by a process restart.
+        """Fail non-terminal generation jobs whose worker is demonstrably gone.
 
         The generate endpoint sets ``failed`` on every handled exception path,
         but a hard process death (SIGKILL, OOM, deploy restart) skips those
-        handlers and the job would stay ``pending`` forever — shadowing the
-        scheme status endpoint and the job history until a lucky rerun.
-        Called once at startup: any non-terminal job older than the threshold
-        predates this process and cannot belong to a live run on a
-        single-process deployment; the age threshold keeps multi-worker
-        restarts conservative. Lesson rows and quota units are untouched —
-        a rerun converges and unit keys are already idempotent.
+        handlers and the job would stay ``pending``/``processing`` forever -
+        shadowing the scheme status endpoint and the job history.
+
+        Policy
+        ------
+        A job is orphaned only when its last activity is STRICTLY older than
+        ``GENERATION_STALE_MINUTES`` (default 60). Last activity is
+        ``heartbeat_at`` when present, else ``created_at`` for legacy rows and
+        jobs that never started. A running worker refreshes the heartbeat
+        every ``GENERATION_HEARTBEAT_SECONDS`` (default 30), so a legitimate
+        long run is not reclaimed merely because it outlived the threshold.
+        Exactly at the threshold is still live; one second past it is stale.
+
+        Lesson rows and quota units are untouched: recovery is a status
+        transition only, and a resume/rerun converges without duplicating
+        lessons or double-charging the per-scheme indicator units.
         """
-        cutoff = datetime.utcnow() - timedelta(minutes=older_than_minutes)
+        if older_than_minutes is None:
+            older_than_minutes = get_settings().GENERATION_STALE_MINUTES
+        older_than_minutes = int(older_than_minutes)
+        if older_than_minutes <= 0:
+            raise ValueError("older_than_minutes must be positive")
+
+        now = now or datetime.utcnow()
+        cutoff = now - timedelta(minutes=older_than_minutes)
+        # COALESCE keeps legacy rows (heartbeat_at NULL) on the original
+        # created_at contract while letting active workers protect long runs.
+        last_activity = func.coalesce(
+            GenerationJobDB.heartbeat_at, GenerationJobDB.created_at
+        )
         stale = (
             db.query(GenerationJobDB)
             .filter(
                 GenerationJobDB.status.in_(["pending", "processing"]),
-                GenerationJobDB.created_at < cutoff,
+                last_activity < cutoff,
             )
             .all()
         )
         for job in stale:
             job.status = "failed"
             job.error_message = (
-                "Generation was interrupted by a server restart. "
-                "Please generate again."
+                "Generation was interrupted by a server restart or an "
+                "unresponsive worker. Resume the pending lessons or generate "
+                "again."
             )
-            job.completed_at = job.completed_at or datetime.utcnow()
+            job.completed_at = job.completed_at or now
         if stale:
             db.commit()
         return len(stale)
 
     # ── Lesson Plans ──────────────────────────────────────────────────────────
 
-    def create_lesson_plan(self, db: Session, owner_id: str, job_id: str, scheme_id: str, lp: LessonPlan) -> LessonPlanDB:
+    def create_lesson_plan(self, db: Session, owner_id: str, job_id: str, scheme_id: str, lp: LessonPlan,
+                           commit: bool = True) -> LessonPlanDB:
         db_lp = LessonPlanDB(
             id=lp.id,
             job_id=job_id,
@@ -475,12 +524,22 @@ class DataService:
             template_id=getattr(lp, "template_id", None),
             status=lp.status.value if isinstance(lp.status, LessonStatus) else str(lp.status),
             ai_generated=lp.ai_generated,
+            ai_provider=getattr(lp, "ai_provider", "") or "",
+            ai_model=getattr(lp, "ai_model", "") or "",
+            generation_method=(
+                getattr(lp, "generation_method", "") or "standard"),
             teacher_edited=lp.teacher_edited,
             original_data={},
         )
         db.add(db_lp)
-        db.commit()
-        db.refresh(db_lp)
+        if commit:
+            db.commit()
+            db.refresh(db_lp)
+        else:
+            # Part of the caller's transaction: make constraint/PK errors
+            # surface now, but do not durably write a lesson the run may
+            # still roll back (quota integrity, audit defect #2).
+            db.flush()
         return db_lp
 
     def get_lesson_plan(self, db: Session, lesson_id: str, owner_id: str) -> Optional[LessonPlanDB]:
@@ -634,7 +693,8 @@ class DataService:
         ).delete()
         db.commit()
 
-    def delete_lesson_plans_by_ids(self, db: Session, owner_id: str, lesson_ids: List[str]) -> int:
+    def delete_lesson_plans_by_ids(self, db: Session, owner_id: str, lesson_ids: List[str],
+                                   commit: bool = True) -> int:
         """Remove specific lessons (owner-checked). Priority 3 replacement.
 
         Occurrence-scoped regeneration replaces ONLY the lessons the run
@@ -647,10 +707,14 @@ class DataService:
             and_(LessonPlanDB.owner_id == owner_id,
                  LessonPlanDB.id.in_(list(lesson_ids)))
         ).delete(synchronize_session=False)
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            db.flush()
         return int(deleted or 0)
 
-    def rehome_lesson_plans_for_scheme(self, db: Session, scheme_id: str, owner_id: str, job_id: str) -> int:
+    def rehome_lesson_plans_for_scheme(self, db: Session, scheme_id: str, owner_id: str, job_id: str,
+                                       commit: bool = True) -> int:
         """Re-point every surviving lesson of a scheme at the current job.
 
         Each generation run creates a new job (the AI credit is keyed by the
@@ -664,7 +728,10 @@ class DataService:
             and_(LessonPlanDB.scheme_id == scheme_id,
                  LessonPlanDB.owner_id == owner_id)
         ).update({"job_id": job_id}, synchronize_session=False)
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            db.flush()
         return int(moved or 0)
 
     # ── Holidays ──────────────────────────────────────────────────────────────

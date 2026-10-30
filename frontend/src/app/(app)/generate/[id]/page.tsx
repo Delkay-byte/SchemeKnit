@@ -9,7 +9,7 @@ import { Banner } from '@/components/ui/banner'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Field, TextArea } from '@/components/ui/field'
-import { Download, Settings, Play, CheckCircle, FileText, FileSpreadsheet, FileArchive, Loader2, Eye, Save, ChevronDown, ChevronRight } from 'lucide-react'
+import { Download, Settings, Play, CheckCircle, FileText, FileSpreadsheet, FileArchive, Loader2, Eye, Save, ChevronDown, ChevronRight, SlidersHorizontal } from 'lucide-react'
 import { api, sanitizeTermConfig } from '@/lib/api'
 import { normalizeError } from '@/lib/error-normalizer'
 import { resolveRouteId } from '@/lib/route-params'
@@ -28,7 +28,8 @@ import {
 import { PageHeader } from '@/components/ui/page-header'
 import { StatusPill } from '@/components/ui/badge'
 import { LessonWorkspace } from '@/components/lesson-workspace'
-import { SchemeOfWork, TermConfig, CurriculumCoverage, Template, CurriculumProfile, WapefOptions } from '@/types'
+import { LessonConfigModal } from '@/components/lesson-config-modal'
+import { SchemeOfWork, TermConfig, CurriculumCoverage, Template, CurriculumProfile, WapefOptions, LessonRubricConfig } from '@/types'
 
 // The Approved WAPEF Plan is one shared form for Nursery/KG/Basic/JHS; its
 // four structured fields are teacher-selected from approved option lists.
@@ -53,6 +54,13 @@ export default function GeneratePage() {
   const [jobId, setJobId] = useState<string | null>(null)
   const [exporting, setExporting] = useState<string | null>(null)
   const [genProgress, setGenProgress] = useState<string>('')
+  // Honest batch outcome: occurrences the quality gate refused stay pending
+  // and must not be presented as generated.
+  const [batchNotice, setBatchNotice] = useState<string | null>(null)
+  // A committed run whose response finalization failed is still a success,
+  // but it must not look like an unqualified one. The API returns/persists
+  // this warning; show it here and on reload.
+  const [finalizationWarning, setFinalizationWarning] = useState<string | null>(null)
   const [allocationPreview, setAllocationPreview] = useState<any>(null)
   const [previewing, setPreviewing] = useState(false)
   // Occurrence ids the teacher has edited since the last preview. A debounced
@@ -79,6 +87,14 @@ export default function GeneratePage() {
   // Approved WAPEF option lists (Deep Hope / Storyline / Through lines /
   // God's Story). Dropdown-only: the teacher picks, never free text, never AI.
   const [wapefOptions, setWapefOptions] = useState<WapefOptions | null>(null)
+  // Guided lesson configuration (Phase 2): the seven plan-wide fields the
+  // teacher confirms AFTER extraction and BEFORE generation, through the ONE
+  // "Configure lesson rubrics" modal. Saved on the scheme; readiness comes
+  // from the server so the browser never decides what counts as configured.
+  const [lessonConfig, setLessonConfig] = useState<LessonRubricConfig>({})
+  const [lessonConfigMissing, setLessonConfigMissing] = useState<string[]>([])
+  const [configModalOpen, setConfigModalOpen] = useState(false)
+  const [configSavedAt, setConfigSavedAt] = useState<string | null>(null)
   const NACCA_COMPETENCIES = [
     'Critical Thinking and Problem Solving',
     'Creativity and Innovation',
@@ -93,8 +109,15 @@ export default function GeneratePage() {
     mode: string; active: boolean; provider: string | null; state: string;
     reason: string | null; provider_label?: string | null;
   } | null>(null)
+  // "Generate with Zeli" availability, reported by the backend for the Zeli
+  // method specifically. It drives an honest disabled state and an explicit
+  // message — never a silent disable or a fake success.
+  const [zeliStatus, setZeliStatus] = useState<{
+    active: boolean; state: string; reason: string | null;
+  } | null>(null)
   const [aiResult, setAiResult] = useState<{
     mode: string; active: boolean; provider: string | null;
+    generation_method?: string;
     lessons_ai: number; lessons_deterministic: number; reason: string | null;
   } | null>(null)
 
@@ -116,6 +139,48 @@ export default function GeneratePage() {
   const [autopilotResult, setAutopilotResult] = useState<
     { rows: Array<{ source_occurrence_id?: string; week_number?: number; topic?: string }> } | null
   >(null)
+  // Honest post-run summary (§18): every number comes from the POST response
+  // or the server's Autopilot plan. The browser never estimates what remains
+  // or how much quota a retry would cost.
+  const [autopilotOutcome, setAutopilotOutcome] = useState<{
+    generated: number
+    already: number
+    rejected: number
+    pending: number
+    quotaSkipped: number
+    needsReview: number
+  } | null>(null)
+  // A failed (or server-restart-orphaned) last run is reported on reload.
+  // When the job persisted a planned occurrence set, the banner offers a TRUE
+  // resume (same job, pending occurrences only); otherwise it falls back to
+  // the existing re-planning retry. Silence made it look as though nothing had
+  // ever happened.
+  const [jobRecovery, setJobRecovery] = useState<{
+    error: string
+    jobId?: string
+    resumable?: string[]
+    blocked?: string[]
+  } | null>(null)
+
+  // Guided configuration (Phase 2): the shared modal persists the plan's
+  // lesson details; this page mirrors the saved values into the generation
+  // payload and refreshes the allocation preview.
+  const handleLessonConfigSaved = async (saved: LessonRubricConfig) => {
+    setLessonConfig(saved)
+    setConfigSavedAt(new Date().toLocaleTimeString())
+    setConfig(prev => ({
+      ...prev,
+      school_name: saved.school_name || prev.school_name,
+      teacher_name: saved.teacher_name || prev.teacher_name,
+      class_size: saved.class_size ?? prev.class_size,
+      lesson_duration_minutes: saved.lesson_duration_minutes ?? prev.lesson_duration_minutes,
+      lessons_per_week: saved.periods_per_week ?? prev.lessons_per_week,
+      period: saved.period ?? prev.period,
+      references: saved.reference ? [saved.reference] : prev.references,
+      teaching_days: saved.teaching_days?.length ? [...saved.teaching_days] : prev.teaching_days,
+    }))
+    try { await handlePreviewAllocation() } catch { /* preview refreshes debounced anyway */ }
+  }
 
   const levelForClass = (classLevel: string): string | undefined => {
     const c = (classLevel || '').toLowerCase()
@@ -138,10 +203,15 @@ export default function GeneratePage() {
     term_end_date: '2026-12-18',
     lessons_per_week: 3,
     lesson_duration_minutes: 60,
-    class_size: 11,
+    // No invented class size: it arrives from the guided configuration or
+    // stays unset (Phase 2.1C).
+    class_size: undefined as unknown as number,
     teaching_days: [0, 2, 4],
     holidays: [],
     ai_mode: 'OFF',
+    // "standard" keeps the existing deterministic/AI-enrichment options;
+    // "zeli" asks Zeli to write each whole lesson. Persisted across visits.
+    generation_method: 'standard',
     template_type: 'GES-style',
     template_id: '',
     include_special_weeks: false,
@@ -171,6 +241,10 @@ export default function GeneratePage() {
     try {
       const saved = window.localStorage.getItem('schemeknit.ai_mode')
       if (saved) setConfig(prev => ({ ...prev, ai_mode: saved as any }))
+      const savedMethod = window.localStorage.getItem('schemeknit.generation_method')
+      if (savedMethod === 'zeli' || savedMethod === 'standard') {
+        setConfig(prev => ({ ...prev, generation_method: savedMethod }))
+      }
       const savedGenMode = window.localStorage.getItem('schemeknit.gen_mode')
       if (savedGenMode === 'guided' || savedGenMode === 'quick') setGenMode(savedGenMode)
       // Autopilot intent (§17): the upload page's ONE explicit action records
@@ -190,14 +264,26 @@ export default function GeneratePage() {
   }, [schemeId])
 
   // The displayed AI status must always reflect what the backend will actually
-  // do for the currently selected mode.
+  // do for the currently selected mode AND generation method.
   useEffect(() => {
     let cancelled = false
-    api.getAiStatus(config.ai_mode || 'OFF')
-      .then((s) => { if (!cancelled) setAiStatus(s) })
-      .catch(() => { if (!cancelled) setAiStatus(null) })
+    api.getAiStatus(config.ai_mode || 'OFF', config.generation_method || 'standard')
+      .then((s) => {
+        if (cancelled) return
+        setAiStatus(s)
+        setZeliStatus(
+          config.generation_method === 'zeli'
+            ? { active: s.active, state: s.state, reason: s.reason }
+            : null,
+        )
+      })
+      .catch(() => {
+        if (cancelled) return
+        setAiStatus(null)
+        setZeliStatus(null)
+      })
     return () => { cancelled = true }
-  }, [config.ai_mode])
+  }, [config.ai_mode, config.generation_method])
 
   const loadData = async () => {
     try {
@@ -245,8 +331,66 @@ export default function GeneratePage() {
       // from the teacher's preferences, never from a fresh guess.
       const prefs = await api.getPreferences().catch(() => null)
 
-      // If this scheme was already generated, restore that job so exports stay reachable after reload
-      if (statusData?.id && statusData?.status === 'completed') {
+      // Guided lesson configuration (Phase 2): the plan's saved values are
+      // the authority for class size, duration, period, reference and the
+      // teaching days; readiness/missing comes from the server. A failure to
+      // load never blocks the page — the modal simply starts from defaults.
+      const savedConfig = await api.getLessonConfig(schemeId).catch(() => null)
+      if (savedConfig?.config) {
+        setLessonConfig(savedConfig.config)
+        setLessonConfigMissing(savedConfig.missing || [])
+        if (savedConfig.config.lesson_duration_minutes) {
+          setConfig(prev => ({ ...prev,
+            lesson_duration_minutes: savedConfig.config.lesson_duration_minutes as number }))
+        }
+        if (savedConfig.config.periods_per_week) {
+          setConfig(prev => ({ ...prev,
+            lessons_per_week: savedConfig.config.periods_per_week as number }))
+        }
+        if (savedConfig.config.period !== undefined && savedConfig.config.period !== null) {
+          setConfig(prev => ({ ...prev, period: savedConfig.config.period as string }))
+        }
+        if (savedConfig.config.teaching_days?.length) {
+          setConfig(prev => ({ ...prev, teaching_days: [...savedConfig.config.teaching_days!] }))
+        }
+      } else {
+        setLessonConfigMissing([])
+      }
+
+      // A failed run (including a job the API reclaimed after a server
+      // restart) stays visible instead of silently disappearing. A partial
+      // job that persisted some lessons is still restored in the workspace;
+      // the banner then offers a true resume of only the remaining plan.
+      const resumableIds: string[] = Array.isArray(statusData?.resumable_occurrence_ids)
+        ? statusData.resumable_occurrence_ids
+        : []
+      const blockedIds: string[] = Array.isArray(statusData?.blocked_for_review_occurrence_ids)
+        ? statusData.blocked_for_review_occurrence_ids
+        : []
+      const canResume = Boolean(statusData?.can_resume) && resumableIds.length > 0
+      const hasRecoveredJob = Boolean(
+        statusData?.id &&
+        (statusData.status === 'completed' ||
+          Number(statusData.completed_lessons || 0) > 0 ||
+          canResume),
+      )
+      if (statusData?.status === 'failed' || canResume) {
+        setJobRecovery({
+          error: statusData.error_message
+            || (resumableIds.length > 0
+              ? 'Some lesson plans from the last run are still pending.'
+              : 'The last generation stopped before it finished.'),
+          jobId: statusData.id,
+          resumable: resumableIds,
+          blocked: blockedIds,
+        })
+      } else {
+        setJobRecovery(null)
+      }
+      setFinalizationWarning(statusData?.finalization_warning || null)
+      // If this scheme was already generated, restore that job so lesson
+      // review and exports stay reachable after reload.
+      if (hasRecoveredJob && statusData?.id) {
         setJobId(statusData.id)
         setCoverage({
           total_instructional_weeks: 0,
@@ -269,7 +413,7 @@ export default function GeneratePage() {
       // job snapshot): exporting a reloaded WAPEF job must use the WAPEF form,
       // not silently fall back to the level default.
       const generatedTemplateId: string | undefined =
-        statusData?.status === 'completed' ? statusData.template_id : undefined
+        hasRecoveredJob ? statusData?.template_id : undefined
       const restoredTemplate = generatedTemplateId
         ? templatesData.templates?.find((t: Template) => t.id === generatedTemplateId)
         : undefined
@@ -432,6 +576,7 @@ export default function GeneratePage() {
               occurrences: plan.selected_occurrence_ids || [],
             },
             plan.selected_rows || [],
+            plan,
           )
         }
       }
@@ -451,10 +596,13 @@ export default function GeneratePage() {
   const runGeneration = async (
     selection: { codes: string[]; occurrences: string[] },
     progress: Array<{ source_occurrence_id?: string; week_number?: number; topic?: string }> = [],
+    plan: any = null,
   ) => {
     try {
       setGenerating(true)
       setError(null)
+      setFinalizationWarning(null)
+      setAutopilotOutcome(null)
       setGenProgress('Generating your lesson plans…')
       setProgressRows(progress)
       if (lessonReview.length > 0) {
@@ -470,11 +618,56 @@ export default function GeneratePage() {
         ...sanitizeTermConfig(config, configFallback()),
         selected_indicator_codes: selection.codes,
         selected_occurrence_ids: selection.occurrences,
+        request_id: (globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`),
       }
       const response = await api.generateLessonPlans(schemeId, body)
+      setJobRecovery(null)
       setJobId(response.job_id)
       setAiResult(response.ai || null)
-      setGenProgress('Lesson plans generated successfully!')
+      setFinalizationWarning(response.warning || null)
+      // The backend now names exactly which occurrences were accepted and
+      // which the quality gate refused. Only accepted rows may be shown as
+      // "Generated"; refused/unstarted work stays pending for a retry.
+      const rejectedIds: string[] = Array.isArray(response.rejected_occurrence_ids)
+        ? response.rejected_occurrence_ids
+        : []
+      const generatedIds = new Set<string>(
+        Array.isArray(response.generated_occurrence_ids)
+          ? response.generated_occurrence_ids
+          : [],
+      )
+      const alreadyIds: string[] = Array.isArray(response.already_generated_occurrence_ids)
+        ? response.already_generated_occurrence_ids
+        : []
+      const pendingIds: string[] = Array.isArray(response.pending_occurrence_ids)
+        ? response.pending_occurrence_ids
+        : []
+      if (plan) {
+        // Quota wait / review counts are the SERVER plan's numbers (§20);
+        // generated/already/rejected/pending are the run's real response.
+        setAutopilotOutcome({
+          generated: generatedIds.size,
+          already: alreadyIds.length,
+          rejected: rejectedIds.length,
+          pending: pendingIds.length,
+          quotaSkipped: Number(plan.counts?.quota_skipped_count ?? 0),
+          needsReview: Number(plan.counts?.needs_review_count ?? 0),
+        })
+      }
+      const readyRows = Array.isArray(response.generated_occurrence_ids)
+        ? progress.filter((r) => r.source_occurrence_id && generatedIds.has(r.source_occurrence_id))
+        : progress
+      if (rejectedIds.length > 0) {
+        setBatchNotice(
+          `${rejectedIds.length} lesson plan${rejectedIds.length === 1 ? '' : 's'} ` +
+          'could not be generated and remain pending. They were not saved and ' +
+          'no quota was charged for them — try those again, or review the source scheme.',
+        )
+        setGenProgress(`${readyRows.length} lesson plan${readyRows.length === 1 ? '' : 's'} generated; ${rejectedIds.length} remain pending.`)
+      } else {
+        setBatchNotice(null)
+        setGenProgress('Lesson plans generated successfully!')
+      }
 
       const coverageData = await api.getCurriculumCoverage(response.job_id)
       setCoverage(coverageData)
@@ -482,7 +675,102 @@ export default function GeneratePage() {
       await refreshSchemeLessons()
       // Autopilot handoff (§18): a multi-lesson run gets the simple results
       // view; ONE generated lesson opens directly in the workspace below.
-      setAutopilotResult(progress.length > 1 ? { rows: progress } : null)
+      setAutopilotResult(readyRows.length > 1 ? { rows: readyRows } : null)
+    } catch (err) {
+      setError(normalizeError(err).message)
+      setGenProgress('')
+    } finally {
+      setGenerating(false)
+      setProgressRows([])
+    }
+  }
+
+  // True resume: continue the SAME job's planned-but-unpersisted occurrences.
+  // This is deliberately separate from runGeneration (which creates a new job
+  // and re-plans the scheme). The server reuses the job, skips existing
+  // lessons, and charges only codes that have not already been paid for.
+  const runResume = async () => {
+    const resumeJobId = jobRecovery?.jobId
+    if (!resumeJobId) return
+    try {
+      setGenerating(true)
+      setError(null)
+      setBatchNotice(null)
+      setFinalizationWarning(null)
+      setAutopilotOutcome(null)
+      setGenProgress('Resuming the pending lesson plans…')
+      const response = await api.resumeGeneration(schemeId, resumeJobId)
+      setJobId(response.job_id)
+      setAiResult(response.ai || null)
+      setFinalizationWarning(response.warning || null)
+
+      const generatedIds: string[] = Array.isArray(response.generated_occurrence_ids)
+        ? response.generated_occurrence_ids
+        : []
+      const alreadyIds: string[] = Array.isArray(response.already_generated_occurrence_ids)
+        ? response.already_generated_occurrence_ids
+        : []
+      const rejectedIds: string[] = Array.isArray(response.rejected_occurrence_ids)
+        ? response.rejected_occurrence_ids
+        : []
+      const resumableIds: string[] = Array.isArray(response.resumable_occurrence_ids)
+        ? response.resumable_occurrence_ids
+        : []
+      const blockedIds: string[] = Array.isArray(response.blocked_for_review_occurrence_ids)
+        ? response.blocked_for_review_occurrence_ids
+        : []
+
+      setAutopilotOutcome({
+        generated: generatedIds.length,
+        already: alreadyIds.length,
+        rejected: rejectedIds.length,
+        pending: resumableIds.length,
+        quotaSkipped: 0,
+        needsReview: blockedIds.length,
+      })
+      if (response.status === 'failed') {
+        setError(
+          response.message
+            || 'This batch could not continue. Start a new generation instead.',
+        )
+      }
+      if (resumableIds.length > 0) {
+        setBatchNotice(
+          `${resumableIds.length} lesson plan${resumableIds.length === 1 ? '' : 's'} ` +
+          'are still pending and can be resumed without duplicating the lessons ' +
+          'already saved.',
+        )
+        setGenProgress(
+          `${generatedIds.length} generated; ${resumableIds.length} remain pending.`,
+        )
+        setJobRecovery({
+          error: 'Some lesson plans from this batch are still pending.',
+          jobId: response.job_id,
+          resumable: resumableIds,
+          blocked: blockedIds,
+        })
+      } else {
+        setBatchNotice(null)
+        setGenProgress(
+          generatedIds.length
+            ? 'Pending lesson plans generated.'
+            : 'No pending lessons remain in this batch.',
+        )
+        if (response.status === 'failed') {
+          setJobRecovery({
+            error: response.message
+              || 'This batch could not continue. Start a new generation instead.',
+            jobId: response.job_id,
+          })
+        } else {
+          setJobRecovery(null)
+        }
+      }
+
+      const coverageData = await api.getCurriculumCoverage(response.job_id)
+      setCoverage(coverageData)
+      await refreshSchemeLessons()
+      setAutopilotResult(null)
     } catch (err) {
       setError(normalizeError(err).message)
       setGenProgress('')
@@ -497,7 +785,11 @@ export default function GeneratePage() {
   // (honest about what fits — never a silent cap, never a client-side quota
   // rule). Already-generated rows never re-enter the batch.
   const handleGenerateAll = () => {
-    const pending = weekPlans.flatMap((w) => w.rows.filter((r) => !r.generated))
+    // needs_review rows are never part of an automatic batch: they stay
+    // visible with their warning and are generated only after review. The
+    // backend rejects them too, so the UI must not invite the 409.
+    const pending = weekPlans.flatMap((w) =>
+      w.rows.filter((r) => !r.generated && !r.needs_review))
     const selection = fullSelection(pending, allocationPreview?.lesson_quota)
     const rows = pending
       .filter((r) => selection.codes.includes((r.indicator_code || '').trim()))
@@ -570,6 +862,7 @@ export default function GeneratePage() {
         occurrences: plan.selected_occurrence_ids || [],
       },
       plan.selected_rows || [],
+      plan,
     )
   }
 
@@ -792,8 +1085,22 @@ export default function GeneratePage() {
     generateBlockReasons.push(
       'Your Free Tier lesson plans for this month are used up. Upgrade to Teacher Pro for unlimited generation, or wait for next month.')
   }
+  // Zeli unconfigured/unavailable: block with the reason and charge nothing.
+  // The backend refuses before any quota reservation; this keeps the UI honest.
+  if (config.generation_method === 'zeli' && zeliStatus && !zeliStatus.active) {
+    generateBlockReasons.push(
+      'Generate with Zeli is unavailable right now — nothing will be saved and no quota will be used. Choose Standard generation, or try again later.')
+  }
+  // Guided configuration (Phase 2): generation cannot start until the
+  // required lesson details are saved. The missing list comes from the
+  // server, so the UI never invents what counts as configured.
+  if (lessonConfigMissing.length > 0) {
+    generateBlockReasons.push(
+      'Complete the lesson configuration first: '
+      + lessonConfigMissing.join(', ')
+      + '. Open Configure lesson rubrics to save the missing details.')
+  }
   const generateIsBlocked = generateBlockReasons.length > 0
-
   const toggleWeek = (weekNumber: number) => {
     setCollapsedWeeks((prev) =>
       prev.includes(weekNumber)
@@ -818,10 +1125,126 @@ export default function GeneratePage() {
               WORKSPACE leads, so the first thing the teacher sees is the real
               generated lesson (never an empty editor or a bare success toast).
               The configuration surfaces remain below for regeneration. */}
-          <div className="space-y-6 lg:col-span-2">
+          <div className="min-w-0 space-y-6 lg:col-span-2">
           {/* Autopilot handoff (§18): multi-lesson runs lead with the simple
               results view (week/topic/status/Open lesson); a single generated
               lesson opens directly in the workspace below. */}
+          {jobRecovery && (
+            <div
+              data-generation-recovery
+              role="alert"
+              className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900"
+            >
+              <p className="font-semibold">
+                {(jobRecovery.resumable?.length || 0) > 0
+                  ? 'Your last generation has pending lessons.'
+                  : 'Your last generation did not finish.'}
+              </p>
+              <p className="mt-1">
+                {jobRecovery.error}{' '}
+                {(jobRecovery.resumable?.length || 0) > 0
+                  ? `Lessons already generated remain saved. ${jobRecovery.resumable?.length} can be resumed without duplication.`
+                  : 'Lessons already generated remain saved.'}
+              </p>
+              {(jobRecovery.blocked?.length || 0) > 0 && (
+                <p className="mt-1">
+                  {jobRecovery.blocked?.length} source item
+                  {(jobRecovery.blocked?.length || 0) === 1 ? '' : 's'} still
+                  need review before they can be generated.
+                </p>
+              )}
+              <div className="mt-3">
+                {(jobRecovery.resumable?.length || 0) > 0 ? (
+                  <Button
+                    data-generation-resume
+                    size="sm"
+                    onClick={runResume}
+                    disabled={generating}
+                  >
+                    Resume pending lessons
+                  </Button>
+                ) : (
+                  <Button
+                    data-generation-retry
+                    size="sm"
+                    onClick={handleAutopilot}
+                    disabled={generating || !autopilot?.ready}
+                  >
+                    Try again
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+          {batchNotice && (
+            <div
+              data-batch-notice
+              role="status"
+              className="rounded-lg border border-yellow-300 bg-yellow-50 px-4 py-3 text-sm text-yellow-900"
+            >
+              {batchNotice}
+            </div>
+          )}
+          {finalizationWarning && (
+            <div
+              data-finalization-warning
+              role="status"
+              className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+            >
+              {finalizationWarning}
+            </div>
+          )}
+          {jobId && autopilotOutcome && (
+            <div
+              data-autopilot-outcome
+              role="status"
+              className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950"
+            >
+              <p className="font-semibold">This run&apos;s result</p>
+              <ul className="mt-2 list-disc space-y-1 pl-5">
+                <li>
+                  {autopilotOutcome.generated} lesson plan
+                  {autopilotOutcome.generated === 1 ? '' : 's'} generated.
+                </li>
+                {autopilotOutcome.already > 0 && (
+                  <li>
+                    {autopilotOutcome.already} lesson plan
+                    {autopilotOutcome.already === 1 ? '' : 's'} already existed
+                    and {autopilotOutcome.already === 1 ? 'was' : 'were'} not
+                    generated again.
+                  </li>
+                )}
+                {autopilotOutcome.rejected > 0 && (
+                  <li>
+                    {autopilotOutcome.rejected} could not be generated; nothing
+                    was saved and no quota was charged for
+                    {autopilotOutcome.rejected === 1 ? ' it' : ' them'}.
+                  </li>
+                )}
+                {autopilotOutcome.quotaSkipped > 0 && (
+                  <li>
+                    {autopilotOutcome.quotaSkipped} wait for next month&apos;s
+                    allowance.
+                  </li>
+                )}
+                {autopilotOutcome.needsReview > 0 && (
+                  <li>
+                    {autopilotOutcome.needsReview} source item
+                    {autopilotOutcome.needsReview === 1 ? ' needs' : 's need'}{' '}
+                    review before {autopilotOutcome.needsReview === 1 ? 'it' : 'they'} can
+                    be generated.
+                  </li>
+                )}
+                {autopilotOutcome.pending > 0 && (
+                  <li>
+                    {autopilotOutcome.pending} remain
+                    {autopilotOutcome.pending === 1 ? 's' : ''} pending and can be
+                    generated in a later run.
+                  </li>
+                )}
+              </ul>
+            </div>
+          )}
           {jobId && autopilotResult && (
             <SurfaceCard
               data-autopilot-results
@@ -1097,13 +1520,36 @@ export default function GeneratePage() {
             <SurfaceCard data-generate-config className="px-5 py-5 sm:px-6">
               <div className="flex items-center">
                 <Settings className="mr-2 h-5 w-5 text-[#04769B]" aria-hidden="true" />
-                <div>
+                <div className="flex-1">
                   <h2 className="text-lg font-semibold text-[#102A43]">Configuration</h2>
                   <p className="text-sm text-muted-foreground">
                     Configure your lesson plan generation settings
                   </p>
                 </div>
+                {/* Phase 3: ONE route back into the guided configuration —
+                    the modal owns the seven lesson-rubric fields; the review
+                    page never duplicates the form. */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  data-configure-lesson-rubrics
+                  onClick={() => setConfigModalOpen(true)}
+                >
+                  <SlidersHorizontal className="mr-2 h-4 w-4" aria-hidden="true" />
+                  Configure lesson rubrics
+                </Button>
               </div>
+              {lessonConfigMissing.length > 0 && (
+                <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="status">
+                  Lesson configuration is incomplete: {lessonConfigMissing.join(', ')}.{' '}
+                  Use Configure lesson rubrics to save the missing details before generating.
+                </p>
+              )}
+              {lessonConfigMissing.length === 0 && configSavedAt && (
+                <p className="mt-3 text-sm text-green-700" role="status">
+                  Lesson configuration saved{configSavedAt ? ` — ${configSavedAt}` : ''}.
+                </p>
+              )}
 
               <div className="mt-5 space-y-6">
                 <section aria-label="Teaching setup" className="space-y-6">
@@ -1116,7 +1562,7 @@ export default function GeneratePage() {
                         id="cfg-class-size"
                         type="number"
                         value={config.class_size}
-                        onChange={(e) => setConfig({ ...config, class_size: parseInt(e.target.value) || 11 })}
+                        onChange={(e) => { const v = parseInt(e.target.value); setConfig({ ...config, class_size: Number.isFinite(v) && v > 0 ? v : (undefined as unknown as number) }) }}
                       />
                     </Field>
                     <Field label="Lesson Duration (min)" htmlFor="cfg-duration">
@@ -1186,6 +1632,65 @@ export default function GeneratePage() {
                     </div>
                   </div>
 
+                  {/* Generation method: Zeli is an ADDITIONAL, explicitly
+                      selectable method — the existing OFF/BASIC/ENHANCED
+                      options below are preserved and still work when
+                      Standard is selected. */}
+                  <Field
+                    label="Generation method"
+                    htmlFor="cfg-generation-method"
+                    hint="How your lesson plans are written"
+                  >
+                    <div
+                      id="cfg-generation-method"
+                      role="group"
+                      aria-label="Generation method"
+                      className="grid gap-2 sm:grid-cols-2"
+                    >
+                      {([
+                        { value: 'standard', label: 'Standard', hint: 'Deterministic lessons, optionally enriched' },
+                        { value: 'zeli', label: 'Generate with Zeli', hint: 'Zeli writes each whole lesson plan' },
+                      ] as const).map((option) => {
+                        const selected = (config.generation_method || 'standard') === option.value
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            data-generation-method={option.value}
+                            aria-pressed={selected}
+                            onClick={() => {
+                              setConfig((prev) => ({ ...prev, generation_method: option.value }))
+                              try {
+                                window.localStorage.setItem('schemeknit.generation_method', option.value)
+                              } catch { /* storage unavailable */ }
+                            }}
+                            className={`rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
+                              selected
+                                ? 'border-[#102A43] bg-[#102A43] text-white'
+                                : 'border-input bg-background text-foreground hover:bg-muted'
+                            }`}
+                          >
+                            <span className="block font-medium">{option.label}</span>
+                            <span className={`block text-xs ${selected ? 'text-white/80' : 'text-muted-foreground'}`}>
+                              {option.hint}
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                    {config.generation_method === 'zeli' && zeliStatus && (
+                      <p
+                        className={`mt-1 text-xs ${zeliStatus.active ? 'text-green-600' : 'text-amber-700'}`}
+                        role="status"
+                      >
+                        {zeliStatus.active
+                          ? 'Zeli is ready — each lesson plan will be written by Zeli.'
+                          : (zeliStatus.reason
+                            || 'Zeli is unavailable right now. Nothing will be saved and no quota will be used — choose Standard generation or try again later.')}
+                      </p>
+                    )}
+                  </Field>
+
                   <div className="grid gap-4 md:grid-cols-2">
                     <Field label="Template" htmlFor="cfg-template">
                       <Select
@@ -1209,6 +1714,8 @@ export default function GeneratePage() {
                       <Select
                         id="cfg-ai-mode"
                         value={config.ai_mode}
+                        disabled={config.generation_method === 'zeli'}
+                        aria-describedby={config.generation_method === 'zeli' ? 'cfg-ai-mode-note' : undefined}
                         onChange={(e) => {
                           const mode = e.target.value
                           setConfig({ ...config, ai_mode: mode as any })
@@ -1219,7 +1726,12 @@ export default function GeneratePage() {
                         <option value="BASIC">BASIC - Zeli suggestions</option>
                         <option value="ENHANCED">ENHANCED - Zeli assistance</option>
                       </Select>
-                      {aiStatus && (
+                      {config.generation_method === 'zeli' ? (
+                        <p id="cfg-ai-mode-note" className="mt-1 text-xs text-muted-foreground">
+                          Generate with Zeli writes the whole lesson, so this enrichment mode is not used.
+                          Switch to Standard to use OFF, BASIC or ENHANCED.
+                        </p>
+                      ) : aiStatus && (
                         <p className={`mt-1 text-xs ${aiStatus.active ? 'text-green-600' : 'text-muted-foreground'}`}>
                           {/* Zeli is the teacher-facing assistant name. The
                               resolved provider stays in the backend-only
@@ -1533,7 +2045,7 @@ export default function GeneratePage() {
                                           size="sm"
                                           variant="outline"
                                           className="h-6 rounded-md px-2 text-[11px]"
-                                          disabled={rowDisabled || !row.source_occurrence_id}
+                                          disabled={rowDisabled || !row.source_occurrence_id || row.needs_review}
                                           onClick={() => handleGenerateRow(row)}
                                         >
                                           Regenerate
@@ -1550,7 +2062,7 @@ export default function GeneratePage() {
                                           data-generate-lesson
                                           size="sm"
                                           className="h-6 rounded-md px-2 text-[11px]"
-                                          disabled={rowDisabled || !row.source_occurrence_id}
+                                          disabled={rowDisabled || !row.source_occurrence_id || row.needs_review}
                                           onClick={() => handleGenerateRow(row)}
                                         >
                                           Generate
@@ -2125,11 +2637,15 @@ export default function GeneratePage() {
                   </div>
                   {aiResult && (
                     <p className="text-center text-xs text-muted-foreground">
-                      {aiResult.active && aiResult.lessons_ai > 0
-                        ? `Zeli enriched ${aiResult.lessons_ai} lesson${aiResult.lessons_ai === 1 ? '' : 's'}; ${aiResult.lessons_deterministic} used the deterministic engine.`
-                        : aiResult.mode === 'OFF'
-                          ? 'All lessons generated deterministically (Zeli off).'
-                          : 'Zeli unavailable right now — all lessons generated deterministically.'}
+                      {aiResult.generation_method === 'zeli'
+                        ? aiResult.active && aiResult.lessons_ai > 0
+                          ? `All ${aiResult.lessons_ai} lesson plan${aiResult.lessons_ai === 1 ? '' : 's'} were generated by Zeli.`
+                          : 'Zeli did not produce usable lesson plans for this run — nothing was saved and no quota was used.'
+                        : aiResult.active && aiResult.lessons_ai > 0
+                          ? `Zeli enriched ${aiResult.lessons_ai} lesson${aiResult.lessons_ai === 1 ? '' : 's'}; ${aiResult.lessons_deterministic} used the deterministic engine.`
+                          : aiResult.mode === 'OFF'
+                            ? 'All lessons generated deterministically (Zeli off).'
+                            : 'Zeli unavailable right now — all lessons generated deterministically.'}
                     </p>
                   )}
                   <Button className="w-full" variant="outline" asChild>
@@ -2162,6 +2678,7 @@ export default function GeneratePage() {
                       setAllocationPreview(null);
                       // Autopilot results belong to the run that just ended.
                       setAutopilotResult(null);
+                      setAutopilotOutcome(null);
                       autopilotFired.current = false;
                     }}
                     className="w-full"
@@ -2211,6 +2728,14 @@ export default function GeneratePage() {
           </div>
         </div>
       </main>
+
+      <LessonConfigModal
+        schemeId={schemeId}
+        open={configModalOpen}
+        onOpenChange={setConfigModalOpen}
+        config={lessonConfig}
+        onSaved={handleLessonConfigSaved}
+      />
     </div>
   )
 }

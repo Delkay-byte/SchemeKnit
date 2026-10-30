@@ -128,7 +128,7 @@ export function RoleLogin({ entry }: { entry: EntryRole }) {
     setError('')
     setLoading(true)
     try {
-      await login(email, password)
+      await login(email, password, entry)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Authentication failed')
     } finally {
@@ -297,8 +297,8 @@ export function RoleLogin({ entry }: { entry: EntryRole }) {
               Individual Teacher
             </p>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              No school? Start free, or upgrade to Teacher Pro for batch
-              generation and more.
+              No school? Start free with two lesson plans each month, then buy
+              prepaid credits by Bank Transfer or Mobile Money when you need more.
             </p>
           </div>
         </div>

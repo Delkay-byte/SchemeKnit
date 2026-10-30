@@ -16,11 +16,12 @@ from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any, List
 import json
 import os
+import random
 import re
 
 #: Named provider keys accepted by ``get_provider`` (lowercase).
 NAMED_PROVIDERS = frozenset({
-    "gemini", "groq", "openai", "minimax", "ollama", "opencode-zen",
+    "gemini", "groq", "deepseek", "openai", "minimax", "ollama", "opencode-zen",
 })
 
 #: Auto-selection order when AI is on but no named provider is pinned.
@@ -36,6 +37,8 @@ _AUTO_PROVIDER_ORDER = ("groq", "gemini", "openai", "opencode-zen", "ollama")
 #: openai/gpt-oss-120b, which supports strict Structured Outputs.
 DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
 DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b"
+DEFAULT_DEEPSEEK_MODEL = "deepseek-flash"
+DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
 
 #: Hard timeout for provider HTTP calls (seconds).
@@ -783,9 +786,247 @@ class GroqProvider(AIProvider):
         return "groq"
 
 
+class DeepSeekProvider(GroqProvider):
+    """DeepSeek chat-completions provider — the verified engine behind Zeli.
+
+    The DeepSeek API is OpenAI-compatible, so this class reuses the shared
+    prompt builders and response parsing while enforcing DeepSeek-specific
+    request semantics:
+
+    * ``max_tokens`` is the API's completion budget (no ``max_completion_tokens``).
+    * ``thinking`` is sent only when a mode is configured (enabled/disabled);
+      ``auto`` omits it. Reasoning models do not accept a sampling temperature,
+      so ``temperature`` is omitted when thinking is enabled or the model id
+      names a reasoner.
+    * ``response_format`` is limited to ``json_object`` — DeepSeek does not
+      document strict ``json_schema`` support, so schema enforcement stays in
+      SchemeKnit's own validator.
+    * The HTTP client receives an explicit ``(connect, read)`` timeout tuple.
+    * Retries are bounded and only for transient 429/5xx/network failures, with
+      exponential back-off and jitter; auth/validation/unknown-model errors are
+      never retried.
+    * Provider usage (input/output/total plus prompt-cache hit/miss tokens) is
+      recorded on ``last_usage`` for the existing observability surface.
+    """
+
+    BASE_URL = DEFAULT_DEEPSEEK_BASE_URL
+    _TRANSIENT_STATUS = frozenset({429, 500, 502, 503, 504})
+    RETRY_BASE_SECONDS = 1.0
+    RETRY_MAX_SECONDS = 8.0
+
+    def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None,
+                 base_url: Optional[str] = None, *,
+                 temperature: Optional[float] = None,
+                 max_tokens: Optional[int] = None,
+                 thinking_mode: Optional[str] = None,
+                 connect_timeout: Optional[float] = None,
+                 read_timeout: Optional[float] = None,
+                 max_retries: Optional[int] = None):
+        self.api_key = (
+            api_key if api_key is not None else _env("DEEPSEEK_API_KEY")
+        ).strip()
+        self.model = (
+            model or _env("DEEPSEEK_MODEL", DEFAULT_DEEPSEEK_MODEL)
+            or DEFAULT_DEEPSEEK_MODEL
+        ).strip()
+        self.base_url = (
+            base_url or _env("DEEPSEEK_BASE_URL", self.BASE_URL) or self.BASE_URL
+        ).strip()
+        self.temperature = float(
+            temperature if temperature is not None
+            else _env("ZELI_TEMPERATURE", "0.3")
+        )
+        self.max_tokens = int(
+            max_tokens if max_tokens is not None
+            else _env("ZELI_MAX_TOKENS", "2000")
+        )
+        self.thinking_mode = (
+            (thinking_mode if thinking_mode is not None
+             else _env("ZELI_THINKING_MODE", "disabled")) or "auto"
+        ).strip().lower()
+        self.connect_timeout = float(
+            connect_timeout if connect_timeout is not None
+            else _env("ZELI_CONNECT_TIMEOUT_SECONDS", "10")
+        )
+        self.read_timeout = float(
+            read_timeout if read_timeout is not None
+            else _env("ZELI_READ_TIMEOUT_SECONDS", "90")
+        )
+        self.max_retries = int(
+            max_retries if max_retries is not None
+            else _env("ZELI_MAX_RETRIES", "2")
+        )
+        self.last_usage: Optional[Dict[str, Any]] = None
+
+    # ── request construction ───────────────────────────────────────────────
+    def supports_temperature(self) -> bool:
+        """False for reasoning/thinking modes, which ignore sampling controls."""
+        if self.thinking_mode == "enabled":
+            return False
+        model = (self.model or "").lower()
+        return "reasoner" not in model and "-r1" not in model
+
+    def build_request_body(self, prompt: str, *, json_mode: bool = False,
+                           system: Optional[str] = None,
+                           schema: Optional[dict] = None) -> Dict[str, Any]:
+        messages: List[Dict[str, str]] = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+        body: Dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "max_tokens": self.max_tokens,
+        }
+        if self.supports_temperature():
+            body["temperature"] = self.temperature
+        if self.thinking_mode in ("enabled", "disabled"):
+            body["thinking"] = {"type": self.thinking_mode}
+        # DeepSeek supports json_object, not strict json_schema. Schema
+        # enforcement remains in _parse_or_diagnose.
+        if json_mode or schema:
+            body["response_format"] = {"type": "json_object"}
+        return body
+
+    # ── transport ──────────────────────────────────────────────────────────
+    def _chat(self, prompt: str, *, json_mode: bool = False,
+              system: Optional[str] = None,
+              schema: Optional[dict] = None) -> str:
+        import time
+
+        self.last_error = None
+        self.last_usage = None
+        if not self.is_available():
+            self.last_error = "missing_api_key"
+            return ""
+
+        body = self.build_request_body(
+            prompt, json_mode=json_mode, system=system, schema=schema)
+        timeout = (self.connect_timeout, self.read_timeout)
+        url = f"{self.base_url.rstrip('/')}/chat/completions"
+
+        def _post() -> Any:
+            import requests
+            return requests.post(
+                url,
+                json=body,
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+                timeout=timeout,
+            )
+
+        attempt = 0
+        dropped_format = False
+        started = time.monotonic()
+        try:
+            while True:
+                try:
+                    resp = _post()
+                except Exception as exc:
+                    _record_error(self, exc)
+                    ename = type(exc).__name__.lower()
+                    transient = ("timeout" in ename or "connection" in ename)
+                    if transient and attempt < self.max_retries:
+                        attempt += 1
+                        self._sleep_before_retry(attempt)
+                        continue
+                    if "timeout" in ename:
+                        self.last_error = "timeout"
+                    return ""
+
+                if resp.status_code == 400 and not dropped_format:
+                    # A model without json_object support: drop it ONCE and
+                    # re-ask; this is not a transient retry.
+                    if "response_format" in body:
+                        body.pop("response_format", None)
+                        dropped_format = True
+                        continue
+
+                if (resp.status_code in self._TRANSIENT_STATUS
+                        and attempt < self.max_retries):
+                    attempt += 1
+                    self._sleep_before_retry(attempt)
+                    continue
+                break
+        except Exception as exc:
+            _record_error(self, exc)
+            return ""
+
+        elapsed = max(0.0, time.monotonic() - started)
+        if resp.status_code == 429:
+            self.last_error = "rate_limit"
+            return ""
+        if resp.status_code in (401, 403):
+            self.last_error = "auth_failed"
+            return ""
+        if resp.status_code == 402:
+            self.last_error = "insufficient_balance"
+            return ""
+        if resp.status_code == 404:
+            self.last_error = "model_not_found"
+            return ""
+        if resp.status_code in (400, 422):
+            self.last_error = "invalid_request"
+            return ""
+        if resp.status_code != 200:
+            self.last_error = f"http_{resp.status_code}"
+            return ""
+
+        self.last_error = None
+        try:
+            data = resp.json()
+        except Exception:
+            self.last_error = "malformed_response"
+            return ""
+        self._record_usage(data, elapsed)
+        choices = data.get("choices") or []
+        if not choices:
+            self.last_error = "empty_output"
+            return ""
+        message = choices[0].get("message") or {}
+        content = message.get("content") or ""
+        if not str(content).strip():
+            self.last_error = "empty_output"
+            return ""
+        return str(content)
+
+    def _sleep_before_retry(self, attempt: int) -> None:
+        import time
+        delay = min(
+            self.RETRY_BASE_SECONDS * (2 ** max(0, attempt - 1)),
+            self.RETRY_MAX_SECONDS,
+        )
+        time.sleep(delay + random.uniform(0, 0.25))
+
+    def _record_usage(self, data: Dict[str, Any], elapsed: float) -> None:
+        usage = data.get("usage") if isinstance(data, dict) else None
+        if not isinstance(usage, dict):
+            self.last_usage = None
+            return
+        cached = usage.get("prompt_cache_hit_tokens")
+        uncached = usage.get("prompt_cache_miss_tokens")
+        self.last_usage = {
+            "provider": "deepseek",
+            "model": self.model,
+            "input_tokens": usage.get("prompt_tokens"),
+            "output_tokens": usage.get("completion_tokens"),
+            "total_tokens": usage.get("total_tokens"),
+            "cached_input_tokens": cached,
+            "uncached_input_tokens": uncached,
+            "duration_seconds": round(elapsed, 3),
+        }
+
+    def is_available(self) -> bool:
+        return bool(self.api_key)
+
+    def get_name(self) -> str:
+        return "deepseek"
+
+
 class OpenAIProvider(AIProvider):
     """OpenAI API provider. Model configurable via OPENAI_MODEL."""
-
     def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
         self.api_key = api_key or _env("OPENAI_API_KEY")
         self.model = (model or _env("OPENAI_MODEL", DEFAULT_OPENAI_MODEL) or DEFAULT_OPENAI_MODEL).strip()
@@ -1129,6 +1370,7 @@ def get_provider(mode: str = "OFF", **kwargs) -> AIProvider:
         "ENHANCED": MockProvider,
         "gemini": GeminiProvider,
         "groq": GroqProvider,
+        "deepseek": DeepSeekProvider,
         "openai": OpenAIProvider,
         "minimax": MiniMaxProvider,
         "ollama": OllamaProvider,

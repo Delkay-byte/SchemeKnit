@@ -29,7 +29,7 @@ computed from ``current_period_key()`` unless a test passes one explicitly.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Sequence
 
 from sqlalchemy import text
@@ -47,13 +47,21 @@ UNIT_KIND_LESSON_PLAN = "lesson_plan"
 
 
 def current_period_key(at: Optional[datetime] = None) -> str:
-    """Return the active calendar-month key (``YYYY-MM``) from the server clock.
+    """Return the active calendar-month key (``YYYY-MM``) in Africa/Accra.
 
     This is the only place the period is computed; callers must not use a
-    client-supplied month.
+    client-supplied month. Ghana observes UTC+0 with no DST, but using the
+    named zone keeps the rule explicit and correct if local policy changes.
     """
-    at = at or datetime.utcnow()
-    return at.strftime("%Y-%m")
+    try:
+        from zoneinfo import ZoneInfo
+        accra = ZoneInfo("Africa/Accra")
+    except Exception:  # pragma: no cover - tzdata missing on a bare host
+        accra = timezone(timedelta(0))
+    at = at or datetime.now(accra)
+    if at.tzinfo is None:
+        at = at.replace(tzinfo=timezone.utc).astimezone(accra)
+    return at.astimezone(accra).strftime("%Y-%m")
 
 
 def _dialect(db: Session) -> str:
@@ -113,6 +121,39 @@ def get_units_used(db: Session, user_id: str, period_key: Optional[str] = None) 
         UsagePeriodDB.period_key == period_key,
     ).first()
     return int(row.units_used or 0) if row else 0
+
+
+def charged_indicator_codes(
+    db: Session,
+    user_id: str,
+    scheme_id: str,
+    period_key: Optional[str] = None,
+) -> set[str]:
+    """Indicator codes already charged for this scheme in the period.
+
+    A resumed batch can contain occurrences whose indicator code was already
+    paid for by an earlier occurrence (one unit per scheme+code per calendar
+    month). Those occurrences must not be treated as new quota demand, and
+    must not cause a false "not enough allowance" refusal.
+    """
+    period_key = period_key or current_period_key()
+    prefix = f"{scheme_id}:"
+    rows = (
+        db.query(UsageUnitDB.unit_key)
+        .filter(
+            UsageUnitDB.user_id == user_id,
+            UsageUnitDB.period_type == PERIOD_TYPE_CALENDAR_MONTH,
+            UsageUnitDB.period_key == period_key,
+            UsageUnitDB.unit_kind == UNIT_KIND_LESSON_PLAN,
+            UsageUnitDB.scheme_id == scheme_id,
+        )
+        .all()
+    )
+    return {
+        (key or "")[len(prefix):]
+        for (key,) in rows
+        if (key or "").startswith(prefix) and len(key) > len(prefix)
+    }
 
 
 @dataclass
@@ -243,12 +284,16 @@ def release_lesson_units(
     user_id: str,
     unit_keys: Sequence[str],
     period_key: Optional[str] = None,
+    commit: bool = True,
 ) -> int:
     """Release previously reserved units (generation failed / produced fewer).
 
     Deletes the named per-unit rows and decrements the aggregate by exactly the
     number deleted, guarded so it can never go negative. Returns the count
     released.
+
+    ``commit=False`` joins the caller's transaction: the run can then persist
+    lessons, replacement and the unused-unit release atomically.
     """
     period_key = period_key or current_period_key()
     keys = [k for k in unit_keys if k]
@@ -278,7 +323,10 @@ def release_lesson_units(
                     "pk": period_key,
                 },
             )
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            db.flush()
         return int(deleted or 0)
     except Exception:
         db.rollback()

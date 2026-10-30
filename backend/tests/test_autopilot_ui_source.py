@@ -139,7 +139,41 @@ class TestHonestProgressAndResults:
         assert "Open lesson" in src
         assert "Generated" in src
         # Single lesson opens the workspace directly (§18).
-        assert "progress.length > 1" in src
+        assert "readyRows.length > 1" in src
+        # Only accepted occurrences may be listed as ready — a gate-rejected
+        # lesson stays pending and is reported separately.
+        assert "response.generated_occurrence_ids" in src
+        assert "response.rejected_occurrence_ids" in src
+        assert "data-batch-notice" in src
+
+
+class TestAutopilotOutcomeSummary:
+    def test_outcome_names_every_real_batch_field(self):
+        """The result summary must use the POST /generate response, not counts
+        inferred from the rows the browser happened to send."""
+        src = _page()
+        assert "data-autopilot-outcome" in src
+        assert "response.generated_occurrence_ids" in src
+        assert "response.already_generated_occurrence_ids" in src
+        assert "response.rejected_occurrence_ids" in src
+        assert "response.pending_occurrence_ids" in src
+
+    def test_quota_wait_line_comes_from_the_server_plan(self):
+        """Only the API plan may claim work 'waits for next month'."""
+        src = _page()
+        # The fields are populated from the server plan…
+        start = src.index("const runGeneration")
+        end = src.index("const handleGenerateAll", start)
+        body = src[start:end]
+        assert "plan.counts?.quota_skipped_count" in body
+        assert "plan.counts?.needs_review_count" in body
+        # …and the rendered line only repeats those outcome fields.
+        start = src.index("data-autopilot-outcome")
+        end = src.index("data-autopilot-results", start)
+        render = src[start:end]
+        assert "autopilotOutcome.quotaSkipped" in render
+        assert "autopilotOutcome.needsReview" in render
+        assert "wait for next month" in render
 
 
 class TestServerAuthoritativeQuota:
@@ -166,6 +200,40 @@ class TestServerAuthoritativeQuota:
         assert "plan.selected_occurrence_ids" in body
 
 
+class TestGenerationRecoverySurface:
+    def test_failed_interrupted_job_is_reported_with_a_retry(self):
+        """A failed/restart-orphaned job must not vanish on reload.
+
+        The status endpoint now reclaims stale jobs as failed; the page must
+        say so and keep the one-click retry available.
+        """
+        src = _page()
+        assert "data-generation-recovery" in src
+        assert "statusData?.status === 'failed'" in src
+        assert "statusData?.can_resume" in src, (
+            "the banner must follow the server's terminal-state verdict, not "
+            "merely the presence of planned-but-unwritten occurrences (a "
+            "still-processing job also has those)")
+        assert "error_message" in src
+        assert "api.resumeGeneration" in src
+        start = src.index("data-generation-recovery")
+        body = src[start:src.index("data-batch-notice", start)]
+        # A planned-but-unfinished job offers a true resume; a legacy/unknown
+        # job falls back to the re-planning retry.
+        assert "runResume" in body
+        assert "Resume pending lessons" in body
+        assert "data-generation-resume" in body
+        assert "handleAutopilot" in body
+        assert "data-generation-retry" in body
+        assert "Try again" in body
+
+    def test_api_has_a_dedicated_resume_call(self):
+        src = _api()
+        assert "async resumeGeneration" in src
+        assert "/generate/resume" in src
+        assert "job_id: jobId" in src
+
+
 class TestManualFlowUntouched:
     def test_config_weeks_and_review_surfaces_stay_visible(self):
         src = _page()
@@ -187,4 +255,16 @@ class TestManualFlowUntouched:
         src = _page()
         assert "weekStarts[0] || prev.term_start_date" in src
         assert "weekEnds[weekEnds.length - 1] || prev.term_end_date" in src
+
+    def test_committed_run_finalization_warning_is_surfaced(self):
+        """A committed run with a finalization warning must not look clean.
+
+        The API returns `warning` on the POST response and persists
+        `finalization_warning` for reloads. The page must consume both and
+        render a dedicated banner, not merely report an unqualified success.
+        """
+        src = _page()
+        assert "finalization_warning" in src
+        assert "response.warning" in src
+        assert "data-finalization-warning" in src
         assert "default_lesson_duration" in src

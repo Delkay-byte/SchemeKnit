@@ -34,7 +34,7 @@ export default function TermsPage() {
         <ul className="list-disc space-y-1 pl-6">
           <li>
             <strong>Individual Teachers</strong> may use SchemeKnit with a Free
-            or Teacher Pro subscription.
+            plan or a prepaid credit package.
           </li>
           <li>
             <strong>Schools</strong> activate a license and manage their
@@ -52,12 +52,13 @@ export default function TermsPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="4. Subscriptions and Payments">
+      <LegalSection title="4. Packages and Payments">
         <p>
-          Subscription plans are described on our pricing and plan pages.
-          Payments are verified manually — we do not process card or
-          mobile-money transactions automatically. A subscription activates
-          only after payment verification is complete. See our{' '}
+          Lesson-plan packages and their prices, credits and validity periods
+          are described on our pricing page. Purchases are prepaid by Bank
+          Transfer or Mobile Money through Paystack. Cards are not accepted and
+          packages do not renew automatically. A package activates only after
+          Paystack confirms the payment and TeachFlow verifies it. See our{' '}
           <a href="/license-subscription" className="text-brand-cyan underline">
             License &amp; Subscription Terms
           </a>{' '}

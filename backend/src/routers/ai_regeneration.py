@@ -6,6 +6,7 @@ while preserving all other content.
 """
 
 import hashlib
+import json
 
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
@@ -224,22 +225,41 @@ async def regenerate_section(
     # provider, unchanged content hash) returns the cached generation
     # without calling the provider again and without consuming quota.
     _provider_name = provider.get_name()
+    # The cache key covers EVERY input that changes what the provider was
+    # asked to produce: the lesson + section + current text + provider, plus
+    # the rewrite affordance, the teacher's extra instruction and the resolved
+    # mode label. Omitting any of these served one variant's result for a
+    # different request (e.g. "make it practical" returning the cached
+    # "another version" rewrite).
+    _input_hash = _enrichment_cache_hash(
+        lp.id, req.section, previous_content, _provider_name,
+        extra=json.dumps([req.rewrite_mode or "", req.additional_context or "",
+                          mode_label or ""], ensure_ascii=False),
+        model=str(getattr(provider, "model", "") or ""),
+    )
     if _request_already_consumed(db, user.id, req.request_id or ""):
-        _last = (
-            db.query(AIEnrichmentCacheDB)
-            .filter(
-                AIEnrichmentCacheDB.lesson_plan_id == lp.id,
-                AIEnrichmentCacheDB.section == req.section,
+        # Prefer the row for THIS exact input; a replay of an earlier action
+        # must not return a later regeneration of the same section.
+        _last = _load_enrichment_cache(db, lp.id, req.section, _input_hash)
+        if not _last:
+            _row = (
+                db.query(AIEnrichmentCacheDB)
+                .filter(
+                    AIEnrichmentCacheDB.lesson_plan_id == lp.id,
+                    AIEnrichmentCacheDB.section == req.section,
+                )
+                .order_by(AIEnrichmentCacheDB.created_at.desc())
+                .first()
             )
-            .order_by(AIEnrichmentCacheDB.created_at.desc())
-            .first()
-        )
+            _last = (_row.content or "") if _row else ""
+        _text, _activities = _unpack_section_cache(_last, req.section)
         log_event("section_regen_duplicate_request", user_id=user.id,
                   lesson_plan_id=lp.id, section=req.section)
         return SectionRegenerateResponse(
             section=req.section,
             previous_content=previous_content,
-            new_content=(_last.content or "") if _last else previous_content,
+            new_content=_text or previous_content,
+            new_activities=_activities,
             provider=provider.get_name(),
             model=getattr(provider, "model", "unknown"),
             mode=mode_label,
@@ -247,16 +267,16 @@ async def regenerate_section(
             source=ContentSource.AI.value,
             already_generated=True,
         )
-    _input_hash = _enrichment_cache_hash(
-        lp.id, req.section, previous_content, _provider_name)
     _cached = _load_enrichment_cache(db, lp.id, req.section, _input_hash)
     if _cached:
+        _text, _activities = _unpack_section_cache(_cached, req.section)
         log_event("section_regen_cache_hit", user_id=user.id,
                   lesson_plan_id=lp.id, section=req.section)
         return SectionRegenerateResponse(
             section=req.section,
             previous_content=previous_content,
-            new_content=_cached,
+            new_content=_text,
+            new_activities=_activities,
             provider=provider.get_name(),
             model=getattr(provider, "model", "unknown"),
             mode=mode_label,
@@ -356,8 +376,12 @@ async def regenerate_section(
                 ),
             )
 
-        _save_enrichment_cache(db, lp.id, req.section, new_content, provider.__class__.__name__, mode_label,
-                               indicator_hash=_input_hash)
+        _save_enrichment_cache(
+            db, lp.id, req.section,
+            _pack_section_cache(new_content, new_activities),
+            provider.__class__.__name__, mode_label,
+            indicator_hash=_input_hash,
+        )
 
         # Only a SUCCESSFUL generation consumes one lifetime AI generation.
         # Failed/empty/provider-unavailable attempts above never reach here.
@@ -910,16 +934,32 @@ async def enrich_lesson(
     # A replayed enrich action (same request_id already recorded) or an
     # identical input snapshot returns the cached enrichment without a
     # second provider call or a second quota consumption.
+    _enrich_input = "|".join([
+        lp.subject or "", lp.class_level or "", lp.strand or "",
+        lp.sub_strand or "", lp.lesson_topic or "",
+        ",".join((lp.indicators or [])[:3]),
+    ])
+    # The export template selects the system prompt, the phase names and the
+    # validator, so it is part of the request identity: the same lesson
+    # enriched for a GES form must not reuse the approved-format result.
+    _enrich_hash = _enrichment_cache_hash(
+        lp.id, "enrich-lesson", _enrich_input, provider.get_name(),
+        extra=req.template_id or "",
+        model=str(getattr(provider, "model", "") or ""),
+    )
     if _request_already_consumed(db, user.id, req.request_id or ""):
-        _last = (
-            db.query(AIEnrichmentCacheDB)
-            .filter(
-                AIEnrichmentCacheDB.lesson_plan_id == lp.id,
-                AIEnrichmentCacheDB.section == "enrich-lesson",
+        _last = _load_enrichment_cache(db, lp.id, "enrich-lesson", _enrich_hash)
+        if not _last:
+            _row = (
+                db.query(AIEnrichmentCacheDB)
+                .filter(
+                    AIEnrichmentCacheDB.lesson_plan_id == lp.id,
+                    AIEnrichmentCacheDB.section == "enrich-lesson",
+                )
+                .order_by(AIEnrichmentCacheDB.created_at.desc())
+                .first()
             )
-            .order_by(AIEnrichmentCacheDB.created_at.desc())
-            .first()
-        )
+            _last = (_row.content or "") if _row else ""
         log_event("enrich_duplicate_request", user_id=user.id,
                   lesson_plan_id=lp.id)
         return {
@@ -928,15 +968,8 @@ async def enrich_lesson(
             "provider": provider.get_name(),
             "mode": mode,
             "already_generated": True,
-            "cached": (_last.content or "") if _last else "",
+            "cached": _last or "",
         }
-    _enrich_input = "|".join([
-        lp.subject or "", lp.class_level or "", lp.strand or "",
-        lp.sub_strand or "", lp.lesson_topic or "",
-        ",".join((lp.indicators or [])[:3]),
-    ])
-    _enrich_hash = _enrichment_cache_hash(
-        lp.id, "enrich-lesson", _enrich_input, provider.get_name())
     _cached_enrich = _load_enrichment_cache(
         db, lp.id, "enrich-lesson", _enrich_hash)
     if _cached_enrich:
@@ -1066,15 +1099,78 @@ async def enrich_lesson(
 
 
 def _enrichment_cache_hash(lesson_plan_id: str, section: str,
-                           content: str, provider: str) -> str:
+                           content: str, provider: str,
+                           extra: str = "", model: str = "") -> str:
     """Content-identity key for the enrichment cache.
 
     Hashes the lesson/section INPUT the provider was asked to rewrite plus
-    the provider name, so a duplicate submit with the same input resolves to
-    the same cache row while any teacher edit (new input) misses cleanly.
+    the provider name AND model, so a duplicate submit with the same input
+    resolves to the same cache row while any teacher edit (new input) or a
+    model switch misses cleanly.
+
+    ``extra`` carries request configuration that changes the provider's
+    output without changing the section text (rewrite affordance, teacher
+    instruction, resolved mode for section rewrites; template for a full
+    enrichment). Without it one variant's cached result was served for a
+    genuinely different request.
+
+    The payload is structured JSON, not a ``|``-joined string: teacher text
+    may itself contain the separator, and two different inputs previously
+    produced the same digest (``content="x|y", extra="z"`` vs
+    ``content="x", extra="y|z"``). The version field retires old digests.
     """
-    payload = f"{lesson_plan_id}|{section}|{provider}|{content or ''}"
+    payload = json.dumps({
+        "v": 2,
+        "lesson_plan_id": lesson_plan_id or "",
+        "section": section or "",
+        "provider": provider or "",
+        "model": model or "",
+        "content": content or "",
+        "extra": extra or "",
+    }, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+#: Marker for a structured section cache payload (text + activities).
+_SECTION_CACHE_MARK = "schemeknit_section_cache"
+
+
+def _pack_section_cache(text: str, activities: Optional[List[dict]]):
+    """Store the COMPLETE response shape, not just its text.
+
+    A cached ``main_activities`` rewrite that returned only joined text lost
+    the phase/duration structure; the UI treats a response without
+    ``new_activities`` as a failed suggestion, so a double-submit showed an
+    error even though the rewrite had succeeded.
+    """
+    if activities is None:
+        return text or ""
+    return json.dumps({
+        _SECTION_CACHE_MARK: 1,
+        "text": text or "",
+        "activities": activities,
+    })
+
+
+def _unpack_section_cache(raw: str, section: str):
+    """Return ``(text, activities)`` for a cached section payload.
+
+    Legacy rows store plain text; ``main_activities`` rows written before the
+    structured payload existed are split back into activity rows so a replay
+    still yields the UI's expected array (durations unknown).
+    """
+    raw = raw or ""
+    try:
+        obj = json.loads(raw)
+    except Exception:
+        obj = None
+    if isinstance(obj, dict) and obj.get(_SECTION_CACHE_MARK):
+        return (obj.get("text") or "", obj.get("activities"))
+    if section == "main_activities" and raw:
+        rows = _normalize_main_activities(
+            {"main_activities": [ln for ln in raw.splitlines() if ln.strip()]})
+        return raw, (rows or None)
+    return raw, None
 
 
 def _load_enrichment_cache(db, lesson_plan_id: str, section: str,

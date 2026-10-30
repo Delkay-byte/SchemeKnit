@@ -23,7 +23,7 @@ export function SurfaceCard({
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded-2xl border border-[#102A43]/8 bg-white text-[#102A43]',
+        'relative min-w-0 overflow-hidden rounded-2xl border border-[#102A43]/8 bg-white text-[#102A43]',
         elevated
           ? 'shadow-[0_24px_55px_rgba(16,42,67,0.12)]'
           : 'shadow-[0_10px_30px_rgba(16,42,67,0.08)]',

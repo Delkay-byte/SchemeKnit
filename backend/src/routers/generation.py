@@ -5,32 +5,421 @@ Production endpoints for lesson plan generation with persistence.
 """
 
 import asyncio
+import hashlib
 import json
-from datetime import date
+import threading
+from contextlib import contextmanager
+from datetime import date, datetime
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import FileResponse
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote
 import re
+from pydantic import BaseModel
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from ..database import get_db
+from ..config import get_settings
+from ..database import get_db, SessionLocal
 from ..auth import get_current_user, get_optional_user, require_teacher_workflow
-from ..database import User
+from ..database import GenerationJobDB, User
 from ..service import data_service
 from ..entitlements import require_ai_entitlement, consume_ai_generation
 from ..models import (
     TermConfig, LessonPlan, Subject, ClassLevel, TemplateType, AIMode,
-    ReferenceEntry,
+    ReferenceEntry, GenerationMethod,
 )
 from ..engines.generation_pipeline import GenerationPipeline
+from ..engines.zeli_generation import ZeliGenerationError, zeli_availability
 from ..ai_resource_text import normalize_text_items, normalize_structured_references
 from ..logging_config import get_logger, log_event, log_error
 
 router = APIRouter()
 pipeline = GenerationPipeline()
 logger = get_logger()
+
+
+def _is_free_only(quota: dict) -> bool:
+    """True when the account has no paid/referral/package credit balance."""
+    state = (quota or {}).get("credits") or {}
+    return not (
+        int(state.get("purchased") or 0)
+        + int(state.get("package") or 0)
+        + int(state.get("referral") or 0)
+    )
+
+# ── Generation coordination ───────────────────────────────────────────────
+# Two truly concurrent POST /generate requests for the same (owner, scheme)
+# used to pass the in-flight job read before either created its job, then both
+# ran and wrote duplicate lessons. The endpoint is synchronous (FastAPI
+# threadpool), so the bodies really can overlap.
+#
+# The process-wide non-blocking lock is the cheap local gate. It cannot protect
+# a multi-worker or multi-machine deployment, so PostgreSQL additionally takes
+# a session-level advisory lock on a dedicated connection held for the whole
+# request. The database lock is released by PostgreSQL if the process dies.
+# The registry is bounded by the number of schemes a process has generated for.
+_generation_locks: Dict[tuple, threading.Lock] = {}
+_generation_locks_guard = threading.Lock()
+
+
+def generation_lock_key(user_id: str, scheme_id: str) -> int:
+    """Stable 64-bit PostgreSQL advisory-lock key for one owner + scheme.
+
+    Keep this derivation stable: rolling-deploy workers and crash-recovery
+    processes must contend on the same key. Tests pin the same contract.
+    """
+    digest = hashlib.sha256(
+        f"schemeknit:generation:{user_id or ''}:{scheme_id or ''}".encode("utf-8")
+    ).digest()[:8]
+    return int.from_bytes(digest, "big", signed=True)
+
+
+def _scheme_generation_lock(user_id: str, scheme_id: str) -> threading.Lock:
+    key = (user_id or "", scheme_id or "")
+    with _generation_locks_guard:
+        lock = _generation_locks.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _generation_locks[key] = lock
+        return lock
+
+
+@contextmanager
+def _generation_guard(db: Session, user_id: str, scheme_id: str):
+    """Hold the local + PostgreSQL generation guard for one request.
+
+    PostgreSQL uses ``pg_try_advisory_lock`` on a dedicated connection. That
+    connection is held (and the lock is session-scoped) for the entire run;
+    commits in the request's own session therefore cannot release it early.
+    SQLite and other local drivers keep the process lock only, which is
+    sufficient for the supported single-process local/desktop path.
+    """
+    local_lock = _scheme_generation_lock(user_id, scheme_id)
+    if not local_lock.acquire(blocking=False):
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "A generation for this scheme is already running. "
+                "Wait for it to finish before starting another."
+            ),
+        )
+
+    lock_conn = None
+    lock_held = False
+    key = generation_lock_key(user_id, scheme_id)
+    try:
+        bind = db.get_bind()
+        dialect = getattr(getattr(bind, "dialect", None), "name", "")
+        if dialect == "postgresql":
+            try:
+                lock_conn = bind.connect()
+                lock_held = bool(lock_conn.execute(
+                    text("SELECT pg_try_advisory_lock(:k)"), {"k": key}
+                ).scalar())
+            except Exception as exc:
+                if lock_conn is not None:
+                    lock_conn.close()
+                    lock_conn = None
+                raise HTTPException(
+                    status_code=503,
+                    detail=(
+                        "Generation coordination is temporarily unavailable. "
+                        "Please try again."
+                    ),
+                ) from exc
+            if not lock_held:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "A generation for this scheme is already running in "
+                        "another process. Wait for it to finish before "
+                        "starting another."
+                    ),
+                )
+        yield
+    finally:
+        if lock_conn is not None:
+            try:
+                if lock_held:
+                    lock_conn.execute(
+                        text("SELECT pg_advisory_unlock(:k)"), {"k": key})
+                    lock_conn.commit()
+            except Exception as exc:  # pragma: no cover - broken connection
+                # Invalidate so the pool cannot hand a connection that still
+                # holds the session-level lock to a later request. Never let
+                # cleanup mask the request's outcome or strand the local lock.
+                log_error(
+                    "generation_lock_release_failed",
+                    user_id=user_id, scheme_id=scheme_id, error=str(exc),
+                )
+                try:
+                    lock_conn.invalidate()
+                except Exception:
+                    pass
+            finally:
+                lock_conn.close()
+        local_lock.release()
+
+
+@contextmanager
+def _job_heartbeat(job_id: str):
+    """Refresh a running job's last-activity timestamp in the background.
+
+    The generation call is synchronous and can legitimately outlive the stale
+    window, so a single timestamp at start is not enough. A daemon thread uses
+    its OWN SessionLocal session: it never shares the request's transaction,
+    never delays the response, and cannot roll back durable work. It starts by
+    waiting one interval because the caller has already written the initial
+    heartbeat; short runs therefore do not touch the database from this thread.
+
+    Heartbeat failures are logged and swallowed: a transient database hiccup
+    must not fail an otherwise healthy generation. If the database is down for
+    longer than the stale window, the job is genuinely unrecoverable and
+    reconciliation will surface it later.
+    """
+    try:
+        interval = max(int(get_settings().GENERATION_HEARTBEAT_SECONDS), 1)
+    except Exception:
+        interval = 30
+    stop = threading.Event()
+
+    def _beat() -> None:
+        while not stop.wait(interval):
+            session = SessionLocal()
+            try:
+                data_service.heartbeat_job(session, job_id)
+            except Exception as exc:  # pragma: no cover - broken DB
+                session.rollback()
+                log_error(
+                    "generation_heartbeat_failed", job_id=job_id,
+                    error=str(exc),
+                )
+            finally:
+                session.close()
+
+    thread = threading.Thread(
+        target=_beat, name=f"generation-heartbeat-{job_id[:8]}", daemon=True,
+    )
+    thread.start()
+    try:
+        yield
+    finally:
+        stop.set()
+        thread.join(timeout=2)
+
+
+def _persist_finalization_warning(db: Session, job_db: GenerationJobDB,
+                                  warning: str) -> None:
+    """Record a post-commit warning on the durable job (best effort).
+
+    The warning is additive to the existing snapshot, so planned occurrence
+    ids, resume state and the config the job was generated with are preserved.
+    A failure here is logged and never masks the committed result.
+    """
+    try:
+        snapshot = dict(job_db.config_snapshot or {})
+        snapshot["finalization_warning"] = warning
+        data_service.update_job(
+            db, job_db.id, config_snapshot=snapshot,
+        )
+    except Exception as exc:
+        db.rollback()
+        log_error(
+            "generation_finalization_warning_persist_failed",
+            job_id=job_db.id, error=str(exc),
+        )
+
+
+def _recovered_committed_response(db: Session, user: User,
+                                  job_db: GenerationJobDB, scheme_id: str,
+                                  error: Exception) -> Dict[str, Any]:
+    """Last-resort truthful response after a committed run's finalization.
+
+    This runs only when something outside the explicitly guarded post-commit
+    steps raised. The transaction is already durable, so this must never be
+    presented as a rollback or a 500. It re-reads lessons, occurrence ids and
+    job state from the database and returns a recovered success with a
+    warning. Any read that itself fails falls back to honest nulls.
+    """
+    db.rollback()
+    warning = (
+        "Generation completed and its lessons and lesson-plan quota are "
+        "saved, but the final response could not be fully assembled. Reload "
+        "the saved job to see the durable result."
+    )
+    log_error(
+        "generation_post_commit_finalization_failed",
+        user_id=user.id, scheme_id=scheme_id, job_id=job_db.id,
+        error=str(error),
+    )
+
+    lessons = []
+    job = None
+    quota = None
+    try:
+        lessons = data_service.get_lesson_plans_for_scheme(
+            db, scheme_id, user.id)
+        job = data_service.get_job(db, job_db.id, user.id)
+    except Exception:
+        db.rollback()
+    try:
+        from ..entitlements import lesson_quota_status
+        quota = lesson_quota_status(db, user)
+    except Exception:
+        db.rollback()
+        quota = None
+
+    try:
+        total = len(lessons) if lessons else int(
+            getattr(job_db, "completed_lessons", 0) or 0)
+    except Exception:
+        db.rollback()
+        total = 0
+    occurrences = sorted({
+        lp.source_occurrence_id for lp in lessons
+        if getattr(lp, "source_occurrence_id", "")
+    })
+    codes = sorted({
+        code for lp in lessons for code in (lp.indicator_codes or [])
+    })
+    status = job.status if job is not None else "completed"
+    resume_view = {
+        "planned_occurrence_ids": [],
+        "blocked_for_review_occurrence_ids": [],
+        "resumable_occurrence_ids": [],
+        "pending_occurrence_ids": [],
+        "can_resume": False,
+    }
+    if job is not None:
+        try:
+            resume_view = _job_resume_view(db, job, user.id)
+        except Exception:
+            db.rollback()
+
+    _persist_finalization_warning(db, job_db, warning)
+    return {
+        "job_id": job_db.id,
+        "status": status,
+        "total_lessons": total,
+        "completed_lessons": total,
+        "generated_indicator_codes": codes,
+        "generated_occurrence_ids": occurrences,
+        "rejected_occurrence_ids": [],
+        "pending_occurrence_ids": resume_view["pending_occurrence_ids"],
+        "planned_occurrence_ids": resume_view["planned_occurrence_ids"],
+        "resumable_occurrence_ids": resume_view["resumable_occurrence_ids"],
+        "preserved_occurrence_ids": [],
+        "blocked_for_review_occurrence_ids":
+            resume_view["blocked_for_review_occurrence_ids"],
+        "already_generated_occurrence_ids": occurrences,
+        "resumed": False,
+        "resumed_from_job_id": None,
+        "quota": quota,
+        "ai_credits_remaining": None,
+        "ai": {
+            "mode": "UNKNOWN", "active": False, "provider": None,
+            "state": "UNKNOWN",
+            "reason": "Finalization was incomplete; reload the saved job.",
+        },
+        "quality": None,
+        "recovered": True,
+        "warning": warning,
+        "finalization": {
+            "state": "completed_with_warning",
+            "warnings": ["response finalization failed"],
+        },
+    }
+
+
+class ResumeGenerationRequest(BaseModel):
+    """The durable job whose eligible pending occurrences should be resumed."""
+
+    job_id: str
+
+
+def _config_from_snapshot(snapshot: Dict[str, Any]) -> TermConfig:
+    """Rebuild a TermConfig from a stored job snapshot without inventing fields."""
+    fields = {
+        key: value
+        for key, value in (snapshot or {}).items()
+        if key in TermConfig.model_fields
+    }
+    return TermConfig.model_validate(fields)
+
+
+def _allocations_for_config(scheme, config: TermConfig):
+    """The same deterministic allocation the original run used."""
+    calendar = pipeline.calendar_engine.build_calendar(
+        config, scheme.weeks, config.holidays)
+    coverage = pipeline.allocation_engine.allocate(
+        scheme.weeks, calendar, config,
+        bool(config.include_special_weeks),
+    )
+    return list(coverage.allocations)
+
+
+def _planned_scope(
+    *,
+    allocations: List[Any],
+    selected_occurrence_ids: List[str],
+    requested_codes: List[str],
+    indicatorless: bool,
+) -> tuple[List[str], List[str]]:
+    """Return (planned, blocked-for-review) occurrence ids for this run.
+
+    Planned excludes special periods and rows the allocation engine marked
+    needs_review; blocked names the latter so the API never silently drops
+    them. Explicit occurrence selections are already gated upstream, so their
+    blocked list is empty in practice.
+    """
+    if selected_occurrence_ids:
+        scope = [
+            a for a in allocations
+            if a.source_occurrence_id in set(selected_occurrence_ids)
+        ]
+    elif indicatorless:
+        scope = list(allocations)
+    else:
+        codes = set(requested_codes)
+        scope = [a for a in allocations if a.indicator_code in codes]
+
+    planned = sorted({
+        a.source_occurrence_id for a in scope
+        if a.source_occurrence_id
+        and not getattr(a, "is_special_period", False)
+        and not getattr(a, "needs_review", False)
+    })
+    blocked = sorted({
+        a.source_occurrence_id for a in scope
+        if a.source_occurrence_id and getattr(a, "needs_review", False)
+    })
+    return planned, blocked
+
+
+def _job_resume_view(db: Session, job: GenerationJobDB, user_id: str) -> Dict[str, Any]:
+    """Occurrence-level recovery state for a job, without re-planning it."""
+    snapshot = job.config_snapshot or {}
+    planned = sorted(set(
+        (snapshot.get("planned_occurrence_ids") or [])
+        or (snapshot.get("selected_occurrence_ids") or [])
+    ))
+    blocked = sorted(set(snapshot.get("blocked_for_review_occurrence_ids") or []))
+    existing = {
+        (getattr(lp, "source_occurrence_id", "") or "")
+        for lp in data_service.get_lesson_plans_for_scheme(
+            db, job.scheme_id, user_id)
+    }
+    existing.discard("")
+    resumable = sorted(set(planned) - existing - set(blocked))
+    return {
+        "planned_occurrence_ids": planned,
+        "blocked_for_review_occurrence_ids": blocked,
+        "resumable_occurrence_ids": resumable,
+        "pending_occurrence_ids": resumable,
+        "can_resume": bool(resumable) and job.status in ("failed", "completed"),
+    }
 
 
 #: Response header carrying the download filename for export endpoints.
@@ -102,13 +491,42 @@ def _render_context(db, user_id: str, job, scheme_db, lp_models) -> Dict:
     """
     prefs = data_service.get_preferences(db, user_id)
     snapshot = job.config_snapshot or {}
+    # Phase 5: the DATE / DAY: row must show the teacher's selected teaching
+    # DAYS (never calendar dates), in weekday order. The configured snapshot
+    # is the authority; an empty selection renders nothing rather than a guess.
+    day_names = _teaching_day_names(snapshot.get("teaching_days") or [])
     return {
         "term": scheme_db.term if scheme_db and scheme_db.term else None,
         "academic_term": snapshot.get("term") if snapshot else None,
         "period": (prefs.default_period if prefs else "")
                   or snapshot.get("period", "")
                   or (lp_models[0].period if lp_models else ""),
+        "teaching_days": day_names,
     }
+
+
+_WEEKDAY_NAMES = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
+                  "Saturday", "Sunday")
+
+
+def _teaching_day_names(days) -> list:
+    """Normalize configured teaching days to ordered weekday names.
+
+    Accepts weekday ints (0=Monday, the TermConfig convention) or name
+    strings; the output is always in Monday-first order and de-duplicated.
+    """
+    names = set()
+    for d in days or []:
+        if isinstance(d, bool):
+            continue
+        if isinstance(d, int) and 0 <= d < len(_WEEKDAY_NAMES):
+            names.add(_WEEKDAY_NAMES[d])
+        elif isinstance(d, str):
+            probe = d.strip().lower()
+            for i, name in enumerate(_WEEKDAY_NAMES):
+                if probe == name.lower() or probe == name.lower()[:3]:
+                    names.add(name)
+    return [n for n in _WEEKDAY_NAMES if n in names]
 
 
 def _resolve_export_template_id(job, lp_models, template_id) -> Optional[str]:
@@ -195,6 +613,11 @@ async def preview_allocation(
 
     config.school_name = _resolve_school_name(db, user)
     config.teacher_name = _resolve_teacher_name(db, user)
+    # Guided configuration (Phase 2): the preview reflects the plan's SAVED
+    # configuration, so what the teacher reviews is what generation will use.
+    # No hard gate here — the preview is how the teacher SEES the plan before
+    # the configuration step; generation enforces the required fields.
+    _apply_saved_lesson_config(db, scheme_db, config, user)
     # PART 3: record a teacher-confirmed class at PREVIEW time too, so the
     # preview the teacher approves is generated from the same class.
     _persist_confirmed_class(db, user, scheme_db, config)
@@ -383,6 +806,180 @@ async def get_wapef_options(
     """
     from ..engines.wapef_fields import wapef_options
     return wapef_options()
+
+
+# ── Guided lesson configuration (Phase 2) ────────────────────────────────────
+
+#: Fields the GES template requires before a plan can be generated. A field
+# that is genuinely optional on the form (Reference, the timetable PERIOD
+# slot) may legitimately stay blank; everything here must be either already
+# saved or entered by the teacher — never invented.
+LESSON_CONFIG_REQUIRED = (
+    "school_name", "teacher_name", "class_size",
+    "lesson_duration_minutes", "teaching_days",
+)
+
+_ALLOWED_TEACHING_DAYS = {0, 1, 2, 3, 4}  # Monday..Friday (TermConfig ints)
+
+
+class LessonConfigRequest(BaseModel):
+    """The teacher's per-plan lesson configuration (Configure lesson rubrics)."""
+    school_name: Optional[str] = None
+    teacher_name: Optional[str] = None
+    class_size: Optional[int] = None
+    reference: Optional[str] = None
+    lesson_duration_minutes: Optional[int] = None
+    periods_per_week: Optional[int] = None
+    period: Optional[str] = None
+    teaching_days: Optional[List[int]] = None
+
+
+def _normalize_lesson_config(payload: LessonConfigRequest) -> dict:
+    """Validate and normalize the configuration the teacher submitted.
+
+    Raises 422 with a field-specific message on nonsense values; blanks stay
+    blank (an optional field may legitimately be empty) and nothing is ever
+    invented to make the form look complete.
+    """
+    errors = []
+    out: dict = {}
+
+    def _clean_str(name, value, max_len=200):
+        if value is None:
+            return None
+        v = str(value).strip()
+        if not v:
+            return None
+        if len(v) > max_len:
+            errors.append(f"{name} is too long (max {max_len} characters).")
+            return None
+        return v
+
+    out["school_name"] = _clean_str("School name", payload.school_name)
+    out["teacher_name"] = _clean_str("Teacher's name", payload.teacher_name)
+    out["reference"] = _clean_str("Reference", payload.reference, max_len=400)
+    out["period"] = _clean_str("Period", payload.period, max_len=60)
+
+    cs = payload.class_size
+    if cs is not None:
+        if not isinstance(cs, int) or isinstance(cs, bool) or cs < 1 or cs > 500:
+            errors.append("Class size must be a whole number between 1 and 500.")
+        else:
+            out["class_size"] = cs
+
+    dur = payload.lesson_duration_minutes
+    if dur is not None:
+        if not isinstance(dur, int) or isinstance(dur, bool) or dur < 20 or dur > 240:
+            errors.append("Lesson duration must be a whole number between 20 and 240 minutes.")
+        else:
+            out["lesson_duration_minutes"] = dur
+
+    ppw = payload.periods_per_week
+    if ppw is not None:
+        if not isinstance(ppw, int) or isinstance(ppw, bool) or ppw < 1 or ppw > 15:
+            errors.append("Periods per week must be a whole number between 1 and 15.")
+        else:
+            out["periods_per_week"] = ppw
+
+    if payload.teaching_days is not None:
+        days = payload.teaching_days
+        bad = [d for d in days
+               if not isinstance(d, int) or isinstance(d, bool)
+               or d not in _ALLOWED_TEACHING_DAYS]
+        if bad:
+            errors.append("Teaching days must be weekdays (Monday-Friday).")
+        else:
+            out["teaching_days"] = sorted(set(days))
+
+    if errors:
+        raise HTTPException(status_code=422, detail="; ".join(errors))
+    return {k: v for k, v in out.items() if v is not None}
+
+
+def _saved_lesson_config(scheme_db) -> dict:
+    saved = getattr(scheme_db, "lesson_config", None)
+    return dict(saved) if isinstance(saved, dict) else {}
+
+
+def _lesson_config_readiness(config: dict) -> dict:
+    """Which REQUIRED fields the plan is still missing (never invented)."""
+    missing = [name for name in LESSON_CONFIG_REQUIRED
+               if not config.get(name) and config.get(name) != 0]
+    return {"ready": not missing, "missing": missing}
+
+
+@router.get("/{scheme_id}/lesson-config")
+async def get_lesson_config(
+    scheme_id: str,
+    user: User = Depends(require_teacher_workflow),
+    db=Depends(get_db),
+):
+    """The plan's saved lesson configuration, prepopulated from what exists.
+
+    Merge order (most specific wins): the plan's saved configuration, then
+    the teacher's profile defaults (school name, duration, period,
+    references), then the server-resolved identity for the authenticated
+    user. A field with no applicable value anywhere is returned as null —
+    the UI asks the teacher for it instead of inventing one.
+    """
+    scheme_db = data_service.get_scheme(db, scheme_id, user.id)
+    if not scheme_db:
+        raise HTTPException(status_code=404, detail="Scheme not found")
+    prefs = data_service.get_preferences(db, user.id)
+    merged: dict = {}
+    if prefs:
+        if getattr(prefs, "default_school_name", None):
+            merged["school_name"] = prefs.default_school_name
+        if getattr(prefs, "default_lesson_duration", None):
+            merged["lesson_duration_minutes"] = prefs.default_lesson_duration
+        if getattr(prefs, "default_period", None):
+            merged["period"] = prefs.default_period
+        refs = getattr(prefs, "default_references", None) or []
+        if refs:
+            merged["reference"] = refs[0] if isinstance(refs[0], str) else ""
+    resolved_school = _resolve_school_name(db, user)
+    resolved_teacher = _resolve_teacher_name(db, user)
+    if resolved_school:
+        merged.setdefault("school_name", resolved_school)
+    if resolved_teacher:
+        merged.setdefault("teacher_name", resolved_teacher)
+    merged.update(_saved_lesson_config(scheme_db))
+    readiness = _lesson_config_readiness(merged)
+    return {
+        "config": merged,
+        "ready": readiness["ready"],
+        "missing": readiness["missing"],
+        "required_fields": list(LESSON_CONFIG_REQUIRED),
+    }
+
+
+@router.put("/{scheme_id}/lesson-config")
+async def put_lesson_config(
+    scheme_id: str,
+    payload: LessonConfigRequest,
+    user: User = Depends(require_teacher_workflow),
+    db=Depends(get_db),
+):
+    """Validate and persist the plan's lesson configuration.
+
+    The values are saved on THIS scheme only — a per-plan override that never
+    silently mutates global school settings or other plans. Configuration
+    must be persisted before generation; the generate endpoint merges it.
+    """
+    scheme_db = data_service.get_scheme(db, scheme_id, user.id)
+    if not scheme_db:
+        raise HTTPException(status_code=404, detail="Scheme not found")
+    config = _normalize_lesson_config(payload)
+    scheme_db.lesson_config = config
+    db.commit()
+    readiness = _lesson_config_readiness(config)
+    log_event("lesson_config_saved", user_id=user.id, scheme_id=scheme_id,
+              ready=readiness["ready"])
+    return {
+        "config": config,
+        "ready": readiness["ready"],
+        "missing": readiness["missing"],
+    }
 
 
 @router.get("/{scheme_id}/lesson-review")
@@ -622,11 +1219,29 @@ async def autopilot_selection(
 
 
 @router.post("/{scheme_id}/generate")
-async def generate_lesson_plans(
+def generate_lesson_plans(
     scheme_id: str,
     config: TermConfig,
     user: User = Depends(require_teacher_workflow),
     db=Depends(get_db),
+):
+    """Synchronous endpoint so FastAPI runs the blocking pipeline off-loop.
+
+    The body performs synchronous DB and CPU work; declaring it ``async def``
+    blocked the event loop for the whole run. It now runs in the threadpool,
+    which makes the process lock below necessary and correct.
+    """
+    with _generation_guard(db, user.id, scheme_id):
+        return _generate_lesson_plans(scheme_id, config, user, db)
+
+
+def _generate_lesson_plans(
+    scheme_id: str,
+    config: TermConfig,
+    user: User,
+    db: Session,
+    existing_job: Optional[GenerationJobDB] = None,
+    resume: bool = False,
 ):
     scheme_db = data_service.get_scheme(db, scheme_id, user.id)
     if not scheme_db:
@@ -693,6 +1308,15 @@ async def generate_lesson_plans(
     config.school_name = _resolve_school_name(db, user)
     config.teacher_name = _resolve_teacher_name(db, user)
 
+    # Guided lesson configuration (Phase 2): the plan's SAVED configuration —
+    # confirmed by the teacher through "Configure lesson rubrics" — is the
+    # authority for class size, duration, period allocation, teaching days,
+    # reference and the per-plan name overrides. A materially different
+    # configuration must never reuse a lesson generated with old settings, so
+    # the merged values below feed both the builder and the job snapshot.
+    _apply_saved_lesson_config(db, scheme_db, config, user)
+    _require_lesson_config(config)
+
     # ── AI commercial gate (checked BEFORE any generation work) ──────────
     # Commercial entitlement is enforced before any provider is constructed: an
     # installed local provider (e.g. Ollama) never grants access by itself. AI
@@ -700,18 +1324,34 @@ async def generate_lesson_plans(
     if config.ai_mode != AIMode.OFF:
         require_ai_entitlement(user, db)
 
+    # ── Generate with Zeli: configuration gate BEFORE any quota reservation ─
+    # A missing key/disabled method must produce a clear unconfigured state and
+    # charge nothing. Standard generation is untouched and stays usable.
+    if config.generation_method == GenerationMethod.ZELI:
+        require_ai_entitlement(user, db)
+        zeli_state = zeli_availability()
+        if not zeli_state.get("available"):
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Generate with Zeli is not available right now. No lesson "
+                    "plans were saved and no lesson-plan quota was used. "
+                    "Choose Standard generation, or try again later."
+                ),
+            )
+
     # ── Server-side calendar-month lesson-plan quota (Free Tier) ─────────
     # Enforcement lives entirely on the server. The browser never supplies the
     # month. Reservation is atomic and idempotent per indicator.
     from ..entitlements import (
         resolve_entitlement, lesson_quota_status, free_tier_lesson_quota_message,
     )
-    from ..usage_quota import reserve_lesson_units, release_lesson_units
+    from ..usage_quota import charged_indicator_codes
+    from .. import credits as credit_service
     from ..models import WeekType
 
     resolved = resolve_entitlement(db, user)
     quota_before = lesson_quota_status(db, user, resolved)
-    gen_limit = quota_before["limit"] if quota_before["enforced"] else 0
 
     scheme = data_service.scheme_to_model(scheme_db)
     resolve_term_window(config, scheme.weeks)
@@ -754,11 +1394,15 @@ async def generate_lesson_plans(
     # deterministic machinery the preview uses, and quota is reserved for
     # exactly the codes those occurrences carry.
     resolved_by_occ: dict = {}
+    # Every allocation in the scheme, used after the run to report which
+    # occurrences remain pending (never silently implying a full success).
+    _all_allocations: list = []
     if selected_occ:
         _cal = pipeline.calendar_engine.build_calendar(
             config, scheme.weeks, config.holidays
         )
         _cov = ae.allocate(scheme.weeks, _cal, config, include_special)
+        _all_allocations = list(_cov.allocations)
         resolved_by_occ = {
             a.source_occurrence_id: a
             for a in _cov.allocations
@@ -820,12 +1464,57 @@ async def generate_lesson_plans(
             detail="This scheme contains no instructional indicators to generate.",
         )
 
+    # ── needs_review gate for code/full selections (backlog item 5) ───────
+    # The occurrence path above already rejects an explicitly selected
+    # uncertain row. The code path (and the no-selection full run) is a
+    # separate public surface: without this check a client could omit
+    # occurrence ids and still generate a placement the allocation engine
+    # could not confirm. Nothing is reserved or written when the gate fires.
+    if not selected_occ:
+        _gate_cal = pipeline.calendar_engine.build_calendar(
+            config, scheme.weeks, config.holidays
+        )
+        _gate_cov = ae.allocate(scheme.weeks, _gate_cal, config, include_special)
+        _all_allocations = list(_gate_cov.allocations)
+        if indicatorless:
+            _gate_allocs = list(_gate_cov.allocations)
+        else:
+            _gate_codes = set(requested_codes)
+            _gate_allocs = [
+                a for a in _gate_cov.allocations
+                if a.indicator_code in _gate_codes
+            ]
+        _gate_unsafe = [
+            a for a in _gate_allocs if bool(getattr(a, "needs_review", False))
+        ]
+        if _gate_unsafe:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"{len(_gate_unsafe)} lesson placement"
+                    f"{'s' if len(_gate_unsafe) != 1 else ''} in this "
+                    "selection are flagged for review and cannot be "
+                    "generated automatically. Review them first, then "
+                    "generate the confirmed lessons."
+                ),
+            )
+
     # ── Double-submit guard (backlog item 4) ─────────────────────────────
     # A second click while this scheme is still generating must not start a
     # competing run (which would race the lesson replacement and reserve a
     # second quota). The in-flight job is returned as a 409 with its id so
     # the UI can keep polling it instead of resubmitting.
+    #
+    # Reclaim jobs orphaned by a hard process death first: otherwise a stale
+    # "pending" row blocks this scheme until the next server restart. Only
+    # jobs older than the conservative threshold are touched, so a live run
+    # is never failed by this call.
+    data_service.reconcile_stale_generation_jobs(db)
     for _j in data_service.list_jobs(db, user.id):
+        if existing_job is not None and _j.id == existing_job.id:
+            # A resume is the owner of this exact job; its failed/completed
+            # state is the resume precondition, not a competing run.
+            continue
         if _j.scheme_id == scheme_id and _j.status in ("pending", "processing"):
             raise HTTPException(
                 status_code=409,
@@ -859,31 +1548,65 @@ async def generate_lesson_plans(
             already_generated_occurrence_ids = sorted(_existing_occ)
 
     reservation = None
-    if gen_limit > 0:
-        remaining = quota_before["remaining"] or 0
-        if len(requested_codes) > remaining:
-            # Never silently select or drop indicators — ask the teacher to
-            # choose a subset no larger than the remaining allowance.
-            raise HTTPException(
-                status_code=403,
-                detail=(
-                    "This scheme contains "
-                    f"{len(available_codes)} instructional indicator"
-                    f"{'s' if len(available_codes) != 1 else ''}. "
-                    f"You have {remaining} Free Tier lesson plan"
-                    f"{'s' if remaining != 1 else ''} remaining this month. "
-                    f"Select up to {remaining} indicator"
-                    f"{'s' if remaining != 1 else ''} to generate now, or "
-                    "upgrade to Teacher Pro for unlimited generation."
-                ),
-            )
-        reservation = reserve_lesson_units(
-            db, user.id, scheme_id, requested_codes, gen_limit
+    # ── Credit reservation (free monthly first, then paid buckets) ───────
+    # Affordability is decided on the server from the approved catalogue and
+    # the user's auditable balances. A partial batch is never silently run.
+    charged_codes = charged_indicator_codes(
+        db, user.id, scheme_id, quota_before.get("period_key"))
+    unpaid_codes = [c for c in requested_codes if c not in charged_codes]
+    requested_units = len(unpaid_codes)
+    available_units = int(quota_before.get("remaining") or 0)
+    quota_unlimited = bool(
+        quota_before.get("unlimited") or not quota_before.get("enforced"))
+    if not quota_unlimited and requested_units > available_units:
+        shortfall = requested_units - available_units
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                f"This selection needs {requested_units} credit"
+                f"{'s' if requested_units != 1 else ''} for "
+                f"{requested_units} indicator-level lesson plan"
+                f"{'s' if requested_units != 1 else ''}. "
+                f"You have {available_units} credit"
+                f"{'s' if available_units != 1 else ''} available "
+                f"(shortfall: {shortfall}). Select up to {available_units} "
+                "indicator(s) to generate now, or buy a package for more credits."
+                + (" Adesua — Free allowance resets on the 1st of each month."
+                   if _is_free_only(quota_before) else "")
+                + (" This resume can be limited to the indicators you can afford."
+                   if resume else "")
+            ),
+            headers={
+                "X-Credits-Requested": str(requested_units),
+                "X-Credits-Available": str(available_units),
+                "X-Credits-Shortfall": str(shortfall),
+            },
+        )
+
+    if not quota_unlimited and requested_units > 0:
+        import hashlib as _hashlib
+        _request_id = (getattr(config, "request_id", "") or "").strip()
+        if _request_id:
+            _idem = f"gen:{user.id}:{_request_id}"
+        else:
+            _fingerprint = _hashlib.sha256(
+                ("|".join(sorted(unpaid_codes)) + f"|{scheme_id}|"
+                 + (existing_job.id if (resume and existing_job) else "")).encode()
+            ).hexdigest()[:32]
+            _idem = f"gen:{user.id}:{scheme_id}:{quota_before.get('period_key')}:{_fingerprint}"
+        reservation = credit_service.reserve(
+            db, user.id, requested_units, _idem, scheme_id, unpaid_codes,
+            period_key=quota_before.get("period_key"),
         )
         if not reservation.allowed:
             raise HTTPException(
                 status_code=403,
-                detail=free_tier_lesson_quota_message(0),
+                detail=(
+                    f"You need {requested_units} credits but only "
+                    f"{reservation.available} are available. No lesson plans "
+                    "were generated and no credit was charged. Reduce the "
+                    "batch or buy a package."
+                ),
             )
 
     # ── What this run replaces (Priority 3) ────────────────────────────────
@@ -902,37 +1625,89 @@ async def generate_lesson_plans(
         else "all"
     )
 
-    job_db = data_service.create_job(db, user.id, scheme_id, config)
-    config.scheme_of_work_id = scheme_id
     # Generate exactly the requested indicators (all of them when no explicit
     # selection was made). The allocation engine keeps every original field.
     # The occurrence ids stay on the config as the pipeline's subset authority.
+    config.scheme_of_work_id = scheme_id
     config.selected_indicator_codes = requested_codes
     config.selected_occurrence_ids = list(selected_occ)
 
+    # Persist the occurrence identity of this run BEFORE generation. A hard
+    # process death skips the endpoint's exception handlers; without this
+    # snapshot a later request could not tell which occurrences the job still
+    # owed. The snapshot is additive to the existing config (exports and
+    # template restoration keep reading the same fields).
+    _planned_ids, _blocked_ids = _planned_scope(
+        allocations=_all_allocations,
+        selected_occurrence_ids=selected_occ,
+        requested_codes=requested_codes,
+        indicatorless=indicatorless,
+    )
+
+    if existing_job is None:
+        job_db = data_service.create_job(db, user.id, scheme_id, config)
+    else:
+        job_db = existing_job
+        if job_db.owner_id != user.id or job_db.scheme_id != scheme_id:
+            raise HTTPException(status_code=404, detail="Job not found")
+
+    _snapshot = dict(config.model_dump(mode="json"))
+    _snapshot["planned_occurrence_ids"] = _planned_ids
+    _snapshot["blocked_for_review_occurrence_ids"] = _blocked_ids
+    if existing_job is not None:
+        _prior = dict(existing_job.config_snapshot or {})
+        _snapshot["planned_occurrence_ids"] = sorted(
+            set(_prior.get("planned_occurrence_ids") or []) | set(_planned_ids))
+        _snapshot["blocked_for_review_occurrence_ids"] = sorted(
+            set(_prior.get("blocked_for_review_occurrence_ids") or [])
+            | set(_blocked_ids))
+        _snapshot["resumed_at"] = datetime.utcnow().isoformat()
+        _snapshot["resume_count"] = int(_prior.get("resume_count") or 0) + 1
+    data_service.update_job(
+        db, job_db.id, status="processing", error_message="",
+        config_snapshot=_snapshot,
+        heartbeat_at=datetime.utcnow(),
+        # A resumed job may have been marked failed/completed by stale
+        # reconciliation; starting it again clears the old terminal stamp.
+        completed_at=None,
+    )
+
+    # Set only after the accepted lessons, replacement, rehome and unused-unit
+    # release have committed as ONE transaction. From that point on the run
+    # owns durable lesson rows and its quota units, so an exception handler
+    # must never return the reservation (audit defect #2: a late failure used
+    # to leave persisted lessons charged zero quota).
+    persistence_committed = False
+
     try:
-        job = pipeline.generate_all(
-            scheme, config,
-            template_id=config.template_id,
-        )
+        # Keep this job demonstrably alive while the (synchronous) engine
+        # works. Without it, a legitimate run longer than the stale window
+        # could be reclaimed by a peer. The thread never shares this session.
+        with _job_heartbeat(job_db.id):
+            job = pipeline.generate_all(
+                scheme, config,
+                template_id=config.template_id,
+                db=db,
+            )
 
         # generate_all() records engine errors on the job instead of raising
         # (its historical contract). A swallowed failure must NEVER reach the
         # teacher as a 200 with zero lessons: fail the request through the
         # handlers below, which return the reservation and mark the job.
         if job.status.value != "completed":
+            zeli_error = getattr(job, "_zeli_error", None)
+            if zeli_error is not None:
+                # Classified, teacher-safe Zeli failure (429/503/504/502).
+                # Nothing was persisted, so the handler below releases quota.
+                raise HTTPException(
+                    status_code=zeli_error.status_code,
+                    detail=zeli_error.message,
+                )
             raise HTTPException(
                 status_code=500,
                 detail="Generation failed: "
                 f"{getattr(job, 'error_message', None) or 'the lesson engine could not complete this run.'}",
             )
-
-        data_service.update_job(db, job_db.id,
-            status=job.status.value,
-            total_lessons=job.total_lessons,
-            completed_lessons=job.completed_lessons,
-            progress=100,
-        )
 
         actual_lesson_count = (
             len(job._lesson_plans) if hasattr(job, '_lesson_plans') else job.completed_lessons
@@ -987,7 +1762,10 @@ async def generate_lesson_plans(
             # the gate rejects the whole run the request fails, the job is
             # marked failed and the reservation is returned in full — a failed
             # generation consumes no quota and leaves no corrupted row.
-            gate_report = _run_quality_gate(job, config, scheme_id, drafts)
+            gate_report = _run_quality_gate(
+                job, config, scheme_id, drafts,
+                allow_rebuild=config.generation_method != GenerationMethod.ZELI,
+            )
             accepted = gate_report["accepted"]
             gate_metrics = gate_report["metrics"]
             if not accepted:
@@ -1055,12 +1833,24 @@ async def generate_lesson_plans(
                 ]
 
             for lp in accepted:
-                data_service.create_lesson_plan(db, user.id, job_db.id, scheme_id, lp)
+                data_service.create_lesson_plan(
+                    db, user.id, job_db.id, scheme_id, lp, commit=False)
 
-            data_service.delete_lesson_plans_by_ids(db, user.id, replaced_ids)
+            data_service.delete_lesson_plans_by_ids(
+                db, user.id, replaced_ids, commit=False)
             data_service.rehome_lesson_plans_for_scheme(
-                db, scheme_id, user.id, job_db.id
+                db, scheme_id, user.id, job_db.id, commit=False
             )
+
+            # Commit exactly the credits that paid for ACCEPTED lessons and
+            # refund any reserved unit that did not become a lesson.
+            if reservation is not None and reservation.charged:
+                produced_codes = set()
+                for lp in accepted:
+                    for c in (lp.indicator_codes or []):
+                        produced_codes.add(c)
+                credit_service.commit(db, reservation, produced_codes,
+                                      commit=False)
 
             # Cumulative totals: after any partial run this job represents the
             # scheme's complete lesson set — which is exactly what
@@ -1069,97 +1859,269 @@ async def generate_lesson_plans(
             scheme_total = data_service.count_lessons_for_scheme(
                 db, scheme_id, user.id
             )
+            # The terminal job state commits WITH the lessons, replacement,
+            # rehome and unused-unit release. Previously the job was marked
+            # completed in a separate earlier commit, so a hard failure during
+            # persistence could leave a "completed" job with no lessons.
             data_service.update_job(db, job_db.id,
+                status=job.status.value,
                 total_lessons=scheme_total,
                 completed_lessons=scheme_total,
+                progress=100,
+                heartbeat_at=datetime.utcnow(),
+                completed_at=datetime.utcnow(),
+                commit=False,
             )
+            db.commit()
+            persistence_committed = True
         else:
             scheme_total = actual_lesson_count
+            # Legacy engines without an in-memory lesson list still expose a
+            # terminal job, but this update does not make the run's lesson
+            # transaction durable; a later failure may still release units.
+            data_service.update_job(
+                db, job_db.id,
+                status=job.status.value,
+                total_lessons=scheme_total,
+                completed_lessons=scheme_total,
+                progress=100,
+                heartbeat_at=datetime.utcnow(),
+                completed_at=datetime.utcnow(),
+            )
 
         # Only accepted lessons are billed (Priority 4: a gate-rejected lesson
         # consumes nothing).
         actual_lesson_count = len(accepted)
 
+        # ── Honest batch semantics (backlog item 4E) ─────────────────────
+        # Name exactly what was produced, what the gate refused (and which
+        # therefore stays pending for a retry), and what remains ungenerated.
+        # A successful HTTP response must never make a dropped/unstarted
+        # lesson look generated.
+        _accepted_occurrences = {
+            lp.source_occurrence_id for lp in accepted
+            if getattr(lp, "source_occurrence_id", "")
+        }
+        _candidate_occurrences = {
+            lp.source_occurrence_id
+            for lp in (getattr(job, "_lesson_plans", None) or [])
+            if getattr(lp, "source_occurrence_id", "")
+        }
+        rejected_occurrence_ids = sorted(
+            _candidate_occurrences - _accepted_occurrences)
+        _pending_pool = {
+            a.source_occurrence_id for a in _all_allocations
+            if a.source_occurrence_id
+            and not getattr(a, "is_special_period", False)
+            and not getattr(a, "needs_review", False)
+        }
+        pending_occurrence_ids = sorted(
+            _pending_pool - _accepted_occurrences - _existing_occ)
+
+        # The durable resume scope: the plan persisted on this job, intersected
+        # with occurrences still present in the scheme. This is deliberately
+        # narrower than ``pending_occurrence_ids`` above: the latter also names
+        # quota-skipped/unselected scheme occurrences for the UI's honest
+        # whole-scheme summary, but resume must never silently expand the batch
+        # the teacher originally approved.
+        _batch_planned = set(
+            (job_db.config_snapshot or {}).get("planned_occurrence_ids")
+            or _planned_ids)
+        _known_ids = {
+            a.source_occurrence_id for a in _all_allocations
+            if a.source_occurrence_id
+        }
+        _resumable = sorted(
+            (_batch_planned & _known_ids)
+            - _accepted_occurrences
+            - _existing_occ
+            - set(_blocked_ids)
+        )
+        _preserved = sorted(_batch_planned & _existing_occ)
+
         # Release any reserved unit that did not become a lesson (defensive: a
         # selected indicator that had no allocation must not consume quota).
         # Priority 4: a unit is only "produced" by an ACCEPTED lesson — one the
         # quality gate refused releases its unit (gate failure = 0 consumed).
-        if reservation and reservation.consumed:
-            produced = set()
+        # The normal persistence path already did this atomically above; this
+        # covers a job without an in-memory lesson set.
+        if reservation is not None and reservation.charged and not persistence_committed:
+            produced_codes = set()
             for lp in accepted:
                 for c in (lp.indicator_codes or []):
-                    produced.add(f"{scheme_id}:{c}")
-            unused = [k for k in reservation.reserved_keys if k not in produced]
-            if unused:
-                release_lesson_units(db, user.id, unused, reservation.period_key)
+                    produced_codes.add(c)
+            credit_service.commit(db, reservation, produced_codes)
 
-        quota_after = lesson_quota_status(db, user)
-        log_event("generation_completed", user_id=user.id, scheme_id=scheme_id, job_id=job_db.id,
-                   total_lessons=job.total_lessons, lessons_billed=actual_lesson_count,
-                   quota_used=quota_after.get("used"))
+        # Everything below this line is AFTER the atomic lesson/quota commit.
+        # It can enrich the response but must never turn durable work into a
+        # 500. Each step degrades independently; failures are logged with
+        # detail server-side and exposed only as a safe warning.
+        finalization_warnings: List[str] = []
+
+        def _finalization_failure(step: str, exc: Exception) -> None:
+            # Clear a failed statement/aborted PostgreSQL transaction before
+            # the next safe read. Already committed rows are untouched.
+            db.rollback()
+            finalization_warnings.append(step)
+            log_error(
+                "generation_finalization_failed",
+                user_id=user.id, scheme_id=scheme_id, job_id=job_db.id,
+                step=step, error=str(exc),
+            )
+
+        quota_after = None
+        try:
+            quota_after = lesson_quota_status(db, user)
+        except Exception as exc:
+            _finalization_failure("lesson quota status could not be read", exc)
+            # The reservation already knows what this run charged. Reporting it
+            # is more truthful than a null quota; unlimited runs stay null-free
+            # too (as_quota marks them unlimited).
+            if reservation is not None:
+                quota_after = reservation.as_quota()
+
+        try:
+            log_event(
+                "generation_completed", user_id=user.id, scheme_id=scheme_id,
+                job_id=job_db.id, total_lessons=job.total_lessons,
+                lessons_billed=actual_lesson_count,
+                quota_used=(quota_after or {}).get("used"),
+            )
+        except Exception as exc:
+            _finalization_failure("completion logging failed", exc)
 
         # ── AI lifetime credits (separate from the lesson-plan quota) ────
-        # Batch AI enrichment that actually produced AI content consumes ONE
-        # lifetime AI generation per successful request (idempotent on the
-        # job id). Failed generation, AI OFF, or a fully deterministic
+        # Batch AI generation that actually produced AI content consumes ONE
+        # AI generation per successful request (idempotent on the job id).
+        # Failed generation, AI OFF without Zeli, or a fully deterministic
         # fallback never consumes AI credits. Local Ollama cannot bypass this.
         ai_credit_remaining = None
-        if config.ai_mode != AIMode.OFF and getattr(job, "ai_enrichment_succeeded", 0) > 0:
-            ai_credit_remaining = consume_ai_generation(
-                user, db, request_id=job_db.id,
-            )
-            log_event("ai_generation_consumed", user_id=user.id, job_id=job_db.id,
-                      provider_batch=True, remaining=ai_credit_remaining)
+        _ai_content_produced = (
+            config.ai_mode != AIMode.OFF
+            or config.generation_method == GenerationMethod.ZELI
+        ) and getattr(job, "ai_enrichment_succeeded", 0) > 0
+        if _ai_content_produced:
+            try:
+                ai_credit_remaining = consume_ai_generation(
+                    user, db, request_id=job_db.id,
+                )
+                try:
+                    log_event(
+                        "ai_generation_consumed", user_id=user.id,
+                        job_id=job_db.id, provider_batch=True,
+                        remaining=ai_credit_remaining,
+                    )
+                except Exception as exc:
+                    _finalization_failure("AI usage logging failed", exc)
+            except Exception as exc:
+                # The lessons and lesson-plan quota are already durable. The
+                # AI ledger may or may not have committed inside the failed
+                # call; because it is keyed by this job id, retrying the same
+                # job (resume) cannot double-consume. Report the uncertainty
+                # instead of claiming a rolled-back run.
+                ai_credit_remaining = None
+                _finalization_failure(
+                    "AI usage ledger could not be finalized", exc)
 
-        # Report the ACTUAL AI mode/provider that was used for this job, so the
-        # UI can never claim "AI" while the backend generated deterministically.
-        from ..engines.ai_provider import (
-            resolve_provider_mode, get_provider, provider_status, NAMED_PROVIDERS,
-        )
+        # Report the ACTUAL generation method and provider that produced this
+        # job, so the UI can never claim "Zeli" while the engine generated
+        # deterministically (or vice versa).
         ai_lessons = int(getattr(job, "ai_enrichment_succeeded", 0) or 0)
+        is_zeli = config.generation_method == GenerationMethod.ZELI
         ai_info = {
             "mode": config.ai_mode.value,
-            "active": False,
+            "generation_method": config.generation_method.value,
+            "active": bool(is_zeli and ai_lessons > 0),
             "provider": None,
-            "state": "OFF" if config.ai_mode == AIMode.OFF else "NOT_CONFIGURED",
+            "state": (
+                "CONFIGURED" if is_zeli and ai_lessons > 0
+                else "NOT_CONFIGURED" if is_zeli
+                else "OFF" if config.ai_mode == AIMode.OFF
+                else "NOT_CONFIGURED"
+            ),
             "lessons_ai": ai_lessons,
             "lessons_deterministic": max(job.completed_lessons - ai_lessons, 0),
             "reason": None,
         }
-        if config.ai_mode != AIMode.OFF:
-            resolved = resolve_provider_mode(config.ai_mode)
-            if resolved in NAMED_PROVIDERS:
-                prov = get_provider(resolved)
-                ai_info["provider"] = prov.get_name() if prov else None
-                ai_info["provider_key"] = resolved
-                ai_info["state"] = provider_status(prov)
-                ai_info["active"] = bool(prov and prov.is_available())
-            # A BASIC/ENHANCED token after resolution means NO real provider
-            # was found (deterministic fallback) — never report the Mock
-            # provider as "AI active" (CASE C, PART 13/14).
-            if not ai_info["active"]:
-                # CASE B (PART 14): name the ACTUAL provider that was tried —
-                # including the auto-resolved one — never a generic "no AI".
-                tried = ai_info.get("provider") or resolved
+        try:
+            from ..engines.ai_provider import (
+                resolve_provider_mode, get_provider, provider_status, NAMED_PROVIDERS,
+            )
+            if is_zeli:
+                # Report the provider/model that actually produced the lessons.
+                produced = [
+                    lp for lp in (getattr(job, "_lesson_plans", None) or [])
+                    if getattr(lp, "ai_provider", "")
+                ]
+                if produced:
+                    ai_info["provider"] = produced[0].ai_provider
+                    ai_info["provider_key"] = produced[0].ai_provider
+                ai_info["state"] = "CONFIGURED" if ai_lessons else "NOT_CONFIGURED"
                 ai_info["reason"] = (
-                    f"AI provider {tried or 'configured'} was not available — "
-                    "every lesson was generated by the deterministic engine."
+                    None if ai_lessons
+                    else "Zeli did not produce usable lesson content for this run."
                 )
-            elif ai_lessons == 0:
-                # CASE D (PART 14/15): the provider was configured and reachable
-                # but the actual calls failed (rate limit, malformed output,
-                # quality gate) — the lessons are deterministic. Say so, and
-                # make the no-consumption explicit (PART 19).
-                prov = get_provider(resolved) if resolved in NAMED_PROVIDERS else None
-                detail = getattr(prov, "last_error", "") or "provider returned no usable content"
-                ai_info["reason"] = (
-                    f"AI provider {ai_info.get('provider') or resolved} did not "
-                    f"produce usable content ({detail}) — every lesson was "
-                    "generated by the deterministic engine. No AI generation "
-                    "was consumed."
-                )
-        else:
-            ai_info["reason"] = "AI is off — lessons come from the deterministic engine."
+            elif config.ai_mode != AIMode.OFF:
+                resolved = resolve_provider_mode(config.ai_mode)
+                if resolved in NAMED_PROVIDERS:
+                    prov = get_provider(resolved)
+                    ai_info["provider"] = prov.get_name() if prov else None
+                    ai_info["provider_key"] = resolved
+                    ai_info["state"] = provider_status(prov)
+                    ai_info["active"] = bool(prov and prov.is_available())
+                # A BASIC/ENHANCED token after resolution means NO real provider
+                # was found (deterministic fallback) — never report the Mock
+                # provider as "AI active" (CASE C, PART 13/14).
+                if not ai_info["active"]:
+                    # CASE B (PART 14): name the ACTUAL provider that was tried —
+                    # including the auto-resolved one — never a generic "no AI".
+                    tried = ai_info.get("provider") or resolved
+                    ai_info["reason"] = (
+                        f"AI provider {tried or 'configured'} was not available — "
+                        "every lesson was generated by the deterministic engine."
+                    )
+                elif ai_lessons == 0:
+                    # CASE D (PART 14/15): the provider was configured and reachable
+                    # but the actual calls failed (rate limit, malformed output,
+                    # quality gate) — the lessons are deterministic. Say so, and
+                    # make the no-consumption explicit (PART 19).
+                    prov = get_provider(resolved) if resolved in NAMED_PROVIDERS else None
+                    detail = getattr(prov, "last_error", "") or "provider returned no usable content"
+                    ai_info["reason"] = (
+                        f"AI provider {ai_info.get('provider') or resolved} did not "
+                        f"produce usable content ({detail}) — every lesson was "
+                        "generated by the deterministic engine. No AI generation "
+                        "was consumed."
+                    )
+            else:
+                ai_info["reason"] = "AI is off — lessons come from the deterministic engine."
+        except Exception as exc:
+            ai_info = {
+                "mode": config.ai_mode.value,
+                "generation_method": config.generation_method.value,
+                "active": False,
+                "provider": None,
+                "state": "UNKNOWN",
+                "lessons_ai": ai_lessons,
+                "lessons_deterministic": max(
+                    job.completed_lessons - ai_lessons, 0),
+                "reason": (
+                    "AI provider status could not be finalized; "
+                    "no provider claim is made for this run."
+                ),
+            }
+            _finalization_failure(
+                "AI provider status could not be finalized", exc)
+
+        warning = None
+        if finalization_warnings:
+            warning = (
+                "Generation completed and its lessons and lesson-plan quota "
+                "are saved. Some response details could not be finalized: "
+                + "; ".join(finalization_warnings)
+                + ". Reload the saved job to see the durable result."
+            )
+            _persist_finalization_warning(db, job_db, warning)
 
         return {
             "job_id": job_db.id,
@@ -1167,29 +2129,229 @@ async def generate_lesson_plans(
             "total_lessons": scheme_total,
             "completed_lessons": scheme_total,
             "generated_indicator_codes": requested_codes,
+            "generated_occurrence_ids": sorted(_accepted_occurrences),
+            "rejected_occurrence_ids": rejected_occurrence_ids,
+            "pending_occurrence_ids": pending_occurrence_ids,
+            "planned_occurrence_ids": sorted(_batch_planned),
+            "resumable_occurrence_ids": _resumable,
+            "preserved_occurrence_ids": _preserved,
+            "blocked_for_review_occurrence_ids": sorted(_blocked_ids),
             "already_generated_occurrence_ids": already_generated_occurrence_ids,
+            "resumed": bool(resume),
+            "resumed_from_job_id": existing_job.id if resume and existing_job else None,
             "quota": quota_after,
             "ai_credits_remaining": ai_credit_remaining,
             "ai": ai_info,
             # Priority 4: the deterministic quality gate's run metrics
             # (first-pass rate, rebuilds, rejections, teacher-ready rate).
             "quality": gate_metrics,
+            "recovered": bool(finalization_warnings),
+            "warning": warning,
+            "finalization": {
+                "state": (
+                    "completed_with_warning" if finalization_warnings
+                    else "completed"
+                ),
+                "warnings": finalization_warnings,
+            },
         }
 
     except HTTPException:
-        if reservation and reservation.consumed:
-            release_lesson_units(db, user.id, reservation.reserved_keys, reservation.period_key)
-        # The job row exists (it is created before the run); never leave it
-        # "pending" forever when the run was refused after creation.
-        data_service.update_job(db, job_db.id, status="failed")
+        if not persistence_committed:
+            # Clear any failed statement (PostgreSQL aborts the transaction)
+            # before returning the reservation in its own transaction.
+            db.rollback()
+            if reservation and reservation.charged:
+                credit_service.release(db, reservation)
+            # The job row exists (it is created before the run); never leave
+            # it "pending" forever when the run was refused after creation.
+            data_service.update_job(db, job_db.id, status="failed")
         raise
     except Exception as e:
-        # A failed generation must not consume quota.
-        if reservation and reservation.consumed:
-            release_lesson_units(db, user.id, reservation.reserved_keys, reservation.period_key)
-        data_service.update_job(db, job_db.id, status="failed", error_message=str(e))
-        log_error("generation_failed", user_id=user.id, scheme_id=scheme_id, error=str(e))
-        raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
+        # A failed generation must not consume quota — but only when nothing
+        # was persisted. Once lessons are durable, the units that paid for them
+        # stay charged; releasing here was audit defect #2.
+        if not persistence_committed:
+            db.rollback()
+            if reservation and reservation.charged:
+                credit_service.release(db, reservation)
+            data_service.update_job(db, job_db.id, status="failed", error_message=str(e))
+            log_error("generation_failed", user_id=user.id, scheme_id=scheme_id, error=str(e))
+            raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
+        # The run committed. Any later error is a finalization problem, not a
+        # rolled-back generation: recover the truthful result from durable
+        # state and return a success with an explicit warning.
+        return _recovered_committed_response(db, user, job_db, scheme_id, e)
+
+
+@router.post("/{scheme_id}/generate/resume")
+def resume_generation(
+    scheme_id: str,
+    request: ResumeGenerationRequest,
+    user: User = Depends(require_teacher_workflow),
+    db=Depends(get_db),
+):
+    """Continue the eligible pending occurrences of an existing job.
+
+    This is intentionally not a synonym for Generate again. The original job
+    is reused (including its AI-credit request identity), occurrences that
+    already have a persisted lesson are excluded, and only the planned-but-
+    unproduced set is sent through the normal generation, quality-gate,
+    atomic-persistence and quota paths.
+    """
+    with _generation_guard(db, user.id, scheme_id):
+        return _resume_lesson_plans(scheme_id, request.job_id, user, db)
+
+
+def _resume_lesson_plans(
+    scheme_id: str,
+    job_id: str,
+    user: User,
+    db: Session,
+):
+    scheme_db = data_service.get_scheme(db, scheme_id, user.id)
+    if not scheme_db:
+        raise HTTPException(status_code=404, detail="Scheme not found")
+    job = data_service.get_job(db, job_id, user.id)
+    if not job or job.scheme_id != scheme_id:
+        raise HTTPException(status_code=404, detail="Generation job not found")
+
+    if job.status in ("pending", "processing"):
+        data_service.reconcile_stale_generation_jobs(db)
+        db.expire(job)
+        job = data_service.get_job(db, job_id, user.id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Generation job not found")
+        if job.status in ("pending", "processing"):
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "This generation is still running. Wait for it to finish "
+                    "before resuming."
+                ),
+            )
+
+    snapshot = dict(job.config_snapshot or {})
+    try:
+        config = _config_from_snapshot(snapshot)
+    except Exception:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "This job's original generation settings are unavailable, so "
+                "it cannot be resumed safely. Start a new generation instead."
+            ),
+        )
+    config.scheme_of_work_id = scheme_id
+
+    scheme = data_service.scheme_to_model(scheme_db)
+    allocations = _allocations_for_config(scheme, config)
+    by_id = {
+        a.source_occurrence_id: a for a in allocations
+        if a.source_occurrence_id
+    }
+
+    planned = list(dict.fromkeys(
+        snapshot.get("planned_occurrence_ids")
+        or snapshot.get("selected_occurrence_ids")
+        or []
+    ))
+    if not planned:
+        # Older jobs predate the planned-occurrence snapshot. Reconstruct the
+        # only safe scope they can support: their selected codes, else all
+        # eligible occurrences. Unknown occurrence ids are never invented.
+        codes = set(config.selected_indicator_codes or [])
+        planned = [
+            a.source_occurrence_id for a in allocations
+            if a.source_occurrence_id
+            and (not codes or a.indicator_code in codes)
+        ]
+    known = [occ for occ in planned if occ in by_id]
+    if not known:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "This job no longer matches the scheme's curriculum, so there "
+                "is no safe occurrence set to resume. Start a new generation."
+            ),
+        )
+
+    blocked = sorted({
+        occ for occ in known if bool(getattr(by_id[occ], "needs_review", False))
+    })
+    existing = {
+        (getattr(lp, "source_occurrence_id", "") or "")
+        for lp in data_service.get_lesson_plans_for_scheme(
+            db, scheme_id, user.id)
+    }
+    existing.discard("")
+    pending = [
+        occ for occ in known
+        if occ not in existing
+        and occ not in set(blocked)
+        and not bool(getattr(by_id[occ], "is_special_period", False))
+    ]
+
+    # Persist the union before any work so a crash during resume is recoverable
+    # too. The blocked set stays visible; it is not silently converted to work.
+    prior = dict(snapshot)
+    prior["planned_occurrence_ids"] = sorted(
+        set(prior.get("planned_occurrence_ids") or []) | set(known))
+    prior["blocked_for_review_occurrence_ids"] = sorted(
+        set(prior.get("blocked_for_review_occurrence_ids") or []) | set(blocked))
+    data_service.update_job(db, job.id, config_snapshot=prior)
+
+    if not pending:
+        total = data_service.count_lessons_for_scheme(db, scheme_id, user.id)
+        data_service.update_job(
+            db, job.id,
+            status="completed" if total else "failed",
+            total_lessons=total,
+            completed_lessons=total,
+            progress=100 if total else job.progress,
+            error_message=(
+                "" if total else
+                "No planned occurrences can be resumed; review the scheme or "
+                "start a new generation."
+            ),
+            completed_at=datetime.utcnow() if total else job.completed_at,
+        )
+        return {
+            "job_id": job.id,
+            "status": "completed" if total else "failed",
+            "total_lessons": total,
+            "completed_lessons": total,
+            "generated_indicator_codes": [],
+            "generated_occurrence_ids": [],
+            "rejected_occurrence_ids": [],
+            "pending_occurrence_ids": [],
+            "planned_occurrence_ids": sorted(set(known)),
+            "resumable_occurrence_ids": [],
+            "preserved_occurrence_ids": sorted(set(known) & existing),
+            "blocked_for_review_occurrence_ids": blocked,
+            "already_generated_occurrence_ids": sorted(set(known) & existing),
+            "resumed": False,
+            "resumed_from_job_id": job.id,
+            "quota": None,
+            "ai_credits_remaining": None,
+            "ai": None,
+            "quality": None,
+            "message": (
+                "No pending lessons remain in this batch."
+                if total else
+                "No planned occurrence can be resumed; start a new generation."
+            ),
+        }
+
+    resume_config = config.model_copy(deep=True)
+    resume_config.selected_occurrence_ids = pending
+    # Occurrence ids are the authority for a resume. Emptying the code list
+    # prevents an old code-level selection from widening the batch.
+    resume_config.selected_indicator_codes = []
+    return _generate_lesson_plans(
+        scheme_id, resume_config, user, db,
+        existing_job=job, resume=True,
+    )
 
 
 @router.get("/{job_id}/status")
@@ -1201,6 +2363,13 @@ async def get_generation_status(
     job = data_service.get_job(db, job_id, user.id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+    if job.status in ("pending", "processing"):
+        # A status poll is the place the UI learns a job died with the server.
+        # Reclaim orphaned work after the same conservative threshold used by
+        # the generate endpoint, then report the terminal status honestly.
+        data_service.reconcile_stale_generation_jobs(db)
+        db.expire(job)
+        job = data_service.get_job(db, job_id, user.id)
     return {
         "id": job.id,
         "status": job.status,
@@ -1209,9 +2378,18 @@ async def get_generation_status(
         "completed_lessons": job.completed_lessons,
         "failed_lessons": job.failed_lessons,
         "error_message": job.error_message,
+        # The method that produced (or is producing) this job. Persisted in the
+        # snapshot, so a status poll, reload or resume can never disagree.
+        "generation_method": (job.config_snapshot or {}).get(
+            "generation_method", "standard"),
+        "finalization_warning": (job.config_snapshot or {}).get(
+            "finalization_warning"),
+        "created_at": job.created_at.isoformat() if job.created_at else None,
+        "completed_at": job.completed_at.isoformat() if job.completed_at else None,
         "coverage": {
             "total_generated_lessons": job.completed_lessons,
-        }
+        },
+        **_job_resume_view(db, job, user.id),
     }
 
 
@@ -1288,6 +2466,10 @@ async def get_latest_job_for_scheme(
     db=Depends(get_db),
 ):
     """Return the most recent generation job for a scheme (so the UI can restore state)."""
+    # This is the endpoint the generate page uses on load/reload. Reclaim a
+    # job orphaned by a server restart here too, otherwise the page shows a
+    # live-looking job and never surfaces the recovery banner.
+    data_service.reconcile_stale_generation_jobs(db)
     jobs = data_service.list_jobs(db, user.id)
     for job in jobs:
         if job.scheme_id == scheme_id:
@@ -1309,6 +2491,10 @@ async def get_latest_job_for_scheme(
                 "completed_lessons": job.completed_lessons,
                 "failed_lessons": job.failed_lessons,
                 "error_message": job.error_message,
+                "finalization_warning": (job.config_snapshot or {}).get(
+                    "finalization_warning"),
+                "created_at": job.created_at.isoformat() if job.created_at else None,
+                "completed_at": job.completed_at.isoformat() if job.completed_at else None,
                 # The template the lessons were actually generated with, so a
                 # reloaded generate page exports with the same form instead of
                 # silently falling back to the level default (a WAPEF lesson
@@ -1318,6 +2504,7 @@ async def get_latest_job_for_scheme(
                     "total_generated_lessons": job.completed_lessons,
                 },
                 "already_generated_occurrence_ids": _occ,
+                **_job_resume_view(db, job, user.id),
             }
     return None
 
@@ -1447,6 +2634,7 @@ async def export_docx(
             lp_models, tt,
             Path(f"exports/{user.id}/{job_id}/lesson_plans.docx"),
             template_id=resolved_template_id,
+            context=render_context,
         )
         download_name = f"Lesson_Plans_{scheme_label}.docx"
 
@@ -1507,7 +2695,7 @@ async def _build_export_pdf(db, user, job, scheme_label, lp_models, tt,
         try:
             await _run_pipeline(
                 pipeline.export_docx_combined, scheme_label, lp_models, tt,
-                combined_docx, template_id=resolved)
+                combined_docx, template_id=resolved, context=context)
         except Exception as e:
             logger.error("pdf_source_docx_failed", user_id=user_id, job_id=job_id, detail=str(e))
             raise HTTPException(status_code=500, detail=PDF_CONVERSION_FAILED)
@@ -1722,7 +2910,8 @@ async def issue_download_url(
             out = await _run_pipeline(
                 pipeline.export_docx_combined, "", lp_models, tt,
                 Path(f"exports/{user.id}/{job_id}/lesson_plans.docx"),
-                template_id=resolved_template_id)
+                template_id=resolved_template_id,
+                context=_render_context(db, user.id, job, scheme_db, lp_models))
         media_type = ("application/vnd.openxmlformats-officedocument"
                       ".wordprocessingml.document")
         filename = f"Lesson_Plans_{scheme_label}.docx"
@@ -1987,6 +3176,65 @@ def _resolve_teacher_name(db: Session, user: User) -> Optional[str]:
     return local.strip().title() or None
 
 
+def _apply_saved_lesson_config(db: Session, scheme_db, config: TermConfig,
+                               user: User) -> None:
+    """Merge the plan's saved lesson configuration into the request config.
+
+    The saved configuration is what the teacher confirmed in the guided step;
+    it wins over any client default so a stale browser payload can never
+    generate with old settings. Fields the teacher never configured fall back
+    to the request/preference values exactly as before.
+    """
+    saved = _saved_lesson_config(scheme_db)
+    if not saved:
+        return
+    if saved.get("school_name"):
+        config.school_name = saved["school_name"]
+    if saved.get("teacher_name"):
+        config.teacher_name = saved["teacher_name"]
+    if saved.get("class_size") is not None:
+        config.class_size = saved["class_size"]
+    if saved.get("lesson_duration_minutes") is not None:
+        config.lesson_duration_minutes = saved["lesson_duration_minutes"]
+    if saved.get("period"):
+        config.period = saved["period"]
+    if saved.get("periods_per_week") is not None:
+        config.lessons_per_week = saved["periods_per_week"]
+    if saved.get("teaching_days"):
+        config.teaching_days = list(saved["teaching_days"])
+    if saved.get("reference"):
+        config.references = [saved["reference"]]
+
+
+def _require_lesson_config(config: TermConfig) -> None:
+    """Block generation when REQUIRED configuration is missing (Phase 2.2).
+
+    The guided step must be completed first; the server never invents a class
+    size, duration or timetable to make the request pass.
+    """
+    missing = []
+    if not (getattr(config, "school_name", None) or "").strip():
+        missing.append("school name")
+    if not (getattr(config, "teacher_name", None) or "").strip():
+        missing.append("teacher's name")
+    if getattr(config, "class_size", None) in (None, 0):
+        missing.append("class size")
+    if not getattr(config, "lesson_duration_minutes", 0):
+        missing.append("lesson duration")
+    if not getattr(config, "teaching_days", None):
+        missing.append("teaching days")
+    if missing:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Complete the lesson configuration before generating: "
+                + ", ".join(missing)
+                + ". Open Configure lesson rubrics and save the missing "
+                  "details."
+            ),
+        )
+
+
 def _replacement_ids_for_occurrences(existing, occurrence_ids, chosen_allocs) -> list:
     """Existing lessons replaced by an occurrence-selected generation run.
 
@@ -2118,8 +3366,15 @@ _REBUILD_METADATA_FIELDS = (
 )
 
 
-def _run_quality_gate(job, config, scheme_id, drafts):
+def _run_quality_gate(job, config, scheme_id, drafts, allow_rebuild: bool = True):
     """Priority 4 — validate every built lesson BEFORE any row is written.
+
+    ``allow_rebuild=False`` is used for the "Generate with Zeli" method: the
+    deterministic pattern rebuild would substitute engine-written content for a
+    lesson the teacher asked Zeli to write, which is exactly the silent fallback
+    the method forbids. Such a lesson is instead rejected (never persisted) and
+    reported honestly. Mechanical repair — punctuation/whitespace and missing
+    boundary rows — still runs because it never invents content.
 
     Returns ``{"accepted", "reports", "metrics"}``:
 
@@ -2210,7 +3465,8 @@ def _run_quality_gate(job, config, scheme_id, drafts):
         # ── Candidates 1..N: rebuild with an untried teaching pattern ─────
         # Only pattern-shaped lessons have an alternative (early years and
         # pre-pattern paths compose their own pedagogy — nothing to swap).
-        if outcome.needs_work and ctx is not None and (ctx.pattern_id or ""):
+        if (allow_rebuild and outcome.needs_work
+                and ctx is not None and (ctx.pattern_id or "")):
             tried = [ctx.pattern_id]
             for attempt in range(MAX_REBUILD_ATTEMPTS):
                 pattern = pick_alternate_pattern(
@@ -2414,8 +3670,13 @@ def _serialize_lesson(lp, scheme_db=None) -> dict:
         "template_id": getattr(lp, "template_id", None),
         "status": lp.status,
         "ai_generated": lp.ai_generated,
+        "ai_provider": getattr(lp, "ai_provider", "") or "",
+        "ai_model": getattr(lp, "ai_model", "") or "",
+        "generation_method": (
+            getattr(lp, "generation_method", "") or "standard"),
         "teacher_edited": lp.teacher_edited,
-        "provenance": lesson_provenance(lp, scheme_db),
+        "provenance": lesson_provenance(
+            lp, scheme_db, ai_provider=getattr(lp, "ai_provider", "") or None),
     }
 
 
@@ -2568,4 +3829,10 @@ def _db_to_lesson_model(lp) -> LessonPlan:
         template_id=getattr(lp, "template_id", None),
         special_period_label=getattr(lp, "special_period_label", "") or "",
         special_period_type=getattr(lp, "special_period_type", "") or "",
+        ai_generated=bool(getattr(lp, "ai_generated", False)),
+        ai_provider=getattr(lp, "ai_provider", "") or "",
+        ai_model=getattr(lp, "ai_model", "") or "",
+        generation_method=(
+            getattr(lp, "generation_method", "") or "standard"),
+        teacher_edited=bool(getattr(lp, "teacher_edited", False)),
     )

@@ -13,32 +13,29 @@ export default function LicenseSubscriptionPage() {
       subtitle="Plans, quotas, and licensing terms for SchemeKnit."
       lastUpdated="September 2026"
     >
-      <LegalSection title="1. Individual Teacher Plans">
+      <LegalSection title="1. Individual Teacher Packages">
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b text-left">
-              <th className="py-2 pr-4 font-semibold">Plan</th>
-              <th className="py-2 pr-4 font-semibold">Generation quota</th>
-              <th className="py-2 pr-4 font-semibold">AI</th>
+              <th className="py-2 pr-4 font-semibold">Package</th>
+              <th className="py-2 pr-4 font-semibold">Price</th>
+              <th className="py-2 pr-4 font-semibold">Lesson-plan credits</th>
+              <th className="py-2 pr-4 font-semibold">Validity</th>
             </tr>
           </thead>
           <tbody className="divide-y">
-            <tr>
-              <td className="py-2 pr-4">Free Tier</td>
-              <td className="py-2 pr-4">5 lesson plans per calendar month</td>
-              <td className="py-2 pr-4">5 AI generations per month</td>
-            </tr>
-            <tr>
-              <td className="py-2 pr-4">Teacher Pro</td>
-              <td className="py-2 pr-4">Higher / unlimited lesson generation</td>
-              <td className="py-2 pr-4">Included with quota</td>
-            </tr>
+            <tr><td className="py-2 pr-4">Free</td><td className="py-2 pr-4">GH₵0</td><td className="py-2 pr-4">2 per calendar month</td><td className="py-2 pr-4">Monthly reset</td></tr>
+            <tr><td className="py-2 pr-4">Flexible Credit Pack</td><td className="py-2 pr-4">GH₵12</td><td className="py-2 pr-4">20</td><td className="py-2 pr-4">Credits do not expire</td></tr>
+            <tr><td className="py-2 pr-4">Teacher Monthly</td><td className="py-2 pr-4">GH₵22</td><td className="py-2 pr-4">40</td><td className="py-2 pr-4">30 days</td></tr>
+            <tr><td className="py-2 pr-4">Teacher Term Pass</td><td className="py-2 pr-4">GH₵50</td><td className="py-2 pr-4">160</td><td className="py-2 pr-4">120 days</td></tr>
+            <tr><td className="py-2 pr-4">Academic Year Pass</td><td className="py-2 pr-4">GH₵120</td><td className="py-2 pr-4">480</td><td className="py-2 pr-4">365 days</td></tr>
           </tbody>
         </table>
         <p>
-          Generation quota counts individual generated lesson plans, not
-          schemes. A scheme containing 15 indicators across 5 weeks may
-          produce many individual lessons — each counts toward the quota.
+          One credit generates one independently teachable, indicator-level
+          lesson plan. A scheme week containing several indicators can produce
+          several separate plans and consume one credit per plan. All packages
+          are one-time prepaid purchases and do not renew automatically.
         </p>
       </LegalSection>
 
@@ -64,10 +61,13 @@ export default function LicenseSubscriptionPage() {
 
       <LegalSection title="4. Payment Verification">
         <p>
-          Payments are verified manually. Subscription or license activation
-          occurs only after verification. We do not process card or
-          mobile-money transactions automatically and do not store full
-          payment credentials.
+          Purchases are prepaid by Bank Transfer or Mobile Money through
+          Paystack. Card checkout is not offered and packages do not renew
+          automatically. A package is activated only after Paystack confirms
+          the payment and TeachFlow verifies the reference, amount, currency
+          and account. Pending, failed or expired payments do not activate a
+          package. TeachFlow never receives or stores your full payment
+          credentials.
         </p>
       </LegalSection>
 

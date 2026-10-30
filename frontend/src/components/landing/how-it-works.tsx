@@ -91,11 +91,29 @@ export function HowItWorks() {
 
         <p className="mx-auto mt-8 max-w-2xl text-center text-sm text-slate-500">
           Example content shown above is illustrative. SchemeKnit follows whatever scheme
-          you upload — your document sets the curriculum.{' '}
-          <Link href="/login" className="font-semibold text-[#102A43] underline underline-offset-2">
-            Start Planning
-          </Link>
+          you upload — your document sets the curriculum. Free accounts receive two
+          lesson-plan generations each month. <Link href="/pricing" className="font-semibold text-[#102A43] underline underline-offset-2">View pricing</Link>
+          {' '}or <Link href="/signup" className="font-semibold text-[#102A43] underline underline-offset-2">start free</Link>.
         </p>
+
+        <div className="mx-auto mt-10 grid max-w-4xl gap-4 md:grid-cols-2">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h3 className="font-semibold text-[#102A43]">One week can produce several plans</h3>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+              A single scheme week often contains more than one indicator. Select
+              three indicators and SchemeKnit generates three separate,
+              independently teachable lesson plans — one credit each.
+            </p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h3 className="font-semibold text-[#102A43]">KG, Basic 1–6 and JHS</h3>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+              Works from the scheme for your class and subject, whether you teach
+              early years, a Basic 1–6 class, or a JHS subject across several
+              classes.
+            </p>
+          </div>
+        </div>
       </div>
     </section>
   )

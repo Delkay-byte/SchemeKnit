@@ -34,7 +34,9 @@ export function PageHeader({ eyebrow, title, description, actions, className }: 
           </p>
         )}
         <h1 className="text-2xl font-bold tracking-tight text-[#102A43]">{title}</h1>
-        {description && <p className="text-sm text-muted-foreground">{description}</p>}
+        {description && (
+          <p className="break-words text-sm text-muted-foreground">{description}</p>
+        )}
       </div>
       {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
     </div>

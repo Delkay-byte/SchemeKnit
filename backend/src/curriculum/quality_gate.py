@@ -966,8 +966,8 @@ def _check_practicality(lesson: Dict[str, Any]) -> List[QualityIssue]:
         ))
 
     # Check class size feasibility
-    class_size = lesson.get("class_size", 35)
-    if class_size > 60:
+    class_size = lesson.get("class_size")
+    if class_size is not None and class_size > 60:
         issues.append(QualityIssue(
             check_name="class_size_feasible",
             status=QualityStatus.WARN,

@@ -264,10 +264,12 @@ async def general_exception_handler(request: Request, exc: Exception):
 from .routers import documents, curriculum, generation, templates, settings as settings_router
 from .routers import auth as auth_router
 from .routers import payments as payments_router
+from .routers import paystack as paystack_router
 from .routers import content_packs as content_packs_router
 from .routers import ai_regeneration as ai_router
 from .routers import platform_admin as platform_admin_router
 from .routers import weekly_plans as weekly_plans_router
+from .routers import referrals as referrals_router
 
 app.include_router(auth_router.router, prefix="/api/auth", tags=["authentication"])
 app.include_router(documents.router, prefix="/api/documents", tags=["documents"])
@@ -276,10 +278,12 @@ app.include_router(generation.router, prefix="/api/generation", tags=["generatio
 app.include_router(templates.router, prefix="/api/templates", tags=["templates"])
 app.include_router(settings_router.router, prefix="/api/settings", tags=["settings"])
 app.include_router(payments_router.router, prefix="/api/payments", tags=["payments"])
+app.include_router(paystack_router.router, prefix="/api/paystack", tags=["paystack"])
 app.include_router(content_packs_router.router, prefix="/api/content-packs", tags=["content-packs"])
 app.include_router(ai_router.router, prefix="/api/ai", tags=["ai"])
 app.include_router(platform_admin_router.router, prefix="/api/platform-admin", tags=["platform-admin"])
 app.include_router(weekly_plans_router.router, prefix="/api/weekly-plans", tags=["weekly-plans"])
+app.include_router(referrals_router.router, prefix="/api/referrals", tags=["referrals"])
 
 
 @app.get("/api/health")
