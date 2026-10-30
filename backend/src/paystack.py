@@ -518,6 +518,8 @@ def record_webhook(db: Session, event: str, data: dict, raw: bytes) -> Tuple[Pay
         id=generate_id(), event_key=key, event_type=event,
         reference=str(data.get("reference") or ""),
         payload_hash=hashlib.sha256(raw).hexdigest(),
+        payload_json=data,
+        status="received",
     )
     db.add(row)
     try:

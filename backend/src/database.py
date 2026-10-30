@@ -1108,11 +1108,20 @@ class PaystackWebhookEventDB(Base):
     event_type = Column(String, default="")
     reference = Column(String, default="", index=True)
     payload_hash = Column(String, default="")
-    status = Column(String, default="received")  # received|processed|ignored|failed
+    payload_json = Column(JSON, default=dict)
+    status = Column(String, default="received")  # received|processing|processed|ignored|failed|exhausted
     attempts = Column(Integer, default=0)
     last_error = Column(String, default="")
     received_at = Column(DateTime, default=datetime.utcnow)
     processed_at = Column(DateTime, nullable=True)
+    last_attempt_at = Column(DateTime, nullable=True)
+    next_retry_at = Column(DateTime, nullable=True)
+    lease_owner = Column(String, default="")
+    lease_expires_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index("ix_paystack_webhook_retry", "status", "next_retry_at"),
+    )
 
 
 class SubscriptionEventDB(Base):

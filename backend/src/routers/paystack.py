@@ -21,7 +21,7 @@ from ..database import (
     get_db, PaystackWebhookEventDB, SubscriptionPlanDB,
     SubscriptionTransactionDB, User, UserLicenseDB, UserSubscriptionDB,
 )
-from .. import credits, paystack
+from .. import credits, paystack, webhook_sweeper
 from ..logging_config import log_event, log_error
 
 router = APIRouter()
@@ -532,34 +532,15 @@ async def cancel(
 def _process_webhook_event(bind, event_id: str, event: str, data: dict) -> None:
     """Process one recorded event in its own session, after the HTTP ack.
 
-    A failure is recorded on the event row so a Paystack retry can be retried
-    idempotently. The HTTP response never waits for Paystack verification.
+    Delegates to the durable recovery path so the webhook worker and the
+    sweeper share exactly one idempotent processing implementation.
     """
     session = sessionmaker(bind=bind)()
-    reference = str(data.get("reference") or "")
     try:
-        paystack.handle_webhook(session, event, data)
-        row = session.query(PaystackWebhookEventDB).filter(
-            PaystackWebhookEventDB.id == event_id).first()
-        if row is not None:
-            row.status = "processed"
-            row.processed_at = datetime.utcnow()
-            row.attempts = (row.attempts or 0) + 1
-            row.last_error = ""
-        session.commit()
-        log_event("paystack_webhook_processed", event_type=event,
-                  reference=reference, event_id=event_id)
-    except Exception as exc:
-        session.rollback()
-        row = session.query(PaystackWebhookEventDB).filter(
-            PaystackWebhookEventDB.id == event_id).first()
-        if row is not None:
-            row.status = "failed"
-            row.attempts = (row.attempts or 0) + 1
-            row.last_error = str(exc)[:300]
-            session.commit()
-        log_error("paystack_webhook_failed", event_type=event,
-                  reference=reference, event_id=event_id, error=str(exc))
+        webhook_sweeper.process_event(
+            session, event_id, worker_id="webhook-background",
+            fallback_data=data,
+        )
     finally:
         session.close()
 
