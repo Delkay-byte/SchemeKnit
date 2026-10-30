@@ -133,11 +133,48 @@ verification enabled.
   are updated in place. Historical transaction amounts and plan IDs are never
   rewritten.
 
+## Durable webhook recovery
+
+The webhook endpoint persists the verified event payload before acknowledging it.
+Processing is idempotent and runs in a background task. A one-shot sweeper
+recovers events left in `received`, `failed` or expired `processing` state after
+a worker crash.
+
+Run one bounded cycle:
+
+```bash
+cd backend
+python -m src.webhook_sweeper --batch-size 20 --max-batches 5
+```
+
+Properties:
+
+- PostgreSQL `FOR UPDATE SKIP LOCKED` claims rows; SQLite is supported for tests
+  only and does not prove PostgreSQL lock behaviour.
+- 120-second lease; expired leases are reclaimed.
+- Stale `received` events become eligible after 5 minutes.
+- Failed events retry with 30s, 60s, 120s … backoff capped at 1 hour.
+- Maximum 8 attempts by default; exhausted rows are retained for inspection.
+- Unknown/outgoing-transfer events are marked `ignored`, never retried.
+- Completed events are never retried.
+- Only the existing `handle_webhook` finalizer runs; credits, referrals and
+  refunds keep their existing idempotency keys.
+
+Scheduling is deliberately **not** created automatically. Add a Render Cron Job
+only after approving its cost, with start command:
+
+```bash
+cd backend && python -m src.webhook_sweeper --batch-size 20 --max-batches 5
+```
+
+A cron job is not required for the webhook endpoint to work; it is the recovery
+safety net for worker crashes.
+
 ## Recovery
 
 - Duplicate webhook: unique `event_key` plus unique credit grant key.
 - Callback/webhook race: transaction status check plus unique grant key.
 - Wrong amount/currency/reference/customer: rejected with 400, no credits.
-- Failed processing: event row `failed` with `last_error`; replay after fixing.
+- Failed processing: event row `failed` with sanitized `last_error`; the sweeper retries after backoff.
 - Rollback: remove the Paystack secret key; lesson and credit features continue,
   and no new payment can start.
