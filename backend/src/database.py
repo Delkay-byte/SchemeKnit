@@ -20,9 +20,36 @@ from .config import get_settings
 
 settings = get_settings()
 
-_is_sqlite = "sqlite" in settings.DATABASE_URL
+
+def normalize_database_url(url: str) -> str:
+    """Normalize standard PostgreSQL URLs to the installed Psycopg 3 driver.
+
+    SQLAlchemy's bare ``postgresql://`` and ``postgres://`` schemes default to
+    the psycopg2 DBAPI. This project installs ``psycopg[binary]`` (Psycopg 3),
+    so those schemes must select ``postgresql+psycopg`` before create_engine.
+
+    The value is changed only at the scheme prefix; credentials, host, port,
+    database, path and every query parameter (including ``sslmode`` and
+    ``channel_binding``) are preserved byte-for-byte. The URL is never logged.
+    """
+    if not url or not str(url).strip():
+        raise ValueError("DATABASE_URL is not configured.")
+    value = str(url).strip()
+    lower = value.lower()
+    if lower.startswith("postgresql+psycopg://"):
+        return value
+    if lower.startswith("postgresql://"):
+        return "postgresql+psycopg://" + value[len("postgresql://"):]
+    if lower.startswith("postgres://"):
+        return "postgresql+psycopg://" + value[len("postgres://"):]
+    # SQLite and any other explicitly selected SQLAlchemy driver are unchanged.
+    return value
+
+
+_database_url = normalize_database_url(settings.DATABASE_URL)
+_is_sqlite = _database_url.startswith("sqlite")
 engine = create_engine(
-    settings.DATABASE_URL,
+    _database_url,
     connect_args={"check_same_thread": False} if _is_sqlite else {},
     echo=settings.DEBUG,
     # Neon/Render can close idle pooled PostgreSQL connections. Pre-ping
