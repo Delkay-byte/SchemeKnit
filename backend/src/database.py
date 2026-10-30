@@ -20,10 +20,15 @@ from .config import get_settings
 
 settings = get_settings()
 
+_is_sqlite = "sqlite" in settings.DATABASE_URL
 engine = create_engine(
     settings.DATABASE_URL,
-    connect_args={"check_same_thread": False} if "sqlite" in settings.DATABASE_URL else {},
+    connect_args={"check_same_thread": False} if _is_sqlite else {},
     echo=settings.DEBUG,
+    # Neon/Render can close idle pooled PostgreSQL connections. Pre-ping
+    # replaces a dead connection before use instead of surfacing a 500.
+    pool_pre_ping=not _is_sqlite,
+    pool_recycle=300 if not _is_sqlite else -1,
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
