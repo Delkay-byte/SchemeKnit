@@ -158,8 +158,13 @@ class Settings(BaseSettings):
     #: Bounded retries for transient failures (429 / 5xx / network only).
     ZELI_MAX_RETRIES: int = 2
 
-    # Paystack (payments) — optional; absent keys disable card checkout.
+    # Paystack (payments) — optional; absent keys disable new payment initiation.
     # Server-side secret only; never expose PAYSTACK_SECRET_KEY to the browser.
+    # PAYSTACK_MODE must match the key environment: "test" for sk_test_,
+    # "live" for sk_live_. Live keys are refused outside live mode, so a
+    # development machine cannot accidentally start a real-money payment.
+    PAYSTACK_ENABLED: bool = True
+    PAYSTACK_MODE: str = "test"
     PAYSTACK_PUBLIC_KEY: str = ""
     PAYSTACK_SECRET_KEY: str = ""
     PAYSTACK_CURRENCY: str = "GHS"
@@ -357,6 +362,32 @@ class Settings(BaseSettings):
                 "EMAIL_FROM (must use a verified production domain, "
                 "not resend.dev — set SCHEMEKNIT_PREVIEW=true for test mode)"
             )
+
+        # Paystack — when enabled in production, it must be explicitly live.
+        # A test key here would take test-mode payments in production, so that
+        # is a hard boot failure rather than a silent downgrade.
+        if self.PAYSTACK_ENABLED:
+            mode = (self.PAYSTACK_MODE or "").strip().lower()
+            secret = (self.PAYSTACK_SECRET_KEY or "").strip()
+            if secret:
+                if mode != "live":
+                    problems.append(
+                        "PAYSTACK_MODE (must be 'live' when a live Paystack "
+                        "secret is configured in production)"
+                    )
+                if not secret.startswith("sk_live_"):
+                    problems.append(
+                        "PAYSTACK_SECRET_KEY (production must use sk_live_, "
+                        "not a test key)"
+                    )
+            if (self.PAYSTACK_CURRENCY or "").strip().upper() != "GHS":
+                problems.append("PAYSTACK_CURRENCY (must be GHS)")
+            for key in ("PAYSTACK_PUBLIC_KEY", "NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY"):
+                value = (getattr(self, key, "") or "").strip()
+                if value.startswith("sk_"):
+                    problems.append(
+                        f"{key} (must never contain a Paystack secret key)"
+                    )
 
         # Object storage — required in production
         if self.STORAGE_BACKEND == "s3":

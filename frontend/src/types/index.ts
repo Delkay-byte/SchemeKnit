@@ -592,3 +592,41 @@ export interface WeeklyPlanListItem {
   created_date: string
   updated_date: string
 }
+
+/** Public package returned by GET /api/paystack/catalogue. */
+export interface CataloguePlan {
+  slug: string
+  name: string
+  description: string
+  price_pesewas: number
+  price_ghs: number
+  currency: string
+  duration_days: number
+  credits: number
+  credit_validity_days: number | null
+  package_kind: 'free' | 'flexible' | 'timed'
+  validity_label: string
+  payment_terms: string
+  features: string[]
+  active: boolean
+  free?: boolean
+}
+
+export interface CreditStatus {
+  free: {
+    limit: number
+    used: number
+    remaining: number
+    period_key: string
+    resets: string
+    rollover: boolean
+  }
+  purchased: number
+  package: number
+  referral: number
+  packages: Array<{ slug: string; label: string; remaining: number; expires_at: string | null }>
+  expired_packages: Array<{ slug: string; label: string; unused: number; expired_at: string | null }>
+  total: number
+  spending_order: string[]
+  unit: string
+}

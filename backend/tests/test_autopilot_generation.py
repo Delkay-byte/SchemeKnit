@@ -298,7 +298,7 @@ class TestAutopilotApi:
         from fastapi.testclient import TestClient
 
         user = make_user(db)
-        scheme = _multi_scheme(db, user.id, weeks=3, code_for=lambda n: f"B7.1.1.{n}.1")
+        scheme = _multi_scheme(db, user.id, weeks=2, code_for=lambda n: f"B7.1.1.{n}.1")
         config = _config(scheme.id)
 
         with TestClient(_app(db, user)) as client:
@@ -306,13 +306,13 @@ class TestAutopilotApi:
             assert plan["ready"] is True
             assert plan["blockers"] == []
             assert plan["counts"] == {
-                "pending_count": 3, "safe_pending_count": 3,
-                "needs_review_count": 0, "selected_count": 3,
+                "pending_count": 2, "safe_pending_count": 2,
+                "needs_review_count": 0, "selected_count": 2,
                 "generated_count": 0, "quota_skipped_count": 0,
             }
             # Source order: earliest week first.
-            assert [r["week_number"] for r in plan["selected_rows"]] == [1, 2, 3]
-            assert plan["quota"]["remaining"] == 5
+            assert [r["week_number"] for r in plan["selected_rows"]] == [1, 2]
+            assert plan["quota"]["remaining"] == 2
             assert plan["wapef"]["required"] is False
             # Deterministic default: the plan never implies AI.
             blob = str(plan).lower()
@@ -329,17 +329,17 @@ class TestAutopilotApi:
             plan = _select_via(client, scheme, config)
             assert plan["ready"] is True
             assert plan["counts"]["pending_count"] == 7
-            assert plan["counts"]["selected_count"] == 5
-            assert plan["counts"]["quota_skipped_count"] == 2
-            assert len(plan["selected_indicator_codes"]) == 5
+            assert plan["counts"]["selected_count"] == 2
+            assert plan["counts"]["quota_skipped_count"] == 5
+            assert len(plan["selected_indicator_codes"]) == 2
             # The capped batch is generation-ready through the REAL endpoint:
-            # 5 codes fit the remaining 5 units, so no 403 and no job-less failure.
+            # 2 codes fit the remaining 2 units, so no 403 and no job-less failure.
             _generate(
                 client, scheme, config,
                 selected_occurrence_ids=plan["selected_occurrence_ids"],
                 selected_indicator_codes=plan["selected_indicator_codes"],
             )
-            assert len(_lessons(client, scheme)) == 5
+            assert len(_lessons(client, scheme)) == 2
 
     def test_matrix_c_unlimited_account_generates_everything(self, db):
         from fastapi.testclient import TestClient
@@ -361,12 +361,12 @@ class TestAutopilotApi:
         from fastapi.testclient import TestClient
 
         user = make_user(db)
-        scheme = _multi_scheme(db, user.id, weeks=4, code_for=lambda n: f"B7.4.{n}.1.1")
+        scheme = _multi_scheme(db, user.id, weeks=2, code_for=lambda n: f"B7.4.{n}.1.1")
         config = _config(scheme.id)
 
         with TestClient(_app(db, user)) as client:
             plan = _select_via(client, scheme, config)
-            assert plan["counts"]["selected_count"] == 4
+            assert plan["counts"]["selected_count"] == 2
             assert plan["counts"]["quota_skipped_count"] == 0
             assert plan["ready"] is True
 

@@ -593,6 +593,9 @@ class TermConfig(BaseModel):
     #: codes for quota reservation); empty keeps the code-based behaviour
     #: above. Never reorders or renames the curriculum.
     selected_occurrence_ids: List[str] = []
+    #: Client-generated id for THIS generation action. Makes credit
+    #: reservation idempotent across duplicate submissions/retries.
+    request_id: str = ""
     # Teacher-supplied lesson metadata (PART 11-24). Each is optional and blanks
     # are preserved as blank — the generator never invents values for them.
     period: str = ""

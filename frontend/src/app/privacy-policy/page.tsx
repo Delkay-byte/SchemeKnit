@@ -41,9 +41,11 @@ export default function PrivacyPolicyPage() {
             produced from your uploaded schemes.
           </li>
           <li>
-            <strong>Payment records:</strong> payment evidence and verification
-            details for subscriptions. Payments are verified manually — we do
-            not process card or mobile-money transactions automatically.
+            <strong>Payment records:</strong> transaction references, payment
+            method, amount, status and verification details for prepaid
+            packages. Payments are processed by Paystack by Bank Transfer or
+            Mobile Money; TeachFlow does not receive or store full payment
+            credentials.
           </li>
           <li>
             <strong>Usage data:</strong> generation counts, feature usage, and

@@ -281,7 +281,7 @@ function LicenseUnlockDecor() {
           <div className="flex items-start justify-between">
             <div>
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-600">SchemeKnit License</p>
-              <p className="mt-2 text-lg font-bold text-[#102A43]">Teacher Pro</p>
+              <p className="mt-2 text-lg font-bold text-[#102A43]">Lesson-plan credits</p>
             </div>
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 shadow-inner">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="2" strokeLinecap="round">
@@ -291,7 +291,7 @@ function LicenseUnlockDecor() {
             </div>
           </div>
           <div className="mt-5 space-y-2">
-            {[['Status', 'Awaiting activation'], ['Tier', 'Free → Pro'], ['Seats', 'Included']].map(([k, v]) => (
+            {[['Status', 'Awaiting payment'], ['Tier', 'Free → Credits'], ['Validity', 'Prepaid']].map(([k, v]) => (
               <div key={k} className="flex justify-between text-xs">
                 <span className="text-[#3D5A75]">{k}</span>
                 <span className="font-semibold text-[#102A43]">{v}</span>

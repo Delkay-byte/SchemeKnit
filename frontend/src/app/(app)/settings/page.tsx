@@ -200,15 +200,15 @@ export default function SettingsPage() {
 
                   {plan.expires_at && (
                     <p data-plan-expiry className="text-sm text-muted-foreground">
-                      Renews / expires: {new Date(plan.expires_at).toLocaleDateString()}
+                      Expires / valid until: {new Date(plan.expires_at).toLocaleDateString()}
                     </p>
                   )}
 
                   {(plan.plan || 'FREE') === 'FREE' && (
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                       <p className="text-sm text-muted-foreground">
-                        Need more? Teacher Pro is activated by an administrator after
-                        payment is verified.
+                        Need more? Buy a prepaid package by Bank Transfer or Mobile Money.
+                        Packages activate only after payment is verified.
                       </p>
                       <Button asChild variant="outline" size="sm">
                         <Link href="/upgrade">Upgrade to Teacher Pro</Link>

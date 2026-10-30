@@ -602,6 +602,9 @@ class IndividualRegisterRequest(BaseModel):
     email: str
     password: str
     full_name: str
+    #: Captured from a referral link and submitted with the new account. May
+    #: be blank. Attribution happens exactly once, at registration.
+    referral_code: str = ""
 @router.post("/register/individual")
 async def register_individual_teacher(
     req: IndividualRegisterRequest,
@@ -664,6 +667,15 @@ async def register_individual_teacher(
     db.add(free_ent)
     db.commit()
     db.refresh(new_user)
+
+    # Referral attribution: only for this newly created account, only once.
+    # Registration alone never grants credits — the reward waits for the
+    # first verified paid package purchase.
+    try:
+        from .. import referrals
+        referrals.attribute(db, new_user, req.referral_code)
+    except Exception:
+        db.rollback()
 
     token = create_user_token(new_user)
     log_security("individual_teacher_registered", user_id=new_user.id, email=new_user.email)
@@ -730,7 +742,10 @@ async def get_my_plan(
     For teachers with both: returns the combined/resolved entitlement.
     """
     from ..entitlements import resolve_entitlement
-    return resolve_entitlement(db, user)
+    from .. import credits
+    resolved = resolve_entitlement(db, user)
+    resolved["credits"] = credits.status(db, user.id)
+    return resolved
 
 
 @router.get("/users")

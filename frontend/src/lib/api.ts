@@ -132,10 +132,10 @@ class ApiService {
     })
   }
 
-  async registerIndividual(email: string, password: string, fullName: string): Promise<any> {
+  async registerIndividual(email: string, password: string, fullName: string, referralCode?: string): Promise<any> {
     return this.request('/api/auth/register/individual', {
       method: 'POST',
-      body: JSON.stringify({ email, password, full_name: fullName }),
+      body: JSON.stringify({ email, password, full_name: fullName, referral_code: referralCode || '' }),
     })
   }
 
@@ -873,6 +873,72 @@ class ApiService {
   // Payment API
   async getPaymentConfig(): Promise<any> {
     return this.request('/api/payments/config')
+  }
+
+  // Paystack prepaid packages (Bank Transfer and Mobile Money only)
+  async getPaystackPlans(): Promise<any> {
+    return this.request('/api/paystack/plans')
+  }
+
+  async getCatalogue(): Promise<any> {
+    return this.request('/api/paystack/catalogue')
+  }
+
+  async bankTransferCharge(planSlug: string): Promise<any> {
+    return this.request('/api/paystack/bank-transfer/charge', {
+      method: 'POST',
+      body: JSON.stringify({ plan_slug: planSlug }),
+    })
+  }
+
+  async initializePaystack(planSlug: string): Promise<any> {
+    // Retired card endpoint; kept for a clear server-side refusal.
+    return this.request('/api/paystack/initialize', {
+      method: 'POST',
+      body: JSON.stringify({ plan_slug: planSlug }),
+    })
+  }
+
+  async verifyPaystack(reference: string): Promise<any> {
+    return this.request(`/api/paystack/verify/${encodeURIComponent(reference)}`)
+  }
+
+  async momoCharge(planSlug: string, phone: string, provider: string): Promise<any> {
+    return this.request('/api/paystack/momo/charge', {
+      method: 'POST',
+      body: JSON.stringify({ plan_slug: planSlug, phone, provider }),
+    })
+  }
+
+  async momoStatus(reference: string): Promise<any> {
+    return this.request(`/api/paystack/momo/status/${encodeURIComponent(reference)}`)
+  }
+
+  async chargeStatus(reference: string): Promise<any> {
+    return this.request(`/api/paystack/charge/status/${encodeURIComponent(reference)}`)
+  }
+
+  async getCredits(): Promise<any> {
+    return this.request('/api/paystack/credits')
+  }
+
+  async getMyReferrals(): Promise<any> {
+    return this.request('/api/referrals/me')
+  }
+
+  async trackReferral(code: string): Promise<any> {
+    return this.request('/api/referrals/track', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    })
+  }
+
+  async getMySubscription(): Promise<any> {
+    return this.request('/api/paystack/me')
+  }
+
+  async cancelSubscription(): Promise<any> {
+    return this.request('/api/paystack/cancel', { method: 'POST' })
   }
 
   async submitPayment(data: {

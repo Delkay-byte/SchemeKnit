@@ -39,6 +39,16 @@ router = APIRouter()
 pipeline = GenerationPipeline()
 logger = get_logger()
 
+
+def _is_free_only(quota: dict) -> bool:
+    """True when the account has no paid/referral/package credit balance."""
+    state = (quota or {}).get("credits") or {}
+    return not (
+        int(state.get("purchased") or 0)
+        + int(state.get("package") or 0)
+        + int(state.get("referral") or 0)
+    )
+
 # ── Generation coordination ───────────────────────────────────────────────
 # Two truly concurrent POST /generate requests for the same (owner, scheme)
 # used to pass the in-flight job read before either created its job, then both
@@ -1336,14 +1346,12 @@ def _generate_lesson_plans(
     from ..entitlements import (
         resolve_entitlement, lesson_quota_status, free_tier_lesson_quota_message,
     )
-    from ..usage_quota import (
-        reserve_lesson_units, release_lesson_units, charged_indicator_codes,
-    )
+    from ..usage_quota import charged_indicator_codes
+    from .. import credits as credit_service
     from ..models import WeekType
 
     resolved = resolve_entitlement(db, user)
     quota_before = lesson_quota_status(db, user, resolved)
-    gen_limit = quota_before["limit"] if quota_before["enforced"] else 0
 
     scheme = data_service.scheme_to_model(scheme_db)
     resolve_term_window(config, scheme.weeks)
@@ -1540,47 +1548,65 @@ def _generate_lesson_plans(
             already_generated_occurrence_ids = sorted(_existing_occ)
 
     reservation = None
-    if gen_limit > 0:
-        remaining = quota_before["remaining"] or 0
-        # One unit is charged per (scheme, indicator code), not per occurrence.
-        # A resume may re-request a code that a previous occurrence already
-        # paid for; counting it as new demand would falsely refuse the resume.
-        charged_codes = charged_indicator_codes(
-            db, user.id, scheme_id, quota_before.get("period_key"))
-        unpaid_codes = [c for c in requested_codes if c not in charged_codes]
-        if len(unpaid_codes) > remaining:
-            # Never silently select or drop indicators — ask the teacher to
-            # choose a subset no larger than the remaining allowance.
-            raise HTTPException(
-                status_code=403,
-                detail=(
-                    ("This resume needs " if resume else "This scheme contains ")
-                    + (
-                        f"{len(unpaid_codes)} new lesson-plan unit"
-                        f"{'s' if len(unpaid_codes) != 1 else ''}. "
-                        if resume else
-                        f"{len(available_codes)} instructional indicator"
-                        f"{'s' if len(available_codes) != 1 else ''}. "
-                    )
-                    + f"You have {remaining} Free Tier lesson plan"
-                    f"{'s' if remaining != 1 else ''} remaining this month. "
-                    + (
-                        "Wait for the next monthly allowance or upgrade to "
-                        "Teacher Pro."
-                        if resume else
-                        f"Select up to {remaining} indicator"
-                        f"{'s' if remaining != 1 else ''} to generate now, or "
-                        "upgrade to Teacher Pro for unlimited generation."
-                    )
-                ),
-            )
-        reservation = reserve_lesson_units(
-            db, user.id, scheme_id, requested_codes, gen_limit
+    # ── Credit reservation (free monthly first, then paid buckets) ───────
+    # Affordability is decided on the server from the approved catalogue and
+    # the user's auditable balances. A partial batch is never silently run.
+    charged_codes = charged_indicator_codes(
+        db, user.id, scheme_id, quota_before.get("period_key"))
+    unpaid_codes = [c for c in requested_codes if c not in charged_codes]
+    requested_units = len(unpaid_codes)
+    available_units = int(quota_before.get("remaining") or 0)
+    quota_unlimited = bool(
+        quota_before.get("unlimited") or not quota_before.get("enforced"))
+    if not quota_unlimited and requested_units > available_units:
+        shortfall = requested_units - available_units
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                f"This selection needs {requested_units} credit"
+                f"{'s' if requested_units != 1 else ''} for "
+                f"{requested_units} indicator-level lesson plan"
+                f"{'s' if requested_units != 1 else ''}. "
+                f"You have {available_units} credit"
+                f"{'s' if available_units != 1 else ''} available "
+                f"(shortfall: {shortfall}). Select up to {available_units} "
+                "indicator(s) to generate now, or buy a package for more credits."
+                + (" Adesua — Free allowance resets on the 1st of each month."
+                   if _is_free_only(quota_before) else "")
+                + (" This resume can be limited to the indicators you can afford."
+                   if resume else "")
+            ),
+            headers={
+                "X-Credits-Requested": str(requested_units),
+                "X-Credits-Available": str(available_units),
+                "X-Credits-Shortfall": str(shortfall),
+            },
+        )
+
+    if not quota_unlimited and requested_units > 0:
+        import hashlib as _hashlib
+        _request_id = (getattr(config, "request_id", "") or "").strip()
+        if _request_id:
+            _idem = f"gen:{user.id}:{_request_id}"
+        else:
+            _fingerprint = _hashlib.sha256(
+                ("|".join(sorted(unpaid_codes)) + f"|{scheme_id}|"
+                 + (existing_job.id if (resume and existing_job) else "")).encode()
+            ).hexdigest()[:32]
+            _idem = f"gen:{user.id}:{scheme_id}:{quota_before.get('period_key')}:{_fingerprint}"
+        reservation = credit_service.reserve(
+            db, user.id, requested_units, _idem, scheme_id, unpaid_codes,
+            period_key=quota_before.get("period_key"),
         )
         if not reservation.allowed:
             raise HTTPException(
                 status_code=403,
-                detail=free_tier_lesson_quota_message(0),
+                detail=(
+                    f"You need {requested_units} credits but only "
+                    f"{reservation.available} are available. No lesson plans "
+                    "were generated and no credit was charged. Reduce the "
+                    "batch or buy a package."
+                ),
             )
 
     # ── What this run replaces (Priority 3) ────────────────────────────────
@@ -1816,18 +1842,15 @@ def _generate_lesson_plans(
                 db, scheme_id, user.id, job_db.id, commit=False
             )
 
-            # Release any reserved unit that did not become an accepted
-            # lesson INSIDE the same transaction: the ledger and the lesson
-            # rows must become durable together.
-            if reservation and reservation.consumed:
-                produced = set()
+            # Commit exactly the credits that paid for ACCEPTED lessons and
+            # refund any reserved unit that did not become a lesson.
+            if reservation is not None and reservation.charged:
+                produced_codes = set()
                 for lp in accepted:
                     for c in (lp.indicator_codes or []):
-                        produced.add(f"{scheme_id}:{c}")
-                unused = [k for k in reservation.reserved_keys if k not in produced]
-                if unused:
-                    release_lesson_units(
-                        db, user.id, unused, reservation.period_key, commit=False)
+                        produced_codes.add(c)
+                credit_service.commit(db, reservation, produced_codes,
+                                      commit=False)
 
             # Cumulative totals: after any partial run this job represents the
             # scheme's complete lesson set — which is exactly what
@@ -1922,14 +1945,12 @@ def _generate_lesson_plans(
         # quality gate refused releases its unit (gate failure = 0 consumed).
         # The normal persistence path already did this atomically above; this
         # covers a job without an in-memory lesson set.
-        if reservation and reservation.consumed and not persistence_committed:
-            produced = set()
+        if reservation is not None and reservation.charged and not persistence_committed:
+            produced_codes = set()
             for lp in accepted:
                 for c in (lp.indicator_codes or []):
-                    produced.add(f"{scheme_id}:{c}")
-            unused = [k for k in reservation.reserved_keys if k not in produced]
-            if unused:
-                release_lesson_units(db, user.id, unused, reservation.period_key)
+                    produced_codes.add(c)
+            credit_service.commit(db, reservation, produced_codes)
 
         # Everything below this line is AFTER the atomic lesson/quota commit.
         # It can enrich the response but must never turn durable work into a
@@ -2140,8 +2161,8 @@ def _generate_lesson_plans(
             # Clear any failed statement (PostgreSQL aborts the transaction)
             # before returning the reservation in its own transaction.
             db.rollback()
-            if reservation and reservation.consumed:
-                release_lesson_units(db, user.id, reservation.reserved_keys, reservation.period_key)
+            if reservation and reservation.charged:
+                credit_service.release(db, reservation)
             # The job row exists (it is created before the run); never leave
             # it "pending" forever when the run was refused after creation.
             data_service.update_job(db, job_db.id, status="failed")
@@ -2152,8 +2173,8 @@ def _generate_lesson_plans(
         # stay charged; releasing here was audit defect #2.
         if not persistence_committed:
             db.rollback()
-            if reservation and reservation.consumed:
-                release_lesson_units(db, user.id, reservation.reserved_keys, reservation.period_key)
+            if reservation and reservation.charged:
+                credit_service.release(db, reservation)
             data_service.update_job(db, job_db.id, status="failed", error_message=str(e))
             log_error("generation_failed", user_id=user.id, scheme_id=scheme_id, error=str(e))
             raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")

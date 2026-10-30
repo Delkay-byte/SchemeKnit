@@ -31,6 +31,14 @@ from sqlalchemy.orm import sessionmaker
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+
+@pytest.fixture(autouse=True)
+def _wide_free_allowance(monkeypatch):
+    """Concurrency mechanics use a 3-lesson run; the approved 2-credit policy
+    is pinned separately."""
+    from src import entitlements
+    monkeypatch.setattr(entitlements, "FREE_TIER_LESSON_PLANS_PER_MONTH", 10)
+
 from src.database import (  # noqa: E402
     Base, GenerationJobDB, LessonPlanDB, SchemeDB, UsagePeriodDB, UsageUnitDB,
     WeekDB, generate_id,

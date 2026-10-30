@@ -67,20 +67,22 @@ export function LandingHero() {
 
           <div ref={copyRef} className={styles.copy} data-hero-copy>
             <p className={styles.eyebrow}>
-              Ghana&apos;s curriculum-grounded lesson planner
+              Your scheme. Your curriculum. Your plans.
             </p>
             <h1 id="hero-heading" className={styles.headline}>
-              <span className={styles.line}>Turn Your Scheme</span>
-              <span className={styles.line}>Into the Right Lesson.</span>
+              <span className={styles.line}>Your Scheme of Learning.</span>
+              <span className={styles.line}>Your Lesson Plans.</span>
+              <span className={styles.line}>Made Easier.</span>
             </h1>
             <p className={styles.support}>
-              Upload your real scheme of learning. SchemeKnit maps the curriculum,
-              follows the right indicator and teaching period, and builds a
-              teacher-ready lesson without drifting away from your scheme.
+              Upload the scheme you already teach. SchemeKnit extracts the week,
+              strand, sub-strand, content standard and indicators for you to
+              review, then builds a separate lesson plan for each indicator you
+              choose. Start free with two lesson plans every month.
             </p>
             <div className={styles.actions}>
-              <Link href="/login" className={styles.primary}>
-                Start Planning
+              <Link href="/signup" className={styles.primary}>
+                Start Free
               </Link>
               <a
                 href="#how-it-works"
@@ -92,6 +94,9 @@ export function LandingHero() {
               >
                 See How It Works
               </a>
+              <Link href="/pricing" className={styles.secondary}>
+                View Pricing
+              </Link>
             </div>
           </div>
 

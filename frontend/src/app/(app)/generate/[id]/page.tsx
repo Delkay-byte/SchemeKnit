@@ -618,6 +618,7 @@ export default function GeneratePage() {
         ...sanitizeTermConfig(config, configFallback()),
         selected_indicator_codes: selection.codes,
         selected_occurrence_ids: selection.occurrences,
+        request_id: (globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`),
       }
       const response = await api.generateLessonPlans(schemeId, body)
       setJobRecovery(null)

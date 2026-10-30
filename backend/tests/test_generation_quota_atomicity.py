@@ -31,6 +31,18 @@ from src.usage_quota import current_period_key  # noqa: E402
 from tests.conftest import make_user  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _wide_free_allowance(monkeypatch):
+    """These scenarios drive 3 units per run.
+
+    They exercise multi-unit atomicity, not the size of the Adesua allowance,
+    so give the free tier room for a full run (the production limit is 2).
+    """
+    from src import entitlements
+
+    monkeypatch.setattr(entitlements, "FREE_TIER_LESSON_PLANS_PER_MONTH", 5)
+
+
 def _scheme(db, owner_id):
     scheme = SchemeDB(id=generate_id(), owner_id=owner_id, filename="s.docx",
                       subject="ICT", class_level="Basic 7")

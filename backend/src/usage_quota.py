@@ -29,7 +29,7 @@ computed from ``current_period_key()`` unless a test passes one explicitly.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Sequence
 
 from sqlalchemy import text
@@ -47,13 +47,21 @@ UNIT_KIND_LESSON_PLAN = "lesson_plan"
 
 
 def current_period_key(at: Optional[datetime] = None) -> str:
-    """Return the active calendar-month key (``YYYY-MM``) from the server clock.
+    """Return the active calendar-month key (``YYYY-MM``) in Africa/Accra.
 
     This is the only place the period is computed; callers must not use a
-    client-supplied month.
+    client-supplied month. Ghana observes UTC+0 with no DST, but using the
+    named zone keeps the rule explicit and correct if local policy changes.
     """
-    at = at or datetime.utcnow()
-    return at.strftime("%Y-%m")
+    try:
+        from zoneinfo import ZoneInfo
+        accra = ZoneInfo("Africa/Accra")
+    except Exception:  # pragma: no cover - tzdata missing on a bare host
+        accra = timezone(timedelta(0))
+    at = at or datetime.now(accra)
+    if at.tzinfo is None:
+        at = at.replace(tzinfo=timezone.utc).astimezone(accra)
+    return at.astimezone(accra).strftime("%Y-%m")
 
 
 def _dialect(db: Session) -> str:

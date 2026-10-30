@@ -47,6 +47,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [plan, setPlan] = useState<PlanResolution | null>(null)
+  const [credits, setCredits] = useState<any>(null)
+  const [refStats, setRefStats] = useState<any>(null)
   const [showActivateModal, setShowActivateModal] = useState(false)
   const [activationCode, setActivationCode] = useState('')
   const [activating, setActivating] = useState(false)
@@ -67,12 +69,17 @@ export default function Dashboard() {
   const loadSchemes = async () => {
     try {
       setLoading(true)
-      const [schemesRes, planRes] = await Promise.all([
+      const [schemesRes, planRes, refRes] = await Promise.all([
         api.listSchemes(),
         api.getMyPlan().catch(() => null),
+        api.getMyReferrals().catch(() => null),
       ])
       setSchemes(schemesRes.schemes || [])
-      if (planRes) setPlan(planRes)
+      if (planRes) {
+        setPlan(planRes)
+        setCredits(planRes.credits || null)
+      }
+      if (refRes) setRefStats(refRes)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load schemes')
     } finally {
@@ -176,11 +183,12 @@ export default function Dashboard() {
   }
 
   const termLabel = (activeScheme || schemes[0])?.term?.trim() || '—'
-  const remainingLabel =
-    plan && plan.generation_limit > 0
+  const remainingLabel = credits
+    ? String(credits.total)
+    : plan && plan.generation_limit > 0
       ? String(Math.max(plan.generation_limit - plan.generations_used, 0))
       : plan
-        ? 'Unlimited'
+        ? '0'
         : '—'
   const primaryAction = activeScheme
     ? getNextAction(activeScheme)
@@ -238,6 +246,66 @@ export default function Dashboard() {
               <StatCard label="Current term" value={termLabel} />
             </div>
 
+            {credits && (
+              <SurfaceCard className="px-5 py-5" data-dashboard-credits>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="font-semibold text-[#102A43]">Your lesson-plan credits</h2>
+                  <Button asChild size="sm"><Link href="/upgrade">Buy more credits</Link></Button>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-3 text-sm lg:grid-cols-4">
+                  <div>
+                    <p className="text-xs uppercase text-slate-500">Free this month</p>
+                    <p className="text-xl font-bold text-[#102A43]">{credits.free.remaining}</p>
+                    <p className="text-xs text-slate-500">of {credits.free.limit}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase text-slate-500">Package</p>
+                    <p className="text-xl font-bold text-[#102A43]">{credits.package}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase text-slate-500">Flexible</p>
+                    <p className="text-xl font-bold text-[#102A43]">{credits.purchased}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase text-slate-500">Referral</p>
+                    <p className="text-xl font-bold text-[#102A43]">{credits.referral}</p>
+                  </div>
+                </div>
+                {credits.packages.length > 0 && (
+                  <ul className="mt-3 space-y-1 text-xs text-slate-500">
+                    {credits.packages.map((p: any) => (
+                      <li key={`${p.slug}-${p.expires_at}`}>
+                        {p.label}: {p.remaining} credits · expires {p.expires_at ? new Date(p.expires_at).toLocaleDateString() : 'never'}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {credits.total === 0 && (
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    You have no credits available. Saved plans stay editable and exportable; buy a package to generate more.
+                  </p>
+                )}
+              </SurfaceCard>
+            )}
+
+            {refStats && (
+              <SurfaceCard className="px-5 py-5" data-dashboard-referrals>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="font-semibold text-[#102A43]">Invite a teacher</h2>
+                    <p className="text-sm text-muted-foreground">
+                      Earn {refStats.reward.referrer} bonus credits when a teacher you invite makes their first successful purchase; they receive {refStats.reward.referred}.
+                    </p>
+                  </div>
+                  <Button asChild size="sm" variant="outline"><Link href="/subscription">Referral details</Link></Button>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                  <code className="max-w-full break-all rounded bg-slate-100 px-2 py-1">{refStats.link_path}</code>
+                  <span className="text-muted-foreground">{refStats.registered} registered · {refStats.qualifying} first purchases · {refStats.credits_earned} credits earned</span>
+                </div>
+              </SurfaceCard>
+            )}
+
             {/* 3. Status — first-use profile prompt, then plan / entitlement. */}
             {/* First-use profile prompt (PART 18). The teacher's name is what
                 the generated plan prints; when the profile has none yet we ask
@@ -261,7 +329,7 @@ export default function Dashboard() {
             {/* Account surface — the badge reflects the resolved entitlement
                 source (§13/§14). A school teacher sees SCHOOL ACCESS and is
                 NOT pushed toward buying Individual Pro; an individual teacher
-                sees FREE TEACHER / TEACHER PRO with an upgrade path. */}
+                sees FREE PLAN / PREPAID CREDITS with an upgrade path. */}
             {plan && (
               <SurfaceCard
                 data-plan
@@ -295,9 +363,9 @@ export default function Dashboard() {
                       ) : plan.edition === 'teacher' ? (
                         <>
                           <StatusPill tone="info" className="mb-1 rounded text-[11px] font-bold uppercase tracking-wider">
-                            Individual Teacher Pro
+                            Kyerɛkyerɛni — Individual Teacher
                           </StatusPill>
-                          <h3 className="font-semibold">Teacher Pro</h3>
+                          <h3 className="font-semibold">Kyerɛkyerɛni — Individual Teacher</h3>
                           <p className="text-sm text-muted-foreground">
                             Individual subscription
                           </p>
@@ -305,9 +373,9 @@ export default function Dashboard() {
                       ) : (
                         <>
                           <StatusPill tone="neutral" className="mb-1 rounded text-[11px] font-bold uppercase tracking-wider">
-                            Free Tier
+                            AD ESUA — FREE
                           </StatusPill>
-                          <h3 className="font-semibold">Free Tier</h3>
+                          <h3 className="font-semibold">Adesua — Free</h3>
                           <p className="text-sm text-muted-foreground">
                             Individual plan
                           </p>
@@ -341,12 +409,11 @@ export default function Dashboard() {
                     renews on the 1st — state it plainly. */}
                 {plan.edition === 'free' && plan.generation_limit > 0 && (
                   <p className="mt-3 text-sm text-muted-foreground">
-                    {plan.generations_used} of {plan.generation_limit} lesson plans used this month ·{' '}
-                    {Math.max(plan.generation_limit - plan.generations_used, 0)} remaining.
-                    {' '}Your allowance renews on the 1st.{' '}
+                    {Math.max(plan.generation_limit - plan.generations_used, 0)} of {plan.generation_limit} lesson plans remaining this month.
+                    {' '}Your free lesson-plan allowance refreshes on the first day of every month.{' '}
                     <Link href="/upgrade" className="font-medium text-[#04769B] hover:text-[#04A9CE] hover:underline">
-                      Upgrade to Teacher Pro
-                    </Link>{' '}for unlimited lesson plans.
+                      Choose a paid package
+                    </Link>{' '}to continue generating more lesson plans.
                   </p>
                 )}
                 {/* AI is a CALENDAR-MONTH allowance that renews on the 1st —
@@ -357,8 +424,8 @@ export default function Dashboard() {
                     You&apos;ve used all {plan.ai_credits} free AI generations for this month.
                     {' '}Your allowance renews on the 1st.{' '}
                     <Link href="/upgrade" className="font-medium text-[#04769B] hover:text-[#04A9CE] hover:underline">
-                      Upgrade to Teacher Pro
-                    </Link>{' '}for unlimited AI.
+                      Buy lesson-plan credits
+                    </Link>{' '}for more lesson-plan credits.
                   </p>
                 )}
               </SurfaceCard>
@@ -571,7 +638,7 @@ export default function Dashboard() {
             <DialogHeader>
               <DialogTitle>Activate License</DialogTitle>
               <DialogDescription>
-                Enter your activation code to unlock Teacher Pro features.
+                Enter your activation code to unlock PREPAID CREDITS features.
               </DialogDescription>
             </DialogHeader>
             {error && (

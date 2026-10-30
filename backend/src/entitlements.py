@@ -41,7 +41,7 @@ FREE_TIER_AI_GENERATIONS = 5
 
 #: Visible plan label for the free individual-teacher tier (§14). The internal
 #: edition identifier stays "free"; only this user-facing wording changes.
-FREE_TIER_PLAN_NAME = "Free Tier"
+FREE_TIER_PLAN_NAME = "Adesua — Free"
 
 #: Commercial plan identifiers surfaced to the client. The backend is the ONLY
 #: authority for these — a plan is PRO only when a server-side EntitlementDB row
@@ -69,7 +69,7 @@ def plan_for_edition(edition: Optional[str]) -> str:
 #: Free Tier LESSON-PLAN allowance: this many lesson plans per CALENDAR MONTH.
 #: One indicator → one period → one lesson plan → one unit. This is entirely
 #: separate from the AI allowance above, which stays a lifetime AI count.
-FREE_TIER_LESSON_PLANS_PER_MONTH = 5
+FREE_TIER_LESSON_PLANS_PER_MONTH = 2
 
 
 def free_tier_lesson_quota_message(remaining: int) -> str:
@@ -78,11 +78,11 @@ def free_tier_lesson_quota_message(remaining: int) -> str:
         return (
             "You've used all "
             f"{FREE_TIER_LESSON_PLANS_PER_MONTH} Free Tier lesson plans for this "
-            "month. This allowance renews on the 1st of next month. "
-            "Upgrade to Teacher Pro to generate unlimited lesson plans now."
+            "month (Adesua — Free). This allowance renews on the 1st of next "
+            "month. Choose a paid package to keep generating lesson plans now."
         )
     return (
-        f"You have {remaining} Free Tier lesson plan"
+        f"You have {remaining} Adesua — Free lesson plan"
         f"{'s' if remaining != 1 else ''} remaining this month."
     )
 
@@ -363,13 +363,29 @@ def resolve_entitlement(db: Session, user: User) -> Dict[str, Any]:
         result["lesson_quota_limit"] = limit
         result["lesson_quota_remaining"] = remaining_for_limit(db, user.id, limit, pk)
     else:
-        result["generation_limit"] = 0
-        result["generations_used"] = 0
+        # 0 means unlimited only for a school licence or a legacy admin/
+        # activation grant. A paystack package is bounded by its credit
+        # balance, not a monthly generation cap.
+        legacy_unlimited = (
+            result.get("source") in ("school", "individual+school")
+            or result.get("plan_source") != "paystack"
+        )
+        pk = current_period_key()
         result["lesson_quota_period"] = PERIOD_TYPE_CALENDAR_MONTH
-        result["lesson_quota_period_key"] = current_period_key()
-        result["lesson_quota_unlimited"] = True
-        result["lesson_quota_limit"] = 0
-        result["lesson_quota_remaining"] = None
+        result["lesson_quota_period_key"] = pk
+        if legacy_unlimited:
+            result["generation_limit"] = 0
+            result["generations_used"] = 0
+            result["lesson_quota_unlimited"] = True
+            result["lesson_quota_limit"] = 0
+            result["lesson_quota_remaining"] = None
+        else:
+            result["generation_limit"] = FREE_TIER_LESSON_PLANS_PER_MONTH
+            result["generations_used"] = get_units_used(db, user.id, pk)
+            result["lesson_quota_unlimited"] = False
+            result["lesson_quota_limit"] = FREE_TIER_LESSON_PLANS_PER_MONTH
+            result["lesson_quota_remaining"] = remaining_for_limit(
+                db, user.id, FREE_TIER_LESSON_PLANS_PER_MONTH, pk)
 
     return result
 
@@ -379,24 +395,45 @@ def lesson_quota_status(db: Session, user: User, resolved: Optional[Dict[str, An
 
     This is what the UI displays (“N of M used this month, K remaining”). It is
     always derived server-side; the browser never supplies the month.
+
+    For a paid account the snapshot combines the remaining free monthly
+    allowance with purchased/package/referral credit balances, so Autopilot
+    selects no more plans than the teacher can actually pay for.
     """
     resolved = resolved or resolve_entitlement(db, user)
-    limit = resolved.get("generation_limit", 0) or 0
-    enforced = limit > 0
-    period_key = resolved.get("lesson_quota_period_key") or current_period_key()
-    used = resolved.get("generations_used", 0) if enforced else 0
-    remaining = (max(limit - used, 0) if enforced else None)
+    from . import credits as credit_service
+    state = credit_service.status(db, user.id)
+    paid_total = int(state["purchased"]) + int(state["package"]) + int(state["referral"])
+    period_key = state["free"]["period_key"] or current_period_key()
+    if resolved.get("lesson_quota_unlimited"):
+        return {
+            "plan_name": resolved.get("plan_name"),
+            "edition": resolved.get("edition"),
+            "enforced": False,
+            "unlimited": True,
+            "limit": 0,
+            "used": 0,
+            "remaining": None,
+            "period_type": PERIOD_TYPE_CALENDAR_MONTH,
+            "period_key": period_key,
+            "unit": "lesson_plan",
+            "credits": state,
+        }
+    limit = int(state["free"]["limit"]) + paid_total
+    used = int(state["free"]["used"])
+    remaining = int(state["free"]["remaining"]) + paid_total
     return {
         "plan_name": resolved.get("plan_name"),
         "edition": resolved.get("edition"),
-        "enforced": enforced,
-        "unlimited": not enforced,
+        "enforced": True,
+        "unlimited": False,
         "limit": limit,
         "used": used,
         "remaining": remaining,
         "period_type": PERIOD_TYPE_CALENDAR_MONTH,
         "period_key": period_key,
         "unit": "lesson_plan",
+        "credits": state,
     }
 
 

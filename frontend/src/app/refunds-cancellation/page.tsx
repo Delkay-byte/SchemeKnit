@@ -13,33 +13,33 @@ export default function RefundsCancellationPage() {
       subtitle="Refund and cancellation terms for SchemeKnit subscriptions."
       lastUpdated="September 2026"
     >
-      <LegalSection title="1. Subscription Cancellation">
+      <LegalSection title="1. No Automatic Renewal">
         <p>
-          You may cancel your subscription at any time. Cancellation stops
-          future renewals but does not automatically refund the current
-          billing period. Your subscription remains active until the end of
-          the period you have paid for.
+          All TeachFlow packages are prepaid. Nothing renews automatically and
+          there is no recurring card charge. A Monthly, Term or Academic Year
+          package simply ends at its validity date; to continue generating you
+          make a fresh purchase. Flexible Credit Pack credits do not expire.
         </p>
       </LegalSection>
 
       <LegalSection title="2. Refund Eligibility">
         <p>
-          Because payments are verified manually and subscriptions are
-          activated only after verification, the following refund rules apply:
+          Because packages activate only after Paystack verification, the
+          following refund rules apply:
         </p>
         <ul className="list-disc space-y-1 pl-6">
           <li>
-            If a subscription was activated but the service was never usable
-            due to a platform fault, you may request a full refund within 14
-            days of activation.
+            If a package was activated but the service was never usable due to
+            a platform fault, you may request a full refund within 14 days of
+            activation.
           </li>
           <li>
             If a payment was verified in error (duplicate verification, wrong
-            plan), the excess amount will be refunded or credited.
+            package), the excess amount will be refunded or credited.
           </li>
           <li>
-            If you cancel before the end of a paid period, the remaining
-            period is not refunded but remains accessible until it ends.
+            A package that has ended is not refunded, but saved lesson plans
+            remain accessible and exportable.
           </li>
         </ul>
       </LegalSection>
@@ -66,8 +66,8 @@ export default function RefundsCancellationPage() {
       <LegalSection title="5. No Refund Circumstances">
         <ul className="list-disc space-y-1 pl-6">
           <li>
-            Refunds are not issued for unused generation quota — the quota
-            was available during the subscription period.
+            Refunds are not issued for credits already consumed by successfully
+            generated lesson plans.
           </li>
           <li>
             Refunds are not issued for content generated and exported before

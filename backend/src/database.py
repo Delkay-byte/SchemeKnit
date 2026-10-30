@@ -20,10 +20,42 @@ from .config import get_settings
 
 settings = get_settings()
 
+
+def normalize_database_url(url: str) -> str:
+    """Normalize standard PostgreSQL URLs to the installed Psycopg 3 driver.
+
+    SQLAlchemy's bare ``postgresql://`` and ``postgres://`` schemes default to
+    the psycopg2 DBAPI. This project installs ``psycopg[binary]`` (Psycopg 3),
+    so those schemes must select ``postgresql+psycopg`` before create_engine.
+
+    The value is changed only at the scheme prefix; credentials, host, port,
+    database, path and every query parameter (including ``sslmode`` and
+    ``channel_binding``) are preserved byte-for-byte. The URL is never logged.
+    """
+    if not url or not str(url).strip():
+        raise ValueError("DATABASE_URL is not configured.")
+    value = str(url).strip()
+    lower = value.lower()
+    if lower.startswith("postgresql+psycopg://"):
+        return value
+    if lower.startswith("postgresql://"):
+        return "postgresql+psycopg://" + value[len("postgresql://"):]
+    if lower.startswith("postgres://"):
+        return "postgresql+psycopg://" + value[len("postgres://"):]
+    # SQLite and any other explicitly selected SQLAlchemy driver are unchanged.
+    return value
+
+
+_database_url = normalize_database_url(settings.DATABASE_URL)
+_is_sqlite = _database_url.startswith("sqlite")
 engine = create_engine(
-    settings.DATABASE_URL,
-    connect_args={"check_same_thread": False} if "sqlite" in settings.DATABASE_URL else {},
+    _database_url,
+    connect_args={"check_same_thread": False} if _is_sqlite else {},
     echo=settings.DEBUG,
+    # Neon/Render can close idle pooled PostgreSQL connections. Pre-ping
+    # replaces a dead connection before use instead of surfacing a 500.
+    pool_pre_ping=not _is_sqlite,
+    pool_recycle=300 if not _is_sqlite else -1,
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -976,6 +1008,277 @@ class PasswordResetTokenDB(Base):
         Index("ix_reset_token_user", "user_id"),
         Index("ix_reset_token_hash", "token_hash"),
     )
+
+
+# ── Paystack subscriptions & automatic licensing ────────────────────────────
+
+class SubscriptionPlanDB(Base):
+    """Sellable subscription plan with environment-specific Paystack codes."""
+    __tablename__ = "subscription_plans"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    slug = Column(String, unique=True, nullable=False, index=True)
+    name = Column(String, nullable=False)
+    description = Column(Text, default="")
+    price_pesewas = Column(Integer, nullable=False)  # GHS minor unit
+    currency = Column(String, default="GHS")
+    interval = Column(String, nullable=False)  # monthly | annual
+    duration_days = Column(Integer, nullable=False)
+    features = Column(JSON, default=list)
+    entitlements = Column(JSON, default=dict)
+    active = Column(Boolean, default=True)
+    paystack_test_plan_code = Column(String, default="")
+    paystack_live_plan_code = Column(String, default="")
+    #: Approved commercial catalogue (v041). ``package_kind`` is
+    #: free | flexible | timed. A timed package grants ``credit_allowance``
+    #: credits until ``credit_validity_days`` after activation; a flexible pack
+    #: grants credits that never expire. Prices remain in ``price_pesewas``.
+    package_kind = Column(String, default="timed")
+    credit_allowance = Column(Integer, default=0)
+    credit_validity_days = Column(Integer, nullable=True)
+    display_order = Column(Integer, default=0)
+    payment_terms = Column(String, default="One-time prepaid payment. No automatic renewal.")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class UserSubscriptionDB(Base):
+    """One local subscription per user, advanced only by verified payments."""
+    __tablename__ = "user_subscriptions"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    plan_id = Column(String, ForeignKey("subscription_plans.id"), nullable=False)
+    provider = Column(String, default="paystack")
+    environment = Column(String, default="test")  # test | live
+    provider_customer_code = Column(String, default="")
+    provider_subscription_code = Column(String, default="", index=True)
+    provider_email_token = Column(String, default="")
+    status = Column(String, default="pending")  # pending|active|past_due|non_renewing|cancelled|expired|completed
+    current_period_start = Column(DateTime, nullable=True)
+    current_period_end = Column(DateTime, nullable=True)
+    paid_through = Column(DateTime, nullable=True)
+    grace_until = Column(DateTime, nullable=True)
+    cancel_at_period_end = Column(Boolean, default=False)
+    cancelled_at = Column(DateTime, nullable=True)
+    billing_mode = Column(String, default="recurring")  # recurring|prepaid
+    payment_method = Column(String, default="card")  # card|mobile_money
+    provider = Column(String, default="")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", name="uq_subscription_user"),
+    )
+
+
+class SubscriptionTransactionDB(Base):
+    """Payment attempt keyed by our unique reference (never credited twice)."""
+    __tablename__ = "subscription_transactions"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    reference = Column(String, unique=True, nullable=False, index=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    plan_id = Column(String, ForeignKey("subscription_plans.id"), nullable=False)
+    subscription_id = Column(String, ForeignKey("user_subscriptions.id"), nullable=True)
+    provider = Column(String, default="paystack")
+    environment = Column(String, default="test")
+    amount_pesewas = Column(Integer, nullable=False)
+    currency = Column(String, default="GHS")
+    status = Column(String, default="pending")  # pending|success|failed|abandoned
+    provider_transaction_id = Column(String, default="")
+    channel = Column(String, default="")
+    payment_method = Column(String, default="card_recurring")  # card_recurring|mobile_money
+    provider = Column(String, default="")  # mtn|atl|vod
+    charge_status = Column(String, default="")
+    instructions = Column(Text, default="")
+    #: Provider-returned prepaid instructions (bank account, expiry, etc.).
+    payment_details = Column(JSON, default=dict)
+    paid_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class PaystackWebhookEventDB(Base):
+    """Idempotency ledger for webhook deliveries."""
+    __tablename__ = "paystack_webhook_events"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    event_key = Column(String, unique=True, nullable=False, index=True)
+    event_type = Column(String, default="")
+    reference = Column(String, default="", index=True)
+    payload_hash = Column(String, default="")
+    payload_json = Column(JSON, default=dict)
+    status = Column(String, default="received")  # received|processing|processed|ignored|failed|exhausted
+    attempts = Column(Integer, default=0)
+    last_error = Column(String, default="")
+    received_at = Column(DateTime, default=datetime.utcnow)
+    processed_at = Column(DateTime, nullable=True)
+    last_attempt_at = Column(DateTime, nullable=True)
+    next_retry_at = Column(DateTime, nullable=True)
+    lease_owner = Column(String, default="")
+    lease_expires_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index("ix_paystack_webhook_retry", "status", "next_retry_at"),
+    )
+
+
+class SubscriptionEventDB(Base):
+    """Append-only subscription status history for audit and support."""
+    __tablename__ = "subscription_events"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    subscription_id = Column(String, ForeignKey("user_subscriptions.id"), nullable=False, index=True)
+    event_type = Column(String, nullable=False)
+    from_status = Column(String, default="")
+    to_status = Column(String, default="")
+    metadata_json = Column(JSON, default=dict)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class UserLicenseDB(Base):
+    """Per-user software licence issued by a verified subscription payment."""
+    __tablename__ = "user_licenses"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    user_id = Column(String, ForeignKey("users.id"), unique=True, nullable=False, index=True)
+    plan_id = Column(String, ForeignKey("subscription_plans.id"), nullable=False)
+    subscription_id = Column(String, ForeignKey("user_subscriptions.id"), nullable=True)
+    licence_key = Column(String, unique=True, nullable=False)
+    key_hash = Column(String, unique=True, nullable=False, index=True)
+    status = Column(String, default="active")  # active|expired|revoked
+    issued_at = Column(DateTime, default=datetime.utcnow)
+    starts_at = Column(DateTime, nullable=True)
+    expires_at = Column(DateTime, nullable=True)
+    activated_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class CreditBalanceDB(Base):
+    """One auditable credit bucket for a user.
+
+    ``source`` keeps free/referral/purchased/package credits separate so each
+    source keeps its own expiry and reporting. Free monthly credits are not
+    stored here: they are computed from ``usage_periods`` and reset with the
+    Africa/Accra calendar. A pack that never expires stores ``expires_at=None``.
+    """
+    __tablename__ = "credit_balances"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    source = Column(String, nullable=False)  # purchased|package|referral
+    package_slug = Column(String, default="")
+    label = Column(String, default="")
+    credits_granted = Column(Integer, nullable=False, default=0)
+    credits_remaining = Column(Integer, nullable=False, default=0)
+    granted_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime, nullable=True)  # NULL = never expires
+    #: Idempotency key for the grant that created this bucket (e.g.
+    #: ``package:<transaction reference>`` or ``referral:referrer:<id>``).
+    grant_key = Column(String, unique=True, nullable=False, index=True)
+    reference = Column(String, default="")
+    status = Column(String, default="active")  # active|exhausted|reversed
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_credit_balance_user_source", "user_id", "source"),
+    )
+
+
+class CreditLedgerDB(Base):
+    """Append-only credit movement ledger (never delete a row)."""
+    __tablename__ = "credit_ledger"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    balance_id = Column(String, ForeignKey("credit_balances.id"), nullable=True, index=True)
+    entry_type = Column(String, nullable=False)  # grant|consume|release|expire|reverse|adjust
+    source = Column(String, default="")
+    credits = Column(Integer, nullable=False)  # signed: + grant, - consume
+    reason = Column(String, default="")
+    reference = Column(String, default="", index=True)
+    idempotency_key = Column(String, unique=True, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class CreditReservationDB(Base):
+    """A held batch of credits for one generation request.
+
+    ``allocations`` records exactly which bucket paid for which indicator code,
+    so a failed or partial run can refund the correct source without guessing.
+    The unique ``idempotency_key`` makes a duplicate submission return the
+    existing hold instead of charging twice.
+    """
+    __tablename__ = "credit_reservations"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    idempotency_key = Column(String, unique=True, nullable=False, index=True)
+    scheme_id = Column(String, default="")
+    units = Column(Integer, nullable=False, default=0)
+    status = Column(String, default="held")  # held|committed|released
+    allocations = Column(JSON, default=list)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ReferralCodeDB(Base):
+    """One stable referral code/link per eligible account."""
+    __tablename__ = "referral_codes"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    user_id = Column(String, ForeignKey("users.id"), unique=True, nullable=False, index=True)
+    code = Column(String, unique=True, nullable=False, index=True)
+    active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ReferralDB(Base):
+    """Attribution and reward state for one referred account.
+
+    ``referred_id`` is unique: an account can be attributed to exactly one
+    referrer, and no second reward is ever possible for it.
+    """
+    __tablename__ = "referrals"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    referrer_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    referred_id = Column(String, ForeignKey("users.id"), unique=True, nullable=False, index=True)
+    code = Column(String, nullable=False, index=True)
+    attributed_at = Column(DateTime, default=datetime.utcnow)
+    status = Column(String, default="registered")  # registered|qualified|rewarded|reversed
+    qualifying_reference = Column(String, default="", index=True)
+    referrer_credits = Column(Integer, default=0)
+    referred_credits = Column(Integer, default=0)
+    rewarded_at = Column(DateTime, nullable=True)
+    reversed_at = Column(DateTime, nullable=True)
+    reversal_reason = Column(Text, default="")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ReferralVisitDB(Base):
+    """A referral-link open, so the dashboard can report invites accurately."""
+    __tablename__ = "referral_visits"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    code = Column(String, nullable=False, index=True)
+    opened_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ReferralSettingDB(Base):
+    """Admin-configurable referral limits (singleton row)."""
+    __tablename__ = "referral_settings"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    reward_referrer = Column(Integer, default=5)
+    reward_referred = Column(Integer, default=3)
+    term_limit = Column(Integer, default=5)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_by = Column(String, default="")
 
 
 class RevokedTokenDB(Base):

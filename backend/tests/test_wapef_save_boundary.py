@@ -35,6 +35,14 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+
+@pytest.fixture(autouse=True)
+def _wide_free_allowance(monkeypatch):
+    """WAPEF persistence tests generate three lessons per run; the approved
+    2-credit allowance is pinned in test_commercial_model."""
+    from src import entitlements
+    monkeypatch.setattr(entitlements, "FREE_TIER_LESSON_PLANS_PER_MONTH", 10)
+
 from src.database import SchemeDB, WeekDB, generate_id  # noqa: E402
 from src.models import TermConfig  # noqa: E402
 from src.service import data_service  # noqa: E402

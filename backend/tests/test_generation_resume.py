@@ -23,6 +23,18 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+
+@pytest.fixture(autouse=True)
+def _wide_free_allowance(monkeypatch):
+    """These scenarios exercise resume mechanics with 3+ lessons per run.
+
+    The approved free allowance is 2; raise it here so the mechanics test is
+    not constrained by the commercial size. The 2-credit policy is pinned in
+    test_commercial_model and test_quota_enforcement_journey.
+    """
+    from src import entitlements
+    monkeypatch.setattr(entitlements, "FREE_TIER_LESSON_PLANS_PER_MONTH", 10)
+
 from src.database import (  # noqa: E402
     GenerationJobDB, LessonPlanDB, SchemeDB, UsagePeriodDB, UsageUnitDB,
     WeekDB, generate_id,
@@ -262,12 +274,14 @@ def test_resume_without_quota_capacity_does_no_work(db):
         UsagePeriodDB.user_id == user.id,
         UsagePeriodDB.period_key == period_key).first()
     assert period is not None
-    period.units_used = 5
+    from src import entitlements
+    limit = entitlements.FREE_TIER_LESSON_PLANS_PER_MONTH
+    period.units_used = limit
     db.query(UsageUnitDB).filter(
         UsageUnitDB.user_id == user.id,
         UsageUnitDB.period_key == period_key,
     ).delete(synchronize_session=False)
-    for n in range(5):
+    for n in range(limit):
         db.add(UsageUnitDB(
             id=generate_id(), user_id=user.id,
             period_type="calendar_month", period_key=period_key,
@@ -284,8 +298,8 @@ def test_resume_without_quota_capacity_does_no_work(db):
     assert resp.status_code in (403, 409), resp.text
     state = _state(db, user, scheme)
     assert len(state["lessons"]) == 1
-    assert len(state["units"]) == 5
-    assert state["units_used"] == 5
+    assert len(state["units"]) == limit
+    assert state["units_used"] == limit
     assert state["job"].status == "failed"
 
 

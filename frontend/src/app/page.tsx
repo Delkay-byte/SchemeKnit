@@ -106,10 +106,22 @@ export default function Home() {
                   How it works
                 </button>
                 <Link
+                  href="/pricing"
+                  className="hidden text-sm font-medium text-white/75 transition-colors hover:text-white sm:inline"
+                >
+                  Pricing
+                </Link>
+                <Link
                   href="/login"
                   className="inline-flex items-center rounded-full border border-white/25 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7edcf0] focus-visible:ring-offset-2 focus-visible:ring-offset-[#071826]"
                 >
                   Sign in
+                </Link>
+                <Link
+                  href="/signup"
+                  className="hidden items-center rounded-full bg-[#04A9CE] px-4 py-1.5 text-sm font-semibold text-[#071826] transition-colors hover:bg-[#7edcf0] sm:inline-flex"
+                >
+                  Start Free
                 </Link>
               </nav>
             </div>
@@ -122,6 +134,34 @@ export default function Home() {
 
       {/* Below-the-fold: reinforce that the curriculum stays in control */}
       <HowItWorks />
+
+      {/* Free tier and paid packages — the same server catalogue pricing uses. */}
+      <section className="bg-white py-12 md:py-16">
+        <div className="container mx-auto px-4">
+          <div className="mx-auto max-w-3xl text-center">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#04a9ce]">
+              Start without paying
+            </p>
+            <h2 className="mt-3 text-2xl font-bold tracking-tight text-[#102A43] md:text-3xl">
+              Two free lesson plans every month
+            </h2>
+            <p className="mt-3 text-slate-600">
+              Create an account without payment information. Upload schemes,
+              review extracted curriculum, generate two plans each calendar
+              month, and edit or export everything you have saved. When you need
+              more, buy a prepaid package by Bank Transfer or Mobile Money.
+            </p>
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              <Link href="/signup" className="rounded-full bg-[#102A43] px-6 py-2.5 font-semibold text-white hover:bg-[#0d2740]">
+                Start Free
+              </Link>
+              <Link href="/pricing" className="rounded-full border border-[#102A43]/20 px-6 py-2.5 font-semibold text-[#102A43] hover:bg-[#102A43]/5">
+                View Pricing
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Role cards — the two public audiences only. Staff/Platform Admin is
           deliberately not shown: it is operations, not a public option. */}
@@ -173,7 +213,7 @@ export default function Home() {
                 className="inline-flex items-center justify-center w-full px-4 py-2.5 rounded-md border border-blue-300 text-blue-700 font-medium hover:bg-blue-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 <UserPlus className="h-4 w-4 mr-2" aria-hidden="true" />
-                Create Free Account
+                Start Free — 2 plans/month
               </Link>
             </CardContent>
           </Card>

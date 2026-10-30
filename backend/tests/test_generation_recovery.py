@@ -17,6 +17,14 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+
+@pytest.fixture(autouse=True)
+def _wide_free_allowance(monkeypatch):
+    """Recovery mechanics use a 3-lesson run; see test_commercial_model for
+    the approved 2-credit policy."""
+    from src import entitlements
+    monkeypatch.setattr(entitlements, "FREE_TIER_LESSON_PLANS_PER_MONTH", 10)
+
 from src.database import (  # noqa: E402
     GenerationJobDB, LessonPlanDB, SchemeDB, WeekDB, generate_id,
 )
