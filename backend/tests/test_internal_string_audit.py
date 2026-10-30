@@ -135,7 +135,8 @@ _CORPUS_LESSONS = _corpus_lessons()
 
 #: Keys that legitimately carry machine identifiers, not teacher prose.
 _ID_KEYS = {
-    "id", "scheme_id", "job_id", "template_id", "source_url", "corpus_version",
+    "id", "scheme_id", "scheme_of_work_id", "job_id", "term_config_id",
+    "owner_id", "template_id", "source_url", "corpus_version",
     "source_version", "created_at", "updated_at", "status",
 }
 
@@ -299,19 +300,22 @@ _TEACHER_LIST_FIELDS = (
 
 def _persist(db, lp):
     """Write the built lesson through the real persistence boundary."""
-    from src.database import GenerationJobDB
+    from src.database import GenerationJobDB, SchemeDB, generate_id
     from src.service import DataService
     from tests.conftest import make_user
 
     user = make_user(db)
+    scheme = SchemeDB(id=generate_id(), owner_id=user.id, filename="s.docx",
+                      subject="Mathematics", class_level="Basic 7")
+    db.add(scheme)
+    db.flush()
     job = GenerationJobDB(
-        id="job-audit", owner_id=user.id, scheme_id="s-audit",
+        id=generate_id(), owner_id=user.id, scheme_id=scheme.id,
         status="completed", total_lessons=1,
     )
     db.add(job)
     db.commit()
-    row = DataService().create_lesson_plan(db, user.id, "job-audit",
-                                           "s-audit", lp)
+    row = DataService().create_lesson_plan(db, user.id, job.id, scheme.id, lp)
     db.refresh(row)
     return row
 

@@ -2,6 +2,8 @@
 
 import { DEV_TOOLS_ENABLED } from './dev-tools'
 import type {
+  LessonConfigResponse,
+  LessonRubricConfig,
   WapefOptions,
   WeeklyClassPlan,
   WeeklyDayOption,
@@ -98,12 +100,18 @@ class ApiService {
     return response.json()
   }
 
-  // Auth API
-  async login(email: string, password: string): Promise<any> {
+  // Auth API — `entry` is the login page's intended entry point and is
+  // validated server-side against the user's database role.
+  async login(email: string, password: string, entry: 'teacher' | 'school_admin' | 'platform_admin'): Promise<any> {
     return this.request('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, entry }),
     })
+  }
+
+  // Server-side logout: revokes this session's token id until it expires.
+  async logout(): Promise<void> {
+    await this.request('/api/auth/logout', { method: 'POST' })
   }
 
   async getSetupStatus(): Promise<{ needs_setup: boolean; user_count: number }> {
@@ -412,6 +420,21 @@ class ApiService {
     })
   }
 
+  // Guided lesson configuration (saved AFTER extraction, BEFORE generation).
+  // One source of truth for the "Configure lesson rubrics" modal: school
+  // name, teacher's name, class size, reference, duration, periods and the
+  // teaching days. The server merges teacher defaults and returns readiness.
+  async getLessonConfig(schemeId: string): Promise<LessonConfigResponse> {
+    return this.request(`/api/generation/${schemeId}/lesson-config`)
+  }
+
+  async saveLessonConfig(schemeId: string, config: LessonRubricConfig): Promise<LessonConfigResponse> {
+    return this.request(`/api/generation/${schemeId}/lesson-config`, {
+      method: 'PUT',
+      body: JSON.stringify(config),
+    })
+  }
+
   // Per-lesson review drafts (saved BEFORE generation)
   async getLessonReview(schemeId: string): Promise<{ drafts: Record<string, any> }> {
     return this.request(`/api/generation/${schemeId}/lesson-review`)
@@ -447,6 +470,18 @@ class ApiService {
     return this.request(`/api/generation/${schemeId}/generate`, {
       method: 'POST',
       body: JSON.stringify(sanitizeTermConfig(config)),
+    })
+  }
+
+  /**
+   * Continue the eligible pending occurrences of an existing generation job.
+   * This is not "Generate again": the backend reuses the same job, skips
+   * already-persisted occurrences and charges quota once per indicator code.
+   */
+  async resumeGeneration(schemeId: string, jobId: string): Promise<any> {
+    return this.request(`/api/generation/${schemeId}/generate/resume`, {
+      method: 'POST',
+      body: JSON.stringify({ job_id: jobId }),
     })
   }
 
@@ -812,12 +847,23 @@ class ApiService {
     return this.request('/api/settings/preferences')
   }
 
-  /** Actual AI mode/provider resolution for a requested mode (secret-free). */
-  async getAiStatus(aiMode: string): Promise<{
-    mode: string; active: boolean; provider: string | null;
-    provider_key: string | null; state: string; reason: string | null;
+  /** Actual AI mode/provider resolution for a requested mode (secret-free).
+   *
+   *  ``generationMethod`` selects the generation method being reported: the
+   *  default ``standard`` path (OFF/BASIC/ENHANCED) or ``zeli`` — the
+   *  whole-lesson "Generate with Zeli" method, which reports its own
+   *  availability instead of the enrichment provider's.
+   */
+  async getAiStatus(aiMode: string, generationMethod = 'standard'): Promise<{
+    mode: string; generation_method?: string; active: boolean;
+    provider: string | null; provider_key: string | null; state: string;
+    reason: string | null; provider_label?: string | null;
   }> {
-    return this.request(`/api/settings/ai-status?ai_mode=${encodeURIComponent(aiMode)}`)
+    const params = new URLSearchParams({ ai_mode: aiMode })
+    if (generationMethod && generationMethod !== 'standard') {
+      params.set('generation_method', generationMethod)
+    }
+    return this.request(`/api/settings/ai-status?${params.toString()}`)
   }
 
   async listTeachingDays(): Promise<{ teaching_days: any[] }> {
@@ -1221,6 +1267,10 @@ export function sanitizeTermConfig(
       else delete cfg[key]
     }
   }
+
+  // The generation method is an enum on the backend — never send an unknown
+  // value. Legacy configs without it stay on the standard path.
+  if (cfg.generation_method !== 'zeli') cfg.generation_method = 'standard'
 
   // List fields must be arrays of strings.
   for (const key of ['keywords', 'teaching_learning_resources', 'core_competencies',

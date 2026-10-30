@@ -39,7 +39,7 @@ def main():
 
     r = client.post(
         "/api/auth/login",
-        json={"email": email, "password": password},
+        json={"email": email, "password": password, "entry": "teacher"},
     )
     check("login teacher", r.status_code == 200, r.text[:120])
     token = r.json()["access_token"]

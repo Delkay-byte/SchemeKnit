@@ -16,6 +16,7 @@ Precedence rule:
 from datetime import date, datetime, timedelta
 from typing import Optional, Tuple, Dict, Any
 from fastapi import Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .database import (
@@ -638,7 +639,15 @@ def consume_ai_generation(user: User, db: Session, request_id: Optional[str] = N
             request_id=request_id,
             consumed=True,
         ))
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError:
+            # Two concurrent submissions of the SAME request id both passed
+            # the read check above; the unique (user_id, request_id) constraint
+            # keeps one ledger row. The loser must not surface a 500 — it
+            # returns the current remaining count without consuming again.
+            db.rollback()
+            return max(credits - ai_quota.get_ai_units_used(db, user.id), 0)
     return ai_quota.consume_ai_generation(db, user.id, credits)
 
 

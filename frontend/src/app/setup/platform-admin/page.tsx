@@ -84,7 +84,7 @@ export default function SetupPlatformAdminPage() {
         password,
       })
       if (res.access_token) {
-        await login(email, password)
+        await login(email, password, 'platform_admin')
         setSuccess(true)
         setTimeout(() => router.push('/platform-admin'), 1500)
       }

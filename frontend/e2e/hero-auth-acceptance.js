@@ -41,9 +41,9 @@ async function canvasStats(page) {
     const w = canvas.width
     const h = canvas.height
     if (!w || !h || !ctx) return { present: true, w, h, painted: false }
-    const data = ctx.getImageData(0, 0, Math.min(w, 400), Math.min(h, 300)).data
+    const data = ctx.getImageData(0, 0, w, h).data
     let painted = 0
-    for (let i = 3; i < data.length; i += 4) {
+    for (let i = 3; i < data.length; i += 16) {
       if (data[i] > 0) painted++
     }
     return { present: true, w, h, painted, styleW: canvas.style.width, styleH: canvas.style.height }
@@ -57,8 +57,8 @@ async function frameDiffSamples(page, samples = 8) {
     const canvas = document.querySelector('section[aria-labelledby="hero-heading"] canvas')
     if (!canvas) return null
     const ctx = canvas.getContext('2d')
-    const w = Math.min(canvas.width, 300)
-    const h = Math.min(canvas.height, 200)
+    const w = canvas.width
+    const h = canvas.height
     const read = () => {
       const d = ctx.getImageData(0, 0, w, h).data
       let sum = 0
@@ -200,18 +200,31 @@ async function main() {
     const support = await page.locator('section[aria-labelledby="hero-heading"] p').filter({ hasText: 'scheme' }).first().isVisible()
     log(support, 'hero: support copy visible')
 
-    const pipeline = await page.locator('#curriculum-pipeline').isVisible()
-    log(pipeline, 'hero: curriculum pipeline visible')
+    const intro = await page.locator('[data-hero-intro]').isVisible()
+    log(intro, 'hero: “Inside the lesson” intro visible')
+    const retiredCard = await page.locator('#curriculum-pipeline').count()
+    log(retiredCard === 0, 'hero: retired workflow card removed', `count=${retiredCard}`)
 
+    // The landing header intentionally starts hidden over the untouched logo.
+    const hiddenHeader = await page.locator('[data-landing-header]').evaluate(
+      (el) => ({ visibility: getComputedStyle(el).visibility, opacity: getComputedStyle(el).opacity }),
+    )
+    log(hiddenHeader.visibility === 'hidden', 'header: hidden over intact logo', JSON.stringify(hiddenHeader))
+    await page.evaluate(() => window.scrollTo(0, 140))
+    await page.waitForTimeout(400)
     const logo = page.locator('header').locator('svg, span').filter({ hasText: 'SchemeKnit' }).first()
-    log(await logo.isVisible(), 'header: brand wordmark visible')
-    const capsule = page.locator('header span').filter({ hasText: '' }).first()
+    log(await logo.isVisible(), 'header: brand wordmark appears after scroll')
     const headerHasRing = await page.evaluate(() => {
       const header = document.querySelector('header')
-      if (!header) return false
-      return !!header.querySelector('[class*="ring-1"][class*="04A9CE"], [class*="capsule"], [class*="ring-[#04A9CE]"]')
+      const capsule = header?.querySelector('a[href="/"] span')
+      if (!capsule) return false
+      const cs = getComputedStyle(capsule)
+      return cs.backgroundColor !== 'rgba(0, 0, 0, 0)' &&
+        (cs.boxShadow !== 'none' || parseFloat(cs.borderWidth) > 0)
     })
     log(headerHasRing, 'header: logo capsule treatment present')
+    await page.evaluate(() => window.scrollTo(0, 0))
+    await page.waitForTimeout(350)
 
     const st = await canvasStats(page)
     log(st.present && st.w > 0 && st.h > 0, 'hero: mesh canvas sized', JSON.stringify(st))
@@ -220,7 +233,7 @@ async function main() {
     // z-index: mesh behind copy
     const z = await page.evaluate(() => {
       const mesh = document.querySelector('section[aria-labelledby="hero-heading"] canvas')?.parentElement
-      const inner = document.querySelector('section[aria-labelledby="hero-heading"] [class*="heroInner"], section[aria-labelledby="hero-heading"] > div:not([aria-hidden])')
+      const inner = document.querySelector('[data-hero-inner]')
       const csMesh = mesh ? getComputedStyle(mesh) : null
       const csInner = inner ? getComputedStyle(inner) : null
       return {
@@ -232,19 +245,24 @@ async function main() {
     log(z.meshPE === 'none', 'hero: mesh pointer-events none', JSON.stringify(z))
     log(Number(z.innerZ) > Number(z.meshZ || 0), 'hero: content above mesh', JSON.stringify(z))
 
-    // Cursor deformation — move over hero and sample twice
-    await page.mouse.move(720, 420)
-    await page.waitForTimeout(200)
-    await page.mouse.move(860, 460, { steps: 12 })
-    await page.waitForTimeout(250)
-    const diff1 = await frameDiffSamples(page)
-    log(!!diff1 && diff1.changed, 'hero: mesh animates after cursor move', JSON.stringify(diff1))
-
-    // Move far away, settle, sample again
-    await page.mouse.move(100, 100, { steps: 8 })
-    await page.waitForTimeout(900)
-    const diff2 = await frameDiffSamples(page)
-    log(!!diff2, 'hero: mesh still running after settle', JSON.stringify(diff2))
+    // Scroll scrub: the particle field must change with scroll, then restore.
+    const beforeScroll = await frameDiffSamples(page)
+    await page.evaluate(() => window.scrollTo(0, 220))
+    await page.waitForTimeout(350)
+    const duringScroll = await frameDiffSamples(page)
+    log(
+      !!beforeScroll && !!duringScroll && beforeScroll.a !== duringScroll.a,
+      'hero: scroll scrubs the logo particle field',
+      JSON.stringify({ before: beforeScroll?.a, during: duringScroll?.a }),
+    )
+    await page.evaluate(() => window.scrollTo(0, 0))
+    await page.waitForTimeout(400)
+    const restored = await frameDiffSamples(page)
+    log(
+      !!restored && Math.abs(restored.a - beforeScroll.a) < Math.abs(duringScroll.a - beforeScroll.a),
+      'hero: scroll back restores the intact logo field',
+      JSON.stringify({ restored: restored?.a }),
+    )
 
     const nav = await navPlatformHref(page)
     const badNav = nav.platformLogin.concat(nav.platformSetup)
@@ -291,8 +309,8 @@ async function main() {
     log(of.scrollW <= of.clientW + 1, `hero@${w}: no horizontal overflow`, JSON.stringify(of))
     const heading = await page.locator('#hero-heading').isVisible()
     log(heading, `hero@${w}: headline visible`)
-    const pipeline = await page.locator('#curriculum-pipeline').isVisible()
-    log(pipeline, `hero@${w}: pipeline visible`)
+    const intro = await page.locator('[data-hero-intro]').isVisible()
+    log(intro, `hero@${w}: “Inside the lesson” intro present`)
     const canvas = await canvasStats(page)
     log(canvas.present, `hero@${w}: mesh present`, JSON.stringify(canvas))
     await ctx.close()
@@ -335,10 +353,10 @@ async function main() {
     {
       route: '/login',
       label: 'teacher-login',
-      titleMust: 'Teacher Sign In',
+      titleMust: 'Welcome back',
       emailId: 'teacher-email',
       shot: 'auth-teacher-login-1440.png',
-      roleBadge: 'Teacher',
+      roleBadge: 'School Teacher',
       expectForgot: true,
       expectTeacherCards: true,
       tryEmptySubmit: false,
@@ -349,7 +367,6 @@ async function main() {
       titleMust: 'Create your',
       emailId: 'signup-email',
       shot: 'auth-signup-1440.png',
-      roleBadge: 'Teacher',
       tryEmptySubmit: false,
     },
     {

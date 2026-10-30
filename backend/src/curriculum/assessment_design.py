@@ -263,7 +263,9 @@ def build_assessment_items(
     focus_starts_with_action = (f.lower().startswith(action + " ")
                                 or f.lower() == action)
     if action in _RECALL_ACTIONS:
-        prompt = (f"Quick check (unprompted): {f} — each learner names or "
+        # Teacher-facing wording: "(unprompted)" is an internal drafting label
+        # and must never reach the printed plan (Phase 7 hygiene).
+        prompt = (f"Quick check: {f} — each learner names or "
                   f"points to {f} correctly without help.")
     elif focus_starts_with_action:
         prompt = (f"Quick check: each learner states in one sentence what it "

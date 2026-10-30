@@ -128,7 +128,7 @@ export function RoleLogin({ entry }: { entry: EntryRole }) {
     setError('')
     setLoading(true)
     try {
-      await login(email, password)
+      await login(email, password, entry)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Authentication failed')
     } finally {

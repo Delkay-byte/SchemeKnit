@@ -137,7 +137,9 @@ class TestServerDerivedIdentity:
 
         captured = {}
 
-        def _stub_generate_all(scheme, config, template_id=None):
+        def _stub_generate_all(scheme, config, template_id=None, **kwargs):
+            # ``db`` is part of the pipeline contract (Zeli cache), so the stub
+            # must accept the same optional keywords as the real method.
             captured["school_name"] = config.school_name
             captured["teacher_name"] = config.teacher_name
             return SimpleNamespace(
@@ -166,7 +168,7 @@ class TestServerDerivedIdentity:
         monkeypatch.setattr(gen_router.pipeline, "generate_all", _stub_generate_all)
 
         config = _term_config(_scheme.id)
-        await gen_router.generate_lesson_plans(_scheme.id, config, u, db)
+        gen_router.generate_lesson_plans(_scheme.id, config, u, db)
 
         assert captured["school_name"] == "Awasive M/A JHS"
         assert captured["teacher_name"] == "Saviour Amegayie"
@@ -181,7 +183,7 @@ class TestServerDerivedIdentity:
         scheme, _job = make_job_with_lessons(db, u, lessons=1)
 
         with pytest.raises(HTTPException) as e:
-            await gen_router.generate_lesson_plans(
+            gen_router.generate_lesson_plans(
                 scheme.id, _term_config(scheme.id), other, db)
         assert e.value.status_code == 404
 

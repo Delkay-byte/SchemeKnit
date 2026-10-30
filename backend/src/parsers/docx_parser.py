@@ -865,9 +865,9 @@ class DOCXParser:
                 }
                 week_rows[current_week].append(row_data)
 
-        for week_num in sorted(week_rows.keys()):
-            rows = week_rows[week_num]
-            parsed_week = self._merge_week_rows(week_num, rows)
+        for assigned_number, rows in self._renumber_repeated_week_sections(
+                week_rows):
+            parsed_week = self._merge_week_rows(assigned_number, rows)
             scheme.weeks.append(parsed_week)
 
         # Attach extraction method info for confidence reporting
@@ -1303,21 +1303,56 @@ class DOCXParser:
                         # every week but the one cell that held two codes), and
                         # never echoed back as its own description. This mirrors
                         # the content-standard column's existing treatment.
-                        if len(codes) > 1:
-                            stripped = ind_text
-                            for c in codes:
-                                stripped = re.sub(
-                                    re.escape(c), "", stripped, flags=re.IGNORECASE
-                                )
-                            desc = re.sub(r"\s+", " ", stripped).strip()
-                        else:
-                            desc = self._clean_description(ind_text, codes[0])
+                        #
+                        # SEVERAL codes in one cell: each code owns ONLY the
+                        # text between it and the next code. The previous
+                        # implementation stripped every code from the whole
+                        # cell and gave the same concatenated remainder to each
+                        # indicator, producing unreadable duplicated statements
+                        # (the Basic 9 Week 2 defect).
+                        matches = list(INDICATOR_CODE_PATTERN.finditer(ind_text))
+                        segments: Dict[str, str] = {}
+                        for idx, m in enumerate(matches):
+                            code = m.group(0).upper()
+                            start = m.end()
+                            end = (matches[idx + 1].start()
+                                   if idx + 1 < len(matches) else len(ind_text))
+                            segment = ind_text[start:end]
+                            segment = re.sub(r"\s+", " ", segment).strip(
+                                " \t\r\n-:;,.")
+                            # First occurrence wins; a later duplicate is a
+                            # source anomaly reported below.
+                            segments.setdefault(code, segment)
                         for code in codes:
-                            if not any(i.code == code for i in all_indicators):
-                                all_indicators.append(ParsedIndicator(
-                                    code=code,
-                                    description=desc
-                                ))
+                            if len(codes) == 1:
+                                # A single code owns the whole cell: keep its
+                                # prose AND a range tail ("K2.1.1.1.1-3")
+                                # through the canonical cleaner. Segmenting a
+                                # one-code cell would strip the hyphen and
+                                # turn the family into a bare "3".
+                                desc = self._clean_description(ind_text, code)
+                            else:
+                                # Adjacent codes have no prose of their own;
+                                # never let the NEXT code become a description.
+                                desc = segments.get(code, "")
+                            if any(i.code == code for i in all_indicators):
+                                existing = next(
+                                    i for i in all_indicators if i.code == code)
+                                if desc and desc != existing.description:
+                                    self.validation_issues.append(ValidationIssue(
+                                        severity=ValidationSeverity.WARNING,
+                                        message=(
+                                            f"Duplicate indicator code {code} in "
+                                            f"week {row.get('week_number', '?')} carries different "
+                                            "text in the source; the first occurrence "
+                                            "was kept and the row needs review."
+                                        ),
+                                    ))
+                                continue
+                            all_indicators.append(ParsedIndicator(
+                                code=code,
+                                description=desc
+                            ))
                     else:
                         # No canonical code in the cell: keep the previous
                         # behaviour (first token as code, remainder as text).
@@ -1482,6 +1517,77 @@ class DOCXParser:
 
         weeks.sort(key=lambda w: w.week_number)
         return weeks
+
+    @staticmethod
+    def _renumber_repeated_week_sections(week_rows: Dict[int, list]):
+        """Resolve REPEATED week labels into a gapless week sequence.
+
+        Phase 4 regression (Basic 9 Science fixture): a source that prints
+        "WEEK 2" for two DIFFERENT weekly sections must not merge two
+        curriculum weeks — the merged plan shows Week 2 twice, drops a real
+        week, and breaks the required Week 1..N sequence.
+
+        The discriminator is the source's own week-ending date: consecutive
+        rows of ONE weekly section share one date, while a mislabeled new
+        section carries the NEXT section's date. A week whose rows advance
+        through distinct dates is split at each date change; the split-off
+        sections (and any later week whose label now collides) are renumbered
+        to continue the sequence. Weeks that keep a single date keep their
+        source number — genuine gaps and nonstandard labels are preserved.
+        """
+        assigned: list = []
+        running = 0  # highest week number handed out so far
+        for week_num in sorted(week_rows.keys()):
+            rows = week_rows[week_num]
+            # Group CONSECUTIVE rows by their section date. Rows without a
+            # date (sticky/continuation rows) stay with the current group.
+            # SPECIAL-period rows never start a group and never advance the
+            # date baseline: a mid-term/exam segment sharing its week with
+            # teaching content is one MIXED week (Defect 4), whichever row
+            # comes first. Only an INSTRUCTIONAL row whose date differs from
+            # the last instructional date marks a new (mislabeled) section.
+            groups: list = []
+            for row in rows:
+                row_date = row.get("date")
+                is_special = bool(
+                    (row.get("special_label_cell") or "").strip()
+                    or row.get("week_type", WeekType.INSTRUCTION)
+                    != WeekType.INSTRUCTION)
+                if not groups:
+                    groups.append((row_date, [row]))
+                    continue
+                if is_special or row_date is None:
+                    groups[-1][1].append(row)
+                    continue
+                last_instructional = next(
+                    (r.get("date") for r in reversed(groups[-1][1])
+                     if not ((r.get("special_label_cell") or "").strip()
+                             or r.get("week_type", WeekType.INSTRUCTION)
+                             != WeekType.INSTRUCTION)),
+                    None)
+                if (last_instructional is not None
+                        and row_date != last_instructional):
+                    groups.append((row_date, [row]))
+                else:
+                    groups[-1][1].append(row)
+            for idx, (_gdate, group_rows) in enumerate(groups):
+                if idx == 0:
+                    # The first group keeps the source label unless it
+                    # collides with an already-assigned week.
+                    number = week_num if week_num > running else running + 1
+                else:
+                    number = running + 1
+                running = max(running, number)
+                assigned.append((number, group_rows))
+                if number != week_num and idx == 0:
+                    try:
+                        from ..logging_config import log_event
+                        log_event(
+                            "week_label_duplicate_renumbered",
+                            declared_week=week_num, assigned_week=number)
+                    except Exception:
+                        pass
+        return assigned
 
     def _run_validation(self, scheme: ParsedScheme):
         if not scheme.weeks:

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -30,6 +30,7 @@ import { HowItWorks } from '@/components/landing/how-it-works'
 export default function Home() {
   const { user, loading } = useAuth()
   const router = useRouter()
+  const [headerVisible, setHeaderVisible] = useState(false)
 
   // A live session skips the marketing page and lands on the role's console.
   useEffect(() => {
@@ -38,19 +39,44 @@ export default function Home() {
     }
   }, [user, loading, router])
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-      </div>
-    )
-  }
+  // Match the reference: no floating nav over the untouched logo; it enters
+  // only after the visitor has committed to scrolling.
+  useEffect(() => {
+    const update = () => setHeaderVisible(window.scrollY > 80)
+    update()
+    window.addEventListener('scroll', update, { passive: true })
+    return () => window.removeEventListener('scroll', update)
+  }, [])
 
+  // The public marketing page is server-rendered unconditionally. A live
+  // session still redirects after hydration, but a slow auth check (or no
+  // JavaScript at all) never hides the hero behind a full-screen spinner.
   return (
     <div className="min-h-screen bg-[#f4f7fa]">
-      {/* Opaque sticky header overlays the hero top (apmix-style); mesh stays in the hero */}
+      <noscript>
+        <style>{`
+          [data-landing-header] {
+            visibility: visible !important;
+            opacity: 1 !important;
+            transform: none !important;
+            pointer-events: auto !important;
+            background-color: rgba(7, 24, 38, 0.96) !important;
+          }
+        `}</style>
+      </noscript>
+
+      {/* Header is fixed but hidden over the untouched logo; it fades in at ~80px.
+          The rendered DOM stays available to no-JS via the noscript override. */}
       <div className="relative bg-[#071826]" style={{ ['--site-header-h' as string]: '76px' }}>
-        <header className="sticky top-0 z-40 border-b border-white/10 bg-[#071826] text-white">
+        <header
+          data-landing-header
+          className={`fixed inset-x-0 top-0 z-50 border-b border-white/10 text-white transition-[opacity,transform,background-color] duration-300 motion-reduce:transition-none ${
+            headerVisible
+              ? 'translate-y-0 bg-[#071826]/95 opacity-100 shadow-[0_10px_30px_rgba(0,0,0,0.2)] backdrop-blur-md'
+              : 'pointer-events-none -translate-y-2 bg-transparent opacity-0'
+          }`}
+          style={{ visibility: headerVisible ? 'visible' : 'hidden' }}
+        >
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center justify-between gap-4">
               <Link href="/" className="flex items-center gap-3">
@@ -71,7 +97,7 @@ export default function Home() {
                   Scheme<span className="text-[#04A9CE]">Knit</span>
                 </span>
               </Link>
-              <nav className="flex items-center gap-3 sm:gap-5">
+              <nav className="flex items-center gap-3 sm:gap-5" aria-label="Landing">
                 <button
                   type="button"
                   onClick={() => scrollToSection('how-it-works')}
@@ -90,7 +116,7 @@ export default function Home() {
           </div>
         </header>
 
-        {/* Hero — mesh stays inside this section; header sits on top of it */}
+        {/* Hero + “Inside the lesson” share the particle stage. */}
         <LandingHero />
       </div>
 

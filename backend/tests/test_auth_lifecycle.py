@@ -1,4 +1,4 @@
-"""
+﻿"""
 SchemeKnit Authentication Lifecycle Tests.
 
 Covers the full milestone: platform-admin bootstrap, self-service password
@@ -81,13 +81,16 @@ def _auth(token):
     return {"Authorization": f"Bearer {token}"}
 
 
-def _login(client, email, password):
-    return client.post("/api/auth/login", json={"email": email, "password": password})
+def _login(client, email, password, entry="teacher"):
+    return client.post(
+        "/api/auth/login",
+        json={"email": email, "password": password, "entry": entry},
+    )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # PLATFORM ADMIN BOOTSTRAP
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 
 class TestPlatformAdminBootstrap:
@@ -195,7 +198,7 @@ class TestPlatformAdminBootstrap:
             "email": "admin@bloomcore.com",
             "password": "Secure1!Pass",
         })
-        res = _login(client, "admin@bloomcore.com", "Secure1!Pass")
+        res = _login(client, "admin@bloomcore.com", "Secure1!Pass", "platform_admin")
         assert res.status_code == 200
         assert res.json()["user"]["role"] == "platform_admin"
 
@@ -207,7 +210,7 @@ class TestPlatformAdminBootstrap:
             "email": "admin@bloomcore.com",
             "password": "Secure1!Pass",
         })
-        login_data = _login(client, "admin@bloomcore.com", "Secure1!Pass").json()
+        login_data = _login(client, "admin@bloomcore.com", "Secure1!Pass", "platform_admin").json()
         res = client.get("/api/platform-admin/audit?limit=10",
                          headers=_auth(login_data["access_token"]))
         assert res.status_code == 200
@@ -215,9 +218,9 @@ class TestPlatformAdminBootstrap:
         assert "platform_admin_created" in actions
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # PASSWORD CHANGE (self-service, all roles)
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 
 class TestPasswordChange:
@@ -304,9 +307,9 @@ class TestPasswordChange:
         assert res.status_code == 200
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # ADMIN-INITIATED TOKEN-BASED RESET
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 
 class TestAdminInitiatedReset:
@@ -330,7 +333,7 @@ class TestAdminInitiatedReset:
             "reset_token": data["reset_token"], "new_password": "ResetPass123!"})
         assert res.status_code == 200
 
-        assert _login(client, "sa@test.com", "ResetPass123!").status_code == 200
+        assert _login(client, "sa@test.com", "ResetPass123!", "school_admin").status_code == 200
 
     def test_platform_admin_resets_individual_teacher(self, http):
         client, db = http
@@ -385,7 +388,7 @@ class TestAdminInitiatedReset:
         res = client.post("/api/auth/confirm-password-reset", json={
             "reset_token": raw, "new_password": "Recovered123!"})
         assert res.status_code == 200
-        assert _login(client, "pa-a@test.com", "Recovered123!").status_code == 200
+        assert _login(client, "pa-a@test.com", "Recovered123!", "platform_admin").status_code == 200
 
     def test_token_is_single_use(self, http):
         client, db = http
@@ -496,9 +499,9 @@ class TestAdminInitiatedReset:
             assert "reset_token" not in details_str
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # SECURITY BOUNDARIES
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 
 class TestSecurityBoundaries:
@@ -588,9 +591,9 @@ class TestSecurityBoundaries:
         assert res.status_code in (400, 403)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # REGRESSION: existing flows still work
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 
 class TestRegression:

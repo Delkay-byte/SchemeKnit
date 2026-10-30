@@ -6,6 +6,7 @@ JWT-based authentication with password hashing and role-based authorization.
 
 from datetime import datetime, timedelta
 from typing import Optional
+import uuid
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -14,7 +15,7 @@ from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 from .config import get_settings
-from .database import get_db, User
+from .database import get_db, User, RevokedTokenDB
 
 settings = get_settings()
 
@@ -89,17 +90,40 @@ def _authenticate_user(credentials: HTTPAuthorizationCredentials, db: Session) -
             detail="Your session has expired because your password changed. Please sign in again.",
         )
 
+    # Logout revocation: a token explicitly signed out on this server is
+    # rejected until its natural expiry. Only the token id is stored.
+    jti = payload.get("jti")
+    if jti:
+        revoked = (
+            db.query(RevokedTokenDB)
+            .filter(
+                RevokedTokenDB.jti == jti,
+                RevokedTokenDB.expires_at > datetime.utcnow(),
+            )
+            .first()
+        )
+        if revoked is not None:
+            raise HTTPException(
+                status_code=401,
+                detail="You have signed out. Please sign in again.",
+            )
+
     return user
 
 
 def create_user_token(user: User, expires_delta: Optional[timedelta] = None) -> str:
-    """Create a JWT for ``user`` stamped with the current password version."""
+    """Create a JWT for ``user`` stamped with the current password version.
+
+    Each token also carries a unique ``jti`` so logout can revoke exactly that
+    session without affecting the user's other devices.
+    """
     return create_access_token(
         {
             "sub": user.id,
             "email": user.email,
             "role": user.role,
             "pwv": _password_version(user),
+            "jti": uuid.uuid4().hex,
         },
         expires_delta=expires_delta,
     )

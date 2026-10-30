@@ -154,6 +154,38 @@ async function gotoGenerate(page, schemeId) {
   await page.waitForLoadState('networkidle').catch(() => {});
 }
 
+// Guided configuration is now REQUIRED before generation. Open the single
+// "Configure lesson rubrics" modal, fill the plan's details, save, and wait
+// for the server-confirmed modal to close. This follows the real workflow
+// instead of bypassing the gate.
+async function configureLesson(page) {
+  const entry = page.locator('[data-configure-lesson-rubrics]');
+  await entry.waitFor({ timeout: 45000 });
+  await entry.click();
+  await page.locator('[data-lesson-config-modal]').waitFor({ timeout: 20000 });
+  const school = page.locator('#lcfg-school');
+  if (await school.count()) {
+    await page.fill('#lcfg-school', 'Autopilot Basic School');
+    await page.fill('#lcfg-teacher', 'Autopilot Teacher');
+    await page.fill('#lcfg-class-size', '30');
+    await page.fill('#lcfg-duration', '60');
+    await page.fill('#lcfg-reference', 'Basic 9 Science Curriculum (NaCCA)');
+    if (await page.locator('#lcfg-periods').count()) {
+      await page.fill('#lcfg-periods', '3');
+    }
+    if (await page.locator('#lcfg-period').count()) {
+      await page.fill('#lcfg-period', '1st & 2nd');
+    }
+  }
+  for (const day of ['Monday', 'Wednesday', 'Thursday']) {
+    const btn = page.locator(`[data-lesson-config-modal] button:has-text("${day}")`);
+    if (await btn.count()) await btn.first().click();
+  }
+  await page.click('[data-save-lesson-config]');
+  await page.locator('[data-lesson-config-modal]').waitFor({ state: 'detached', timeout: 30000 });
+  await page.waitForLoadState('networkidle').catch(() => {});
+}
+
 (async () => {
   const browser = await chromium.launch({ headless: true });
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
@@ -202,7 +234,13 @@ async function gotoGenerate(page, schemeId) {
       window.sessionStorage.getItem('schemeknit.autopilot_intent'));
     log(intentCleared === null, 'scenario 1: upload intent consumed exactly once');
 
-    // Auto-fire: NO further click — the ordered work list runs itself.
+    // Guided configuration is required before generation in the current
+    // product. Complete it through the real modal, then take the one action.
+    await configureLesson(page);
+    log((await page.locator('[data-configure-lesson-rubrics]').count()) === 1,
+      'scenario 1: configuration completes through the single entry point');
+    await page.locator('[data-autopilot-action]').click();
+
     const prog = await waitProgress(page);
     log(prog && prog.n === 5 && /1 of 5 · Week 1/.test(prog.first),
       'scenario 1: honest ordered work list renders during the run',
@@ -331,7 +369,10 @@ async function gotoGenerate(page, schemeId) {
       'scenario 5b: the class prompt is the focused interrupt (§17)',
       'does not state the class level');
     if (cMode === 'confirm') {
-      // The confirm → generate handoff auto-fires: wait for the results card.
+      // The confirm → generate handoff lands on the plan; configuration is
+      // required before the one action can run.
+      await configureLesson(pb);
+      await pb.locator('[data-autopilot-action]').click();
       await pb.locator('[data-autopilot-results]').waitFor({ timeout: 120000 });
       const cRes = await pb.locator('[data-autopilot-results]').innerText();
       log(cRes.includes('5 lesson plans ready'),
@@ -352,6 +393,13 @@ async function gotoGenerate(page, schemeId) {
         String(classCounts).slice(0, 120));
       await shot(pb, '08-class-confirmed.png');
     }
+
+    // The confirm-path handoff auto-generated, so the setup surface is
+    // intentionally replaced by the workspace (§15). "Start New Generation"
+    // is the product's route back to configuration; only then can the
+    // Change-settings affordance exist.
+    await pb.getByRole('button', { name: /start new generation/i }).click();
+    await pb.locator('[data-autopilot]').waitFor({ timeout: 30000 });
 
     // Change settings scrolls back to the config surface (§19: advanced
     // settings never leave the screen behind the card).
@@ -385,6 +433,7 @@ async function gotoGenerate(page, schemeId) {
       log(uMode === 'success', 'scenario 4: unlimited account uploads the science scheme', uMode);
       const schemeU = await schemeViaReview(pu);   // this account's own scheme
       await gotoGenerate(pu, schemeU);
+      await configureLesson(pu);
       const uCounts = await waitCounts(pu,
         ['22 can be generated this month'], 60000)
         .catch(() => '');

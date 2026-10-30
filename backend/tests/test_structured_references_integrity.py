@@ -268,7 +268,10 @@ class TestMigrationV030Repair:
         from src.migrations.v030_repair_json_list_fields import up
         user = make_user(db)
         lp = _make_lesson(db, user, keywords=[])
-        self._corrupt(db, lp, "keywords", "matter, materials")
+        # A JSON string scalar (not an array) — the "plain text" corruption
+        # shape. json.dumps keeps the value valid JSON so PostgreSQL's json
+        # column type accepts the corrupt row too.
+        self._corrupt(db, lp, "keywords", json.dumps("matter, materials"))
         up(db)
         db.expire_all()
         db.refresh(lp)

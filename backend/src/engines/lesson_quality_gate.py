@@ -176,6 +176,15 @@ def is_early_years(lp: LessonPlan) -> bool:
     return level in EARLY_YEARS_CLASS_LEVELS
 
 
+_ENTRY_CODE_RE = re.compile(r"[A-Za-z]{0,3}\d[\d.]*")
+
+
+def _entry_code_only(text: str) -> bool:
+    """True when the source cell has no words, only curriculum codes."""
+    return bool(text) and not re.search(
+        r"[A-Za-z]{3,}", _ENTRY_CODE_RE.sub(" ", text))
+
+
 def build_entry(alloc: Any, lp: LessonPlan) -> Dict[str, Any]:
     """Build the rubric's ground-truth ``entry`` for one lesson.
 
@@ -184,6 +193,7 @@ def build_entry(alloc: Any, lp: LessonPlan) -> Dict[str, Any]:
     its curriculum code). It may be ``None`` for lessons built outside the
     allocation engine; the entry then falls back to the lesson's own fields.
     """
+    source_code_only = False
     if alloc is not None:
         indicator = (getattr(alloc, "indicator_description", "") or "").strip()
         indicatorless = not indicator
@@ -194,6 +204,19 @@ def build_entry(alloc: Any, lp: LessonPlan) -> Dict[str, Any]:
             # link. The objective and topic are composed from it, so the
             # rubric's recall check must reference it too.
             indicator = (getattr(alloc, "sub_strand", "") or "").strip()
+        elif _entry_code_only(indicator):
+            # A code-only cell ("B7.1.1.1.1") is real source data but not
+            # teachable prose. The lesson's derived topic IS the curriculum
+            # focus for that occurrence (official exemplar learning focus,
+            # else the source sub-strand), so the rubric must score against it
+            # — scoring prose against a bare code rejected every code-only
+            # lesson as generic even when the lesson was specific.
+            indicator = ((getattr(lp, "lesson_topic", "") or "").strip()
+                         or (getattr(alloc, "sub_strand", "") or "").strip()
+                         or indicator)
+            source_code_only = True
+        else:
+            source_code_only = False
         return {
             "subject": lp.subject,
             "class_level": lp.class_level,
@@ -201,6 +224,7 @@ def build_entry(alloc: Any, lp: LessonPlan) -> Dict[str, Any]:
             "code": getattr(alloc, "indicator_code", "") or "",
             "indicator": indicator,
             "indicatorless": indicatorless,
+            "source_code_only": source_code_only,
             "strand": getattr(alloc, "strand", "") or "",
             "sub_strand": getattr(alloc, "sub_strand", "") or "",
             "content_standard_code": getattr(alloc, "content_standard_code", "") or "",
@@ -282,6 +306,73 @@ def _export_structure_failures(lp: LessonPlan) -> List[str]:
     return out
 
 
+#: Teacher-facing fields the Phase 6/7 hygiene gate scans for drafting
+#: artefacts and malformed prose (shared by both generation paths).
+_HYGIENE_SCAN_FIELDS = (
+    "lesson_topic", "introduction", "starter_activity", "assessment",
+    "conclusion", "class_assignment", "home_assignment", "homework",
+    "differentiation", "previous_knowledge",
+)
+
+
+def _hygiene_failures(lp: LessonPlan) -> List[str]:
+    """Drafting artefacts the deterministic composer must never emit.
+
+    Raw differentiation-band markers (NS:/MA:/HP:), mid-dot internal step
+    labels ("Step 2 · Classify"), "(unprompted)" meta labels and truncated
+    "…" sentence fragments are internal scaffolding; a lesson carrying any of
+    them in teacher-facing prose fails the gate and is repaired/rebuilt.
+
+    The ``differentiation`` FIELD is exempt from the band-marker check: its
+    spelled-out labels ("Needs Support (NS):") are the approved teacher-facing
+    presentation the tests pin. Raw markers woven into activity prose are not.
+    """
+    out: List[str] = []
+    texts: List[str] = []
+    for name in _HYGIENE_SCAN_FIELDS:
+        value = getattr(lp, name, None)
+        if isinstance(value, str) and value.strip():
+            texts.append(value)
+    for name in ("main_activities", "learner_activities", "teacher_activities"):
+        for row in (getattr(lp, name, None) or []):
+            desc = getattr(row, "description", None)
+            if isinstance(desc, str) and desc.strip():
+                texts.append(desc)
+    for item in (lp.assessment_items or []):
+        for attr in ("prompt", "expected_evidence", "marking_guidance",
+                     "misconception", "follow_up"):
+            v = getattr(item, attr, None)
+            if isinstance(v, str) and v.strip():
+                texts.append(v)
+    for t in texts:
+        if "Quick check (unprompted)" in t or "What to look for:" in t:
+            out.append("drafting_label_present")
+            break
+    # Band markers are checked in ACTIVITY/assessment prose only — the
+    # differentiation field's spelled-out labels are approved (see docstring).
+    activity_texts = [getattr(row, "description", "") or ""
+                      for name in ("main_activities", "learner_activities",
+                                   "teacher_activities")
+                      for row in (getattr(lp, name, None) or [])]
+    for t in activity_texts:
+        if re.search(r"\b(?:NS|MA|HP)\s*:", t):
+            out.append("raw_band_marker")
+            break
+    for t in texts:
+        if re.search(r"Step\s+\d+\s*·", t):
+            out.append("mid_dot_step_label")
+            break
+    for t in texts:
+        if "Quick check (unprompted)" in t or "What to look for:" in t:
+            out.append("drafting_label_present")
+            break
+    for t in texts:
+        if re.search(r"(?:\.{3}|…)\s*$", t.strip()):
+            out.append("truncated_ellipsis")
+            break
+    return out
+
+
 def _wapef_norm(value: Any) -> Any:
     if isinstance(value, list):
         return [str(v).strip() for v in value if str(v or "").strip()]
@@ -344,7 +435,11 @@ def hard_failures(
             continue
         # Indicatorless rows keep their code/sub-strand only; the canonical
         # wrong_indicator check assumes prose indicators in lp.indicators.
-        if indicatorless and name == "wrong_indicator":
+        # Code-only rows carry a bare code in lp.indicators, so comparing it
+        # with the resolved focus is meaningless — the code itself is checked
+        # by the runtime indicator_code_mismatch below.
+        if name == "wrong_indicator" and (
+                indicatorless or entry.get("source_code_only")):
             continue
         out.append(name)
 
@@ -388,6 +483,11 @@ def hard_failures(
 
     out.extend(_export_structure_failures(lp))
 
+    # Phase 6/7 hygiene: drafting artefacts and malformed prose in
+    # teacher-facing fields. The deterministic composer removes these; this
+    # gate is the shared guarantee for BOTH generation paths.
+    out.extend(_hygiene_failures(lp))
+
     # Deterministic, de-duplicated order (a lesson is failed once per reason).
     seen = set()
     deduped: List[str] = []
@@ -427,6 +527,43 @@ def mechanical_repair(lp: LessonPlan) -> List[str]:
     filler phrases and weak content are NOT mechanical — they need a rebuild.
     """
     repairs: List[str] = []
+
+    # Phase 6/7 hygiene first: drafting labels, band markers, truncated
+    # ellipses and capitalisation are repaired in place before any other
+    # pass, so the repaired text is what the duplicate/structure checks see.
+    from ..curriculum import text_hygiene
+    for name in _TEXT_FIELDS:
+        value = getattr(lp, name, None)
+        if isinstance(value, str) and value.strip():
+            # ``differentiation`` skips the hygiene pass: its spelled-out
+            # tier labels ("Needs Support (NS):") are the approved
+            # presentation and must survive every repair pass untouched.
+            if name == "differentiation":
+                basic = _clean_text(value)
+                cleaned = basic
+            else:
+                basic = _clean_text(value)
+                cleaned = text_hygiene.hygiene_pass(basic)
+            if cleaned != value:
+                # Whitespace-class repairs keep the established "text:" tag;
+                # extra hygiene work (labels, markers, capitalisation) is
+                # reported separately so metrics can tell them apart.
+                repairs.append("text:" + name if basic != value
+                               else "hygiene:" + name)
+                setattr(lp, name, cleaned)
+    for name in ("main_activities", "learner_activities", "teacher_activities"):
+        rows = getattr(lp, name, None)
+        if not isinstance(rows, list):
+            continue
+        changed = False
+        for row in rows:
+            desc = getattr(row, "description", "") or ""
+            cleaned = text_hygiene.hygiene_pass(_clean_text(desc))
+            if cleaned != desc:
+                row.description = cleaned
+                changed = True
+        if changed:
+            repairs.append("hygiene:" + name)
 
     for name in _TEXT_FIELDS:
         value = getattr(lp, name, None)

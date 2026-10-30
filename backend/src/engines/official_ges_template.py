@@ -373,6 +373,16 @@ def _level_or_theme(lesson) -> str:
     return " / ".join(p for p in parts if p)
 
 
+def _is_date_day_field(ctx: Dict[str, Any]) -> bool:
+    """True when the token being resolved is a Date / Day row.
+
+    ``placeholder_values`` passes the token through ``ctx`` (set per call)
+    so ``_resolve`` can distinguish a "Date / Day" label from a plain
+    "Date" label without changing the field map.
+    """
+    return bool(ctx.get("_date_day_tokens"))
+
+
 def _resolve(field: Optional[str], lesson, ctx: Dict[str, Any]) -> str:
     """Resolve one canonical field to the text a form expects.
 
@@ -386,6 +396,13 @@ def _resolve(field: Optional[str], lesson, ctx: Dict[str, Any]) -> str:
             return format_long_date(source)
         return week_ending_for(_get(lesson, "lesson_date"))
     if field == "lesson_date":
+        # A "Date / Day" row shows the teacher's selected teaching DAYS
+        # (never calendar dates squeezed beside them, Phase 2.1G). Callers
+        # that did not configure days keep the plain date.
+        day_names = [d for d in (ctx.get("teaching_days") or [])
+                     if isinstance(d, str) and d.strip()]
+        if day_names and _is_date_day_field(ctx):
+            return ", ".join(day_names)
         return format_long_date(_get(lesson, "lesson_date"))
     if field == "class_level":
         return _text(_get(lesson, "class_level"))
@@ -494,7 +511,11 @@ def placeholder_values(spec: GESLevelSpec, lesson,
     columns (``{"period": "1 & 2"}``, ``{"programme": "Science"}``, …) and never
     overrides a value found on the lesson itself.
     """
-    ctx = context or {}
+    ctx = dict(context or {})
+    # Mark which tokens are Date / Day rows so ``_resolve`` can render the
+    # configured teaching-day names instead of a calendar date (Phase 2.1G).
+    ctx["_date_day_tokens"] = {f.token for f in spec.fields
+                               if "DATE_DAY" in f.token}
     return {field.token: _resolve(field.field, lesson, ctx) for field in spec.fields}
 
 
@@ -560,37 +581,38 @@ def _term_label(lesson, ctx: Dict[str, Any]) -> str:
     return text
 
 
-def render_header(document, lesson, context: Optional[Dict[str, Any]] = None) -> bool:
+def render_header(document, lesson, context: Optional[Dict[str, Any]] = None,
+                  first: bool = True) -> bool:
     """Replace the form's generic template title with the real planning context.
 
-    The bundled forms print ``OFFICIAL GES / NaCCA WEEKLY LESSON PLAN
-    TEMPLATE`` at the top of the page. That is the form's own boilerplate: it
-    describes the *blank form*, not the lesson, so a generated plan must show
-    the actual context instead — the school, the term and week, the teacher and
-    the class. Everything is read from the lesson/context, which the server
-    derives from the authenticated user and the scheme allocation; nothing here
-    is invented and no client-supplied identity is trusted.
+    The required GES heading structure (Phase 5) is:
 
-    The replacement goes into the same paragraphs, keeping the form's own
-    styles, so the approved table structure and layout are untouched (PART 19).
+    * the FIRST page of the plan shows exactly three lines, in order —
+      school name, teacher's name, ``Week 1`` — with no other metadata
+      between them, and
+    * every later page shows ONLY its own correct ``Week N`` heading.
+
+    Everything is read from the lesson/context, which the server derives from
+    the authenticated user and the scheme allocation; nothing here is invented
+    and no client-supplied identity is trusted. The replacement goes into the
+    same paragraphs, keeping the form's own styles, so the approved table
+    structure and layout are untouched (PART 19).
 
     Returns True when a title was replaced.
     """
     ctx = context or {}
     school = _text(ctx.get("school_name") or _get(lesson, "school_name"))
     teacher = _text(ctx.get("teacher_name") or _get(lesson, "teacher_name"))
-    term = _term_label(lesson, ctx)
     week = _get(lesson, "week_number")
     week_text = f"Week {_text(week)}" if week not in (None, "", 0) else ""
 
     lines = []
-    if school:
-        lines.append(school)
-    if term and week_text:
-        lines.append(f"{term}. {week_text}")
-    elif term:
-        lines.append(term)
-    elif week_text:
+    if first:
+        if school:
+            lines.append(school)
+        if teacher:
+            lines.append(teacher)
+    if week_text:
         lines.append(week_text)
     if not lines:
         return False
@@ -603,14 +625,6 @@ def render_header(document, lesson, context: Optional[Dict[str, Any]] = None) ->
         # Keep the paragraph's own style; only its wording changes.
         _fill_paragraph(paragraph, "\n".join(lines))
         replaced = True
-        # The class/teacher line goes directly under the title in the same style
-        # family, as a continuation paragraph, so it stays inside the header band.
-        if teacher:
-            new_p = copy.deepcopy(paragraph._element)
-            paragraph._element.addnext(new_p)
-            from docx.text.paragraph import Paragraph
-            _fill_paragraph(Paragraph(new_p, paragraph._parent),
-                            f"Teacher: {teacher}")
         break
     return replaced
 
@@ -638,15 +652,28 @@ def _fill_paragraph(paragraph, text: str) -> None:
     """Replace a paragraph's content with ``text``, keeping the first run's format.
 
     Rewriting the run (rather than only the token) is what removes the example
-    bullets and line breaks that a form stores alongside each token.
+    bullets and line breaks that a form stores alongside each token. A
+    multi-line ``text`` becomes real Word line breaks between segments, so the
+    school / teacher / week header always renders stacked.
     """
+    segments = (text or "").split("\n")
     runs = paragraph.runs
     if not runs:
-        paragraph.add_run(text)
+        paragraph.add_run(segments[0] if segments else "")
+        last = paragraph.runs[-1]
+        for extra in segments[1:]:
+            last.add_break()
+            last = paragraph.add_run(extra)
         return
-    runs[0].text = text
-    for extra in runs[1:]:
-        extra._element.getparent().remove(extra._element)
+    first_run = runs[0]
+    old_runs = list(runs[1:])
+    first_run.text = segments[0] if segments else ""
+    last = first_run
+    for extra in segments[1:]:
+        last.add_break()
+        last = paragraph.add_run(extra)
+    for r in old_runs:
+        r._element.getparent().remove(r._element)
 
 
 def _set_cell_text(cell, text: str) -> None:
@@ -724,9 +751,10 @@ def render_document(spec: GESLevelSpec, lesson_plans: List[Any],
     tables_per_form = len(document.tables)
     block = [copy.deepcopy(el) for el in body if el is not _sectpr(body)]
     render_into(spec, document, lessons[0], context, table_offset=0)
-    # The generic form title is replaced per-lesson with the real school /
-    # term / week context, so each page carries its own planning header.
-    render_header(document, lessons[0], context)
+    # The generic form title is replaced per-lesson with the real planning
+    # context: the FIRST page carries school / teacher / week, every later
+    # page only its own week heading (Phase 5).
+    render_header(document, lessons[0], context, first=True)
 
     for index, lesson in enumerate(lessons[1:], start=1):
         page_break = document.add_paragraph()
@@ -734,7 +762,7 @@ def render_document(spec: GESLevelSpec, lesson_plans: List[Any],
         for element in block:
             _sectpr(body).addprevious(copy.deepcopy(element))
         render_into(spec, document, lesson, context, table_offset=index * tables_per_form)
-        render_header(document, lesson, context)
+        render_header(document, lesson, context, first=False)
 
     return document
 

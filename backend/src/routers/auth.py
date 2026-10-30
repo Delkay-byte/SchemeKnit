@@ -10,6 +10,7 @@ import hashlib
 import secrets
 
 from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from typing import Optional
 from sqlalchemy.orm import Session
@@ -17,11 +18,12 @@ from sqlalchemy.orm import Session
 from ..database import (
     get_db, User, generate_id, SchoolLicenseDB, SchoolMembershipDB,
     ActivationCodeDB, SchoolDB, ProductPlanDB, PlatformAuditLogDB,
-    PasswordResetTokenDB,
+    PasswordResetTokenDB, RevokedTokenDB,
 )
 from ..auth import (
     hash_password, verify_password, create_user_token,
     get_current_user, require_admin, require_platform_admin,
+    decode_token, security,
 )
 from ..service import data_service
 from ..config import get_settings
@@ -33,6 +35,27 @@ from ..validation import (
 router = APIRouter()
 
 MIN_SETUP_PASSWORD_LEN = 8
+
+#: Login entry points. Each entry is validated against the user's database
+#: role after the password check; a mismatch returns the same generic 401 as
+#: bad credentials (no account-role oracle).
+VALID_LOGIN_ENTRIES = frozenset({"teacher", "school_admin", "platform_admin"})
+
+
+def _entry_matches_role(user: User, entry: str) -> bool:
+    """True when ``entry`` is the correct entry point for this DB identity.
+
+    The role is read from the database row — never from the request body or a
+    token claim. ``is_admin`` keeps legacy school administrators working.
+    """
+    role = (getattr(user, "role", "") or "").strip().lower()
+    if entry == "teacher":
+        return role == "teacher"
+    if entry == "school_admin":
+        return role == "school_admin" or bool(getattr(user, "is_admin", False))
+    if entry == "platform_admin":
+        return role == "platform_admin"
+    return False
 
 
 def _school_audit(db: Session, actor_id: str, actor_role: str, action: str,
@@ -107,6 +130,10 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+    #: The login entry point the client is using. The backend validates it
+    #: against the user's authoritative database role, so a platform admin
+    #: cannot obtain a session through the teacher entry (and vice versa).
+    entry: Optional[str] = None
 
 
 class SetupRequest(BaseModel):
@@ -512,6 +539,14 @@ async def login(req: LoginRequest, db: Session = Depends(get_db)):
         log_security("login_failed", email=req.email, reason="disabled")
         raise HTTPException(status_code=403, detail="Account disabled")
 
+    # Entry-point boundary: the client says WHICH login it is using; the
+    # database says WHO the account is. Both must agree. A mismatch is
+    # indistinguishable from bad credentials in the response.
+    entry = (req.entry or "").strip().lower()
+    if entry not in VALID_LOGIN_ENTRIES or not _entry_matches_role(user, entry):
+        log_security("login_failed", email=req.email, reason="entry_mismatch")
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
     token = create_user_token(user)
     return {
         "access_token": token,
@@ -520,12 +555,53 @@ async def login(req: LoginRequest, db: Session = Depends(get_db)):
     }
 
 
+@router.post("/logout")
+async def logout(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Sign out this session server-side.
+
+    The access token is stateless, so logout records its unique ``jti`` until
+    the token's natural expiry. Other devices keep their independent sessions;
+    the password-version check is unchanged. Only the token id is stored.
+    """
+    payload = decode_token(credentials.credentials)
+    jti = payload.get("jti")
+    if jti:
+        expires_at = datetime.utcnow() + timedelta(days=1)
+        exp = payload.get("exp")
+        if isinstance(exp, (int, float)):
+            expires_at = datetime.utcfromtimestamp(exp)
+        existing = (
+            db.query(RevokedTokenDB)
+            .filter(RevokedTokenDB.jti == jti)
+            .first()
+        )
+        if existing is None:
+            try:
+                db.add(RevokedTokenDB(
+                    jti=jti, user_id=user.id, expires_at=expires_at))
+                db.commit()
+            except Exception:
+                # A concurrent logout of the same token already recorded it.
+                db.rollback()
+    # Bounded cleanup: expired rows can never match a live token.
+    try:
+        db.query(RevokedTokenDB).filter(
+            RevokedTokenDB.expires_at < datetime.utcnow()
+        ).delete(synchronize_session=False)
+        db.commit()
+    except Exception:
+        db.rollback()
+    return {"ok": True}
+
+
 class IndividualRegisterRequest(BaseModel):
     email: str
     password: str
     full_name: str
-
-
 @router.post("/register/individual")
 async def register_individual_teacher(
     req: IndividualRegisterRequest,

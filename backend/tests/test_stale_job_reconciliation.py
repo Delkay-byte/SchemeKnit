@@ -10,6 +10,7 @@ recent non-terminal jobs and terminal jobs stay untouched.
 
 import os
 import sys
+import time
 from datetime import datetime, timedelta
 
 import pytest
@@ -34,11 +35,18 @@ def teacher_scheme(db):
     return teacher, scheme
 
 
-def _job(db, teacher, scheme, status, age_minutes):
+def _job(db, teacher, scheme, status, age_minutes, heartbeat_age_minutes=None,
+         now=None):
+    now = now or datetime.utcnow()
     job = GenerationJobDB(
         id=generate_id(), owner_id=teacher.id, scheme_id=scheme.id,
         status=status,
-        created_at=datetime.utcnow() - timedelta(minutes=age_minutes))
+        created_at=now - timedelta(minutes=age_minutes),
+        heartbeat_at=(
+            None if heartbeat_age_minutes is None
+            else now - timedelta(minutes=heartbeat_age_minutes)
+        ),
+    )
     db.add(job)
     db.commit()
     return job
@@ -90,3 +98,145 @@ def test_reconcile_does_not_touch_lessons_or_quota(db, teacher_scheme):
 
     remaining = db.query(LessonPlanDB).filter_by(job_id=job.id).all()
     assert [r.id for r in remaining] == [lp.id]
+
+
+# ── Boundary and heartbeat policy (deterministic clock) ──────────────────────
+# The policy is: a non-terminal job is orphaned only when its last activity
+# (heartbeat_at, else created_at) is STRICTLY older than the configured stale
+# duration. Exactly at the threshold is still allowed to run. A healthy
+# heartbeat keeps a long-running job out of recovery.
+
+_FIXED_NOW = datetime(2026, 10, 28, 12, 0, 0)
+
+
+def test_job_exactly_at_the_threshold_is_not_stale(db, teacher_scheme):
+    teacher, scheme = teacher_scheme
+    job = _job(db, teacher, scheme, "processing", age_minutes=60, now=_FIXED_NOW)
+
+    assert data_service.reconcile_stale_generation_jobs(
+        db, older_than_minutes=60, now=_FIXED_NOW) == 0
+    db.refresh(job)
+    assert job.status == "processing"
+
+
+def test_job_one_second_past_the_threshold_is_stale(db, teacher_scheme):
+    teacher, scheme = teacher_scheme
+    job = _job(db, teacher, scheme, "processing", age_minutes=60, now=_FIXED_NOW)
+    job.created_at = _FIXED_NOW - timedelta(minutes=60, seconds=1)
+    db.commit()
+
+    assert data_service.reconcile_stale_generation_jobs(
+        db, older_than_minutes=60, now=_FIXED_NOW) == 1
+    db.refresh(job)
+    assert job.status == "failed"
+
+
+def test_heartbeat_keeps_a_long_running_job_alive(db, teacher_scheme):
+    """Created 3 hours ago but active 10 seconds ago: not orphaned."""
+    teacher, scheme = teacher_scheme
+    job = _job(
+        db, teacher, scheme, "processing", age_minutes=180,
+        heartbeat_age_minutes=0, now=_FIXED_NOW,
+    )
+    job.heartbeat_at = _FIXED_NOW - timedelta(seconds=10)
+    db.commit()
+
+    assert data_service.reconcile_stale_generation_jobs(
+        db, older_than_minutes=60, now=_FIXED_NOW) == 0
+    db.refresh(job)
+    assert job.status == "processing"
+
+
+def test_heartbeat_older_than_threshold_is_stale(db, teacher_scheme):
+    teacher, scheme = teacher_scheme
+    job = _job(
+        db, teacher, scheme, "processing", age_minutes=180,
+        heartbeat_age_minutes=61, now=_FIXED_NOW,
+    )
+
+    assert data_service.reconcile_stale_generation_jobs(
+        db, older_than_minutes=60, now=_FIXED_NOW) == 1
+    db.refresh(job)
+    assert job.status == "failed"
+
+
+def test_heartbeat_takes_precedence_over_created_at(db, teacher_scheme):
+    """A recent heartbeat protects even a very old job; the opposite too."""
+    teacher, scheme = teacher_scheme
+    old_but_active = _job(
+        db, teacher, scheme, "processing", age_minutes=600,
+        heartbeat_age_minutes=2, now=_FIXED_NOW,
+    )
+    recent_but_stalled = _job(
+        db, teacher, scheme, "processing", age_minutes=5,
+        heartbeat_age_minutes=120, now=_FIXED_NOW,
+    )
+
+    assert data_service.reconcile_stale_generation_jobs(
+        db, older_than_minutes=60, now=_FIXED_NOW) == 1
+    db.refresh(old_but_active)
+    db.refresh(recent_but_stalled)
+    assert old_but_active.status == "processing"
+    assert recent_but_stalled.status == "failed"
+
+
+def test_heartbeat_job_only_updates_live_jobs(db, teacher_scheme):
+    teacher, scheme = teacher_scheme
+    live = _job(db, teacher, scheme, "processing", age_minutes=10)
+    done = _job(db, teacher, scheme, "completed", age_minutes=10)
+
+    assert data_service.heartbeat_job(db, live.id, at=_FIXED_NOW) is True
+    assert data_service.heartbeat_job(db, done.id, at=_FIXED_NOW) is False
+
+    db.refresh(live)
+    db.refresh(done)
+    assert live.heartbeat_at == _FIXED_NOW
+    assert done.heartbeat_at is None
+
+
+def test_reconcile_uses_configured_stale_duration(db, teacher_scheme, monkeypatch):
+    """The default is configurable, not a hard-coded 60-minute constant."""
+    from types import SimpleNamespace
+    import src.service as service_module
+
+    teacher, scheme = teacher_scheme
+    job = _job(db, teacher, scheme, "processing", age_minutes=10, now=_FIXED_NOW)
+    monkeypatch.setattr(
+        service_module, "get_settings",
+        lambda: SimpleNamespace(GENERATION_STALE_MINUTES=5),
+    )
+
+    assert data_service.reconcile_stale_generation_jobs(
+        db, now=_FIXED_NOW) == 1
+    db.refresh(job)
+    assert job.status == "failed"
+
+
+def test_a_running_job_is_heartbeated_while_work_continues(
+        db, db_engine, teacher_scheme, monkeypatch):
+    """The worker lease is real: a long run keeps proving it is alive."""
+    from types import SimpleNamespace
+    from sqlalchemy.orm import sessionmaker
+    from src.routers import generation as gen_router
+
+    teacher, scheme = teacher_scheme
+    job = _job(db, teacher, scheme, "processing", age_minutes=10)
+    old = datetime.utcnow() - timedelta(minutes=10)
+    job.heartbeat_at = old
+    db.commit()
+
+    monkeypatch.setattr(
+        gen_router, "SessionLocal", sessionmaker(bind=db_engine))
+    monkeypatch.setattr(
+        gen_router, "get_settings",
+        lambda: SimpleNamespace(GENERATION_HEARTBEAT_SECONDS=1),
+    )
+
+    with gen_router._job_heartbeat(job.id):
+        time.sleep(1.4)
+
+    db.expire_all()
+    db.refresh(job)
+    assert job.heartbeat_at is not None
+    assert job.heartbeat_at > old, (
+        "the heartbeat thread did not refresh a live job")

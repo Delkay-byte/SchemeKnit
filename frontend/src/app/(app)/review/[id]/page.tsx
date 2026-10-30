@@ -8,8 +8,10 @@ import { SurfaceCard } from '@/components/ui/surface-card'
 import { Banner } from '@/components/ui/banner'
 import { StatusPill, type StatusTone } from '@/components/ui/badge'
 import { PageHeader } from '@/components/ui/page-header'
-import { ArrowLeft, ArrowRight, CheckCircle, AlertCircle, Info } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CheckCircle, AlertCircle, Info, SlidersHorizontal } from 'lucide-react'
 import { api } from '@/lib/api'
+import { LessonConfigModal } from '@/components/lesson-config-modal'
+import type { LessonRubricConfig } from '@/types'
 import { resolveRouteId } from '@/lib/route-params'
 
 interface WeekData {
@@ -86,6 +88,12 @@ export default function ReviewPage() {
   const [validation, setValidation] = useState<any>(null)
   const [approving, setApproving] = useState(false)
   const [confirmingSubject, setConfirmingSubject] = useState<string | null>(null)
+  // Guided lesson configuration (Phase 2): loaded with the scheme, edited
+  // through the ONE "Configure lesson rubrics" modal. Generation downstream
+  // is blocked until the server reports the required fields as saved.
+  const [lessonConfig, setLessonConfig] = useState<LessonRubricConfig>({})
+  const [lessonConfigMissing, setLessonConfigMissing] = useState<string[]>([])
+  const [configModalOpen, setConfigModalOpen] = useState(false)
 
   useEffect(() => {
     loadSchemeData()
@@ -110,6 +118,13 @@ export default function ReviewPage() {
         setValidation(await api.validateScheme(schemeId))
       } catch {
         setValidation(null)
+      }
+      // Saved lesson configuration + server readiness (Phase 2). A failure
+      // to load never blocks the review — the modal starts from defaults.
+      const savedConfig = await api.getLessonConfig(schemeId).catch(() => null)
+      if (savedConfig?.config) {
+        setLessonConfig(savedConfig.config)
+        setLessonConfigMissing(savedConfig.missing || [])
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load scheme data')
@@ -232,6 +247,17 @@ export default function ReviewPage() {
             <>
               <Button variant="outline" asChild>
                 <Link href="/dashboard">Back to Dashboard</Link>
+              </Button>
+              {/* Phase 3: ONE route into the guided configuration. It opens
+                  the shared modal right here on the review page, so the
+                  teacher completes the lesson details before generating. */}
+              <Button
+                variant="outline"
+                data-configure-lesson-rubrics
+                onClick={() => setConfigModalOpen(true)}
+              >
+                <SlidersHorizontal className="mr-2 h-4 w-4" aria-hidden="true" />
+                Configure lesson rubrics
               </Button>
               <Button size="lg" onClick={handleApprove} disabled={approving}>
                 <CheckCircle className="mr-2 h-4 w-4" />
@@ -700,6 +726,18 @@ export default function ReviewPage() {
           </div>
         </div>
       </main>
+      {/* Guided lesson configuration modal (Phases 2/3) — shared with the
+          generate page; the review page never duplicates the form. */}
+      <LessonConfigModal
+        schemeId={schemeId}
+        open={configModalOpen}
+        onOpenChange={setConfigModalOpen}
+        config={lessonConfig}
+        onSaved={(saved, missing) => {
+          setLessonConfig(saved)
+          setLessonConfigMissing(missing)
+        }}
+      />
     </div>
   )
 }

@@ -50,7 +50,7 @@ export default function IndividualSignupPage() {
     try {
       const res = await api.registerIndividual(email, password, fullName.trim())
       if (res.access_token) {
-        await login(email, password)
+        await login(email, password, 'teacher')
       }
       router.push('/dashboard')
     } catch (err) {

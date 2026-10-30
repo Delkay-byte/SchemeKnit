@@ -436,6 +436,7 @@ def lesson_provenance(
     *,
     ai_active: bool = False,
     ai_provider: Optional[str] = None,
+    ai_model: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Answer "Why did SchemeKnit generate this?" for one lesson.
 
@@ -458,9 +459,12 @@ def lesson_provenance(
         # side by side — repeating it here would show it twice (Defect D5).
         indicator_text = split_indicator_text(str(indicators[0]))[1]
 
-    if ai_active:
-        generation = "Curriculum-first + AI enrichment"
-    elif getattr(lp, "ai_generated", False):
+    lesson_method = (getattr(lp, "generation_method", "") or "standard").strip()
+    if lesson_method == "zeli":
+        # The method flag is authoritative: Groq also powers the optional
+        # section/enrichment path, so provider identity alone is not enough.
+        generation = "Curriculum-first + Zeli generation"
+    elif ai_active or getattr(lp, "ai_generated", False):
         generation = "Curriculum-first + AI enrichment"
     else:
         generation = "Curriculum-first (deterministic)"
@@ -495,7 +499,13 @@ def lesson_provenance(
         "period": getattr(lp, "period", "") or "",
         "carry_forward": bool(getattr(lp, "carry_forward", False)),
         "generation": generation,
-        "ai_provider": ai_provider or ("AI enrichment" if getattr(lp, "ai_generated", False) else None),
+        "generation_method": lesson_method,
+        "ai_provider": (
+            ai_provider
+            or getattr(lp, "ai_provider", "")
+            or ("AI enrichment" if getattr(lp, "ai_generated", False) else None)
+        ),
+        "ai_model": ai_model or getattr(lp, "ai_model", "") or None,
         "source_week_type": source_week_type,
         "source_review_status": source_review_status,
         "source_review_reasons": source_review_reasons,

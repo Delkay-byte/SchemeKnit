@@ -349,7 +349,7 @@ class TestGenerationEntitlement:
         db.add(scheme)
         db.commit()
         with pytest.raises(HTTPException) as e:
-            await gen.generate_lesson_plans(
+            gen.generate_lesson_plans(
                 scheme.id, self._term_config(AIMode.BASIC), u, db)
         assert e.value.status_code == 403
         assert "active school license or a paid AI entitlement" in e.value.detail
@@ -374,7 +374,7 @@ class TestGenerationEntitlement:
         # ...yet AI OFF never consults the entitlement gate at all.
         with patch.object(gen, "require_ai_entitlement") as gate:
             try:
-                await gen.generate_lesson_plans(
+                gen.generate_lesson_plans(
                     scheme.id, self._term_config(AIMode.OFF), u, db)
             except HTTPException as e:
                 # Deterministic generation may fail for unrelated reasons on an
@@ -395,7 +395,7 @@ class TestGenerationEntitlement:
         db.commit()
         with patch.object(gen, "require_ai_entitlement") as gate:
             try:
-                await gen.generate_lesson_plans(
+                gen.generate_lesson_plans(
                     scheme.id, self._term_config(AIMode.BASIC), u, db)
             except HTTPException:
                 pass

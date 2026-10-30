@@ -111,6 +111,10 @@ RULES:
 - ALWAYS connect assessment to the indicator and objectives.
 - ALWAYS use the indicator's action verb in the objectives.
 - ALWAYS provide realistic Ghanaian classroom activities.
+- ALWAYS keep examples factually and scientifically correct. When the indicator
+  names a category, every example MUST belong to that category (for example, a
+  "binary compound" contains exactly two elements, so a carbonate or bicarbonate
+  is not a binary compound).
 - Output MUST be valid JSON matching the provided schema.
 """
 
@@ -331,7 +335,21 @@ CRITICAL RULES:
 11. lesson_identity MUST copy subject, class_level, strand, sub_strand,
     indicator_code and indicator_text EXACTLY from CURRICULUM CONTEXT — never
     paraphrased, reworded, or invented. Generation can enrich pedagogy but can
-    NEVER change or fabricate curriculum facts.""")
+    NEVER change or fabricate curriculum facts.
+12. The starter activity, assessment task and plenary activity MUST each name
+    the indicator's action verb and key topic words. Use the indicator wording
+    verbatim where it reads naturally, so the link to this indicator is
+    explicit rather than implied.
+13. The assessment MUST state concrete success criteria: the evidence the
+    teacher will check (what each learner says, writes, makes or does).
+14. The plenary MUST summarise the learning and include an exit check that
+    gives the teacher evidence for every learner.
+15. Use [] (an empty array) when a phase needs no extra resources. NEVER write
+    "None", "N/A", "null" or other placeholder text as a resource or activity.
+16. Every example MUST satisfy the indicator's category exactly. For a "binary
+    compound", use only compounds of exactly two elements (water, sodium
+    chloride, carbon dioxide); NEVER present a carbonate, bicarbonate or other
+    three-or-more-element compound as a binary compound.""")
 
     return "\n\n".join(sections)
 

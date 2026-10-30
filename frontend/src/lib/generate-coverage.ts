@@ -279,7 +279,9 @@ export function generatableRowsForWeek(
   week: WeekPlan,
   quota: QuotaStatus | null | undefined,
 ): WeekRow[] {
-  const pending = week.rows.filter((r) => !r.generated)
+  // needs_review rows stay visible but never enter an automatic batch; the
+  // backend rejects the whole request when an occurrence is uncertain.
+  const pending = week.rows.filter((r) => !r.generated && !r.needs_review)
   if (!quota?.enforced) return pending
   const remaining = Math.max(quota.remaining ?? 0, 0)
   const allowed = new Set<string>()

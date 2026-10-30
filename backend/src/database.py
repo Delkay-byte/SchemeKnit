@@ -106,6 +106,12 @@ class SchemeDB(Base):
     #: Saved by the teacher BEFORE generation; applied when lessons are built.
     #: Fields: keywords, other_tlrs, core_competencies, structured_references.
     lesson_review_drafts = Column(JSON, default=dict)
+    #: Guided lesson configuration (Phase 2): school name, teacher's name,
+    #: class size, reference, lesson duration, period allocation, periods per
+    #: week and the days the subject is taught — saved by the teacher AFTER
+    #: extraction and BEFORE generation, and re-used by every export of this
+    #: plan. JSON document; NULL/empty = not configured (never invented).
+    lesson_config = Column(JSON, nullable=True)
 
     owner = relationship("User", back_populates="schemes")
     weeks = relationship("WeekDB", back_populates="scheme", cascade="all, delete-orphan")
@@ -152,7 +158,8 @@ class TermConfigDB(Base):
     term_end_date = Column(Date, nullable=False)
     lessons_per_week = Column(Integer, default=3)
     lesson_duration_minutes = Column(Integer, default=60)
-    class_size = Column(Integer, default=11)
+    #: No default: an unconfigured class size stays NULL and renders blank.
+    class_size = Column(Integer, nullable=True)
     teaching_days = Column(JSON, default=lambda: [0, 2, 4])
     holidays = Column(JSON, default=list)
     ai_mode = Column(String, default="OFF")
@@ -179,6 +186,12 @@ class GenerationJobDB(Base):
     error_message = Column(Text, default="")
     config_snapshot = Column(JSON, default=dict)
     created_at = Column(DateTime, default=datetime.utcnow)
+    #: Last proof of life from the worker that owns this job. NULL on legacy
+    #: rows and on jobs that never started; reconciliation then falls back to
+    #: created_at. Written by the running worker every
+    #: GENERATION_HEARTBEAT_SECONDS, so a genuinely long run is not mistaken
+    #: for an orphaned one.
+    heartbeat_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
 
     owner = relationship("User", back_populates="generation_jobs")
@@ -241,7 +254,8 @@ class LessonPlanDB(Base):
     period = Column(String, default="")
     class_level = Column(String, nullable=False)
     subject = Column(String, nullable=False)
-    class_size = Column(Integer, default=11)
+    #: No default: an unconfigured class size stays NULL and renders blank.
+    class_size = Column(Integer, nullable=True)
     duration_minutes = Column(Integer, default=60)
     school_name = Column(String, default="")
     teacher_name = Column(String, default="")
@@ -307,6 +321,10 @@ class LessonPlanDB(Base):
 
     status = Column(String, default="generated")
     ai_generated = Column(Boolean, default=False)
+    #: Durable AI provenance (v035). Empty for deterministic lessons.
+    ai_provider = Column(String, default="")
+    ai_model = Column(String, default="")
+    generation_method = Column(String, default="standard")
     teacher_edited = Column(Boolean, default=False)
     original_data = Column(JSON, default=dict)
 
@@ -555,6 +573,27 @@ class AIEnrichmentCacheDB(Base):
     __table_args__ = (
         Index("ix_ai_cache_lesson_section", "lesson_plan_id", "section"),
     )
+
+
+class ZeliGenerationCacheDB(Base):
+    """Whole-lesson Zeli output, keyed by every material generation input.
+
+    Separate from ``ai_enrichment_cache`` because it is produced BEFORE any
+    lesson row exists and is keyed by curriculum/config identity rather than a
+    lesson_plan_id. The cache key includes generation method, provider, model,
+    prompt version and every lesson/config input that changes the output, so a
+    Zeli result can never be served to a STANDARD generation (or vice versa).
+    """
+
+    __tablename__ = "zeli_generation_cache"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    cache_key = Column(String, nullable=False, unique=True, index=True)
+    content = Column(Text, default="")
+    provider = Column(String, default="")
+    model = Column(String, default="")
+    generation_method = Column(String, default="zeli")
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 class AIUsageEventDB(Base):
@@ -936,6 +975,29 @@ class PasswordResetTokenDB(Base):
     __table_args__ = (
         Index("ix_reset_token_user", "user_id"),
         Index("ix_reset_token_hash", "token_hash"),
+    )
+
+
+class RevokedTokenDB(Base):
+    """Bounded server-side logout revocation, one row per signed-out session.
+
+    Access tokens are stateless JWTs, so logout cannot invalidate them by
+    deleting a server session. Each user token carries a unique ``jti``; logout
+    inserts that id here and every authenticated request rejects a revoked
+    ``jti`` until its natural expiry. Rows are deleted once expired, keeping
+    the table bounded by the number of *recent* logouts, not by lifetime usage.
+
+    Only the token id is stored — never the token, password, or email.
+    """
+    __tablename__ = "revoked_tokens"
+
+    jti = Column(String, primary_key=True)
+    user_id = Column(String, nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False, index=True)
+    revoked_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_revoked_token_expiry", "expires_at"),
     )
 
 

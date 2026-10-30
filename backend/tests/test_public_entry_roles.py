@@ -1,18 +1,18 @@
-"""
-Public Entry + Role-Based Authentication Architecture — backend tests.
+﻿"""
+Public Entry + Role-Based Authentication Architecture â€” backend tests.
 
-Covers (§25):
+Covers (Â§25):
   - Public landing / setup-status routes
   - Role login routing (one shared teacher login, role from backend)
-  - Activation must precede School Admin account creation (§6)
-  - School Admin login after activation (§8)
-  - Individual teacher registration (§12)
-  - School teacher vs individual teacher login (§10, §13, §14)
-  - Entitlement resolution states A-D (§15)
-  - Wrong-role access denied (§22)
-  - Invalid / expired / redeemed / suspended activation states (§19)
-  - Activation-code replay rejected (§22)
-  - Password + email UX regression (§20)
+  - Activation must precede School Admin account creation (Â§6)
+  - School Admin login after activation (Â§8)
+  - Individual teacher registration (Â§12)
+  - School teacher vs individual teacher login (Â§10, Â§13, Â§14)
+  - Entitlement resolution states A-D (Â§15)
+  - Wrong-role access denied (Â§22)
+  - Invalid / expired / redeemed / suspended activation states (Â§19)
+  - Activation-code replay rejected (Â§22)
+  - Password + email UX regression (Â§20)
   - Existing school commercial + individual Free/Pro flows intact
 """
 
@@ -38,7 +38,7 @@ from tests.conftest import (
 )
 
 
-# ── Fixtures ─────────────────────────────────────────────────────────────────
+# â”€â”€ Fixtures â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @pytest.fixture
 def db():
@@ -69,7 +69,7 @@ def _school_with_code(db, status="active", code_status="active",
     return school, plan, lic, code
 
 
-# ── Public / setup routes ─────────────────────────────────────────────────────
+# â”€â”€ Public / setup routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class TestPublicRoutes:
     @pytest.mark.asyncio
@@ -77,7 +77,7 @@ class TestPublicRoutes:
         from src.routers.auth import setup_status
         res = await setup_status(db)
         assert res["needs_setup"] is True
-        # The published policy is what the frontend mirrors (§20).
+        # The published policy is what the frontend mirrors (Â§20).
         assert res["password_policy"]["min_length"] == 8
         assert res["password_policy"]["requires_symbol"] is True
 
@@ -89,7 +89,7 @@ class TestPublicRoutes:
         assert res["needs_setup"] is False
 
 
-# ── Individual teacher registration (§12) ────────────────────────────────────
+# â”€â”€ Individual teacher registration (Â§12) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class TestIndividualRegistration:
     @pytest.mark.asyncio
@@ -100,7 +100,7 @@ class TestIndividualRegistration:
             full_name="Ama Boateng",
         )
         res = await register_individual_teacher(req, db)
-        # Client cannot choose role/plan/school — all server-derived.
+        # Client cannot choose role/plan/school â€” all server-derived.
         assert res["user"]["role"] == "teacher"
         assert res["user"]["school_id"] is None
         assert res["user"]["subscription_type"] == "individual"
@@ -147,7 +147,7 @@ async def _resolve(db, user_id):
     return resolve_entitlement(db, user)
 
 
-# ── Shared teacher login serves both audiences (§10) ─────────────────────────
+# â”€â”€ Shared teacher login serves both audiences (Â§10) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class TestSharedTeacherLogin:
     @pytest.mark.asyncio
@@ -159,7 +159,7 @@ class TestSharedTeacherLogin:
         u.hashed_password = hash_password("Strong1!")
         db.commit()
 
-        res = await login(LoginRequest(email="st@sunrise.edu.gh", password="Strong1!"), db)
+        res = await login(LoginRequest(email="st@sunrise.edu.gh", password="Strong1!", entry="teacher"), db)
         assert res["user"]["role"] == "teacher"
         assert res["user"]["school_id"] == school.id
 
@@ -170,7 +170,7 @@ class TestSharedTeacherLogin:
         u.hashed_password = hash_password("Strong1!")
         db.commit()
 
-        res = await login(LoginRequest(email="indiv@free.com", password="Strong1!"), db)
+        res = await login(LoginRequest(email="indiv@free.com", password="Strong1!", entry="teacher"), db)
         assert res["user"]["role"] == "teacher"
         assert res["user"]["school_id"] is None
 
@@ -181,15 +181,15 @@ class TestSharedTeacherLogin:
         u.hashed_password = hash_password("Strong1!")
         db.commit()
         with pytest.raises(HTTPException) as exc:
-            await login(LoginRequest(email="wp@free.com", password="nope"), db)
+            await login(LoginRequest(email="wp@free.com", password="nope", entry="teacher"), db)
         assert exc.value.status_code in (401, 400)
 
 
-# ── Entitlement resolution states A-D (§15) ──────────────────────────────────
+# â”€â”€ Entitlement resolution states A-D (Â§15) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class TestEntitlementResolution:
     def test_state_a_school_teacher_school_access(self, db):
-        """A: teacher + school_id + active school license → SCHOOL ACCESS."""
+        """A: teacher + school_id + active school license â†’ SCHOOL ACCESS."""
         school, plan, lic, code = _school_with_code(db)
         u = make_user(db, role="teacher", school_id=school.id)
         res = resolve_entitlement(db, u)
@@ -200,7 +200,7 @@ class TestEntitlementResolution:
         assert res["zip_export"] is True
 
     def test_state_b_individual_free(self, db):
-        """B: teacher, no school, free individual plan → FREE TEACHER."""
+        """B: teacher, no school, free individual plan â†’ FREE TEACHER."""
         u = make_user(db, role="teacher", school_id=None)
         u.subscription_type = "individual"
         ent = EntitlementDB(
@@ -217,7 +217,7 @@ class TestEntitlementResolution:
         assert res["batch_generation"] is False
 
     def test_state_c_individual_pro(self, db):
-        """C: teacher, no school, active Pro → INDIVIDUAL PRO."""
+        """C: teacher, no school, active Pro â†’ INDIVIDUAL PRO."""
         u = make_user(db, role="teacher", school_id=None)
         ent = EntitlementDB(
             id=generate_id(), user_id=u.id, edition="teacher",
@@ -233,7 +233,7 @@ class TestEntitlementResolution:
         assert res["batch_generation"] is True
 
     def test_state_d_combined_most_permissive_wins(self, db):
-        """D: school + individual Pro → most permissive per capability."""
+        """D: school + individual Pro â†’ most permissive per capability."""
         school, plan, lic, code = _school_with_code(db)
         u = make_user(db, role="teacher", school_id=school.id)
         ent = EntitlementDB(
@@ -251,7 +251,7 @@ class TestEntitlementResolution:
         assert res["generation_limit"] == 0  # unlimited under school
 
 
-# ── Activation must precede School Admin (§6, §7, §19) ───────────────────────
+# â”€â”€ Activation must precede School Admin (Â§6, Â§7, Â§19) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class TestSchoolActivation:
     @pytest.mark.asyncio
@@ -346,7 +346,7 @@ class TestSchoolActivation:
 
     @pytest.mark.asyncio
     async def test_activation_replay_rejected(self, db):
-        """A redeemed code cannot be replayed to create a second admin (§22)."""
+        """A redeemed code cannot be replayed to create a second admin (Â§22)."""
         from src.routers.auth import setup_school_admin, SetupSchoolAdminRequest
         school, plan, lic, code = _school_with_code(db)
         req = SetupSchoolAdminRequest(
@@ -366,7 +366,7 @@ class TestSchoolActivation:
 
     @pytest.mark.asyncio
     async def test_setup_requires_valid_code(self, db):
-        """Anonymous user cannot create a School Admin without a code (§9)."""
+        """Anonymous user cannot create a School Admin without a code (Â§9)."""
         from src.routers.auth import setup_school_admin, SetupSchoolAdminRequest
         req = SetupSchoolAdminRequest(
             email="anon@sunrise.edu.gh", password="Strong1!",
@@ -377,21 +377,21 @@ class TestSchoolActivation:
 
     @pytest.mark.asyncio
     async def test_school_admin_login_after_activation(self, db):
-        """After activation, the admin logs in with email+password (§8)."""
+        """After activation, the admin logs in with email+password (Â§8)."""
         from src.routers.auth import setup_school_admin, login, SetupSchoolAdminRequest, LoginRequest
         school, plan, lic, code = _school_with_code(db)
         await setup_school_admin(SetupSchoolAdminRequest(
             email="ht@sunrise.edu.gh", password="Strong1!",
             full_name="Headteacher", activation_code=code.code), db)
 
-        # The code is NOT a credential — normal login works.
+        # The code is NOT a credential â€” normal login works.
         res = await login(LoginRequest(
-            email="ht@sunrise.edu.gh", password="Strong1!"), db)
+            email="ht@sunrise.edu.gh", password="Strong1!", entry="school_admin"), db)
         assert res["user"]["role"] == "school_admin"
         assert res["access_token"]
 
 
-# ── Wrong-role access denied (§22) ────────────────────────────────────────────
+# â”€â”€ Wrong-role access denied (Â§22) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _creds(user):
     """Build a real bearer credential for a user (the dependency decodes it)."""
@@ -402,7 +402,7 @@ def _creds(user):
 class TestRoleEnforcement:
     @pytest.mark.asyncio
     async def test_missing_credentials_denied(self, db):
-        """No bearer header → the optional dependency yields None (the public
+        """No bearer header â†’ the optional dependency yields None (the public
         entry path). A required guard would reject before reaching logic."""
         from src.auth import get_optional_user
         assert await get_optional_user(None, db) is None
@@ -425,7 +425,7 @@ class TestRoleEnforcement:
 
     @pytest.mark.asyncio
     async def test_school_admin_denied_platform_admin_dependency(self, db):
-        """A school admin cannot reach platform operations (§22)."""
+        """A school admin cannot reach platform operations (Â§22)."""
         from src.auth import require_platform_admin
         school_admin = make_user(db, role="school_admin", is_admin=True)
         with pytest.raises(HTTPException) as exc:
@@ -450,7 +450,7 @@ class TestRoleEnforcement:
     @pytest.mark.asyncio
     async def test_teacher_denied_platform_create_school(self, db):
         """The platform-admin guard rejects a teacher; school creation is
-        platform-only (§23)."""
+        platform-only (Â§23)."""
         from src.auth import require_platform_admin
         teacher = make_user(db, role="teacher")
         with pytest.raises(HTTPException) as exc:
@@ -459,7 +459,7 @@ class TestRoleEnforcement:
 
     @pytest.mark.asyncio
     async def test_school_admin_scoped_to_own_school_only(self, db):
-        """A school admin from school A cannot see school B's users (§22)."""
+        """A school admin from school A cannot see school B's users (Â§22)."""
         from src.routers.auth import list_users
         school_a, *_ = _school_with_code(db)
         school_b = make_school(db, name="Rival School")
@@ -473,7 +473,7 @@ class TestRoleEnforcement:
         assert "b@rival.com" not in emails
 
 
-# ── Password UX regression (§20) ──────────────────────────────────────────────
+# â”€â”€ Password UX regression (Â§20) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class TestPasswordUx:
     def test_password_requires_min_length(self):
@@ -510,7 +510,7 @@ class TestPasswordUx:
         assert verify_password("wrong", h) is False
 
 
-# ── Existing flows intact (§25 regression guard) ─────────────────────────────
+# â”€â”€ Existing flows intact (Â§25 regression guard) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class TestExistingFlowsIntact:
     @pytest.mark.asyncio

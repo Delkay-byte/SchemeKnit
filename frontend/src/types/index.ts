@@ -112,6 +112,31 @@ export interface LessonReviewSeed {
   structured_references: ReferenceEntry[]
 }
 
+/**
+ * Guided lesson configuration (Phase 2) — the seven fields the teacher
+ * confirms after extraction and before generation, via the single
+ * "Configure lesson rubrics" modal. All fields are optional at the type
+ * level because an unset field is "not configured" (never invented); the
+ * backend readiness check decides which ones the selected template requires.
+ */
+export interface LessonRubricConfig {
+  school_name?: string | null
+  teacher_name?: string | null
+  class_size?: number | null
+  reference?: string | null
+  lesson_duration_minutes?: number | null
+  periods_per_week?: number | null
+  period?: string | null
+  teaching_days?: number[] | null
+}
+
+export interface LessonConfigResponse {
+  config: LessonRubricConfig
+  ready: boolean
+  missing: string[]
+  required_fields?: string[]
+}
+
 export interface TermConfig {
   scheme_of_work_id: string
   academic_year?: string
@@ -126,6 +151,10 @@ export interface TermConfig {
   teaching_days: number[]
   holidays: Holiday[]
   ai_mode: string
+  // "standard" (existing deterministic/AI-enrichment path) or "zeli"
+  // (whole-lesson generation by Zeli). Optional so legacy snapshots default
+  // to standard on the backend.
+  generation_method?: string
   template_type?: string
   template_id?: string
   include_special_weeks: boolean

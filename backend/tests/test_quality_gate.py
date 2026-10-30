@@ -645,8 +645,65 @@ def _gen_config(scheme):
         term="First Term", class_level="Basic 7", subject="ICT",
         term_start_date=date(2026, 9, 7), term_end_date=date(2026, 12, 18),
         lessons_per_week=1, lesson_duration_minutes=60,
+        # Phase 2: class size is REQUIRED guided configuration — never an
+        # invented default — so the test supplies it explicitly.
+        class_size=30,
         teaching_days=[0], holidays=[], ai_mode=AIMode.OFF,
     )
+
+
+class TestCodeOnlySourceGate:
+    """A code-only INDICATOR column is real source data and must still pass.
+
+    ``bs7_code_only_indicators_scheme.docx`` stores bare codes; the planner
+    resolves the teachable focus from the official exemplar. The gate used to
+    compare the lesson's objective/topic against the bare CODE, hard-rejecting
+    every lesson as ``generic_objective`` and making the whole scheme
+    ungeneratable.
+    """
+
+    @pytest.mark.parametrize("code", [
+        "B7.1.1.1.1", "B7.1.1.1.2", "B7.1.1.1.4", "B7.1.1.2.1",
+    ])
+    def test_code_only_lesson_is_accepted_by_the_gate(self, code):
+        from src.curriculum.lesson_builder import build_lesson
+        from src.models import (
+            AIMode, AllocatedIndicator, ClassLevel, Subject, TermConfig,
+        )
+
+        cfg = TermConfig(
+            scheme_of_work_id="code-only", academic_year="2026/2027",
+            term="First Term", class_level=ClassLevel.BASIC_7,
+            subject=Subject.ICT, term_start_date=date(2026, 9, 7),
+            term_end_date=date(2026, 12, 18), lessons_per_week=1,
+            lesson_duration_minutes=60, teaching_days=[0], holidays=[],
+            ai_mode=AIMode.OFF, school_name="S", teacher_name="T",
+        )
+        cs = code.rsplit(".", 1)[0]
+        alloc = AllocatedIndicator(
+            indicator_code=code, indicator_description=code,
+            content_standard_code=cs,
+            content_standard_description=f"Content standard {cs}",
+            strand="Introduction to Computing",
+            sub_strand="Components of Computers and Computer Systems",
+            week_number=1, source_resources=["Personal Computer", "keyboard"],
+            lesson_date=date(2026, 9, 7), period_index=1,
+            allocated=True, teaching_week=1,
+        )
+        lp = build_lesson(alloc, cfg, "code-only")
+        outcome = evaluate(lp, build_entry(alloc, lp))
+
+        assert outcome.hard == [], outcome.hard
+        assert outcome.floors == [], outcome.floors
+        assert outcome.accepted is True
+        # The source code is preserved verbatim; the lesson teaches a real
+        # focus, not the code text.
+        assert lp.indicator_codes == [code]
+        assert lp.indicators == [code]
+        assert not lp.lesson_topic.strip().startswith(code)
+        obj = lp.learning_objectives[0].description.lower()
+        assert not obj.startswith("learners can discuss")
+        assert not obj.startswith("learners can explore")
 
 
 class TestEndpointGate:
@@ -736,6 +793,14 @@ class TestEndpointGate:
             assert body["status"] == "completed"
             assert body["quality"]["accepted"] == 1
             assert body["quality"]["rejected"] == 1
+            # Honest batch semantics: the accepted occurrence is named as
+            # generated; the gate-rejected one is named as rejected and stays
+            # pending — never presented as a success.
+            assert len(body["generated_occurrence_ids"]) == 1
+            assert len(body["rejected_occurrence_ids"]) == 1
+            assert body["rejected_occurrence_ids"][0] not in body[
+                "generated_occurrence_ids"]
+            assert body["blocked_for_review_occurrence_ids"] == []
 
             rows = data_service.get_lesson_plans_for_scheme(db, scheme.id, user.id)
             assert len(rows) == 1, "only the accepted lesson persisted"

@@ -173,14 +173,23 @@ class TestSixthGenerationRejectedBeforeAnySideEffect:
             }
             assert _quota(client)["used"] == 5, "rejected run moved nothing"
 
-            # At exhaustion the pre-check refuses ANY further generate call
-            # (conservative policy that predates the incident): no charge,
-            # no job, no persistence — and never a silent over-allowance.
-            resp = _generate_one(client, scheme, config, rows[0])
-            assert resp.status_code == 403, resp.text
+            # At exhaustion, regenerating an ALREADY-PAID occurrence is still
+            # allowed: its unit key is idempotent, so it consumes zero units
+            # and replaces the lesson in place. It must never add a sixth
+            # lesson or bypass the allowance for a new indicator.
+            regen = _generate_one(client, scheme, config, rows[0])
+            assert regen.status_code == 200, regen.text
+            regen_body = regen.json()
+            assert regen_body["quota"]["used"] == 5
+            assert regen_body["quota"]["remaining"] == 0
+            assert rows[0]["source_occurrence_id"] in regen_body[
+                "generated_occurrence_ids"]
             assert _quota(client)["used"] == 5
-            assert len(_lessons(client, scheme)) == 5
-            assert _job_status(client, scheme) == before
+            lessons = _lessons(client, scheme)
+            assert len(lessons) == 5
+            assert len({
+                l.get("source_occurrence_id") for l in lessons
+            }) == 5, "regeneration must replace, never duplicate"
 
 
 class TestAutopilotConsistencyAfterSingles:

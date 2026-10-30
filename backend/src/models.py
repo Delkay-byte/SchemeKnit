@@ -242,6 +242,20 @@ class AIMode(str, Enum):
     ENHANCED = "ENHANCED"
 
 
+class GenerationMethod(str, Enum):
+    """How the substantive lesson content is produced.
+
+    STANDARD keeps SchemeKnit's deterministic curriculum-first builder (and
+    may add the existing optional AI enrichment). ZELI asks the configured
+    Zeli provider to generate the whole lesson content, then validates it
+    through the same quality gate before persistence. The method is persisted
+    in the job snapshot so resume/status/retry cannot silently change it.
+    """
+
+    STANDARD = "standard"
+    ZELI = "zeli"
+
+
 class TemplateType(str, Enum):
     GES_STYLE = "GES-style"
     STANDARD_PROFESSIONAL = "Standard Professional"
@@ -538,7 +552,10 @@ class TermConfig(BaseModel):
     # never silently become Basic 9 / Science (PART E/Y).
     class_level: ClassLevel = ClassLevel.UNKNOWN
     subject: Subject = Subject.UNKNOWN
-    class_size: int = 24
+    #: Class size has NO default: a plan without the teacher's confirmed
+    # configuration must never present an invented class size (Phase 2.1C).
+    # The guided configuration step supplies it before generation runs.
+    class_size: Optional[int] = None
     lesson_duration_minutes: int = 60
     lessons_per_week: int = 3
     #: The term window is a REQUIRED generation invariant, but the teacher may
@@ -555,6 +572,11 @@ class TermConfig(BaseModel):
     teacher_name: Optional[str] = None
     template_id: Optional[str] = None
     ai_mode: AIMode = AIMode.OFF
+    #: Whole-lesson generation method. STANDARD is the existing deterministic
+    #: curriculum-first pipeline; ZELI selects provider-generated lesson
+    #: content with strict validation (see GenerationMethod). Selecting ZELI
+    #: does not remove the OFF/BASIC/ENHANCED options for STANDARD runs.
+    generation_method: GenerationMethod = GenerationMethod.STANDARD
     include_special_weeks: bool = False
     #: Free-Tier selection: the exact indicator codes the teacher chose to
     #: generate this month. Empty means "everything in curriculum order".
@@ -840,7 +862,10 @@ class LessonPlan(BaseModel):
     educational_level: EducationalLevel = EducationalLevel.JHS
     class_level: ClassLevel = ClassLevel.UNKNOWN
     subject: Subject = Subject.UNKNOWN
-    class_size: int = 24
+    #: Class size comes from the teacher's guided configuration — never a
+    # fabricated default. An unconfigured plan renders a blank Class Size
+    # cell rather than an invented number (Phase 2.1C).
+    class_size: Optional[int] = None
     duration_minutes: int = 60
     school_name: Optional[str] = None
     teacher_name: Optional[str] = None
@@ -904,6 +929,12 @@ class LessonPlan(BaseModel):
 
     status: LessonStatus = LessonStatus.PENDING
     ai_generated: bool = False
+    #: Durable provenance for AI-produced content. Provider/model are stored
+    #: for audit and "why this lesson?"; they are never rendered as provider
+    #: vocabulary in teacher-facing copy. Empty on deterministic lessons.
+    ai_provider: str = ""
+    ai_model: str = ""
+    generation_method: str = GenerationMethod.STANDARD.value
     teacher_edited: bool = False
     template_id: Optional[str] = None
     created_date: datetime = Field(default_factory=datetime.now)

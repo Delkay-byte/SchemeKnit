@@ -244,6 +244,21 @@ def lesson_body(lp):
 def c01_indicator_fidelity(entry, lp):
     body = lesson_body(lp)
     recall = overlap_recall(entry["indicator"], body)
+    if entry.get("source_code_only"):
+        # The stored indicator is the source CODE; the entry's reference is
+        # the resolved focus. Fidelity means the lesson body teaches that
+        # focus and the code is preserved verbatim.
+        code = (entry.get("code") or "").strip()
+        stored_ok = bool(code) and any(
+            code.lower() in (ind or "").lower()
+            for ind in (lp.indicators or []))
+        if stored_ok and recall >= 0.55:
+            return 5
+        if stored_ok and recall >= 0.35:
+            return 4
+        if stored_ok and recall >= 0.20:
+            return 3
+        return 2 if stored_ok else 1
     stored_ok = any(
         entry["indicator"].lower() in (ind or "").lower()
         for ind in (lp.indicators or []))
@@ -260,6 +275,27 @@ def c01_indicator_fidelity(entry, lp):
     return 1
 
 
+_CODE_TOKEN_RE = re.compile(r"[A-Za-z]{0,3}\d[\d.]*")
+
+
+def _objective_reference(entry, lp) -> str:
+    """The curriculum text an objective/topic is judged against.
+
+    A code-only indicator cell ("B7.1.1.1.1") has no prose to overlap with;
+    the lesson's derived topic is the authoritative focus for that occurrence
+    (official exemplar learning focus, else the source sub-strand). Comparing a
+    real objective to a bare code made every code-only lesson fail as
+    ``generic_objective`` even when the objective was specific and measurable.
+    """
+    indicator = (entry.get("indicator") or "").strip()
+    if indicator and not re.search(r"[A-Za-z]{3,}",
+                                   _CODE_TOKEN_RE.sub(" ", indicator)):
+        topic = (getattr(lp, "lesson_topic", "") or "").strip()
+        if topic:
+            return topic
+    return indicator
+
+
 def c02_objective_specificity(entry, lp):
     if not lp.learning_objectives:
         return 1
@@ -273,7 +309,7 @@ def c02_objective_specificity(entry, lp):
     # no longer counts as "perform", but the objective's own outcome verb
     # (right after ``Learners can …``) must name a measurable action.
     has_verb = verb_stem_matches(verb, obj) or _canonical_outcome_action(obj) != ""
-    recall = overlap_recall(entry["indicator"], obj)
+    recall = overlap_recall(_objective_reference(entry, lp), obj)
     if has_verb and recall >= 0.50:
         return 5
     if has_verb and recall >= 0.35:
@@ -290,6 +326,12 @@ def c03_topic_specificity(entry, lp):
     if not topic:
         return 1
     low = topic.lower()
+    if entry.get("source_code_only"):
+        # The source states no indicator prose: the resolved focus (official
+        # exemplar, else the sub-strand) is the most specific topic the source
+        # can support. "Topic equals the sub-strand" is not a defect here —
+        # there is nothing more specific to derive from this row.
+        return 5 if len(topic.split()) >= 2 else 3
     concat = f'{entry["strand"]} - {entry["sub_strand"]}'.lower()
     if low == concat:
         return 2
@@ -629,7 +671,7 @@ def hard_failures(entry, lp):
         if _GENERIC_OBJECTIVE_RE.search(obj):
             failures.append("generic_objective")
         else:
-            recall = overlap_recall(entry["indicator"], obj)
+            recall = overlap_recall(_objective_reference(entry, lp), obj)
             # Outcome-verb interpretation (canonical, word-boundary): the
             # verb right after "Learners can/will …" must name a measurable
             # action — a measurable word elsewhere in the sentence or an

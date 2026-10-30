@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 from functools import lru_cache
 from dotenv import load_dotenv
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 # Export backend/.env into os.environ so provider modules that read
@@ -46,6 +47,18 @@ class Settings(BaseSettings):
     # Server
     HOST: str = "0.0.0.0"
     PORT: int = 8000
+
+    # Generation liveness / crash recovery.
+    # A non-terminal job is reclaimed only when its last activity - the
+    # heartbeat written by the owning worker, else created_at for legacy or
+    # never-started jobs - is STRICTLY older than this many minutes. The
+    # default (60) is deliberately conservative for normal runs, which finish
+    # in seconds/minutes. Units: integer minutes.
+    GENERATION_STALE_MINUTES: int = 60
+    # How often a running generation refreshes heartbeat_at. Must be shorter
+    # than the stale window so a healthy worker always proves liveness before
+    # another request could reclaim it. Units: integer seconds.
+    GENERATION_HEARTBEAT_SECONDS: int = 30
 
     # Public URLs (production: no localhost)
     PUBLIC_WEB_URL: str = "http://localhost:3000"
@@ -102,6 +115,8 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str = ""
     GROQ_MODEL: str = "openai/gpt-oss-120b"
     GROQ_BASE_URL: str = "https://api.groq.com/openai/v1"
+    # DeepSeek is the verified Zeli engine (see ZELI_* below). Server-side only.
+    DEEPSEEK_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o-mini"
     MINIMAX_API_KEY: str = ""
@@ -110,6 +125,48 @@ class Settings(BaseSettings):
     OPENCODE_ZEN_API_KEY: str = ""
     OPENCODE_ZEN_MODEL: str = "nemotron-3-ultra-free"
     OPENCODE_ZEN_BASE_URL: str = "https://opencode.ai/zen/v1"
+
+    # ── Generate with Zeli (whole-lesson generation method) ───────────────
+    # Zeli's verified engine is DeepSeek (OpenAI-compatible chat completions).
+    # Every ZELI_* value is OPTIONAL: when unset, Zeli uses the built-in
+    # DeepSeek endpoint/model and DEEPSEEK_API_KEY. ZELI_API_KEY, when set,
+    # takes precedence over DEEPSEEK_API_KEY. Selecting ZELI_PROVIDER=groq
+    # falls back to GROQ_MODEL / GROQ_BASE_URL / GROQ_API_KEY instead, so the
+    # previous integration keeps working without a second credential system.
+    # Secrets are read here and in the provider module only — never sent to
+    # the browser.
+    #
+    # ZELI_ENABLED=False disables the method without affecting Standard
+    # generation. ZELI_PROVIDER must be one of the supported provider keys.
+    # The tuning values are consumed by ``DeepSeekProvider`` (and by
+    # ``zeli_generation.get_zeli_provider``); see docs/ZELI_ENVIRONMENT.md.
+    ZELI_ENABLED: bool = True
+    ZELI_PROVIDER: str = "deepseek"
+    ZELI_MODEL: str = ""
+    ZELI_BASE_URL: str = ""
+    ZELI_API_KEY: str = ""
+    #: Sampling temperature. Omitted from the request when the selected model
+    #: does not support it (reasoning/thinking mode).
+    ZELI_TEMPERATURE: float = 0.3
+    #: Maps to the API's ``max_tokens`` field (completion budget).
+    ZELI_MAX_TOKENS: int = 2000
+    #: "enabled" | "disabled" | "auto" (auto = omit the parameter).
+    ZELI_THINKING_MODE: str = "disabled"
+    #: HTTP connect/read timeouts (seconds) enforced by the requests client.
+    ZELI_CONNECT_TIMEOUT_SECONDS: float = 10.0
+    ZELI_READ_TIMEOUT_SECONDS: float = 90.0
+    #: Bounded retries for transient failures (429 / 5xx / network only).
+    ZELI_MAX_RETRIES: int = 2
+
+    # Paystack (payments) — optional; absent keys disable card checkout.
+    # Server-side secret only; never expose PAYSTACK_SECRET_KEY to the browser.
+    PAYSTACK_PUBLIC_KEY: str = ""
+    PAYSTACK_SECRET_KEY: str = ""
+    PAYSTACK_CURRENCY: str = "GHS"
+    # Compatibility: the owner's private environment uses the frontend-style
+    # name for the public key. Accepted here so the backend can boot; it is
+    # never returned by an API.
+    NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY: str = ""
 
     # Logging
     LOG_LEVEL: str = "INFO"
@@ -121,6 +178,109 @@ class Settings(BaseSettings):
     MAINTENANCE_ESTIMATED_RESTORE: str = ""  # e.g. "2 hours" or "30 minutes"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+
+    @field_validator("GENERATION_STALE_MINUTES")
+    @classmethod
+    def _validate_stale_minutes(cls, value: int) -> int:
+        value = int(value)
+        if not 1 <= value <= 1440:
+            raise ValueError(
+                "GENERATION_STALE_MINUTES must be between 1 and 1440 minutes"
+            )
+        return value
+
+    @field_validator("GENERATION_HEARTBEAT_SECONDS")
+    @classmethod
+    def _validate_heartbeat_seconds(cls, value: int) -> int:
+        value = int(value)
+        if not 5 <= value <= 3600:
+            raise ValueError(
+                "GENERATION_HEARTBEAT_SECONDS must be between 5 and 3600 seconds"
+            )
+        return value
+
+    @model_validator(mode="after")
+    def _validate_heartbeat_window(self):
+        if self.GENERATION_HEARTBEAT_SECONDS >= self.GENERATION_STALE_MINUTES * 60:
+            raise ValueError(
+                "GENERATION_HEARTBEAT_SECONDS must be shorter than "
+                "GENERATION_STALE_MINUTES, otherwise a healthy long run can "
+                "be reclaimed before its next heartbeat"
+            )
+        return self
+
+    @field_validator("ZELI_PROVIDER")
+    @classmethod
+    def _validate_zeli_provider(cls, value: str) -> str:
+        # Imported lazily so settings can load before the engine package.
+        from .engines.ai_provider import NAMED_PROVIDERS
+
+        provider = (value or "deepseek").strip().lower()
+        if provider not in NAMED_PROVIDERS:
+            raise ValueError(
+                "ZELI_PROVIDER must be one of: "
+                + ", ".join(sorted(NAMED_PROVIDERS))
+            )
+        return provider
+
+    @field_validator("ZELI_MODEL", "ZELI_BASE_URL", "ZELI_API_KEY", "DEEPSEEK_API_KEY")
+    @classmethod
+    def _validate_zeli_text(cls, value: str) -> str:
+        return (value or "").strip()
+
+    @field_validator("ZELI_TEMPERATURE")
+    @classmethod
+    def _validate_zeli_temperature(cls, value: float) -> float:
+        value = float(value)
+        if not 0.0 <= value <= 2.0:
+            raise ValueError("ZELI_TEMPERATURE must be between 0.0 and 2.0")
+        return value
+
+    @field_validator("ZELI_MAX_TOKENS")
+    @classmethod
+    def _validate_zeli_max_tokens(cls, value: int) -> int:
+        value = int(value)
+        if not 1 <= value <= 8192:
+            raise ValueError("ZELI_MAX_TOKENS must be between 1 and 8192")
+        return value
+
+    @field_validator("ZELI_THINKING_MODE")
+    @classmethod
+    def _validate_zeli_thinking_mode(cls, value: str) -> str:
+        mode = (value or "auto").strip().lower()
+        if mode not in ("enabled", "disabled", "auto"):
+            raise ValueError(
+                "ZELI_THINKING_MODE must be enabled, disabled or auto"
+            )
+        return mode
+
+    @field_validator("ZELI_CONNECT_TIMEOUT_SECONDS")
+    @classmethod
+    def _validate_zeli_connect_timeout(cls, value: float) -> float:
+        value = float(value)
+        if not 1.0 <= value <= 60.0:
+            raise ValueError(
+                "ZELI_CONNECT_TIMEOUT_SECONDS must be between 1 and 60 seconds"
+            )
+        return value
+
+    @field_validator("ZELI_READ_TIMEOUT_SECONDS")
+    @classmethod
+    def _validate_zeli_read_timeout(cls, value: float) -> float:
+        value = float(value)
+        if not 1.0 <= value <= 600.0:
+            raise ValueError(
+                "ZELI_READ_TIMEOUT_SECONDS must be between 1 and 600 seconds"
+            )
+        return value
+
+    @field_validator("ZELI_MAX_RETRIES")
+    @classmethod
+    def _validate_zeli_max_retries(cls, value: int) -> int:
+        value = int(value)
+        if not 0 <= value <= 5:
+            raise ValueError("ZELI_MAX_RETRIES must be between 0 and 5")
+        return value
 
     def validate_production(self):
         """Fail fast when mandatory production secrets are missing/default.

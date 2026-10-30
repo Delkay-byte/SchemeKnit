@@ -163,6 +163,156 @@ class TestRegenerateCache:
         assert get_ai_units_used(db, user.id) == 2
 
 
+class TestCacheKeySpecificity:
+    @pytest.mark.asyncio
+    async def test_rewrite_mode_change_bypasses_the_cache(self, db):
+        """A different affordance is a different request, not a cache hit."""
+        user = _entitled_user(db, "cache-mode@t.test")
+        lp = _lesson(db, user.id)
+        provider = _provider({"starter": "Another version."})
+        with patch.object(air, "get_provider", return_value=provider):
+            first = await air.regenerate_section(
+                air.SectionRegenerateRequest(
+                    lesson_plan_id=lp.id, section="introduction",
+                    ai_mode="gemini",
+                    rewrite_mode="suggest_another_version"),
+                user, db)
+            provider.generate_lesson_content.return_value = {
+                "starter": "A practical version with local materials."}
+            provider.generate_lesson_content.reset_mock()
+            second = await air.regenerate_section(
+                air.SectionRegenerateRequest(
+                    lesson_plan_id=lp.id, section="introduction",
+                    ai_mode="gemini",
+                    rewrite_mode="make_more_practical"),
+                user, db)
+        assert first.already_generated is False
+        assert second.already_generated is False, (
+            "a different rewrite affordance must not reuse the cached result")
+        assert second.new_content != first.new_content
+        provider.generate_lesson_content.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_additional_context_change_bypasses_the_cache(self, db):
+        user = _entitled_user(db, "cache-ctx@t.test")
+        lp = _lesson(db, user.id)
+        provider = _provider({"starter": "Version A."})
+        with patch.object(air, "get_provider", return_value=provider):
+            await air.regenerate_section(
+                air.SectionRegenerateRequest(
+                    lesson_plan_id=lp.id, section="introduction",
+                    ai_mode="gemini", additional_context="use a market scene"),
+                user, db)
+            provider.generate_lesson_content.return_value = {"starter": "Version B."}
+            provider.generate_lesson_content.reset_mock()
+            second = await air.regenerate_section(
+                air.SectionRegenerateRequest(
+                    lesson_plan_id=lp.id, section="introduction",
+                    ai_mode="gemini", additional_context="use a clinic queue"),
+                user, db)
+        assert second.already_generated is False
+        assert second.new_content == "Version B."
+        provider.generate_lesson_content.assert_called_once()
+
+    def test_cache_hash_is_unambiguous_when_content_contains_delimiters(self):
+        """Teacher text containing the separator must not collide with config.
+
+        The finished payload is hashed, so ``content="x|y", extra="z"`` and
+        ``content="x", extra="y|z"`` previously produced the same digest and
+        one request was served the other's cached rewrite.
+        """
+        a = air._enrichment_cache_hash(
+            "lp-1", "introduction", "x|y", "gemini", extra="z")
+        b = air._enrichment_cache_hash(
+            "lp-1", "introduction", "x", "gemini", extra="y|z")
+        assert a != b
+
+    @pytest.mark.asyncio
+    async def test_provider_model_change_bypasses_the_cache(self, db):
+        """A different model on the same provider is a different request.
+
+        Provider NAME alone left the cache serving an old model's output
+        after the server switched models (e.g. a Gemini version bump).
+        """
+        user = _entitled_user(db, "cache-model@t.test")
+        lp = _lesson(db, user.id)
+        first_provider = _provider({"starter": "Old model output."})
+        first_provider.model = "model-a"
+        second_provider = _provider({"starter": "New model output."})
+        second_provider.model = "model-b"
+        with patch.object(air, "get_provider",
+                          side_effect=[first_provider, second_provider]):
+            first = await air.regenerate_section(
+                air.SectionRegenerateRequest(
+                    lesson_plan_id=lp.id, section="introduction",
+                    ai_mode="gemini"),
+                user, db)
+            second = await air.regenerate_section(
+                air.SectionRegenerateRequest(
+                    lesson_plan_id=lp.id, section="introduction",
+                    ai_mode="gemini"),
+                user, db)
+        assert first.already_generated is False
+        assert second.already_generated is False, (
+            "a different provider model must not reuse the cached result")
+        assert second.new_content == "New model output."
+        second_provider.generate_lesson_content.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_main_activities_replay_returns_structured_activities(self, db):
+        """A cached main_activities response keeps its phase/duration shape.
+
+        The UI treats a 200 without ``new_activities`` as a failed suggestion;
+        a double-submit used to show an error after a successful rewrite.
+        """
+        user = _entitled_user(db, "cache-activities@t.test")
+        lp = _lesson(db, user.id)
+        provider = _provider({"main_learning": {
+            "phase1": {"activity": "Model the routine.", "duration_minutes": 10},
+            "phase2": {"activity": "Pairs practise.", "duration_minutes": 15},
+            "phase3": {"activity": "Apply to a new case.", "duration_minutes": 10},
+        }})
+        with patch.object(air, "get_provider", return_value=provider):
+            first = await air.regenerate_section(
+                air.SectionRegenerateRequest(
+                    lesson_plan_id=lp.id, section="main_activities",
+                    ai_mode="gemini"),
+                user, db)
+            provider.generate_lesson_content.reset_mock()
+            replay = await air.regenerate_section(
+                air.SectionRegenerateRequest(
+                    lesson_plan_id=lp.id, section="main_activities",
+                    ai_mode="gemini"),
+                user, db)
+        assert first.new_activities and len(first.new_activities) == 3
+        assert replay.already_generated is True
+        assert replay.new_activities == first.new_activities
+        assert replay.new_content == first.new_content
+        provider.generate_lesson_content.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_enrichment_cache_is_template_specific(self, db):
+        """The export template changes the prompt/phase contract → not cache."""
+        user = _entitled_user(db, "cache-template@t.test")
+        lp = _lesson(db, user.id)
+        payload = {"phases": [
+            {"name": "PHASE 1: STARTER", "learner_activities": ["AI starter."]},
+        ]}
+        provider = _provider(payload, name="ollama")
+        with patch.object(air, "get_provider", return_value=provider):
+            await air.enrich_lesson(
+                air.EnrichLessonRequest(
+                    lesson_plan_id=lp.id, ai_mode="ollama", template_id=""),
+                user, db)
+            provider.generate_structured.reset_mock()
+            await air.enrich_lesson(
+                air.EnrichLessonRequest(
+                    lesson_plan_id=lp.id, ai_mode="ollama",
+                    template_id="tpl-other-approved-form"),
+                user, db)
+        provider.generate_structured.assert_called_once()
+
+
 class TestGenerateDoubleSubmit:
     def _scheme(self, db, owner_id):
         from src.database import SchemeDB, WeekDB, generate_id

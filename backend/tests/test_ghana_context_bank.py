@@ -112,3 +112,63 @@ class TestActivityFallback:
         lp = build_lesson(alloc, cfg, "t")
         assert lp.lesson_topic
         assert lp.assessment
+
+    def test_subject_bank_reaches_real_lesson_output(self, monkeypatch):
+        """The fallback must be visible in the lesson, not just resolvable.
+
+        Force the selected activity to carry no activity-level Ghana framing
+        (the three library patterns that legitimately have none behave the
+        same way), so the builder's subject fallback is the only source of
+        the clause; it must appear in the deterministic assessment and be
+        stable for the same input.
+        """
+        from dataclasses import replace
+        from datetime import date
+
+        from src.curriculum import activity_library as al
+        from src.curriculum.lesson_builder import build_lesson
+        from src.models import (
+            AIMode, AllocatedIndicator, ClassLevel, Subject, TermConfig,
+        )
+
+        real_select = al.select_activity
+        monkeypatch.setattr(
+            al, "select_activity",
+            lambda *a, **kw: replace(real_select(*a, **kw), ghana_context=()),
+        )
+
+        cfg = TermConfig(
+            scheme_of_work_id="t", academic_year="2026/2027",
+            term="First Term", class_level=ClassLevel.BASIC_7,
+            subject=Subject.MATHEMATICS,
+            term_start_date=date(2026, 9, 7),
+            term_end_date=date(2026, 12, 18),
+            lessons_per_week=1, lesson_duration_minutes=60,
+            teaching_days=[0], holidays=[], ai_mode=AIMode.OFF,
+            school_name="S", teacher_name="T",
+        )
+
+        def lesson():
+            alloc = AllocatedIndicator(
+                indicator_code="B7.1.1.1.1",
+                indicator_description=(
+                    "B7.1.1.1.1 Demonstrate how to add like fractions"),
+                content_standard_code="B7.1.1",
+                content_standard_description="Number and numeration",
+                strand="Number", sub_strand="Fractions",
+                week_number=1, source_resources=["Fraction strips"],
+                lesson_date=date(2026, 9, 7), period_index=1,
+                allocated=True, teaching_week=1,
+            )
+            return build_lesson(alloc, cfg, "t")
+
+        clause = ghana_context_for("Mathematics", variant=0)
+        first = lesson()
+        blob = " ".join(i.prompt for i in first.assessment_items)
+        # Phase 6.3: an ordinary word after a colon is lowercased in the
+        # composed teacher-facing prompt ("Apply it: use Ghanaian …"), so the
+        # bank clause matches case-insensitively.
+        assert clause.lower() in blob.lower(), blob
+        # Same inputs → identical composed clause (deterministic selection).
+        blob2 = " ".join(i.prompt for i in lesson().assessment_items)
+        assert blob.lower() == blob2.lower()
