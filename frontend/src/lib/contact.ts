@@ -35,6 +35,10 @@ export const BUSINESS_REGISTRATION_NUMBER = 'BN428031125'
 /** Registration date shown on the certificate. */
 export const BUSINESS_REGISTRATION_DATE = '7 November 2025'
 
+/** Confirmed physical business address supplied by the owner. */
+export const BUSINESS_ADDRESS =
+  'L7 Olive St., Akast Road, Akatsi, Volta Region, Ghana.'
+
 /** Default opening message. MUST identify BloomCore Technologies. */
 export const WHATSAPP_OPENING_MESSAGE =
   'Hello BloomCore Technologies, I would like to enquire about SchemeKnit. ' +

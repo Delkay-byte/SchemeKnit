@@ -3,7 +3,8 @@ import Link from 'next/link'
 import { SchemeKnitMark } from '@/components/scheme-knit-mark'
 import { WhatsAppIcon } from '@/components/whatsapp-button'
 import {
-  BUSINESS_NAME, BUSINESS_REGISTRATION_DATE, BUSINESS_REGISTRATION_NUMBER,
+  BUSINESS_ADDRESS, BUSINESS_NAME, BUSINESS_REGISTRATION_DATE,
+  BUSINESS_REGISTRATION_NUMBER,
   CONTACT_EMAIL, CONTACT_PHONE_LOCAL, CONTACT_PHONE_LOCAL_2,
   contactMailtoUrl, contactTelUrl, contactTelUrl2, whatsappUrl,
 } from '@/lib/contact'
@@ -215,6 +216,12 @@ export function PublicFooter() {
               <dd className="text-white/85">
                 Office of the Registrar of Companies, Republic of Ghana
               </dd>
+            </div>
+            <div className="sm:col-span-2 lg:col-span-1">
+              <dt className="text-xs uppercase tracking-wide text-white/50">
+                Business Address
+              </dt>
+              <dd className="text-white/85">{BUSINESS_ADDRESS}</dd>
             </div>
             <div>
               <dt className="text-xs uppercase tracking-wide text-white/50">

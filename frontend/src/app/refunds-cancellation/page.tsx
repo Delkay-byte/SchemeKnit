@@ -69,7 +69,10 @@ export default function RefundsCancellationPage() {
           <li>
             <strong>Credits already consumed:</strong> lesson plans already
             generated are delivered digital content. Amounts attributable to
-            consumed credits are not normally refunded.
+            consumed credits are not normally refunded. This normal commercial
+            position remains subject to any statutory cancellation or refund
+            right that applies under the Electronic Transactions Act, 2008
+            (Act 772) or other applicable law.
           </li>
           <li>
             <strong>Expired package credits:</strong> time-limited credits that

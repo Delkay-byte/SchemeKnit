@@ -15,13 +15,34 @@ export default function DataRetentionPage() {
       subtitle="What SchemeKnit stores, why, and how deletion works."
       lastUpdated="October 2026"
     >
-      <LegalSection title="1. Purpose and approach">
+      <LegalSection title="1. Purpose and legal framework">
         <p>
           This policy describes the data categories SchemeKnit actually stores,
           why they are kept, whether the user can delete them, and whether
-          deletion is immediate. Some records are retained for security,
-          financial or legal reasons. This policy does not promise immediate
-          destruction of every copy.
+          deletion is immediate.
+        </p>
+        <p>
+          Under section 24 of the Data Protection Act, 2012 (Act 843),
+          personal data should not be retained longer than necessary for the
+          purpose for which it was collected, subject to the statutory
+          exceptions.
+        </p>
+        <p>
+          Section 27 of the Revenue Administration Act, 2016 (Act 915)
+          requires necessary tax records — including relevant receipts,
+          invoices, vouchers and contracts — to be retained for at least six
+          years from the relevant date, or longer in specified unresolved
+          matters. Section 8 of the Electronic Transactions Act, 2008 (Act
+          772) applies a six-year electronic-record rule where a law requires
+          the relevant record to be retained. These rules apply to the records
+          they cover; they are not a general justification for keeping every
+          account, curriculum, security or operational record indefinitely.
+        </p>
+        <p>
+          This policy does not promise immediate destruction of every copy.
+          Categories without a scheduled expiry are identified below as
+          owner/engineering follow-up items; no automatic destructive cleanup
+          is claimed or introduced here.
         </p>
       </LegalSection>
 
@@ -59,25 +80,25 @@ export default function DataRetentionPage() {
                 <td className="py-2 pr-4">Export files (DOCX/PDF/XLSX/ZIP)</td>
                 <td className="py-2 pr-4">Download and regeneration</td>
                 <td className="py-2 pr-4">Request removal</td>
-                <td className="py-2 pr-4">No scheduled automatic 30-day purge is implemented. Download links expire after 10 minutes and are single-use; stored export files may remain until operational cleanup or a deletion request</td>
+                <td className="py-2 pr-4">No scheduled automatic 30-day purge is implemented. Download links expire after 10 minutes and are single-use; stored export files may remain until operational cleanup or a deletion request. Owner/engineering follow-up: define an approved cleanup period.</td>
               </tr>
               <tr>
                 <td className="py-2 pr-4">Payment and verification records</td>
                 <td className="py-2 pr-4">Payment verification, accounting and fraud prevention</td>
                 <td className="py-2 pr-4">Normally retained</td>
-                <td className="py-2 pr-4">No automatic expiry; retained as required for financial, tax and audit obligations</td>
+                <td className="py-2 pr-4">Tax-relevant accounting records: at least six years from the relevant date under Act 915 section 27, or longer in specified unresolved matters. Other operational payment data should be minimised to its purpose.</td>
               </tr>
               <tr>
                 <td className="py-2 pr-4">Paystack webhook events</td>
                 <td className="py-2 pr-4">Idempotency, recovery and payment integrity</td>
                 <td className="py-2 pr-4">Normally retained</td>
-                <td className="py-2 pr-4">No automatic expiry; retained for payment reconciliation and security</td>
+                <td className="py-2 pr-4">No scheduled expiry currently. Not automatically justified by tax or audit rules. Owner/engineering follow-up: define a retention period consistent with payment reconciliation and security needs.</td>
               </tr>
               <tr>
                 <td className="py-2 pr-4">Security, login and audit records</td>
                 <td className="py-2 pr-4">Security, abuse prevention and accountability</td>
                 <td className="py-2 pr-4">Normally retained</td>
-                <td className="py-2 pr-4">No automatic expiry currently configured; retained only while needed for security and legal purposes</td>
+                <td className="py-2 pr-4">No scheduled expiry currently. Not automatically justified by tax rules. Owner/engineering follow-up: define a retention period proportionate to security and legal needs.</td>
               </tr>
               <tr>
                 <td className="py-2 pr-4">Password-reset tokens</td>
@@ -95,7 +116,7 @@ export default function DataRetentionPage() {
                 <td className="py-2 pr-4">AI enrichment and generation caches</td>
                 <td className="py-2 pr-4">Reuse identical output and avoid repeated provider cost</td>
                 <td className="py-2 pr-4">Limited; removed with associated data/cleanup where implemented</td>
-                <td className="py-2 pr-4">No scheduled automatic expiry; the whole-lesson cache is not tied to a lesson row</td>
+                <td className="py-2 pr-4">No scheduled automatic expiry; the whole-lesson cache is not tied to a lesson row. Not automatically justified by tax or audit rules. Owner/engineering follow-up: define a cleanup period.</td>
               </tr>
               <tr>
                 <td className="py-2 pr-4">Database backups</td>
@@ -136,7 +157,27 @@ export default function DataRetentionPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="5. Contact">
+      <LegalSection title="5. Categories with no scheduled expiry">
+        <p>
+          The following currently have no automatic deletion schedule. They are
+          recorded as owner/engineering follow-up items; this policy does not
+          claim that their indefinite retention is already justified:
+        </p>
+        <ul className="list-disc space-y-1 pl-6">
+          <li>Stored export files after generation or download.</li>
+          <li>Paystack webhook event rows.</li>
+          <li>Security, login and audit records.</li>
+          <li>AI enrichment and whole-lesson generation caches.</li>
+        </ul>
+        <p>
+          Any retention period or automated deletion mechanism for these
+          categories must be separately justified, approved and tested before
+          it is introduced. Tax-relevant accounting records are treated
+          separately under Act 915 section 27.
+        </p>
+      </LegalSection>
+
+      <LegalSection title="6. Contact">
         <p>
           {BUSINESS_NAME} —{' '}
           <a href={contactMailtoUrl('SchemeKnit — Data Retention Enquiry')} className="text-brand-cyan underline break-all">

@@ -19,6 +19,8 @@ def test_contact_configuration_is_single_source_and_verified():
     assert "+233240064668" in contact and "+233553976334" in contact
     assert "233240064668" in contact
     assert "BloomCore Technologies" in contact
+    assert "L7 Olive St., Akast Road, Akatsi, Volta Region, Ghana." in contact
+    assert "BUSINESS_ADDRESS" in contact
     assert "contactTelUrl" in contact and "contactTelUrl2" in contact
     # WhatsApp is built only from the primary number.
     assert "https://wa.me/${WHATSAPP_NUMBER}" in contact
@@ -101,6 +103,7 @@ def test_footer_has_verified_registered_business_panel_and_no_tin():
     assert "Ltd" not in footer and "Limited" not in footer
     assert "privacy-policy" in footer and "cookie-policy" in footer
     assert "contactTelUrl" in footer and "contactTelUrl2" in footer
+    assert "BUSINESS_ADDRESS" in footer
 
 
 def test_tin_and_old_corporate_form_do_not_appear_in_public_source():
@@ -139,7 +142,7 @@ def test_privacy_policy_reflects_actual_processing_and_rights():
     page = _text(APP / "privacy-policy" / "page.tsx")
     assert "Act 843" in page
     assert "Data Protection Commission" in page
-    assert "has not claimed registration" in page
+    assert "makes no claim" in page
     assert "not a student records" in page
     assert "DeepSeek and Groq" in page
     assert "Cloudflare R2" in page
@@ -163,7 +166,7 @@ def test_retention_policy_does_not_repeat_unverified_periods():
     assert "No scheduled automatic 30-day purge is implemented" in page
     assert "10 minutes" in page
     assert "30 minutes" in page
-    assert "No automatic expiry" in page
+    assert "No scheduled expiry" in page
     assert "7 years" not in page
     assert "2 years" not in page
 
@@ -180,3 +183,80 @@ def test_license_packages_match_approved_catalogue():
         for value in row:
             assert value in page, value
     assert "automatic renewal" in page
+
+
+def test_confirmed_business_address_is_public_and_old_missing_address_wording_is_gone():
+    contact = _text(SRC / "lib" / "contact.ts")
+    footer = _text(SRC / "components" / "public-footer.tsx")
+    page = _text(APP / "contact" / "page.tsx")
+    privacy = _text(APP / "privacy-policy" / "page.tsx")
+    assert "L7 Olive St., Akast Road, Akatsi, Volta Region, Ghana." in contact
+    assert "BUSINESS_ADDRESS" in footer
+    assert "BUSINESS_ADDRESS" in page
+    assert "BUSINESS_ADDRESS" in privacy
+    assert "does not show a physical or registered business address" not in privacy
+    assert "outstanding with the owner" not in privacy
+    assert "P.O. Box" not in footer + page + privacy
+    assert "PO Box" not in footer + page + privacy
+
+
+def test_no_false_dpc_registration_or_certificate_page_is_published():
+    privacy = _text(APP / "privacy-policy" / "page.tsx")
+    assert "makes no claim that BloomCore is" in privacy
+    assert "DPC-registered" in privacy
+    assert "application is pending" not in privacy
+    assert "registration number is" not in privacy
+    for path in APP.rglob("page.tsx"):
+        text = _text(path)
+        assert "DPC Registration Certificate" not in text, path
+        assert "Data Protection Commission Registration" not in text, path
+    sitemap = _text(APP / "sitemap.ts")
+    assert "dpc" not in sitemap.lower()
+    assert "certificate" not in sitemap.lower()
+    assert (APP / "privacy-policy" / "page.tsx").exists()
+    assert (APP / "data-retention" / "page.tsx").exists()
+
+
+def test_refund_policy_preserves_statutory_rights_for_consumed_credits():
+    page = _text(APP / "refunds-cancellation" / "page.tsx")
+    assert "not normally refunded" in page
+    assert "remains subject to any statutory cancellation" in page
+    assert "does not currently present a separate immediate-start" in page
+    assert "not a waiver" in page or "not treated here as a waiver" in page
+    assert "not presented as legally approved" not in page
+    # The page may say it is not legal advice, but must not claim legal approval.
+    assert "legally approved" not in page.lower()
+
+
+def test_data_retention_uses_statutory_frameworks_without_overgeneralising():
+    page = _text(APP / "data-retention" / "page.tsx")
+    assert "section 24" in page and "Act 843" in page
+    assert "section 27" in page and "Act 915" in page
+    assert "Section 8" in page and "Electronic Transactions Act, 2008" in page
+    assert "six years" in page
+    assert "not a general justification" in page
+    assert "Categories with no scheduled expiry" in page
+    assert "No scheduled automatic 30-day purge is implemented" in page
+    assert "7 years" not in page
+    assert "2 years" not in page
+
+
+def test_terms_include_section_47_supplier_disclosures():
+    page = _text(APP / "terms" / "page.tsx")
+    assert "section 47 of the Electronic Transactions Act" in page
+    assert "BUSINESS_ADDRESS" in page
+    assert "Self-regulatory or related-body membership" in page
+    assert "membership is claimed" in page
+    assert "No code of conduct is" in page
+    assert "Minimum duration" in page
+    assert "Consumer rights" in page
+    assert "SITE_URL" in page
+    assert "P.O. Box" not in page
+
+
+def test_sitemap_contains_only_public_routes():
+    sitemap = _text(APP / "sitemap.ts")
+    for private in ("/dashboard", "/upgrade", "/login", "/signup", "/platform-admin", "/school-admin", "/payments"):
+        assert f"'{private}'" not in sitemap, private
+    for public in ("/privacy-policy", "/terms", "/refunds-cancellation", "/data-retention", "/license-subscription", "/cookie-policy"):
+        assert f"'{public}'" in sitemap, public

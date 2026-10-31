@@ -1,8 +1,9 @@
 import { LegalPageLayout, LegalSection } from '@/components/legal-page-layout'
 import { pageMetadata } from '@/lib/site-url'
 import {
-  BUSINESS_NAME, CONTACT_EMAIL, CONTACT_PHONE_LOCAL, CONTACT_PHONE_LOCAL_2,
-  contactMailtoUrl, contactTelUrl, contactTelUrl2, whatsappUrl,
+  BUSINESS_ADDRESS, BUSINESS_NAME, CONTACT_EMAIL, CONTACT_PHONE_LOCAL,
+  CONTACT_PHONE_LOCAL_2, contactMailtoUrl, contactTelUrl, contactTelUrl2,
+  whatsappUrl,
 } from '@/lib/contact'
 
 export const metadata = pageMetadata({
@@ -33,6 +34,19 @@ export default function ContactPage() {
             {CONTACT_EMAIL}
           </a>
         </p>
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Business address
+          </p>
+          <address className="mt-1 not-italic text-sm leading-relaxed text-brand-navy" data-business-address>
+            {BUSINESS_NAME}<br />
+            {BUSINESS_ADDRESS}
+          </address>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Registered business name, BN428031125, registered 7 November 2025
+            under the Registration of Business Names Act, 1962 (No. 151).
+          </p>
+        </div>
       </LegalSection>
 
       <LegalSection title="2. Call or WhatsApp">

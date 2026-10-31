@@ -1,6 +1,11 @@
 import { LegalPageLayout, LegalSection } from '@/components/legal-page-layout'
 import { pageMetadata } from '@/lib/site-url'
-import { BUSINESS_NAME, CONTACT_EMAIL, contactMailtoUrl } from '@/lib/contact'
+import { SITE_URL } from '@/lib/site-url'
+import {
+  BUSINESS_ADDRESS, BUSINESS_NAME, BUSINESS_REGISTRATION_DATE,
+  BUSINESS_REGISTRATION_NUMBER, CONTACT_EMAIL, CONTACT_PHONE_LOCAL,
+  CONTACT_PHONE_LOCAL_2, contactMailtoUrl, contactTelUrl, contactTelUrl2,
+} from '@/lib/contact'
 
 export const metadata = pageMetadata({
   title: 'Terms of Service',
@@ -216,7 +221,85 @@ export default function TermsPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="21. Contact and disputes">
+      <LegalSection title="21. Supplier information and electronic-commerce disclosures">
+        <p>
+          This section provides the supplier information required for electronic
+          transactions under section 47 of the Electronic Transactions Act,
+          2008 (Act 772).
+        </p>
+        <ul className="list-disc space-y-1 pl-6">
+          <li>
+            <strong>Supplier:</strong> {BUSINESS_NAME}, a Ghana-registered
+            business name operating as a sole proprietorship. Business
+            Registration No. {BUSINESS_REGISTRATION_NUMBER}, registered{' '}
+            {BUSINESS_REGISTRATION_DATE} under the Registration of Business
+            Names Act, 1962 (No. 151).
+          </li>
+          <li><strong>Physical address:</strong> {BUSINESS_ADDRESS}</li>
+          <li>
+            <strong>Telephone:</strong>{' '}
+            <a href={contactTelUrl()} className="text-brand-cyan underline">{CONTACT_PHONE_LOCAL}</a>
+            {' '}(calls and WhatsApp) or{' '}
+            <a href={contactTelUrl2()} className="text-brand-cyan underline">{CONTACT_PHONE_LOCAL_2}</a>
+            {' '}(calls only).
+          </li>
+          <li>
+            <strong>Email:</strong>{' '}
+            <a href={contactMailtoUrl('SchemeKnit — Supplier Enquiry')} className="text-brand-cyan underline break-all">{CONTACT_EMAIL}</a>
+          </li>
+          <li>
+            <strong>Website:</strong>{' '}
+            <a href={SITE_URL} className="text-brand-cyan underline break-all">{SITE_URL}</a>
+          </li>
+          <li>
+            <strong>Self-regulatory or related-body membership:</strong> no
+            membership is claimed on this website. No code of conduct is
+            currently published or claimed. If either applies in future, this
+            section will be updated before publication.
+          </li>
+          <li>
+            <strong>Service characteristics and prices:</strong> teacher
+            lesson-plan generation, review, saving and export. Current packages,
+            full prices, credits and validity are on the{' '}
+            <a href="/pricing" className="text-brand-cyan underline">Pricing page</a>{' '}
+            and in the{' '}
+            <a href="/license-subscription" className="text-brand-cyan underline">License &amp; Subscription Terms</a>.
+          </li>
+          <li>
+            <strong>Payment methods:</strong> prepaid Bank Transfer or Mobile
+            Money through Paystack. Packages do not renew automatically. A
+            package activates only after verified payment.
+          </li>
+          <li>
+            <strong>Performance and transaction records:</strong> access is
+            provided after verified activation. The signed-in teacher can view
+            credit balance, package state and payment history where available.
+          </li>
+          <li>
+            <strong>Refunds and cancellation:</strong> see the{' '}
+            <a href="/refunds-cancellation" className="text-brand-cyan underline">Refund &amp; Cancellation Policy</a>.
+          </li>
+          <li>
+            <strong>Payment security and privacy:</strong> payment credentials
+            are handled by Paystack; SchemeKnit does not store full card details
+            or Mobile Money PINs. See the{' '}
+            <a href="/privacy-policy" className="text-brand-cyan underline">Privacy Policy</a>{' '}
+            and <a href="/cookie-policy" className="text-brand-cyan underline">Cookie Policy</a>.
+          </li>
+          <li>
+            <strong>Minimum duration:</strong> there is no recurring or
+            open-ended commitment. Individual paid packages are one-time
+            purchases; time-limited credits expire at the stated validity.
+          </li>
+          <li>
+            <strong>Consumer rights:</strong> nothing in these Terms excludes a
+            right under the Electronic Transactions Act, 2008 (Act 772), the
+            Data Protection Act, 2012 (Act 843) or other mandatory Ghanaian law.
+          </li>
+        </ul>
+      </LegalSection>
+
+      <LegalSection title="22. Contact and disputes">
         <p>
           Contact {BUSINESS_NAME} at{' '}
           <a href={contactMailtoUrl('SchemeKnit — Terms Enquiry')} className="text-brand-cyan underline break-all">

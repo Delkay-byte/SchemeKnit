@@ -1,8 +1,8 @@
 import { LegalPageLayout, LegalSection } from '@/components/legal-page-layout'
 import { pageMetadata } from '@/lib/site-url'
 import {
-  BUSINESS_NAME, BUSINESS_REGISTRATION_DATE, BUSINESS_REGISTRATION_NUMBER,
-  CONTACT_EMAIL, contactMailtoUrl,
+  BUSINESS_ADDRESS, BUSINESS_NAME, BUSINESS_REGISTRATION_DATE,
+  BUSINESS_REGISTRATION_NUMBER, CONTACT_EMAIL, contactMailtoUrl,
 } from '@/lib/contact'
 
 export const metadata = pageMetadata({
@@ -27,18 +27,15 @@ export default function PrivacyPolicyPage() {
           the data controller for the personal data described in this policy.
         </p>
         <p>
-          The business-name certificate supplied to SchemeKnit does not show a
-          physical or registered business address. Where an address is
-          required for a legal or privacy disclosure, that detail is
-          outstanding with the owner and will be published when confirmed. We
-          do not publish an invented address.
+          Business address: {BUSINESS_ADDRESS}
         </p>
         <p>
-          BloomCore Technologies has not claimed registration with Ghana&apos;s
-          Data Protection Commission in this policy. Business-name
-          registration and Data Protection Commission registration are
-          separate matters. If registration is completed, this policy will be
-          updated with the verified details.
+          BloomCore Technologies has not supplied a confirmed Ghana Data
+          Protection Commission registration number or certificate for
+          publication. This policy therefore makes no claim that BloomCore is
+          DPC-registered. Business-name registration and Data Protection
+          Commission registration are separate matters. BloomCore will update
+          this policy if a verified registration is completed.
         </p>
       </LegalSection>
 

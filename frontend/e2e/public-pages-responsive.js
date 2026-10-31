@@ -41,6 +41,16 @@ function log(ok, label, detail = '') {
       const whatsapps = await page.locator('a[href*="wa.me"]').evaluateAll((els) => els.map((e) => e.getAttribute('href')))
       log(whatsapps.length > 0 && whatsapps.every((href) => href.includes('233240064668')), `${label}: WhatsApp only on 024`, whatsapps.join(','))
       log(whatsapps.every((href) => !href.includes('0553976334')), `${label}: no WhatsApp for 055`)
+      const contactText = await page.locator('body').innerText()
+      log(contactText.includes('L7 Olive St., Akast Road, Akatsi, Volta Region, Ghana.'), `${label}: contact address`)
+      log(!contactText.includes('P.O. Box') && !contactText.includes('PO Box'), `${label}: no P.O. Box placeholder`)
+
+      await page.goto(BASE + '/privacy-policy', { waitUntil: 'domcontentloaded' })
+      const privacyText = await page.locator('body').innerText()
+      log(privacyText.includes('L7 Olive St., Akast Road, Akatsi, Volta Region, Ghana.'), `${label}: privacy address`)
+      log(privacyText.includes('makes no claim that BloomCore is'), `${label}: no false DPC claim`)
+      const dpc = await page.goto(BASE + '/dpc-registration', { waitUntil: 'domcontentloaded' })
+      log(dpc && dpc.status() === 404, `${label}: no DPC certificate page`)
 
       await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' })
       const footer = page.locator('[data-registered-business]').first()
@@ -49,6 +59,7 @@ function log(ok, label, detail = '') {
       log(footerText.includes('BloomCore Technologies'), `${label}: business name`)
       log(footerText.includes('BN428031125'), `${label}: registration number`)
       log(footerText.includes('7 November 2025'), `${label}: registration date`)
+      log(footerText.includes('L7 Olive St., Akast Road, Akatsi, Volta Region, Ghana.'), `${label}: footer address`)
       log(!footerText.includes('P0066415551'), `${label}: TIN absent`)
       await context.close()
     }
