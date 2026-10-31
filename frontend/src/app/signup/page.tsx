@@ -10,6 +10,7 @@ import { api } from '@/lib/api'
 import { PasswordInput, PasswordMatchIndicator } from '@/components/password-input'
 import { AuthShell } from '@/components/auth/auth-shell'
 import { AuthField, AuthError } from '@/components/auth/auth-field'
+import { TurnstileWidget, TURNSTILE_SITE_KEY } from '@/components/turnstile-widget'
 import { validateEmail, validatePassword, PASSWORD_POLICY } from '@/lib/password-policy'
 
 export default function IndividualSignupPage() {
@@ -23,6 +24,8 @@ export default function IndividualSignupPage() {
   const [loading, setLoading] = useState(false)
   const [referralCode, setReferralCode] = useState('')
   const [inviteCode, setInviteCode] = useState('')
+  const [turnstileToken, setTurnstileToken] = useState('')
+  const [turnstileReset, setTurnstileReset] = useState(0)
   // Set only on an invite-only pilot deployment. The code is checked again
   // server-side; this flag only controls whether the field is shown.
   const inviteRequired = process.env.NEXT_PUBLIC_PILOT_INVITE_REQUIRED === 'true'
@@ -67,6 +70,10 @@ export default function IndividualSignupPage() {
       setError('Enter the pilot invite code from your invitation.')
       return
     }
+    if (TURNSTILE_SITE_KEY && !turnstileToken) {
+      setError('Please complete the bot-verification challenge first.')
+      return
+    }
 
     setError('')
     setLoading(true)
@@ -78,6 +85,7 @@ export default function IndividualSignupPage() {
         fullName.trim(),
         referralCode,
         inviteRequired ? inviteCode.trim() : '',
+        turnstileToken,
       )
       if (res.access_token) {
         await login(email, password, 'teacher')
@@ -85,6 +93,9 @@ export default function IndividualSignupPage() {
       router.push('/dashboard')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed')
+      // A token is single-use: a failed attempt must request a fresh one.
+      setTurnstileToken('')
+      setTurnstileReset((value) => value + 1)
     } finally {
       setLoading(false)
     }
@@ -199,11 +210,18 @@ export default function IndividualSignupPage() {
           />
         </AuthField>
 
+        <TurnstileWidget
+          siteKey={TURNSTILE_SITE_KEY}
+          action="register"
+          onToken={setTurnstileToken}
+          resetKey={turnstileReset}
+        />
+
         <AuthError message={error} />
 
         <Button
           type="submit"
-          disabled={loading}
+          disabled={loading || Boolean(TURNSTILE_SITE_KEY && !turnstileToken)}
           className="h-11 w-full rounded-lg bg-[#102A43] text-white font-semibold shadow-[0_4px_14px_rgba(16,42,67,0.25)] hover:bg-[#0d2740] active:scale-[0.98] transition focus-visible:ring-2 focus-visible:ring-[#04A9CE] focus-visible:ring-offset-2 disabled:opacity-60"
         >
           {loading ? (

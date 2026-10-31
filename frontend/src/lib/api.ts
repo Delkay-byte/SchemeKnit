@@ -108,6 +108,7 @@ class ApiService {
     entry: 'teacher' | 'school_admin' | 'platform_admin',
     mfaCode?: string,
     recoveryCode?: string,
+    turnstileToken?: string,
   ): Promise<any> {
     return this.request('/api/auth/login', {
       method: 'POST',
@@ -115,6 +116,7 @@ class ApiService {
         email, password, entry,
         ...(mfaCode ? { mfa_code: mfaCode } : {}),
         ...(recoveryCode ? { recovery_code: recoveryCode } : {}),
+        ...(turnstileToken ? { turnstile_token: turnstileToken } : {}),
       }),
     })
   }
@@ -146,7 +148,7 @@ class ApiService {
     })
   }
 
-  async registerIndividual(email: string, password: string, fullName: string, referralCode?: string, inviteCode?: string): Promise<any> {
+  async registerIndividual(email: string, password: string, fullName: string, referralCode?: string, inviteCode?: string, turnstileToken?: string): Promise<any> {
     return this.request('/api/auth/register/individual', {
       method: 'POST',
       body: JSON.stringify({
@@ -155,6 +157,7 @@ class ApiService {
         full_name: fullName,
         referral_code: referralCode || '',
         invite_code: inviteCode || '',
+        turnstile_token: turnstileToken || '',
       }),
     })
   }
@@ -329,10 +332,14 @@ class ApiService {
     return this.request(`/api/auth/reset-token/validate?${params.toString()}`)
   }
 
-  async confirmPasswordReset(token: string, newPassword: string): Promise<{ message: string }> {
+  async confirmPasswordReset(token: string, newPassword: string, turnstileToken?: string): Promise<{ message: string }> {
     return this.request('/api/auth/confirm-password-reset', {
       method: 'POST',
-      body: JSON.stringify({ reset_token: token, new_password: newPassword }),
+      body: JSON.stringify({
+        reset_token: token,
+        new_password: newPassword,
+        turnstile_token: turnstileToken || '',
+      }),
     })
   }
 

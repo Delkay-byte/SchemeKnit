@@ -97,6 +97,26 @@ def _get_or_create(db: Session, key: str) -> LoginFailureDB:
         return row
 
 
+def recent_failure_count(db: Session, identifier: str,
+                         now: Optional[datetime] = None) -> int:
+    """Failures inside the current rolling window (0 when none/expired).
+
+    Used only to decide whether a login needs a Turnstile challenge. The
+    progressive cooldown remains the primary lockout control.
+    """
+    now = now or _now()
+    row = (
+        db.query(LoginFailureDB)
+        .filter(LoginFailureDB.account_key == account_key(identifier))
+        .first()
+    )
+    if row is None or row.window_started_at is None:
+        return 0
+    if now - row.window_started_at >= timedelta(minutes=_window_minutes()):
+        return 0
+    return int(row.failed_count or 0)
+
+
 def check_lockout(db: Session, identifier: str,
                   now: Optional[datetime] = None) -> int:
     """Return remaining cooldown seconds, or 0 when not locked."""

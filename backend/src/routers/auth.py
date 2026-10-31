@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 import hashlib
 import secrets
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from typing import Optional
@@ -28,9 +28,12 @@ from ..auth import (
 )
 from ..service import data_service
 from ..config import get_settings
+from ..security import client_ip
 from ..login_security import (
-    account_key, check_lockout, clear_failures, record_failure,
+    account_key, check_lockout, clear_failures, recent_failure_count,
+    record_failure,
 )
+from ..turnstile import require_turnstile
 from ..mfa import (
     generate_recovery_codes, generate_secret, hash_recovery_codes,
     provisioning_uri, verify_recovery_code, verify_totp,
@@ -140,6 +143,9 @@ class LoginRequest(BaseModel):
     password: str
     mfa_code: Optional[str] = None
     recovery_code: Optional[str] = None
+    #: Turnstile token, sent only when the backend has requested a challenge
+    #: (after repeated failures). Empty on a normal first login.
+    turnstile_token: str = ""
     #: The login entry point the client is using. The backend validates it
     #: against the user's authoritative database role, so a platform admin
     #: cannot obtain a session through the teacher entry (and vice versa).
@@ -568,7 +574,8 @@ def _dummy_password_check(password: str) -> None:
 
 
 @router.post("/login")
-async def login(req: LoginRequest, db: Session = Depends(get_db)):
+async def login(req: LoginRequest, request: Request,
+                db: Session = Depends(get_db)):
     # The email is the login identifier and is compared normalized, so casing
     # at the keyboard never changes which account is matched.
     lookup = normalize_email(req.email) or req.email
@@ -586,6 +593,19 @@ async def login(req: LoginRequest, db: Session = Depends(get_db)):
                 "Too many sign-in attempts. Please wait before trying again."
             ),
             headers={"Retry-After": str(retry_after)},
+        )
+
+    # Risk-based bot challenge: normal logins stay frictionless; only an
+    # account with recent failures must complete Turnstile. The token is
+    # action-bound and single-use, so a registration token cannot be replayed
+    # here.
+    settings = get_settings()
+    threshold = int(getattr(
+        settings, "LOGIN_TURNSTILE_AFTER_FAILURES", 3) or 3)
+    if recent_failure_count(db, lookup) >= threshold:
+        require_turnstile(
+            db, req.turnstile_token, action="login",
+            remote_ip=client_ip(request),
         )
 
     user = db.query(User).filter(User.email == lookup).first()
@@ -864,16 +884,24 @@ class IndividualRegisterRequest(BaseModel):
     referral_code: str = ""
     #: Required only when the deployment is in invite-only pilot mode.
     invite_code: str = ""
+    #: Cloudflare Turnstile token. Required when TURNSTILE_ENABLED=true,
+    #: including invite-only deployments.
+    turnstile_token: str = ""
 @router.post("/register/individual")
 async def register_individual_teacher(
     req: IndividualRegisterRequest,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     """Self-registration for individual teachers (no school required).
 
     Creates a teacher account on the Free Teacher plan. School selection is
-    deliberately omitted â€” individual teachers start with school_id = NULL.
+    deliberately omitted — individual teachers start with school_id = NULL.
     """
+    require_turnstile(
+        db, req.turnstile_token, action="register",
+        remote_ip=client_ip(request),
+    )
     settings = get_settings()
     if not _registration_allowed(
         settings.REGISTRATION_MODE,
@@ -1669,11 +1697,14 @@ async def validate_reset_token(
 class ConfirmPasswordResetRequest(BaseModel):
     reset_token: str
     new_password: str
+    #: Cloudflare Turnstile token. Required when TURNSTILE_ENABLED=true.
+    turnstile_token: str = ""
 
 
 @router.post("/confirm-password-reset")
 async def confirm_password_reset(
     req: ConfirmPasswordResetRequest,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     """Complete a password reset with a one-time token + new password.
@@ -1682,6 +1713,10 @@ async def confirm_password_reset(
     (single-use), the password is set, and ALL existing sessions for the
     target user are invalidated via the password-version bump.
     """
+    require_turnstile(
+        db, req.turnstile_token, action="password_reset",
+        remote_ip=client_ip(request),
+    )
     record = _consume_reset_token(db, req.reset_token)
 
     target = db.query(User).filter(User.id == record.user_id).first()

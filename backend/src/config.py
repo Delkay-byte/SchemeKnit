@@ -119,6 +119,24 @@ class Settings(BaseSettings):
     #: REGISTRATION_MODE=invite_only; compared in constant time.
     PILOT_INVITE_CODE: str = ""
 
+    # ── Cloudflare Turnstile bot protection ───────────────────────────────
+    # TURNSTILE_ENABLED=False keeps local/dev builds usable. Production must
+    # set it to True after creating the widget and adding BOTH the secret
+    # (backend only) and the public site key (frontend build).
+    TURNSTILE_ENABLED: bool = False
+    #: Backend-only Siteverify secret. NEVER expose to the browser.
+    TURNSTILE_SECRET_KEY: str = ""
+    #: Public widget site key (also supplied to the frontend build as
+    #: NEXT_PUBLIC_TURNSTILE_SITE_KEY). Kept here only for config validation.
+    TURNSTILE_SITE_KEY: str = ""
+    TURNSTILE_VERIFY_URL: str = (
+        "https://challenges.cloudflare.com/turnstile/v0/siteverify")
+    #: Comma-separated exact hostnames accepted from Siteverify.
+    TURNSTILE_ALLOWED_HOSTNAMES: str = "schemeknit-frontend.onrender.com"
+    TURNSTILE_TIMEOUT_SECONDS: float = 5.0
+    #: Require a login challenge after this many recent failed attempts.
+    LOGIN_TURNSTILE_AFTER_FAILURES: int = 3
+
     # File Storage
     # STORAGE_BACKEND=local (default) or s3 for S3-compatible object storage.
     UPLOAD_DIR: str = "uploads"
@@ -411,6 +429,24 @@ class Settings(BaseSettings):
             raise ValueError("AI concurrency limits must be between 1 and 100")
         return value
 
+    @field_validator("TURNSTILE_TIMEOUT_SECONDS")
+    @classmethod
+    def _validate_turnstile_timeout(cls, value: float) -> float:
+        value = float(value)
+        if not 1.0 <= value <= 15.0:
+            raise ValueError(
+                "TURNSTILE_TIMEOUT_SECONDS must be between 1 and 15 seconds")
+        return value
+
+    @field_validator("LOGIN_TURNSTILE_AFTER_FAILURES")
+    @classmethod
+    def _validate_login_turnstile_threshold(cls, value: int) -> int:
+        value = int(value)
+        if not 1 <= value <= 50:
+            raise ValueError(
+                "LOGIN_TURNSTILE_AFTER_FAILURES must be between 1 and 50")
+        return value
+
     @field_validator("LOGIN_LOCKOUT_STEPS")
     @classmethod
     def _validate_lockout_steps(cls, value: str) -> str:
@@ -527,6 +563,25 @@ class Settings(BaseSettings):
             problems.append(
                 "RATE_LIMIT_BACKEND (production must use 'db', not process memory)"
             )
+
+        # Turnstile is opt-in until the owner creates the widget. When enabled,
+        # both keys and at least one allowed production hostname are required;
+        # a missing secret must never silently degrade to no bot protection.
+        if self.TURNSTILE_ENABLED:
+            if not self.TURNSTILE_SECRET_KEY.strip():
+                problems.append(
+                    "TURNSTILE_SECRET_KEY (required when TURNSTILE_ENABLED=true)"
+                )
+            if not self.TURNSTILE_SITE_KEY.strip():
+                problems.append(
+                    "TURNSTILE_SITE_KEY (required when TURNSTILE_ENABLED=true)"
+                )
+            if not [h for h in self.TURNSTILE_ALLOWED_HOSTNAMES.split(",")
+                    if h.strip()]:
+                problems.append(
+                    "TURNSTILE_ALLOWED_HOSTNAMES (required when "
+                    "TURNSTILE_ENABLED=true)"
+                )
 
         # Invite-only registration must have a code to check against.
         if self.REGISTRATION_MODE == "invite_only" and not self.PILOT_INVITE_CODE.strip():

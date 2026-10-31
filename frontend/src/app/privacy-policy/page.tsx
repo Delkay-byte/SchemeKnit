@@ -79,7 +79,30 @@ export default function PrivacyPolicyPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="5. Data Storage and Security">
+      <LegalSection title="5. Bot Protection and Cloudflare Turnstile">
+        <p>
+          To protect registration, sign-in and password-reset forms from
+          automated abuse, we use Cloudflare Turnstile. When a challenge is
+          shown, Cloudflare processes technical signals from your browser,
+          your IP address and the result of the challenge to decide whether
+          the request appears to come from a person. Cloudflare acts as a
+          service provider for this purpose and may process data outside your
+          country. The Turnstile token is verified on our server and is not
+          used for advertising or profiling. See Cloudflare&apos;s privacy
+          policy at{' '}
+          <a
+            href="https://www.cloudflare.com/privacypolicy/"
+            className="text-brand-cyan underline"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            cloudflare.com/privacypolicy
+          </a>
+          .
+        </p>
+      </LegalSection>
+
+      <LegalSection title="6. Data Storage and Security">
         <p>
           Your data is stored in a managed PostgreSQL database and, for
           uploaded and generated files, in access-controlled object storage.
@@ -89,7 +112,7 @@ export default function PrivacyPolicyPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="6. Your Rights">
+      <LegalSection title="7. Your Rights">
         <ul className="list-disc space-y-1 pl-6">
           <li>You may access and export your generated lesson plans at any time.</li>
           <li>You may delete your uploaded schemes and generated lessons.</li>
@@ -98,14 +121,14 @@ export default function PrivacyPolicyPage() {
         </ul>
       </LegalSection>
 
-      <LegalSection title="7. Data Retention">
+      <LegalSection title="8. Data Retention">
         <p>
           Please see our <a href="/data-retention" className="text-brand-cyan underline">Data Retention Policy</a> for
           how long different types of data are kept.
         </p>
       </LegalSection>
 
-      <LegalSection title="8. Contact">
+      <LegalSection title="9. Contact">
         <p>
           For privacy questions, please contact us through our{' '}
           <a href="/contact" className="text-brand-cyan underline">Contact page</a>.

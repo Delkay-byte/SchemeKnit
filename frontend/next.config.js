@@ -21,12 +21,12 @@ const nextConfig = {
     const csp = [
       "default-src 'self'",
       // Next.js injects inline bootstrap scripts; dynamic code execution is not allowed.
-      "script-src 'self' 'unsafe-inline'",
+      "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
-      "connect-src 'self' https://schemeknit-api.onrender.com https://api.paystack.co https://checkout.paystack.com",
-      "frame-src 'self' https://checkout.paystack.com",
+      "connect-src 'self' https://schemeknit-api.onrender.com https://api.paystack.co https://checkout.paystack.com https://challenges.cloudflare.com",
+      "frame-src 'self' https://checkout.paystack.com https://challenges.cloudflare.com",
       "frame-ancestors 'self'",
       "base-uri 'self'",
       "object-src 'none'",

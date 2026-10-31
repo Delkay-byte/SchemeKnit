@@ -17,7 +17,7 @@ interface User {
 interface AuthContextType {
   user: User | null
   token: string | null
-  login: (email: string, password: string, entry: 'teacher' | 'school_admin' | 'platform_admin', mfaCode?: string, recoveryCode?: string) => Promise<void>
+  login: (email: string, password: string, entry: 'teacher' | 'school_admin' | 'platform_admin', mfaCode?: string, recoveryCode?: string, turnstileToken?: string) => Promise<void>
   logout: () => void
   loading: boolean
 }
@@ -50,8 +50,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     entry: 'teacher' | 'school_admin' | 'platform_admin',
     mfaCode?: string,
     recoveryCode?: string,
+    turnstileToken?: string,
   ) => {
-    const response = await api.login(email, password, entry, mfaCode, recoveryCode)
+    const response = await api.login(email, password, entry, mfaCode, recoveryCode, turnstileToken)
     setToken(response.access_token)
     setUser(response.user)
     sessionStorage.setItem('teachflow_token', response.access_token)

@@ -1426,6 +1426,23 @@ class LoginFailureDB(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class TurnstileTokenDB(Base):
+    """One successfully verified Turnstile token, for single-use replay denial.
+
+    Cloudflare tokens are single-use, but SchemeKnit also records the token
+    digest so a replayed siteverify result cannot authorise a second action.
+    Only a SHA-256 digest is stored; the raw token is never persisted.
+    """
+    __tablename__ = "turnstile_tokens"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    token_hash = Column(String, unique=True, nullable=False, index=True)
+    action = Column(String, nullable=False, default="")
+    hostname = Column(String, nullable=False, default="")
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class RateLimitCounterDB(Base):
     """Shared fixed-window rate-limit counter (SQLite/PostgreSQL)."""
 
