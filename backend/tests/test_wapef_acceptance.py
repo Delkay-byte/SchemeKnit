@@ -586,8 +586,7 @@ class TestJOptionsEndpoint:
 
 class TestKBasicNonRegression:
     def test_basic9_science_end_to_end(self):
-        scheme = _parse(Path(r"C:\Users\SAVIOUR\Documents\DScience\Lesson Plan"
-                             r"\BASIC 9 SCIENCE SCHEME OF LEARNING.docx"))
+        scheme = _parse(Path(__file__).resolve().parent.parent / "real_documents" / "BASIC 9 SCIENCE SCHEME OF LEARNING.docx")
         assert len(scheme.weeks) == 15
         config = _config(template_type="GES-style", class_level="Basic 9")
         cal = CalendarEngine().build_calendar(config, scheme.weeks, [])

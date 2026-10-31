@@ -360,6 +360,8 @@ class TestAuthOwnership:
 class TestProductionReadiness:
     """High-level production readiness checks."""
 
+    @pytest.mark.skipif(os.environ.get("CI") == "true",
+                        reason="CI has no initialized local production DB")
     def test_database_has_required_tables(self):
         from src.database import SessionLocal
         from sqlalchemy import inspect as sa_inspect

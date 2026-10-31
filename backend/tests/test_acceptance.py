@@ -11,6 +11,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.parsers.docx_parser import DOCXParser
+
+
+def _doc(name: str) -> Path:
+    local = Path(r"C:\Users\SAVIOUR\Documents\DScience\Lesson Plan") / name
+    return local if local.is_file() else Path(__file__).resolve().parent.parent / "real_documents" / name
 from src.models import SchemeOfWork, TermConfig, Subject, ClassLevel, AIMode, TemplateType
 from src.engines.generation_pipeline import GenerationPipeline
 from src.engines.docx_export import DOCXExportEngine
@@ -23,7 +28,7 @@ def _run_async(coro):
 
 
 async def _test_science_pipeline():
-    doc_path = Path(r"C:\Users\SAVIOUR\Documents\DScience\Lesson Plan\BASIC 9 SCIENCE SCHEME OF LEARNING.docx")
+    doc_path = _doc("BASIC 9 SCIENCE SCHEME OF LEARNING.docx")
     parser = DOCXParser()
     scheme = await parser.parse(doc_path)
 
@@ -61,7 +66,7 @@ async def _test_science_pipeline():
 
 
 async def _test_math_pipeline():
-    doc_path = Path(r"C:\Users\SAVIOUR\Documents\DScience\Lesson Plan\BASIC 9 MATH SCHEME OF LEARNING.docx")
+    doc_path = _doc("BASIC 9 MATH SCHEME OF LEARNING.docx")
     parser = DOCXParser()
     scheme = await parser.parse(doc_path)
 

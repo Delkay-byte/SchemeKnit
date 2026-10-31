@@ -359,6 +359,8 @@ def test_structured_pdf_contains_assessment_structure(tmp_path):
 def test_legacy_pdf_export_path_still_works(tmp_path):
     """The plain PDF path must keep working (assessment prose unchanged)."""
     from src.engines.pdf_export import PDFExportEngine
+    if not PDFExportEngine.is_available():
+        pytest.skip("No DOCX->PDF converter in this environment")
     lp = _model_with_structure()
     result = PDFExportEngine().export_single(lp, output_path=tmp_path / "p3.pdf")
     raw = open(result, "rb").read()
