@@ -68,13 +68,9 @@ class TestCompleteSaveRoundtrip:
                 "author_publisher": "RT Pub", "page": "5", "notes": "n",
             }],
             "references": ["RT Book"],
-            "essential_questions": ["What if we change the material?"],
             "homework": "Take-home: complete the worksheet.",
             "class_assignment": "In-class: sort the samples in pairs.",
             "home_assignment": "At-home: find three examples at home.",
-            "duration_minutes": 75,
-            "school_name": "RT School",
-            "template_id": "tpl-wapef-approved-plan",
             "remarks": "RT remarks",
             "main_activities": [
                 {"phase": "main_learning", "description": "RT activity",
@@ -116,9 +112,6 @@ class TestCompleteSaveRoundtrip:
             "homework": "Home task persists",
             "class_assignment": "Class task persists",
             "home_assignment": "Evening task persists",
-            "template_id": "tpl-official-ges-nacca-jhs",
-            "duration_minutes": 45,
-            "school_name": "Reload School",
             "keywords": ["persist"],
         }
         with TestClient(_app(db, user, user)) as client:
@@ -132,16 +125,12 @@ class TestCompleteSaveRoundtrip:
             assert row.homework == "Home task persists"
             assert row.class_assignment == "Class task persists"
             assert row.home_assignment == "Evening task persists"
-            assert row.template_id == "tpl-official-ges-nacca-jhs"
-            assert row.duration_minutes == 45
-            assert row.school_name == "Reload School"
             assert list(row.keywords or []) == ["persist"]
         finally:
             fresh.close()
 
-    def test_alias_and_type_coercion_at_save_boundary(self, db):
-        """duration/school aliases land on the canonical columns and a
-        numeric string becomes an int (never text in an int column)."""
+    def test_legacy_school_and_duration_aliases_are_rejected(self, db):
+        """Legacy aliases cannot rewrite protected school/duration fields."""
         from fastapi.testclient import TestClient
         from tests.test_export_download import make_job_with_lessons
 
@@ -149,16 +138,18 @@ class TestCompleteSaveRoundtrip:
         _scheme, job = make_job_with_lessons(db, user, lessons=1)
         from src.database import LessonPlanDB
         lp = db.query(LessonPlanDB).filter_by(job_id=job.id).first()
+        before = (lp.school_name, lp.duration_minutes, lp.class_size)
 
         with TestClient(_app(db, user, user)) as client:
             r = client.put(f"/api/generation/lessons/{lp.id}",
                            json={"duration": "45", "school": "Alias School",
                                  "class_size": "31"})
-            assert r.status_code == 200, r.text
-            got = r.json()
-        assert got["duration_minutes"] == 45
-        assert got["school_name"] == "Alias School"
-        assert got["class_size"] == 31
+            assert r.status_code == 422, r.text
+            assert "duration" in r.text
+            assert "school" in r.text
+            assert "class_size" in r.text
+        db.refresh(lp)
+        assert (lp.school_name, lp.duration_minutes, lp.class_size) == before
 
     def test_assignment_fields_coerce_lists_to_text(self, db):
         """A list sent to a text column stores joined text, never a
@@ -195,10 +186,9 @@ class TestCompleteSaveRoundtrip:
             r = client.put(f"/api/generation/lessons/{lp.id}",
                            json={"id": "hijack", "owner_id": "evil",
                                  "scheme_id": "evil", "job_id": "evil"})
-            assert r.status_code == 200, r.text
-            got = r.json()
-        assert (got["id"], got.get("scheme_id"), got.get("job_id")) == (
-            original[0], original[2], original[3])
+            assert r.status_code == 422, r.text
+            for field in ("id", "owner_id", "scheme_id", "job_id"):
+                assert field in r.text
         db.refresh(lp)
         assert (lp.id, lp.owner_id, lp.scheme_id, lp.job_id) == original
 

@@ -159,13 +159,13 @@ DEFERRED (reserved for paid infrastructure), NOT STARTED.
 
 Full evidence: `docs/security/SCHEMEKNIT-ASVS-5-AND-API-TOP10-GAP-ASSESSMENT.md`.
 
-Assessment result: **84 requirement rows assessed; 41 VERIFIED, 1 IMPLEMENTED BUT UNVERIFIED,
-27 PARTIAL, 11 FAIL, 3 BLOCKED, 1 NOT APPLICABLE.** API Top 10: 2 VERIFIED, 7 PARTIAL,
-1 FAIL. No certification is claimed.
+Assessment result after remediation: **84 requirement rows assessed; 43 VERIFIED,
+1 IMPLEMENTED BUT UNVERIFIED, 27 PARTIAL, 9 FAIL, 3 BLOCKED, 1 NOT APPLICABLE.**
+API Top 10: 3 VERIFIED, 7 PARTIAL, 0 FAIL. No certification is claimed.
 
 | Status | Item | Evidence |
 |---|---|---|
-| FAIL | Field-level authorization / mass assignment | `service.py:611` accepts arbitrary model attributes; local probe changed `school_id` and `subject` |
+| VERIFIED | Field-level authorization / mass assignment | `normalize_lesson_updates` allowlist before mutation; `test_lesson_update_mass_assignment.py` 31 passed; protected fields return 422 |
 | FAIL | Frontend HSTS/CSP baseline | `frontend/next.config.js` has no headers; backend CSP report-only with unsafe directives |
 | PARTIAL | Platform-admin MFA enforcement | TOTP exists; login only challenges when `mfa_enabled` |
 | PARTIAL | Session idle timeout / revoke-all | 24h JWT; no idle timeout or session list |
@@ -178,8 +178,8 @@ Assessment result: **84 requirement rows assessed; 41 VERIFIED, 1 IMPLEMENTED BU
 | VERIFIED | AI prompt-injection corpus | 14 passed |
 | VERIFIED | Paystack test-mode signature/idempotency | 22 + 13 tests passed |
 
-Pre-pilot gate: fix the mass-assignment allowlist, verify proxy CIDRs, require admin MFA and add
-frontend security headers before inviting teachers. The ordered plan and exact tests are in the
+Pre-pilot gate: verify proxy CIDRs, require admin MFA and add frontend security headers before
+inviting teachers. Mass assignment is closed. The ordered plan and exact tests are in the
 assessment, sections 10–11.
 
 ## Open blockers

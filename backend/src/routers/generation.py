@@ -24,7 +24,7 @@ from ..config import get_settings
 from ..database import get_db, SessionLocal
 from ..auth import get_current_user, get_optional_user, require_teacher_workflow
 from ..database import GenerationJobDB, User
-from ..service import data_service
+from ..service import data_service, UnsupportedLessonFieldError
 from ..entitlements import require_ai_entitlement, consume_ai_generation
 from ..models import (
     TermConfig, LessonPlan, Subject, ClassLevel, TemplateType, AIMode,
@@ -2522,7 +2522,13 @@ async def update_lesson_plan(
     user: User = Depends(require_teacher_workflow),
     db=Depends(get_db),
 ):
-    lp = data_service.update_lesson_plan(db, lesson_id, user.id, updates)
+    try:
+        lp = data_service.update_lesson_plan(db, lesson_id, user.id, updates)
+    except UnsupportedLessonFieldError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail="Unsupported lesson field(s): " + ", ".join(exc.fields),
+        )
     if not lp:
         raise HTTPException(status_code=404, detail="Lesson not found")
     log_event("lesson_edited", user_id=user.id, lesson_id=lesson_id)

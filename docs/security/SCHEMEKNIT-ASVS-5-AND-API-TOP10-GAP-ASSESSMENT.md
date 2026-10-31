@@ -15,24 +15,23 @@ payment signature/idempotency controls, structured security logs, and a substant
 test suite.
 
 The application is **not yet ready for an unrestricted public launch or an unsupervised pilot**.
-Five gaps matter most:
+The confirmed lesson mass-assignment vulnerability was remediated on 2026-10-31. Four
+high-priority gaps remain:
 
-1. Lesson updates accept arbitrary model attributes, including `school_id`, `subject` and
-   curriculum fields (object-property authorization / mass assignment).
-2. The real client IP behind Render is unverified; forwarding remains disabled, so all traffic
+1. The real client IP behind Render is unverified; forwarding remains disabled, so all traffic
    may share one rate-limit bucket, while enabling it without correct CIDRs would allow spoofing.
-3. Platform-admin MFA exists but is not required.
-4. The Next.js frontend does not set CSP/HSTS/frame/referrer headers; the backend CSP is
+2. Platform-admin MFA exists but is not required.
+3. The Next.js frontend does not set CSP/HSTS/frame/referrer headers; the backend CSP is
    report-only and permits `unsafe-inline` and `unsafe-eval`.
-5. There is no tested backup/restore or central alert delivery for the free-tier pilot design.
+4. There is no tested backup/restore or central alert delivery for the free-tier pilot design.
 
-No critical vulnerability was confirmed from code review and local tests. The highest confirmed
-severity is **HIGH** for mass assignment and for the combined session/header/MFA posture.
+No critical vulnerability was confirmed from code review and local tests. The remaining highest
+severity is **HIGH** for the combined session/header/MFA posture.
 
 **Technical-readiness conclusion:** **CONDITIONAL — NOT READY** for public launch. A small,
-invite-only friends-and-family pilot is acceptable only after the high-priority fixes in §10 and
-the pre-pilot tests in §11. Hosting and provider-dependent controls remain BLOCKED until the
-owner verifies them.
+invite-only friends-and-family pilot is acceptable only after the remaining high-priority fixes
+in §10 and the pre-pilot tests in §11. Hosting and provider-dependent controls remain BLOCKED
+until the owner verifies them.
 
 ## 2. Scope and assumptions
 
@@ -133,7 +132,7 @@ are bearer tokens in tab-scoped `sessionStorage`, not cookies.
 | 8.1.1 | Authorization documentation | VERIFIED | `docs/security/AUTHORIZATION-MATRIX.md`; route inventory test. |
 | 8.2.1 | Function-level authorization | VERIFIED | 105 non-public handlers checked; privileged routes require role dependency. |
 | 8.2.2 | Data-specific authorization | PARTIAL | Owner-scoped IDOR tests cover schemes, lessons, jobs, templates; not every ID type/export token. |
-| 8.2.3 | Field-level authorization | FAIL | `update_lesson_plan` accepts any model attribute except a short denylist. |
+| 8.2.3 | Field-level authorization | VERIFIED | `normalize_lesson_updates` enforces an explicit editable allowlist before mutation; protected/unknown fields return 422. `test_lesson_update_mass_assignment.py` 31 passed. |
 | 8.3.1 | Server-side enforcement | VERIFIED | Dependencies and service-layer owner filters; no client-trusted role. |
 | 8.4.1 | Cross-tenant isolation | PARTIAL | Owner scoping is consistent; `school_id` is mutable through lesson updates, weakening tenant metadata. |
 | 9.1.1 | Token signature verification | VERIFIED | PyJWT HS256 decode; tampered/expired tokens rejected. |
@@ -161,7 +160,7 @@ are bearer tokens in tab-scoped `sessionStorage`, not cookies.
 | 15.1.1 | Dependency remediation timeframes | PARTIAL | Remediation report exists; no formal SLA per severity. |
 | 15.1.2 | SBOM/component inventory | FAIL | No SBOM generation in CI. |
 | 15.2.1 | Components within remediation window | VERIFIED | CI runs `pip-audit` and `npm audit --omit=dev --audit-level=high`; recent run green. |
-| 15.3.3 | Mass-assignment controls | FAIL | Lesson update accepts arbitrary model attributes; confirmed locally with `school_id` and `subject`. |
+| 15.3.3 | Mass-assignment controls | VERIFIED | Lesson update rejects every field outside the explicit allowlist before mutation; regression tests cover ownership, school, subject, class, scheme, template and structural fields. |
 | 15.3.4 | Trusted client IP propagation | PARTIAL | `TRUST_PROXY_HEADERS=false`; Render CIDRs unverified. |
 | 15.4.2 | State checks and actions atomic | VERIFIED | Quota update uses guarded SQL; generation uses advisory lock. |
 | 16.1.1 | Logging inventory | PARTIAL | Structured logs exist; no complete log inventory/retention/access document. |
@@ -178,7 +177,7 @@ are bearer tokens in tab-scoped `sessionStorage`, not cookies.
 |---|---|---|
 | API1:2023 Broken Object Level Authorization | PARTIAL | Owner-scoped IDOR tests cover schemes, weeks, lessons, jobs and templates (`test_authorization_idor.py`, 14 passed). Not every export token/download path or all 105 handlers has an A/B negative test. |
 | API2:2023 Broken Authentication | PARTIAL | Strong lockout, bcrypt, JWT expiry/JTI/revocation and password-version checks. Gaps: optional MFA, 24-hour token with no idle timeout, token in `sessionStorage`, no session list/terminate-all. |
-| API3:2023 Broken Object Property Level Authorization | FAIL | `data_service.update_lesson_plan` iterates all submitted keys and calls `setattr` for any model attribute except `id`, `job_id`, `owner_id`, `scheme_id`, `created_at`. Local probe changed `school_id` and `subject`. |
+| API3:2023 Broken Object Property Level Authorization | VERIFIED | `normalize_lesson_updates` rejects unknown/protected fields before mutation; the ordinary lesson save no longer uses a generic `setattr` loop. Tests cover school, ownership, subject/class/scheme relations, template, status and structural fields. |
 | API4:2023 Unrestricted Resource Consumption | PARTIAL | 50 MB upload cap, rate limits, quotas, bounded AI retries and max tokens. No per-user storage quota, no endpoint cost budget, no bot challenge, reads bypass rate limits. |
 | API5:2023 Broken Function Level Authorization | VERIFIED | 105 non-public handlers checked; all declare an auth dependency; platform-admin handlers require `require_platform_admin`. |
 | API6:2023 Unrestricted Access to Sensitive Business Flows | PARTIAL | Registration, generation and credits are bounded; no bot/velocity control on registration, referrals or repeated generation beyond quotas. Payments are disabled. |
@@ -215,8 +214,9 @@ are bearer tokens in tab-scoped `sessionStorage`, not cookies.
 
 | Suite | Result |
 |---|---|
-| Full backend suite (local) | **2934 passed, 21 skipped, 0 failed** |
+| Full backend suite (local, after mass-assignment fix) | **2965 passed, 21 skipped, 0 failed** |
 | Targeted security suites | **177 passed, 0 failed** |
+| Lesson mass-assignment regression | **31 passed** |
 | Auth lifecycle | 42 tests |
 | Logout/revocation | 7 tests |
 | Login lockout | 7 tests |
@@ -243,19 +243,22 @@ The targeted run covered all suites listed above and completed with 177 passed.
 
 ## 7. Critical and high-risk findings
 
-### H1 — Mass assignment in lesson update (HIGH)
+### H1 — Mass assignment in lesson update (HIGH) — REMEDIATED 2026-10-31
 
 - **ID:** API3:2023; ASVS 8.2.3, 15.3.3.
-- **Evidence:** `data_service.update_lesson_plan` (`backend/src/service.py:611-655`) iterates
-  every submitted key and calls `setattr` on any existing model attribute except `id`,
-  `job_id`, `owner_id`, `scheme_id`, `created_at`.
-- **Confirmed locally:** a teacher-owned lesson accepted `{"school_id":"attacker-school",
-  "subject":"Mathematics"}` and persisted both values.
-- **Impact:** a teacher can alter tenant metadata, subject/class curriculum identity and
-  lesson fields the UI never exposes. This does not permit cross-user reads because
-  `get_lesson_plan` is owner-scoped, but it corrupts data integrity, reporting and exports.
-- **Fix:** explicit allowlist per editable field; reject unknown/immutable fields; separate
-  teacher-editable content from provenance/system fields.
+- **Original evidence:** `data_service.update_lesson_plan` iterated every submitted key and
+  called `setattr` on any existing model attribute except a short denylist. A local probe
+  changed `school_id` and `subject`.
+- **Fix:** `backend/src/service.py` now validates the complete payload through
+  `normalize_lesson_updates` before any mutation. `LESSON_EDITABLE_FIELDS` is an explicit
+  teacher-content allowlist; ownership, school, subject/class, scheme/job, template, status,
+  provenance, curriculum indicators and structural fields are rejected with HTTP 422.
+- **Tests:** `backend/tests/test_lesson_update_mass_assignment.py` (31 tests) covers permitted
+  edits, protected fields, unknown fields, no partial mutation, A/B isolation, persistence,
+  reload and DOCX export. Existing save/reload and IDOR suites remain green.
+- **Residual:** other endpoints that accept dictionaries were reviewed; the lesson-review
+  draft path has its own allowlist, and preferences/templates use typed or explicit fields.
+  No second generic model-`setattr` path was found.
 
 ### H2 — Render client-IP and rate-limit topology unverified (HIGH for pilot)
 
@@ -356,7 +359,7 @@ The targeted run covered all suites listed above and completed with 177 passed.
 
 | Order | Action | Addresses | Effort |
 |---|---|---|---|
-| 1 | Replace lesson-update `setattr` loop with an explicit editable-field allowlist; reject immutable/provenance fields | H1, API3, ASVS 8.2.3/15.3.3 | Small |
+| 1 | **DONE** — Replace lesson-update `setattr` loop with an explicit editable-field allowlist; reject immutable/provenance fields | H1, API3, ASVS 8.2.3/15.3.3 | Small |
 | 2 | Verify Render peer/CIDRs; configure `TRUSTED_PROXY_CIDRS`; add forged-XFF and multi-client tests | H2, API4, ASVS 4.1.3 | Medium |
 | 3 | Require MFA for platform admins; add step-up for activation/reset/maintenance | H3, API2, ASVS 6.3.3 | Medium |
 | 4 | Add frontend CSP/HSTS/XFO/referrer/nosniff; remove `unsafe-inline`/`unsafe-eval`; enforce CSP | H4, API8, ASVS 3.4.x | Medium |
@@ -420,9 +423,10 @@ npm run build
 **Status: CONDITIONAL — NOT READY for public launch or unsupervised pilot.**
 
 - The core auth, ownership, upload and payment-test controls are credible and locally tested.
-- The mass-assignment flaw, optional admin MFA, unverified proxy topology, missing frontend
-  headers and 24-hour token are material enough to block an open pilot.
-- A **small, invite-only, owner-supervised pilot** may proceed after H1–H5 are fixed and the
+- The lesson mass-assignment flaw (H1) is fixed and covered by 31 regression tests.
+- Optional admin MFA, unverified proxy topology, missing frontend headers and the 24-hour token
+  remain material enough to block an open pilot.
+- A **small, invite-only, owner-supervised pilot** may proceed after H2–H5 are fixed and the
   §11 must-pass tests are green.
 - Production/staging verification of TLS, proxy CIDRs, backups, alerting, database privileges
   and email remains BLOCKED. Those must be recorded as owner evidence before calling the pilot

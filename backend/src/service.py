@@ -6,7 +6,7 @@ Provides CRUD operations with ownership enforcement.
 """
 
 from datetime import datetime, date, timedelta
-from typing import List, Optional
+from typing import Any, List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
 
@@ -63,6 +63,138 @@ def compute_workflow_state(status: str, has_job: bool, job_completed: bool,
             state = "locked"
         stages.append({"key": key, "state": state})
     return stages
+
+
+# ── Lesson edit boundary ─────────────────────────────────────────────────────
+# The lesson-update API edits teacher-owned content only. Provenance,
+# curriculum identity, ownership and tenant relationships are immutable here;
+# they are set by the upload/generation workflow, never by a save request.
+LESSON_TEXT_FIELDS = frozenset({
+    "lesson_topic", "introduction", "starter_activity", "assessment",
+    "conclusion", "homework", "class_assignment", "home_assignment",
+    "differentiation", "remarks",
+})
+LESSON_TEXT_LIST_FIELDS = frozenset({
+    "keywords", "other_tlrs", "core_competencies", "teaching_learning_resources",
+    "references", "wapef_through_lines",
+})
+LESSON_ACTIVITY_FIELDS = frozenset({
+    "main_activities", "learner_activities", "teacher_activities",
+    "learning_objectives",
+})
+LESSON_EDITABLE_FIELDS = frozenset(
+    LESSON_TEXT_FIELDS
+    | LESSON_TEXT_LIST_FIELDS
+    | LESSON_ACTIVITY_FIELDS
+    | {
+        "structured_references",
+        "wapef_deep_hope", "wapef_storyline", "wapef_gods_story",
+    }
+)
+
+
+class UnsupportedLessonFieldError(ValueError):
+    """A save request tried to write a protected or unknown lesson field."""
+
+    def __init__(self, fields):
+        self.fields = sorted(set(fields))
+        super().__init__(
+            "Unsupported lesson field(s): " + ", ".join(self.fields)
+        )
+
+
+def _clean_activity_items(value: Any) -> Optional[List[Any]]:
+    """Validate and clean one activity/objective list.
+
+    Returns ``None`` when the value is not a list or contains an item that
+    cannot be represented safely. The caller then refuses that field instead of
+    storing a partially cleaned list.
+    """
+    if not isinstance(value, list):
+        return None
+    cleaned_items: List[Any] = []
+    for item in value:
+        if isinstance(item, dict):
+            item = dict(item)
+            phase = item.get("phase")
+            if phase is not None and not isinstance(phase, str):
+                return None
+            description = item.get("description")
+            if description is not None and not isinstance(description, str):
+                return None
+            if isinstance(description, str):
+                item["description"] = strip_internal_markers(description)
+            resources = item.get("resources")
+            if resources is not None:
+                if not isinstance(resources, list) or not all(
+                    isinstance(r, str) for r in resources
+                ):
+                    return None
+                item["resources"] = [
+                    strip_internal_markers(r) for r in resources
+                    if strip_internal_markers(r)
+                ]
+            if "duration_minutes" in item and item["duration_minutes"] is not None:
+                try:
+                    item["duration_minutes"] = int(item["duration_minutes"])
+                except (TypeError, ValueError):
+                    return None
+            cleaned_items.append(item)
+        elif isinstance(item, str):
+            cleaned_items.append(strip_internal_markers(item))
+        else:
+            return None
+    return cleaned_items
+
+
+def normalize_lesson_updates(updates: Any) -> dict:
+    """Validate a lesson save payload before any database mutation.
+
+    Unknown/protected keys raise :class:`UnsupportedLessonFieldError` so the API
+    can return 422. Known fields with an invalid shape are omitted (the
+    historical "safely refuse" behavior) rather than partially written.
+    """
+    if not isinstance(updates, dict):
+        raise UnsupportedLessonFieldError({"<payload>"})
+
+    unknown = set(updates) - LESSON_EDITABLE_FIELDS
+    if unknown:
+        raise UnsupportedLessonFieldError(unknown)
+
+    normalized: dict = {}
+    for key, value in updates.items():
+        if key == "structured_references":
+            normalized[key] = normalize_structured_references(value)
+        elif key == "teaching_learning_resources":
+            # A comma is part of a real material description; do not split it.
+            value = normalize_resource_items(value)
+            value = [strip_internal_markers(v) for v in value]
+            normalized[key] = [v for v in value if v]
+        elif key in LESSON_TEXT_LIST_FIELDS:
+            value = normalize_text_items(value)
+            value = [strip_internal_markers(v) for v in value]
+            normalized[key] = [v for v in value if v]
+        elif key in LESSON_TEXT_FIELDS:
+            if value is None:
+                value = ""
+            elif not isinstance(value, str):
+                value = (
+                    "; ".join(str(v).strip() for v in value)
+                    if isinstance(value, (list, tuple))
+                    else str(value)
+                )
+            normalized[key] = strip_internal_markers(value)
+        elif key in LESSON_ACTIVITY_FIELDS:
+            cleaned = _clean_activity_items(value)
+            if cleaned is not None:
+                normalized[key] = cleaned
+        else:
+            # WAPEF scalar selections are canonicalized later by the approved
+            # option list; the value itself must still be a scalar string.
+            if value is not None and not isinstance(value, str):
+                continue
+            normalized[key] = value
+    return normalized
 
 
 class DataService:
@@ -563,6 +695,11 @@ class DataService:
         if not lp:
             return None
 
+        # Validate the complete payload BEFORE any in-memory or database
+        # mutation. Unknown/protected fields raise; malformed known fields are
+        # omitted, never partially written.
+        normalized = normalize_lesson_updates(updates)
+
         if not lp.teacher_edited:
             lp.original_data = {
                 "introduction": lp.introduction,
@@ -575,109 +712,22 @@ class DataService:
                 "learning_objectives": lp.learning_objectives,
             }
 
-        # Shape-coerce list-typed JSON fields at the write boundary: a client
-        # sending a serialized string would otherwise be double-encoded into
-        # the JSON column (the production structured_references corruption
-        # that crashed every export). Anything that cannot canonicalize to a
-        # list of entries is dropped rather than stored.
-        text_list_fields = {
-            "keywords", "other_tlrs", "core_competencies", "source_tlrs",
-            "teaching_learning_resources", "references", "indicators",
-            "indicator_codes", "wapef_through_lines",
-        }
-        activity_list_fields = {
-            "main_activities", "learner_activities", "teacher_activities",
-            "learning_objectives",
-        }
-        # Client field-name aliases accepted at the save boundary so every
-        # teacher-owned field lands on its canonical column. A mismatched
-        # alias would silently drop the write (the historical
-        # duration/school persistence misses).
-        _ALIASES = {
-            "duration": "duration_minutes",
-            "school": "school_name",
-        }
-        if any(k in _ALIASES for k in updates):
-            updates = {_ALIASES.get(k, k): v for k, v in updates.items()}
-
-        # Text columns: coerce at the boundary so a list/None client value can
-        # never be double-encoded into the column.
-        text_fields = {
-            "homework", "class_assignment", "home_assignment",
-            "differentiation", "lesson_topic", "previous_knowledge",
-            "introduction", "assessment", "conclusion", "starter_activity",
-        }
-
-        for key, value in updates.items():
-            if hasattr(lp, key) and key not in ("id", "job_id", "owner_id", "scheme_id", "created_at"):
-                if key == "structured_references":
-                    value = normalize_structured_references(value)
-                elif key == "teaching_learning_resources":
-                    # A comma is part of a real material description; do not
-                    # split it into fragments at the save boundary.
-                    value = normalize_resource_items(value)
-                    value = [strip_internal_markers(v) for v in value]
-                    value = [v for v in value if v]
-                elif key in text_list_fields:
-                    value = normalize_text_items(value)
-                    # PART 21: an internal/harness marker can never persist
-                    # through a list-typed field either.
-                    value = [strip_internal_markers(v) for v in value]
-                    value = [v for v in value if v]
-                elif key in text_fields:
-                    if value is None:
-                        value = ""
-                    elif not isinstance(value, str):
-                        value = "; ".join(str(v).strip() for v in value) if isinstance(value, (list, tuple)) else str(value)
-                    value = strip_internal_markers(value)
-                elif key in ("duration_minutes", "class_size", "lesson_number"):
-                    # Numeric columns: a form sends strings; never store text
-                    # in an integer column (SQLite would accept it and the
-                    # export would then fail on int parsing).
-                    try:
-                        value = int(value)
-                    except (TypeError, ValueError):
-                        continue
-                elif key in activity_list_fields:
-                    if not isinstance(value, list):
-                        continue
-                    # PART 21: activity/objective prose is teacher-visible and
-                    # exported, so internal artefacts are removed here too — a
-                    # placeholder marker can never become a lesson activity.
-                    cleaned_items = []
-                    for item in value:
-                        if isinstance(item, dict):
-                            item = dict(item)
-                            if isinstance(item.get("description"), str):
-                                item["description"] = strip_internal_markers(
-                                    item["description"])
-                            if isinstance(item.get("resources"), list):
-                                item["resources"] = [
-                                    strip_internal_markers(str(r))
-                                    for r in item["resources"]
-                                ]
-                                item["resources"] = [
-                                    r for r in item["resources"] if r
-                                ]
-                        elif isinstance(item, str):
-                            item = strip_internal_markers(item)
-                        cleaned_items.append(item)
-                    value = cleaned_items
-                setattr(lp, key, value)
+        for key, value in normalized.items():
+            setattr(lp, key, value)
 
         # WAPEF teacher-selected fields are normalized through the approved
         # option lists whenever a lesson update touches them: only approved
         # values persist (through the teacher UI they are already validated;
         # this keeps the stored lesson canonical even if a client re-sends).
         from .engines.wapef_fields import normalize_wapef_payload
-        if any(k in updates for k in (
+        if any(k in normalized for k in (
                 "wapef_deep_hope", "wapef_storyline", "wapef_through_lines",
                 "wapef_gods_story")):
             canonical = normalize_wapef_payload({
-                "deep_hope": updates.get("wapef_deep_hope", lp.wapef_deep_hope),
-                "storyline": updates.get("wapef_storyline", lp.wapef_storyline),
-                "through_lines": updates.get("wapef_through_lines", lp.wapef_through_lines),
-                "gods_story": updates.get("wapef_gods_story", lp.wapef_gods_story),
+                "deep_hope": normalized.get("wapef_deep_hope", lp.wapef_deep_hope),
+                "storyline": normalized.get("wapef_storyline", lp.wapef_storyline),
+                "through_lines": normalized.get("wapef_through_lines", lp.wapef_through_lines),
+                "gods_story": normalized.get("wapef_gods_story", lp.wapef_gods_story),
             })
             lp.wapef_deep_hope = canonical["deep_hope"]
             lp.wapef_storyline = canonical["storyline"]
