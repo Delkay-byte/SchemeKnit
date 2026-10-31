@@ -1,0 +1,11 @@
+# Known false positives documented in the security assessment.
+# These are placeholder strings and a test-result UUID, not credentials.
+[allowlist]
+description = "SchemeKnit documentation/test placeholders"
+regexes = [
+  '''sk_(live|test)_placeholder''',
+  '''DEEPSEEK_API_KEY=<owner-supplied secret>''',
+]
+paths = [
+  '''frontend/e2e/curriculum-workspace-acceptance/results.txt''',
+]
