@@ -142,10 +142,16 @@ class ApiService {
     })
   }
 
-  async registerIndividual(email: string, password: string, fullName: string, referralCode?: string): Promise<any> {
+  async registerIndividual(email: string, password: string, fullName: string, referralCode?: string, inviteCode?: string): Promise<any> {
     return this.request('/api/auth/register/individual', {
       method: 'POST',
-      body: JSON.stringify({ email, password, full_name: fullName, referral_code: referralCode || '' }),
+      body: JSON.stringify({
+        email,
+        password,
+        full_name: fullName,
+        referral_code: referralCode || '',
+        invite_code: inviteCode || '',
+      }),
     })
   }
 

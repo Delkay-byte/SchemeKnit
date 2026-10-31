@@ -814,6 +814,25 @@ async def logout(
     return {"ok": True}
 
 
+def _registration_allowed(mode: str, expected_code: str, supplied_code: str) -> bool:
+    """Apply the configured self-registration gate.
+
+    ``open`` preserves the historical behaviour. ``invite_only`` requires a
+    non-empty configured code and a constant-time match. ``closed`` rejects
+    every self-registration attempt; the owner creates accounts instead.
+    """
+    mode = (mode or "open").strip().lower()
+    if mode == "open":
+        return True
+    if mode == "closed":
+        return False
+    expected = (expected_code or "").strip()
+    supplied = (supplied_code or "").strip()
+    if not expected or not supplied:
+        return False
+    return secrets.compare_digest(expected, supplied)
+
+
 class IndividualRegisterRequest(BaseModel):
     email: str
     password: str
@@ -821,6 +840,8 @@ class IndividualRegisterRequest(BaseModel):
     #: Captured from a referral link and submitted with the new account. May
     #: be blank. Attribution happens exactly once, at registration.
     referral_code: str = ""
+    #: Required only when the deployment is in invite-only pilot mode.
+    invite_code: str = ""
 @router.post("/register/individual")
 async def register_individual_teacher(
     req: IndividualRegisterRequest,
@@ -831,6 +852,17 @@ async def register_individual_teacher(
     Creates a teacher account on the Free Teacher plan. School selection is
     deliberately omitted â€” individual teachers start with school_id = NULL.
     """
+    settings = get_settings()
+    if not _registration_allowed(
+        settings.REGISTRATION_MODE,
+        settings.PILOT_INVITE_CODE,
+        req.invite_code,
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="A valid pilot invite code is required to create an account",
+        )
+
     ok, msg = validate_email(req.email)
     if not ok:
         raise HTTPException(status_code=422, detail=msg)

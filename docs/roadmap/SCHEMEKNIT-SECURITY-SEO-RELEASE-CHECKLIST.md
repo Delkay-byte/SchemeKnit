@@ -4,8 +4,8 @@ Master progress ledger. Statuses: NOT STARTED, IN PROGRESS, PARTIAL, BLOCKED, DO
 
 DONE means implemented and locally tested unless explicitly marked staging-verified. Documentation alone is not DONE.
 
-Branch: `hardening/remediation-staging-20261031`  
-HEAD: `8b70d7f`  
+Branch: `chore/zero-cost-pilot-20261031` (based on `hardening/remediation-staging-20261031` at `7f6206b`)
+
 Last updated: 2026-10-31
 
 ## A. Account and login protection
@@ -116,6 +116,71 @@ Last updated: 2026-10-31
 | NOT STARTED | Production merge/deploy | no authorization |
 | DONE | Friends-and-family pilot plan | `FRIENDS-AND-FAMILY-PILOT-PLAN.md` |
 | NOT STARTED | Pilot execution | requires release |
+
+## I. Zero-Cost Hosting and Friends-and-Family Pilot
+
+Statuses here use the pilot vocabulary: DONE (implemented and tested locally), CONFIGURED
+(enabled on an existing free resource and verified), PREPARED (code/configuration exists but is
+intentionally inactive), BLOCKED (account access or resource limits prevent completion),
+DEFERRED (reserved for paid infrastructure), NOT STARTED.
+
+| Status | Item | Evidence |
+|---|---|---|
+| DONE | Existing account and free-tier assessment | `docs/infrastructure/ZERO-COST-INFRASTRUCTURE-ASSESSMENT.md`; GitHub/Render/Cloudflare read-only API checks on 2026-10-31 |
+| DONE | Free-tier suitability and restriction inventory | same assessment, sections B–C; official provider docs linked there |
+| DONE | Zero-cost architecture and fallback design | same assessment, section D |
+| PREPARED | Frontend on a separate Render free pilot service | No pilot service created; exact build/start commands documented |
+| PREPARED | Backend on a separate Render free pilot service | No pilot service created; exact build/start commands documented |
+| PREPARED | Isolated pilot PostgreSQL database | Neon production URL identified; no pilot project created; do not branch production data |
+| NOT STARTED | Durable storage wiring for uploaded originals | Uploads still use ephemeral `~/teachflow_data/uploads`; R2 bucket exists but is only used by `/api/ready` |
+| DONE | AI quota, bounded fallback and output-token guards | `src/ai_quota.py`; `src/engines/zeli_generation.py`; `ZELI_MAX_TOKENS=2000`; quota/fallback tests |
+| PREPARED | Provider spend limit and owner-side usage alerting | DeepSeek balance/spend limit not inspected; no live call made |
+| PREPARED | Manual Paystack webhook recovery workflow | `.github/workflows/pilot-webhook-recovery.yml`; `workflow_dispatch` only; no schedule; no secret configured |
+| BLOCKED | Automatic scheduled recovery | No `PILOT_DATABASE_URL` GitHub secret; scheduled workflows also disable after 60 days of repo inactivity |
+| PREPARED | Monitoring and alert delivery | Structured logs + `/api/health` + `/api/ready` exist; no central alert webhook configured |
+| PREPARED | Backup and restore | `docs/operations/ZERO-COST-BACKUP-AND-RESTORE-RUNBOOK.md`; no pilot snapshot/dump/restore executed |
+| DONE | Invite-only registration gate | `REGISTRATION_MODE` + `PILOT_INVITE_CODE`; `tests/test_pilot_registration_gate.py` 5 passed; default remains `open` |
+| PREPARED | Pilot invite-only deployment | Code exists; Render env not changed; owner must set mode + code + frontend flag |
+| DONE | Teacher upload privacy notice | `upload-privacy-notice.tsx`; upload page placement; exact wording pinned by `tests/test_upload_privacy_notice_source.py` 4 passed |
+| DONE | Browser acceptance for the privacy notice | `frontend/e2e/upload-privacy-notice.js`; 13/13 passed at 1440 and 390 widths against local backend/frontend on 2026-10-31 |
+| NOT STARTED | Pilot deployment | No new Render/Neon pilot resources created |
+| NOT STARTED | Friends-and-family testing | No invitations sent |
+| DEFERRED | Future paid services (Starter instances, Neon Launch, Resend Pro, domain) | Assessment section F |
+
+### Pilot-specific blockers
+
+1. `onboarding@resend.dev` cannot email external teachers; self-service password reset is blocked until a domain is verified or owner-side resets are used.
+2. DeepSeek generation is usage-billed; the account balance and spend limit are unverified.
+3. Render free services sleep, restart and share 750 instance hours across six existing services.
+4. Uploaded originals and local exports are ephemeral; a restart before multi-subject confirmation can require re-upload.
+5. No automatic database backup or restore test exists for the pilot.
+
+## J. ASVS 5.0 and OWASP API Top 10
+
+Full evidence: `docs/security/SCHEMEKNIT-ASVS-5-AND-API-TOP10-GAP-ASSESSMENT.md`.
+
+Assessment result: **84 requirement rows assessed; 41 VERIFIED, 1 IMPLEMENTED BUT UNVERIFIED,
+27 PARTIAL, 11 FAIL, 3 BLOCKED, 1 NOT APPLICABLE.** API Top 10: 2 VERIFIED, 7 PARTIAL,
+1 FAIL. No certification is claimed.
+
+| Status | Item | Evidence |
+|---|---|---|
+| FAIL | Field-level authorization / mass assignment | `service.py:611` accepts arbitrary model attributes; local probe changed `school_id` and `subject` |
+| FAIL | Frontend HSTS/CSP baseline | `frontend/next.config.js` has no headers; backend CSP report-only with unsafe directives |
+| PARTIAL | Platform-admin MFA enforcement | TOTP exists; login only challenges when `mfa_enabled` |
+| PARTIAL | Session idle timeout / revoke-all | 24h JWT; no idle timeout or session list |
+| BLOCKED | Render proxy IP semantics | `TRUST_PROXY_HEADERS=false`; CIDRs unverified |
+| BLOCKED | Backup/restore evidence | Runbook prepared; no restore executed |
+| BLOCKED | Central alert delivery | `SECURITY_ALERT_WEBHOOK_URL` unset |
+| VERIFIED | Function-level authorization inventory | 105 non-public handlers checked, 0 missing |
+| VERIFIED | Auth logout/revocation | `test_logout_revocation.py` 7 passed |
+| VERIFIED | Upload container validation | `test_upload_security.py` 9 passed |
+| VERIFIED | AI prompt-injection corpus | 14 passed |
+| VERIFIED | Paystack test-mode signature/idempotency | 22 + 13 tests passed |
+
+Pre-pilot gate: fix the mass-assignment allowlist, verify proxy CIDRs, require admin MFA and add
+frontend security headers before inviting teachers. The ordered plan and exact tests are in the
+assessment, sections 10–11.
 
 ## Open blockers
 

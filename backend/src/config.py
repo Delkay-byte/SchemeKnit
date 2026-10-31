@@ -103,6 +103,15 @@ class Settings(BaseSettings):
     #: Empty = no central delivery; structured security logs still record.
     SECURITY_ALERT_WEBHOOK_URL: str = ""
 
+    # Registration gate for private pilots. "open" preserves the current
+    # public self-registration flow. "invite_only" requires PILOT_INVITE_CODE;
+    # "closed" rejects self-registration entirely. The owner creates pilot
+    # accounts manually when registration is closed.
+    REGISTRATION_MODE: str = "open"
+    #: Shared pilot code. Never commit a real value. Only used when
+    #: REGISTRATION_MODE=invite_only; compared in constant time.
+    PILOT_INVITE_CODE: str = ""
+
     # File Storage
     # STORAGE_BACKEND=local (default) or s3 for S3-compatible object storage.
     UPLOAD_DIR: str = "uploads"
@@ -339,6 +348,16 @@ class Settings(BaseSettings):
             raise ValueError("LOGIN_LOCKOUT_STEPS must not exceed 60 minutes")
         return ",".join(str(s) for s in steps)
 
+    @field_validator("REGISTRATION_MODE")
+    @classmethod
+    def _validate_registration_mode(cls, value: str) -> str:
+        mode = (value or "open").strip().lower()
+        if mode not in {"open", "invite_only", "closed"}:
+            raise ValueError(
+                "REGISTRATION_MODE must be 'open', 'invite_only' or 'closed'"
+            )
+        return mode
+
     @field_validator("RATE_LIMIT_BACKEND")
     @classmethod
     def _validate_rate_limit_backend(cls, value: str) -> str:
@@ -397,6 +416,12 @@ class Settings(BaseSettings):
                 and not self.DATABASE_URL.startswith("sqlite")):
             problems.append(
                 "RATE_LIMIT_BACKEND (production must use 'db', not process memory)"
+            )
+
+        # Invite-only registration must have a code to check against.
+        if self.REGISTRATION_MODE == "invite_only" and not self.PILOT_INVITE_CODE.strip():
+            problems.append(
+                "PILOT_INVITE_CODE (required when REGISTRATION_MODE=invite_only)"
             )
 
         # Public URLs must not contain localhost in production

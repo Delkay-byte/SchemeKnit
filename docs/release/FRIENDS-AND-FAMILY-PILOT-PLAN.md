@@ -1,7 +1,10 @@
 # Friends-and-Family Pilot Plan
 
 Date: 2026-10-31  
-Status: **NOT STARTED — requires production release**
+Status: **NOT STARTED — zero-cost path assessed; owner provisioning required**
+
+See `docs/infrastructure/ZERO-COST-INFRASTRUCTURE-ASSESSMENT.md` for the free-tier
+architecture, limits and owner-side setup.
 
 ## Goal
 
@@ -20,6 +23,9 @@ period. No public invitation, no live payments.
 - Use Free tier or explicitly granted pilot credits.
 - Do not share accounts.
 - Keep payment disabled.
+- For an invite-only deployment, set backend `REGISTRATION_MODE=invite_only` and
+  `PILOT_INVITE_CODE`, and frontend `NEXT_PUBLIC_PILOT_INVITE_REQUIRED=true`.
+  Never commit the code. Otherwise the owner creates accounts manually.
 
 ## Scenarios
 
@@ -58,5 +64,12 @@ period. No public invitation, no live payments.
 
 - No API keys, logs or other users' data to testers.
 - No live payments.
-- Do not upload sensitive personal documents.
+- Do not upload sensitive personal documents. The upload page now carries the
+  exact owner-approved privacy notice; testers must remove pupil names, grades
+  and other identifiable records before upload.
+- Original upload files are on ephemeral free-host disk. Complete multi-subject
+  confirmation before the service sleeps; parsed curriculum persists in PostgreSQL.
+- External password-reset email is unavailable while `EMAIL_FROM` uses
+  `resend.dev`; reset pilot passwords from the platform-admin surface.
+- Take a manual Neon snapshot/dump before the pilot and weekly.
 - Remove pilot accounts/data after the pilot if required.
