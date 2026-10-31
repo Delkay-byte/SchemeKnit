@@ -27,6 +27,13 @@ from ..auth import (
 )
 from ..service import data_service
 from ..config import get_settings
+from ..login_security import (
+    account_key, check_lockout, clear_failures, record_failure,
+)
+from ..mfa import (
+    generate_recovery_codes, generate_secret, hash_recovery_codes,
+    provisioning_uri, verify_recovery_code, verify_totp,
+)
 from ..logging_config import log_security
 from ..validation import (
     validate_password, validate_email, normalize_email, password_policy_hint,
@@ -130,10 +137,21 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+    mfa_code: Optional[str] = None
+    recovery_code: Optional[str] = None
     #: The login entry point the client is using. The backend validates it
     #: against the user's authoritative database role, so a platform admin
     #: cannot obtain a session through the teacher entry (and vice versa).
     entry: Optional[str] = None
+
+
+class MfaCodeRequest(BaseModel):
+    code: str
+
+
+class MfaDisableRequest(BaseModel):
+    password: str
+    code: str
 
 
 class SetupRequest(BaseModel):
@@ -524,19 +542,69 @@ async def register(req: RegisterRequest, user: User = Depends(require_admin), db
     }
 
 
+_DUMMY_PASSWORD_HASH = None
+
+
+def _dummy_password_check(password: str) -> None:
+    """Perform a bcrypt verification for an unknown identifier.
+
+    Keeps timing closer to a real account check and avoids a trivial
+    account-existence oracle. The result is deliberately ignored.
+    """
+    global _DUMMY_PASSWORD_HASH
+    if _DUMMY_PASSWORD_HASH is None:
+        _DUMMY_PASSWORD_HASH = hash_password("schemeKnit-dummy-password-check")
+    try:
+        verify_password(password, _DUMMY_PASSWORD_HASH)
+    except Exception:
+        pass
+
+
 @router.post("/login")
 async def login(req: LoginRequest, db: Session = Depends(get_db)):
     # The email is the login identifier and is compared normalized, so casing
     # at the keyboard never changes which account is matched.
     lookup = normalize_email(req.email) or req.email
+
+    # Account-level cooldown is checked before password verification. The
+    # counter is keyed opaquely and applies across all source IPs. Unknown
+    # identifiers are tracked too, so the response never reveals existence.
+    retry_after = check_lockout(db, lookup)
+    if retry_after:
+        log_security("login_locked", account=account_key(lookup),
+                     retry_after=retry_after)
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                "Too many sign-in attempts. Please wait before trying again."
+            ),
+            headers={"Retry-After": str(retry_after)},
+        )
+
     user = db.query(User).filter(User.email == lookup).first()
-    if not user or not verify_password(req.password, user.hashed_password):
-        # Security audit: identifier + result only. Never passwords, hashes, tokens.
-        # Same message whether the email exists or not (no enumeration oracle).
-        log_security("login_failed", email=req.email, reason="bad_credentials")
+    password_ok = bool(user) and verify_password(
+        req.password, user.hashed_password)
+    if not user:
+        # Equalise timing for unknown identifiers; never disclose existence.
+        _dummy_password_check(req.password)
+    if not password_ok:
+        cooldown = record_failure(db, lookup)
+        if cooldown:
+            log_security("account_cooldown", account=account_key(lookup),
+                         cooldown_seconds=cooldown)
+            raise HTTPException(
+                status_code=429,
+                detail=(
+                    "Too many sign-in attempts. Please wait before trying again."
+                ),
+                headers={"Retry-After": str(cooldown)},
+            )
+        log_security("login_failed", account=account_key(lookup),
+                     reason="bad_credentials")
         raise HTTPException(status_code=401, detail="Invalid email or password")
     if not user.is_active:
-        log_security("login_failed", email=req.email, reason="disabled")
+        log_security("login_failed", account=account_key(lookup),
+                     reason="disabled")
         raise HTTPException(status_code=403, detail="Account disabled")
 
     # Entry-point boundary: the client says WHICH login it is using; the
@@ -544,15 +612,127 @@ async def login(req: LoginRequest, db: Session = Depends(get_db)):
     # indistinguishable from bad credentials in the response.
     entry = (req.entry or "").strip().lower()
     if entry not in VALID_LOGIN_ENTRIES or not _entry_matches_role(user, entry):
-        log_security("login_failed", email=req.email, reason="entry_mismatch")
+        cooldown = record_failure(db, lookup)
+        if cooldown:
+            log_security("account_cooldown", account=account_key(lookup),
+                         cooldown_seconds=cooldown)
+            raise HTTPException(
+                status_code=429,
+                detail=(
+                    "Too many sign-in attempts. Please wait before trying again."
+                ),
+                headers={"Retry-After": str(cooldown)},
+            )
+        log_security("login_failed", account=account_key(lookup),
+                     reason="entry_mismatch")
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
+    if user.mfa_enabled:
+        matched_step = None
+        recovery_index = None
+        if req.recovery_code:
+            recovery_index = verify_recovery_code(
+                req.recovery_code, user.mfa_recovery_codes or [])
+        elif req.mfa_code:
+            matched_step = verify_totp(user.mfa_secret or "", req.mfa_code)
+            if matched_step is not None and user.mfa_last_step is not None \
+                    and matched_step <= user.mfa_last_step:
+                matched_step = None  # replay of an already-used code
+        if recovery_index is None and matched_step is None:
+            cooldown = record_failure(db, lookup)
+            log_security("mfa_failed", account=account_key(lookup))
+            if cooldown:
+                raise HTTPException(
+                    status_code=429,
+                    detail="Too many sign-in attempts. Please wait before trying again.",
+                    headers={"Retry-After": str(cooldown)},
+                )
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+        if recovery_index is not None:
+            codes = list(user.mfa_recovery_codes or [])
+            codes.pop(recovery_index)
+            user.mfa_recovery_codes = codes
+            log_security("mfa_recovery_used", user_id=user.id)
+        else:
+            user.mfa_last_step = matched_step
+            log_security("mfa_verified", user_id=user.id)
+        db.commit()
+
+    clear_failures(db, lookup)
     token = create_user_token(user)
     return {
         "access_token": token,
         "token_type": "bearer",
         "user": user_response(user),
     }
+
+
+@router.post("/mfa/setup")
+async def mfa_setup(
+    user: User = Depends(require_platform_admin),
+    db: Session = Depends(get_db),
+):
+    """Start TOTP enrollment. Existing admins are not forced to enroll."""
+    if user.mfa_enabled:
+        raise HTTPException(status_code=400, detail="MFA is already enabled")
+    secret = generate_secret()
+    user.mfa_secret = secret
+    user.mfa_enabled = False
+    db.commit()
+    log_security("mfa_setup_started", user_id=user.id)
+    return {
+        "secret": secret,
+        "otpauth_uri": provisioning_uri(secret, user.email),
+        "digits": 6,
+        "period_seconds": 30,
+    }
+
+
+@router.post("/mfa/verify-setup")
+async def mfa_verify_setup(
+    req: MfaCodeRequest,
+    user: User = Depends(require_platform_admin),
+    db: Session = Depends(get_db),
+):
+    if not user.mfa_secret:
+        raise HTTPException(status_code=400, detail="Start MFA setup first")
+    step = verify_totp(user.mfa_secret, req.code)
+    if step is None:
+        log_security("mfa_setup_failed", user_id=user.id)
+        raise HTTPException(status_code=400, detail="Invalid verification code")
+    codes = generate_recovery_codes()
+    user.mfa_recovery_codes = hash_recovery_codes(codes)
+    user.mfa_last_step = step
+    user.mfa_enabled = True
+    db.commit()
+    log_security("mfa_enabled", user_id=user.id)
+    return {"enabled": True, "recovery_codes": codes}
+
+
+@router.post("/mfa/disable")
+async def mfa_disable(
+    req: MfaDisableRequest,
+    user: User = Depends(require_platform_admin),
+    db: Session = Depends(get_db),
+):
+    if not user.mfa_enabled:
+        raise HTTPException(status_code=400, detail="MFA is not enabled")
+    if not verify_password(req.password, user.hashed_password):
+        log_security("mfa_disable_failed", user_id=user.id, reason="password")
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    step = verify_totp(user.mfa_secret or "", req.code)
+    recovery = verify_recovery_code(
+        req.code, user.mfa_recovery_codes or [])
+    if step is None and recovery is None:
+        log_security("mfa_disable_failed", user_id=user.id, reason="code")
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    user.mfa_enabled = False
+    user.mfa_secret = None
+    user.mfa_recovery_codes = []
+    user.mfa_last_step = None
+    db.commit()
+    log_security("mfa_disabled", user_id=user.id)
+    return {"enabled": False}
 
 
 @router.post("/logout")
@@ -1032,6 +1212,7 @@ async def reset_password(user_id: str, req: LoginRequest, admin: User = Depends(
     user.password_changed_at = datetime.utcnow()
     _school_audit(db, admin.id, admin.role, "teacher_password_reset", "user", user.id, {})
     db.commit()
+    clear_failures(db, user.email)
     return {"message": "Password reset successfully"}
 
 
@@ -1122,10 +1303,13 @@ async def setup_platform_admin(req: PlatformAdminBootstrapRequest, db: Session =
         result = db.execute(text("""
             INSERT INTO users (id, email, full_name, hashed_password,
                                is_admin, is_active, role, school_id,
-                               password_changed_at, created_at, updated_at)
+                               password_changed_at, mfa_enabled, mfa_secret,
+                               mfa_recovery_codes, mfa_last_step,
+                               created_at, updated_at)
             SELECT :id, :email, :name, :password,
                    TRUE, TRUE, 'platform_admin', NULL,
-                   :now, :now, :now
+                   :now, FALSE, NULL, NULL, NULL,
+                   :now, :now
             WHERE NOT EXISTS (
                 SELECT 1 FROM users
                 WHERE role = 'platform_admin' AND is_active = TRUE
@@ -1214,6 +1398,7 @@ async def change_password(
 
     _school_audit(db, user.id, user.role, "password_changed", "user", user.id, {})
     db.commit()
+    clear_failures(db, user.email)
 
     # Issue a fresh token stamped with the new password version so the
     # current session remains valid; every OTHER token is now stale.
@@ -1420,6 +1605,7 @@ async def confirm_password_reset(
         {"method": record.method},
     )
     db.commit()
+    clear_failures(db, target.email)
 
     log_security("password_reset_completed", user_id=target.id)
     # No token returned: the user must sign in fresh.

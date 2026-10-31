@@ -6,20 +6,41 @@ import { AuthProvider } from '@/lib/auth-context'
 import { PwaManager } from '@/components/pwa/pwa-manager'
 import { DesktopMenuListener } from '@/components/desktop-menu-listener'
 import { ServiceStatusBanner } from '@/components/ServiceStatusBanner'
+import { SiteStructuredData } from '@/components/site-structured-data'
+import { IS_STAGING, SITE_URL, absoluteUrl } from '@/lib/site-url'
 
 const inter = Inter({ subsets: ['latin'] })
 
 const APP_DESCRIPTION =
-  'Create, manage and export professional lesson plans for your school.'
+  'Turn a Ghanaian Scheme of Learning into editable, curriculum-aligned lesson plans for KG, primary and JHS teachers.'
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: {
-    default: 'SchemeKnit — Lesson Plan Generator',
+    default: 'SchemeKnit — Lesson Plan Generator for Ghanaian Teachers',
     template: '%s | SchemeKnit',
   },
   description: APP_DESCRIPTION,
   manifest: '/manifest.webmanifest',
   applicationName: 'SchemeKnit',
+  alternates: { canonical: absoluteUrl('/') },
+  openGraph: {
+    title: 'SchemeKnit — Lesson Plan Generator for Ghanaian Teachers',
+    description: APP_DESCRIPTION,
+    url: absoluteUrl('/'),
+    siteName: 'SchemeKnit',
+    type: 'website',
+    images: [{ url: absoluteUrl('/icons/icon-512x512.png'), alt: 'SchemeKnit' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'SchemeKnit — Lesson Plan Generator for Ghanaian Teachers',
+    description: APP_DESCRIPTION,
+    images: [absoluteUrl('/icons/icon-512x512.png')],
+  },
+  robots: IS_STAGING
+    ? { index: false, follow: false, nocache: true }
+    : { index: true, follow: true },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
@@ -57,6 +78,7 @@ export default function RootLayout({
         <AuthProvider>
           <DesktopMenuListener />
            {/* v1.0.5.1 */}
+           <SiteStructuredData />
            <ServiceStatusBanner />
            <div className="min-h-screen bg-background">
             {children}

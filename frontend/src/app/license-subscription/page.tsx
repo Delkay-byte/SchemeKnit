@@ -1,10 +1,11 @@
 import { LegalPageLayout, LegalSection } from '@/components/legal-page-layout'
-import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/site-url'
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: 'License & Subscription Terms',
   description: 'Plans, quotas, and licensing terms for SchemeKnit.',
-}
+  path: '/license-subscription',
+})
 
 export default function LicenseSubscriptionPage() {
   return (
@@ -64,9 +65,9 @@ export default function LicenseSubscriptionPage() {
           Purchases are prepaid by Bank Transfer or Mobile Money through
           Paystack. Card checkout is not offered and packages do not renew
           automatically. A package is activated only after Paystack confirms
-          the payment and TeachFlow verifies the reference, amount, currency
+          the payment and SchemeKnit verifies the reference, amount, currency
           and account. Pending, failed or expired payments do not activate a
-          package. TeachFlow never receives or stores your full payment
+          package. SchemeKnit never receives or stores your full payment
           credentials.
         </p>
       </LegalSection>

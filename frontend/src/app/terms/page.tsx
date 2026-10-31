@@ -1,10 +1,11 @@
 import { LegalPageLayout, LegalSection } from '@/components/legal-page-layout'
-import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/site-url'
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: 'Terms of Service',
   description: 'The terms and conditions of using SchemeKnit.',
-}
+  path: '/terms',
+})
 
 export default function TermsPage() {
   return (
@@ -58,7 +59,7 @@ export default function TermsPage() {
           are described on our pricing page. Purchases are prepaid by Bank
           Transfer or Mobile Money through Paystack. Cards are not accepted and
           packages do not renew automatically. A package activates only after
-          Paystack confirms the payment and TeachFlow verifies it. See our{' '}
+          Paystack confirms the payment and SchemeKnit verifies it. See our{' '}
           <a href="/license-subscription" className="text-brand-cyan underline">
             License &amp; Subscription Terms
           </a>{' '}

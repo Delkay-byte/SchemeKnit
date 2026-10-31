@@ -41,23 +41,32 @@ test. No authorized penetration test was performed.
 
 ## Key findings
 
-1. **High — no account lockout.** Any account can receive unlimited password
-   attempts, bounded only by a 20/minute in-memory IP limit that resets on
-   restart and is not shared across workers.
-2. **High — rate limiter is process-local.** The production rate limit can be
-   bypassed by multiple workers/instances and does not survive restart.
-3. **High — no trusted proxy handling.** `request.client.host` may be the proxy
-   address, or forwarding headers are not safely modeled. Real client IP
-   extraction must be designed for Render before per-IP controls are trusted.
-4. **High — no MFA for platform administrators.**
-5. **High — no CI/CD or dependency/secret scanning.**
-6. **High — no staging environment**, so no security control can be qualified
-   against a production-like deployment.
-7. **Medium — no CSP/HSTS.** Baseline headers exist, but CSP and HSTS are not
-   configured.
-8. **Medium — upload validation is not archive-safe.** Size and MIME checks
-   exist; magic bytes, ZIP bomb limits and XML parser hardening need explicit
-   validation.
+1. **RESOLVED locally — account lockout.** Progressive 1/5/15/30/60-minute
+   cooldowns, account-scoped HMAC counters, atomic DB updates, `Retry-After`,
+   reset on success/recovery. `src/login_security.py`, `test_login_lockout.py`.
+2. **RESOLVED locally — distributed rate limiting.** PostgreSQL/SQLite-backed
+   fixed-window counters; production requires `RATE_LIMIT_BACKEND=db`;
+   high-risk endpoints fail closed if the store is unavailable.
+3. **PARTIAL — trusted proxy.** Safe trust interface and forged-header tests
+   exist; Render's actual proxy CIDRs must be verified in staging.
+4. **RESOLVED locally — MFA.** TOTP for platform admins, replay protection,
+   hashed single-use recovery codes, rate-limited failures. API only; no
+   enrollment UI yet.
+5. **RESOLVED locally — upload archive validation.** Magic bytes, DOCX container
+   checks, entry/size/compression limits, macro rejection, XML entity rejection.
+6. **RESOLVED locally — CSP/HSTS controls.** Report-only CSP default, opt-in
+   HSTS. Enforcement/domain verification remains staging work.
+7. **OPEN — dependency risk.** `pip-audit` reports vulnerabilities in
+   `aiohttp`, `requests`, `pytest`, `black`, `ecdsa`; `npm audit` reports a
+   critical Next.js advisory plus high transitive advisories. Upgrading Next is
+   a major-version change and was not forced.
+8. **OPEN — staging.** No isolated staging environment; no security control has
+   been qualified against a production-like deployment.
+9. **PARTIAL — CI.** GitHub Actions workflow added, but it has not run on GitHub
+   yet; dependency audits will fail until the open advisories are resolved or
+   formally accepted.
+10. **OPEN — authorization matrix completeness.** Route-family matrix documented;
+    per-handler negative tests still need expansion.
 
 ## What is not claimed
 

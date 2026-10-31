@@ -18,6 +18,12 @@ from sqlalchemy.pool import StaticPool
 # below enables test mode only for those modules. No live key or live
 # transaction is used. Individual tests can still override these variables.
 
+# Payment tests use mocked test-mode flows; the targeted fixture below enables
+# them. The suite uses the in-memory limiter because middleware cannot use the
+# per-test DB override; production defaults to the shared DB limiter and a
+# dedicated test exercises that implementation directly.
+os.environ.setdefault("RATE_LIMIT_BACKEND", "memory")
+
 # Ensure backend src is importable
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 

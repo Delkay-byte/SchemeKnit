@@ -9,6 +9,8 @@ Centralized, dependency-free hardening helpers:
 Documented limits live here; operational tuning via environment (see .env.example).
 """
 
+import ipaddress
+import logging
 import os
 import re
 import time
@@ -18,6 +20,11 @@ from typing import Dict, List, Tuple
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
+
+from .config import get_settings
+from .database import RateLimitCounterDB, SessionLocal, generate_id
+
+logger = logging.getLogger("security")
 
 
 # ── Filename / path safety ────────────────────────────────────────────────────
@@ -144,6 +151,124 @@ class RateLimiter:
 rate_limiter = RateLimiter()
 
 
+class DbRateLimiter:
+    """Fixed-window limiter backed by the shared application database."""
+
+    _cleanup_after = 200
+    _calls = 0
+
+    def __init__(self, session_factory=None):
+        self._session_factory = session_factory or SessionLocal
+
+    def _allowed_for_rule(self, db, key: str, prefix: str, maximum: int,
+                          window: int, now: float) -> Tuple[bool, dict]:
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+        from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+
+        table = RateLimitCounterDB.__table__
+        window_start = int(now // window) * window
+        bucket_key = f"{key}|{prefix}"
+        values = {
+            "id": generate_id(), "bucket_key": bucket_key,
+            "window_start": window_start, "count": 1,
+        }
+        dialect = db.get_bind().dialect.name if db.get_bind() is not None else "sqlite"
+        make = pg_insert if dialect == "postgresql" else sqlite_insert
+        stmt = make(table).values(**values).on_conflict_do_update(
+            index_elements=["bucket_key", "window_start"],
+            set_={"count": table.c.count + 1},
+        ).returning(table.c.count)
+        count = int(db.execute(stmt).scalar() or 0)
+        db.commit()
+        reset = max(1, window_start + window - int(now))
+        if count > maximum:
+            return False, {"limit": maximum, "remaining": 0, "reset": reset}
+        return True, {
+            "limit": maximum, "remaining": max(maximum - count, 0),
+            "reset": reset,
+        }
+
+    def is_allowed(self, key: str, path: str, now: float = None) -> Tuple[bool, dict]:
+        now = now if now is not None else time.time()
+        rules = rate_limiter._rules_for(path)
+        if not rules:
+            return True, {}
+        db = self._session_factory()
+        try:
+            allowed, info = True, {}
+            for prefix, maximum, window in rules:
+                ok, rule_info = self._allowed_for_rule(
+                    db, key, prefix, maximum, window, now)
+                if not ok:
+                    return False, rule_info
+                if allowed:
+                    info = rule_info
+            self._calls += 1
+            if self._calls % self._cleanup_after == 0:
+                cutoff = int(now) - 86400
+                db.query(RateLimitCounterDB).filter(
+                    RateLimitCounterDB.window_start < cutoff
+                ).delete(synchronize_session=False)
+                db.commit()
+            return allowed, info
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
+
+def _trusted_proxy(host: str) -> bool:
+    settings = get_settings()
+    if not settings.TRUST_PROXY_HEADERS:
+        return False
+    raw = (settings.TRUSTED_PROXY_CIDRS or "").strip()
+    if not raw:
+        return False
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    for part in raw.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            if address in ipaddress.ip_network(part, strict=False):
+                return True
+        except ValueError:
+            continue
+    return False
+
+
+def client_ip(request: Request) -> str:
+    """Return the rate-limit key for the request's client address.
+
+    Forwarding headers are trusted ONLY when the direct peer is inside the
+    configured trusted-proxy CIDRs. Otherwise a forged X-Forwarded-For is
+    ignored and the direct socket address is used. When enabled, the first
+    address in X-Forwarded-For is treated as the original client; this must be
+    verified against the actual Render proxy topology before enabling.
+    """
+    direct = request.client.host if request.client else "unknown"
+    if not _trusted_proxy(direct):
+        return direct
+    forwarded = request.headers.get("x-forwarded-for", "")
+    first = forwarded.split(",")[0].strip() if forwarded else ""
+    return first or direct
+
+
+def get_rate_limiter():
+    backend = (getattr(get_settings(), "RATE_LIMIT_BACKEND", "db") or "db").lower()
+    return DbRateLimiter() if backend == "db" else rate_limiter
+
+
+_HIGH_RISK_PREFIXES = (
+    "/api/auth/", "/api/documents/", "/api/templates/",
+    "/api/generation/", "/api/paystack/",
+)
+
+
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """429 JSON on exceeded sensitive-route budgets.
 
@@ -157,10 +282,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if request.method in SAFE_METHODS:
             return await call_next(request)
         try:
+            limiter = get_rate_limiter()
             if rate_limiter._rules_for(path):
-                client = request.client.host if request.client else "unknown"
+                client = client_ip(request)
                 if client not in RATE_LIMIT_EXEMPT_IPS:
-                    allowed, info = rate_limiter.is_allowed(client, path)
+                    allowed, info = limiter.is_allowed(client, path)
                     if not allowed:
                         return JSONResponse(
                             status_code=429,
@@ -169,24 +295,60 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                                      "status_code": 429},
                             headers={"Retry-After": str(max(info.get("reset", 60), 1))},
                         )
-        except Exception:
-            # Limiter must fail open: never break legitimate traffic.
-            pass
+        except Exception as exc:
+            # Never silently make a high-risk endpoint unrestricted when the
+            # shared limiter store is down. Low-risk routes keep working and
+            # the failure is logged for operations.
+            logger.error("rate_limit_store_unavailable path=%s error=%s",
+                         path, type(exc).__name__)
+            if path.startswith(_HIGH_RISK_PREFIXES):
+                return JSONResponse(
+                    status_code=503,
+                    content={
+                        "error": True,
+                        "detail": "Security controls are temporarily unavailable. "
+                                  "Please try again shortly.",
+                        "status_code": 503,
+                    },
+                    headers={"Retry-After": "30"},
+                )
         return await call_next(request)
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Baseline headers compatible with the Next.js frontend.
 
-    Note: no Content-Security-Policy here — Next.js dev/inline scripts would
-    break; CSP is documented as WARNING in the audit for later tightening.
+    CSP starts in report-only mode by default so a staging deployment can
+    collect violations before enforcement. HSTS is opt-in and must only be
+    enabled on a verified HTTPS domain.
     """
 
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
+        settings = get_settings()
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
         response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
         response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
         response.headers.setdefault("Cache-Control", "no-store")
+        csp = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: https:; "
+            "font-src 'self' data:; "
+            "connect-src 'self' https:; "
+            "frame-ancestors 'self'; "
+            "base-uri 'self'; "
+            "object-src 'none'"
+        )
+        header = ("Content-Security-Policy-Report-Only"
+                  if getattr(settings, "CSP_REPORT_ONLY", True)
+                  else "Content-Security-Policy")
+        response.headers.setdefault(header, csp)
+        if getattr(settings, "ENABLE_HSTS", False) and not settings.DEBUG:
+            response.headers.setdefault(
+                "Strict-Transport-Security",
+                "max-age=31536000",
+            )
         return response

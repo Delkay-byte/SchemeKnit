@@ -1,11 +1,19 @@
 import Link from 'next/link'
 import { PublicPage } from '@/components/public-page'
 import { Button } from '@/components/ui/button'
+import { pageMetadata } from '@/lib/site-url'
+
+export const metadata = pageMetadata({
+  title: 'How SchemeKnit Works',
+  description:
+    'Upload a Scheme of Learning, review extracted curriculum fields, generate lesson plans and export them.',
+  path: '/how-it-works',
+})
 
 const STEPS = [
   {
     title: 'Upload a DOCX or PDF scheme',
-    body: 'Bring the scheme of learning you already teach. TeachFlow reads its table structure instead of replacing it with generic content.',
+    body: 'Bring the scheme of learning you already teach. SchemeKnit reads its table structure instead of replacing it with generic content.',
   },
   {
     title: 'Extract the curriculum fields',
@@ -30,7 +38,7 @@ export default function HowItWorksPage() {
     <PublicPage
       eyebrow="How it works"
       title="From your scheme to a teachable plan"
-      description="TeachFlow follows your document. It does not claim to know your curriculum better than you do, and it does not silently replace your scheme with a generic topic library."
+      description="SchemeKnit follows your document. It does not claim to know your curriculum better than you do, and it does not silently replace your scheme with a generic topic library."
     >
       <ol className="space-y-4">
         {STEPS.map((step, i) => (

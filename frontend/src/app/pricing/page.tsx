@@ -139,7 +139,7 @@ export default function PricingPage() {
       <p className="mt-8 rounded-xl bg-white p-5 text-sm text-slate-600 shadow-sm">
         Pay by <strong>Bank Transfer</strong> or <strong>Mobile Money</strong> (MTN,
         Telecel, AirtelTigo). Both are one-time prepaid payments: there is no
-        automatic renewal. A package is activated only after TeachFlow verifies
+        automatic renewal. A package is activated only after SchemeKnit verifies
         the payment with Paystack.
       </p>
     </PublicPage>

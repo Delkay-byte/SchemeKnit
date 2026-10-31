@@ -26,8 +26,8 @@ No push, merge into `main`, or deployment was performed.
 
 The hardening report recorded:
 
-- Full backend suite: **2,876 passed, 21 skipped, 0 failed, 0 errors**
-- Collected: **2,897**
+- Full backend suite at the hardening head: **2,902 passed, 21 skipped, 0 failed, 0 errors**
+- Collected: **2,923**
 - Real DeepSeek generation: verified
 - Real Groq fallback: verified
 - Six-case KG/primary/JHS matrix: all gate-accepted
@@ -45,7 +45,7 @@ The seven previously reported failures are resolved:
 
 The 134-test collection gap is resolved: the ten missing `origin/main` modules
 (142 tests) are present; the net difference was the eight pre-existing new Zeli
-tests. Current total is 2,897 after additional hardening tests.
+tests. Current total is 2,923 after security and SEO hardening tests.
 
 ## Staging preconditions
 

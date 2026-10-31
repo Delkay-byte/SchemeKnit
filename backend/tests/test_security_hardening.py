@@ -235,6 +235,7 @@ class TestConfigFailSafe:
             S3_BUCKET="schemeknit",
             S3_ACCESS_KEY="ak",
             S3_SECRET_KEY="sk",
+            RATE_LIMIT_BACKEND="db",
         )
         s.validate_production()  # must not raise
 

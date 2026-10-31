@@ -1,10 +1,11 @@
 import { LegalPageLayout, LegalSection } from '@/components/legal-page-layout'
-import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/site-url'
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: 'Privacy Policy',
   description: 'How SchemeKnit collects, uses, and protects your information.',
-}
+  path: '/privacy-policy',
+})
 
 export default function PrivacyPolicyPage() {
   return (
@@ -44,7 +45,7 @@ export default function PrivacyPolicyPage() {
             <strong>Payment records:</strong> transaction references, payment
             method, amount, status and verification details for prepaid
             packages. Payments are processed by Paystack by Bank Transfer or
-            Mobile Money; TeachFlow does not receive or store full payment
+            Mobile Money; SchemeKnit does not receive or store full payment
             credentials.
           </li>
           <li>

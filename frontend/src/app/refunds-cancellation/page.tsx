@@ -1,10 +1,11 @@
 import { LegalPageLayout, LegalSection } from '@/components/legal-page-layout'
-import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/site-url'
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: 'Refund & Cancellation Policy',
   description: 'Refund and cancellation terms for SchemeKnit subscriptions.',
-}
+  path: '/refunds-cancellation',
+})
 
 export default function RefundsCancellationPage() {
   return (
@@ -15,7 +16,7 @@ export default function RefundsCancellationPage() {
     >
       <LegalSection title="1. No Automatic Renewal">
         <p>
-          All TeachFlow packages are prepaid. Nothing renews automatically and
+          All SchemeKnit packages are prepaid. Nothing renews automatically and
           there is no recurring card charge. A Monthly, Term or Academic Year
           package simply ends at its validity date; to continue generating you
           make a fresh purchase. Flexible Credit Pack credits do not expire.

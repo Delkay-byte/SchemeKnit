@@ -1,10 +1,11 @@
 import { LegalPageLayout, LegalSection } from '@/components/legal-page-layout'
-import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/site-url'
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: 'Contact SchemeKnit',
   description: 'Get in touch with SchemeKnit support.',
-}
+  path: '/contact',
+})
 
 export default function ContactPage() {
   return (

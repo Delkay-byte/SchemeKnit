@@ -82,6 +82,24 @@ class Settings(BaseSettings):
     # Password reset token lifetime (minutes)
     PASSWORD_RESET_TOKEN_TTL_MINUTES: int = 30
 
+    # Security counters / progressive lockout.
+    #: Keyed HMAC secret for account identifiers in counters and security logs.
+    #: Set a distinct value in production; empty falls back to SECRET_KEY only
+    #: for local/development compatibility.
+    SECURITY_HMAC_KEY: str = ""
+    LOGIN_MAX_FAILURES: int = 5
+    LOGIN_FAILURE_WINDOW_MINUTES: int = 15
+    #: Comma-separated cooldown steps in minutes; the last value is the cap.
+    LOGIN_LOCKOUT_STEPS: str = "1,5,15,30,60"
+    LOGIN_LOCKOUT_TRACK_HOURS: int = 24
+    #: db (production default) or memory (tests/local only).
+    RATE_LIMIT_BACKEND: str = "db"
+    TRUST_PROXY_HEADERS: bool = False
+    #: Comma-separated trusted proxy IPs/CIDRs. Empty trusts no proxy.
+    TRUSTED_PROXY_CIDRS: str = ""
+    ENABLE_HSTS: bool = False
+    CSP_REPORT_ONLY: bool = True
+
     # File Storage
     # STORAGE_BACKEND=local (default) or s3 for S3-compatible object storage.
     UPLOAD_DIR: str = "uploads"
@@ -304,6 +322,28 @@ class Settings(BaseSettings):
             raise ValueError("ZELI_MAX_RETRIES must be between 0 and 5")
         return value
 
+    @field_validator("LOGIN_LOCKOUT_STEPS")
+    @classmethod
+    def _validate_lockout_steps(cls, value: str) -> str:
+        raw = [p.strip() for p in str(value or "").split(",") if p.strip()]
+        try:
+            steps = [int(p) for p in raw]
+        except ValueError:
+            raise ValueError("LOGIN_LOCKOUT_STEPS must be comma-separated minutes")
+        if not steps or any(s <= 0 for s in steps) or steps != sorted(steps):
+            raise ValueError("LOGIN_LOCKOUT_STEPS must be positive and ascending")
+        if steps[-1] > 60:
+            raise ValueError("LOGIN_LOCKOUT_STEPS must not exceed 60 minutes")
+        return ",".join(str(s) for s in steps)
+
+    @field_validator("RATE_LIMIT_BACKEND")
+    @classmethod
+    def _validate_rate_limit_backend(cls, value: str) -> str:
+        backend = (value or "db").strip().lower()
+        if backend not in ("db", "memory"):
+            raise ValueError("RATE_LIMIT_BACKEND must be 'db' or 'memory'")
+        return backend
+
     def validate_production(self):
         """Fail fast when mandatory production secrets are missing/default.
 
@@ -345,6 +385,15 @@ class Settings(BaseSettings):
         if not self.DATABASE_URL or self.DATABASE_URL.startswith("sqlite"):
             problems.append(
                 "DATABASE_URL (production must use PostgreSQL, not SQLite)"
+            )
+
+        # Rate limiting must be shared in production; a process-local counter
+        # would silently reset on restart and diverge across workers. SQLite is
+        # the local/test profile; PostgreSQL production must use the DB store.
+        if (self.RATE_LIMIT_BACKEND != "db"
+                and not self.DATABASE_URL.startswith("sqlite")):
+            problems.append(
+                "RATE_LIMIT_BACKEND (production must use 'db', not process memory)"
             )
 
         # Public URLs must not contain localhost in production
