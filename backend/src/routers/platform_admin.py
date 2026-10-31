@@ -221,6 +221,24 @@ async def platform_dashboard(
     }
 
 
+@router.get("/ai-spend")
+async def ai_spend_summary(
+    user: User = Depends(require_platform_admin),
+    db=Depends(get_db),
+):
+    """Owner-only AI provider cost summary.
+
+    Safe aggregate only: no prompt, response, credential, teacher identity or
+    raw provider diagnostic is returned.
+    """
+    from .. import ai_spend
+
+    return {
+        "budget": ai_spend.budget_status(db),
+        "usage": ai_spend.usage_summary(db),
+    }
+
+
 # ── Schools ───────────────────────────────────────────────────────────────────
 
 @router.get("/schools")

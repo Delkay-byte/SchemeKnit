@@ -199,6 +199,29 @@ class Settings(BaseSettings):
     #: Bounded retries for transient failures (429 / 5xx / network only).
     ZELI_MAX_RETRIES: int = 2
 
+    # ── AI provider spending controls (application-level) ──────────────────
+    # Separate from teacher credits: these cap the REAL provider bill across
+    # every SchemeKnit account. Money is accounted in micro-USD in the shared
+    # database, so multiple workers cannot each spend the full budget.
+    # Defaults are deliberately conservative. 0 disables a specific cap;
+    # the monthly total remains the hard ceiling. Set values in Render to
+    # change them — no redeploy-time secret is involved.
+    AI_SPEND_CONTROL_ENABLED: bool = True
+    AI_MONTHLY_BUDGET_USD: float = 10.0
+    #: Optional daily guard against a runaway day. 0 disables it.
+    AI_DAILY_BUDGET_USD: float = 2.0
+    #: Per-provider monthly caps. 0 disables the provider-specific cap.
+    AI_DEEPSEEK_MONTHLY_BUDGET_USD: float = 8.0
+    AI_GROQ_MONTHLY_BUDGET_USD: float = 2.0
+    #: Emit one owner alert when spent/budget reaches this fraction.
+    AI_BUDGET_WARNING_THRESHOLD: float = 0.8
+    #: Reject an oversized prompt BEFORE any provider request is made.
+    AI_MAX_INPUT_CHARS: int = 60000
+    #: Hard ceiling for provider completion tokens (also clamps ZELI_MAX_TOKENS).
+    AI_MAX_OUTPUT_TOKENS: int = 2000
+    AI_MAX_CONCURRENT_PER_TEACHER: int = 2
+    AI_GLOBAL_MAX_CONCURRENT: int = 8
+
     # Paystack (payments) — optional; absent keys disable new payment initiation.
     # Server-side secret only; never expose PAYSTACK_SECRET_KEY to the browser.
     # PAYSTACK_MODE must match the key environment: "test" for sk_test_,
@@ -339,6 +362,53 @@ class Settings(BaseSettings):
         value = int(value)
         if not 0 <= value <= 5:
             raise ValueError("ZELI_MAX_RETRIES must be between 0 and 5")
+        return value
+
+    @field_validator(
+        "AI_MONTHLY_BUDGET_USD", "AI_DAILY_BUDGET_USD",
+        "AI_DEEPSEEK_MONTHLY_BUDGET_USD", "AI_GROQ_MONTHLY_BUDGET_USD",
+    )
+    @classmethod
+    def _validate_ai_budget(cls, value: float) -> float:
+        value = float(value)
+        if value < 0:
+            raise ValueError("AI budget values must be zero or greater")
+        if value > 10000:
+            raise ValueError("AI budget values must not exceed 10000 USD")
+        return value
+
+    @field_validator("AI_BUDGET_WARNING_THRESHOLD")
+    @classmethod
+    def _validate_ai_warning_threshold(cls, value: float) -> float:
+        value = float(value)
+        if not 0.1 <= value <= 1.0:
+            raise ValueError(
+                "AI_BUDGET_WARNING_THRESHOLD must be between 0.1 and 1.0"
+            )
+        return value
+
+    @field_validator("AI_MAX_INPUT_CHARS")
+    @classmethod
+    def _validate_ai_max_input_chars(cls, value: int) -> int:
+        value = int(value)
+        if not 1000 <= value <= 500000:
+            raise ValueError("AI_MAX_INPUT_CHARS must be between 1000 and 500000")
+        return value
+
+    @field_validator("AI_MAX_OUTPUT_TOKENS")
+    @classmethod
+    def _validate_ai_max_output_tokens(cls, value: int) -> int:
+        value = int(value)
+        if not 1 <= value <= 8192:
+            raise ValueError("AI_MAX_OUTPUT_TOKENS must be between 1 and 8192")
+        return value
+
+    @field_validator("AI_MAX_CONCURRENT_PER_TEACHER", "AI_GLOBAL_MAX_CONCURRENT")
+    @classmethod
+    def _validate_ai_concurrency(cls, value: int) -> int:
+        value = int(value)
+        if not 1 <= value <= 100:
+            raise ValueError("AI concurrency limits must be between 1 and 100")
         return value
 
     @field_validator("LOGIN_LOCKOUT_STEPS")

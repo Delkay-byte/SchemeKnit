@@ -181,12 +181,14 @@ class GenerationPipeline:
         selected_weeks: Optional[List[int]] = None,
         template_id: Optional[str] = None,
         db=None,
+        owner_id: Optional[str] = None,
     ) -> GenerationJob:
         """Run the full generation pipeline."""
         job = GenerationJob(
             scheme_of_work_id=scheme.id,
             config=config,
             status=JobStatus.PROCESSING,
+            owner_id=owner_id,
         )
         lesson_plans: List[LessonPlan] = []
 
@@ -296,7 +298,7 @@ class GenerationPipeline:
                 self._generate_with_zeli(lesson_plans, config, job, db=db)
             elif config.ai_mode != AIMode.OFF:
                 try:
-                    self._enrich_with_ai(lesson_plans, config, job)
+                    self._enrich_with_ai(lesson_plans, config, job, db=db)
                 except Exception as e:
                     logger.error(
                         "AI enrichment pipeline failed for job %s: %s: %s",
@@ -616,7 +618,8 @@ class GenerationPipeline:
             job.ai_enrichment_total_attempted += 1
 
             content, meta = generate_zeli_with_fallback(
-                primary=provider, fallback=fallback, context=context, db=db)
+                primary=provider, fallback=fallback, context=context, db=db,
+                user_id=getattr(job, "owner_id", None), request_id=job.id)
             job._zeli_attempts.extend(meta.get("attempts") or [])
             if meta.get("fallback_used"):
                 job._zeli_fallback_used = True
@@ -704,7 +707,9 @@ class GenerationPipeline:
             )
             try:
                 content = generate_zeli_content(
-                    provider=fallback, context=context, db=db)
+                    provider=fallback, context=context, db=db,
+                    user_id=getattr(job, "owner_id", None),
+                    request_id=job.id)
             except ZeliGenerationError:
                 continue
             self._apply_v2_content(lp, content, config, whole_lesson=True)
@@ -744,6 +749,7 @@ class GenerationPipeline:
         lesson_plans: List[LessonPlan],
         config: TermConfig,
         job: GenerationJob,
+        db=None,
     ):
         """Enrich lesson plans using Generation V2 with quality gate.
 
@@ -779,6 +785,9 @@ class GenerationPipeline:
             "AI enrichment using provider=%s (ai_mode=%s) for job %s",
             provider.get_name(), config.ai_mode.value, job.id,
         )
+        from .. import ai_spend
+
+        ai_spend.enforce_output_cap(provider)
 
         # Build previous/next context for lesson sequence continuity
         sorted_plans = sorted(lesson_plans, key=lambda lp: lp.lesson_sequence)
@@ -862,7 +871,47 @@ class GenerationPipeline:
                 wapef_ctx = _wapef_context_lines(lp)
                 if wapef_ctx and supports_kwarg(provider.generate_lesson_v2, "wapef_context"):
                     v2_kwargs["wapef_context"] = wapef_ctx
-                content = provider.generate_lesson_v2(**v2_kwargs)
+
+                attempt = None
+                try:
+                    prompt_chars = ai_spend.ensure_prompt_size(
+                        str(v2_kwargs) + (" " * 8000)) - 8000
+                    attempt = ai_spend.begin_attempt(
+                        db,
+                        provider=provider.get_name(),
+                        model=str(getattr(provider, "model", "") or ""),
+                        prompt_chars=prompt_chars,
+                        user_id=getattr(job, "owner_id", None),
+                        request_id=job.id,
+                    )
+                except ai_spend.AIPromptTooLarge:
+                    job.ai_enrichment_errors[lp.id] = "input_too_large"
+                    continue
+                except ai_spend.AISpendError:
+                    # The hard provider budget (or concurrency cap) is
+                    # exhausted. Do not start any further billable attempts in
+                    # this run; deterministic content is already in place.
+                    job.ai_enrichment_errors[lp.id] = "ai_spend_paused"
+                    break
+
+                try:
+                    content = provider.generate_lesson_v2(**v2_kwargs)
+                except Exception:
+                    if attempt is not None:
+                        attempt.finish(
+                            "failure",
+                            error_code=str(
+                                getattr(provider, "last_error", "") or ""))
+                    raise
+                if attempt is not None:
+                    attempt.finish(
+                        "success" if content else "failure",
+                        usage=getattr(provider, "last_usage", None),
+                        error_code=(
+                            "" if content else str(
+                                getattr(provider, "last_error", "") or
+                                "empty_output")),
+                    )
 
                 if not content:
                     logger.warning(

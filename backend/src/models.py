@@ -1082,6 +1082,8 @@ class WeeklyPlanRequest(BaseModel):
 
 class GenerationJob(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    #: Authenticated owner, used only for per-teacher provider concurrency.
+    owner_id: Optional[str] = None
     config: Optional[TermConfig] = None
     scheme_of_work_id: str
     status: JobStatus = JobStatus.PENDING

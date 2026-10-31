@@ -309,7 +309,14 @@ async def regenerate_section(
         # (a rewrite of one section, not a whole-lesson regeneration). Mocks
         # and providers without that override fall back to the legacy
         # whole-lesson call, whose payload is then mined for the section.
-        result = _section_generation(provider, prompt, gen_kwargs, schema)
+        attempt = _begin_spend_attempt(
+            db, provider, prompt, user, req.request_id)
+        try:
+            result = _section_generation(provider, prompt, gen_kwargs, schema)
+        except Exception:
+            _finish_spend_attempt(attempt, provider, None)
+            raise
+        _finish_spend_attempt(attempt, provider, result)
 
         # ``main_activities`` is a STRUCTURED section: the provider's
         # ``main_learning`` object must be normalized to
@@ -327,7 +334,14 @@ async def regenerate_section(
         # and a transient failure should be retried, not reported.
         if (not new_content or len(new_content.strip()) < MIN_SECTION_CHARS) and provider.get_name() == "ollama":
             logger.warning("ai_empty_retry", section=req.section)
-            result = _section_generation(provider, prompt, gen_kwargs, schema)
+            retry_attempt = _begin_spend_attempt(
+                db, provider, prompt, user, req.request_id)
+            try:
+                result = _section_generation(provider, prompt, gen_kwargs, schema)
+            except Exception:
+                _finish_spend_attempt(retry_attempt, provider, None)
+                raise
+            _finish_spend_attempt(retry_attempt, provider, result)
             if req.section == "main_activities":
                 new_activities = _normalize_main_activities(result)
                 new_content = "\n".join(a["description"] for a in new_activities)
@@ -422,6 +436,36 @@ async def regenerate_section(
 async def list_regeneratable_sections():
     """List sections that can be regenerated."""
     return {"sections": REGENERATABLE_SECTIONS}
+
+
+def _begin_spend_attempt(db, provider, prompt: str, user, request_id: str):
+    """Reserve provider budget before one real call; raise a safe 503/429."""
+    from .. import ai_spend
+    ai_spend.enforce_output_cap(provider)
+    try:
+        chars = ai_spend.ensure_prompt_size(prompt or "")
+        return ai_spend.begin_attempt(
+            db,
+            provider=provider.get_name(),
+            model=str(getattr(provider, "model", "") or ""),
+            prompt_chars=chars,
+            user_id=getattr(user, "id", None),
+            request_id=request_id or None,
+        )
+    except ai_spend.AISpendError as exc:
+        raise _ai_error(exc.status_code, exc.code, exc.message) from exc
+
+
+def _finish_spend_attempt(attempt, provider, content, error_code: str = "") -> None:
+    """Settle actual usage (or a conservative estimate) for one call."""
+    if attempt is None:
+        return
+    attempt.finish(
+        "success" if content else "failure",
+        usage=getattr(provider, "last_usage", None),
+        error_code=error_code or (
+            "" if content else str(getattr(provider, "last_error", "") or "")),
+    )
 
 
 def _section_generation(provider, prompt: str, gen_kwargs: dict,
@@ -930,6 +974,9 @@ async def enrich_lesson(
             ),
         )
 
+    from .. import ai_spend as _ai_spend
+    _ai_spend.enforce_output_cap(provider)
+
     # ── Double-submit guard + cache read path (backlog item 4) ──────────
     # A replayed enrich action (same request_id already recorded) or an
     # identical input snapshot returns the cached enrichment without a
@@ -1011,10 +1058,23 @@ async def enrich_lesson(
         f"Required phase names: {', '.join(phase_names)}\n"
         f"Current topic: {lp.lesson_topic or ''}\n"
     )
-    raw = gen(prompt)
+    attempt = _begin_spend_attempt(db, provider, prompt, user, req.request_id)
+    try:
+        raw = gen(prompt)
+    except Exception:
+        _finish_spend_attempt(attempt, provider, None)
+        raise
+    _finish_spend_attempt(attempt, provider, raw)
     ok, validated = validator(raw)
     if not ok:
-        raw = gen(prompt)  # single bounded retry
+        retry_attempt = _begin_spend_attempt(
+            db, provider, prompt, user, req.request_id)
+        try:
+            raw = gen(prompt)  # single bounded retry
+        except Exception:
+            _finish_spend_attempt(retry_attempt, provider, None)
+            raise
+        _finish_spend_attempt(retry_attempt, provider, raw)
         ok, validated = validator(raw)
     if not ok:
         logger.error("enrich_invalid_output", errors=str(validated)[:300])
