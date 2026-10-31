@@ -134,6 +134,12 @@ automatically. No broader account permission was requested.
 These are Cloudflare's documented public test values and appear only in test
 configuration. Production secrets are never used in tests or committed.
 
+The public test site key returns the same dummy token for every widget and does
+not report a consistent action/hostname. SchemeKnit therefore skips replay
+storage and action/hostname matching **only** when the configured secret is one
+of the documented test secrets. A production secret always enforces all rules;
+this exception cannot be reached by a production deployment.
+
 ## 8. Tests and evidence
 
 `backend/tests/test_turnstile.py` (15 tests) proves:
@@ -153,8 +159,22 @@ configuration. Production secrets are never used in tests or committed.
 - CSP permits Turnstile without `unsafe-eval`.
 
 Browser acceptance for the registration and challenge-triggered login flows is
-documented in the release checklist; it requires the production widget and
-cannot be completed until the owner activation above.
+implemented in `frontend/e2e/turnstile-auth.js`. Against a local backend with
+the documented test keys and a frontend built with the test site key, the run
+passed:
+
+```text
+PASS  desktop: registration passed with a Turnstile token
+PASS  desktop: login challenge appeared and verified
+PASS  mobile: registration passed with a Turnstile token
+PASS  mobile: login challenge appeared and verified
+4 passed, 0 failed
+```
+
+This proves the widget, form submission and risk-triggered login UI work at
+1440 px and 390 px. It does not prove production activation: a real widget token
+must still be validated after the owner configures the production site key and
+secret.
 
 ## 9. Residual limitations
 

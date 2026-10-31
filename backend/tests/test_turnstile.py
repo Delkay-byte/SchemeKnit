@@ -79,7 +79,9 @@ def test_valid_test_token_permits_the_action(db, monkeypatch):
     result = turnstile.verify_token(
         db, "valid-test-token", action="register")
     assert result["success"] is True
-    assert db.query(TurnstileTokenDB).count() == 1
+    # The documented test secret skips replay storage (test keys return the
+    # same dummy token); production tokens are recorded below.
+    assert db.query(TurnstileTokenDB).count() == 0
 
 
 def test_missing_token_is_rejected(db, monkeypatch):
@@ -111,6 +113,8 @@ def test_expired_token_is_rejected(db, monkeypatch):
 
 def test_replayed_token_is_rejected(db, monkeypatch):
     _enable(monkeypatch)
+    monkeypatch.setenv("TURNSTILE_SECRET_KEY", "production-like-secret-value")
+    get_settings.cache_clear()
     _fake_siteverify(monkeypatch, _payload("register"))
     turnstile.verify_token(db, "same-token", action="register")
     with pytest.raises(turnstile.TurnstileError) as exc:
@@ -120,6 +124,8 @@ def test_replayed_token_is_rejected(db, monkeypatch):
 
 def test_wrong_action_is_rejected(db, monkeypatch):
     _enable(monkeypatch)
+    monkeypatch.setenv("TURNSTILE_SECRET_KEY", "production-like-secret-value")
+    get_settings.cache_clear()
     _fake_siteverify(monkeypatch, _payload("login"))
     with pytest.raises(turnstile.TurnstileError) as exc:
         turnstile.verify_token(db, "action-token", action="register")
@@ -207,6 +213,8 @@ def test_login_challenge_after_repeated_failures(db, monkeypatch):
 
 def test_login_challenge_token_is_action_bound(db, monkeypatch):
     _enable(monkeypatch)
+    monkeypatch.setenv("TURNSTILE_SECRET_KEY", "production-like-secret-value")
+    get_settings.cache_clear()
     user = make_user(db, email="action-login@test.com")
     clear_failures(db, user.email)
     for _ in range(3):

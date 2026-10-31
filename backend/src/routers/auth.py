@@ -574,8 +574,8 @@ def _dummy_password_check(password: str) -> None:
 
 
 @router.post("/login")
-async def login(req: LoginRequest, request: Request,
-                db: Session = Depends(get_db)):
+async def login(req: LoginRequest, db: Session = Depends(get_db),
+                request: Request = None):
     # The email is the login identifier and is compared normalized, so casing
     # at the keyboard never changes which account is matched.
     lookup = normalize_email(req.email) or req.email
@@ -605,7 +605,7 @@ async def login(req: LoginRequest, request: Request,
     if recent_failure_count(db, lookup) >= threshold:
         require_turnstile(
             db, req.turnstile_token, action="login",
-            remote_ip=client_ip(request),
+            remote_ip=client_ip(request) if request is not None else None,
         )
 
     user = db.query(User).filter(User.email == lookup).first()
@@ -890,8 +890,8 @@ class IndividualRegisterRequest(BaseModel):
 @router.post("/register/individual")
 async def register_individual_teacher(
     req: IndividualRegisterRequest,
-    request: Request,
     db: Session = Depends(get_db),
+    request: Request = None,
 ):
     """Self-registration for individual teachers (no school required).
 
@@ -900,7 +900,7 @@ async def register_individual_teacher(
     """
     require_turnstile(
         db, req.turnstile_token, action="register",
-        remote_ip=client_ip(request),
+        remote_ip=client_ip(request) if request is not None else None,
     )
     settings = get_settings()
     if not _registration_allowed(
@@ -1704,8 +1704,8 @@ class ConfirmPasswordResetRequest(BaseModel):
 @router.post("/confirm-password-reset")
 async def confirm_password_reset(
     req: ConfirmPasswordResetRequest,
-    request: Request,
     db: Session = Depends(get_db),
+    request: Request = None,
 ):
     """Complete a password reset with a one-time token + new password.
 
@@ -1715,7 +1715,7 @@ async def confirm_password_reset(
     """
     require_turnstile(
         db, req.turnstile_token, action="password_reset",
-        remote_ip=client_ip(request),
+        remote_ip=client_ip(request) if request is not None else None,
     )
     record = _consume_reset_token(db, req.reset_token)
 

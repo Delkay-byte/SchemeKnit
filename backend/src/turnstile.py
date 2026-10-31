@@ -108,7 +108,11 @@ def validate_siteverify_payload(
         )
 
     action = str(payload.get("action") or "")
-    if action != expected_action:
+    # Cloudflare's public test secret does not echo the widget action/hostname
+    # consistently. Test keys are only reachable when the operator explicitly
+    # configures the documented test secret; production keys always enforce.
+    test_mode = bool(allow_test_hostname and is_test_secret())
+    if action != expected_action and not test_mode:
         logger.warning(
             "turnstile_action_mismatch",
             expected=expected_action, received=action[:40],
@@ -121,7 +125,7 @@ def validate_siteverify_payload(
 
     hostname = str(payload.get("hostname") or "").strip().lower()
     allowed = {h for h in hostnames if h}
-    if allow_test_hostname and is_test_secret():
+    if test_mode:
         return
     if not hostname or hostname not in allowed:
         logger.warning(
@@ -227,7 +231,15 @@ def verify_token(
 
     payload = _siteverify(token, action, remote_ip)
     validate_siteverify_payload(
-        payload, expected_action=action, hostnames=allowed_hostnames())
+        payload, expected_action=action, hostnames=allowed_hostnames(),
+        allow_test_hostname=True,
+    )
+
+    # Cloudflare's public test keys return the same dummy token for every
+    # widget. Replay memory is therefore skipped for the documented test
+    # secret only; production tokens are always single-use.
+    if is_test_secret():
+        return payload
 
     digest = _token_hash(token)
     now = datetime.utcnow()

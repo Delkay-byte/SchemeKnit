@@ -4,9 +4,13 @@ Master progress ledger. Statuses: NOT STARTED, IN PROGRESS, PARTIAL, BLOCKED, DO
 
 DONE means implemented and locally tested unless explicitly marked staging-verified. Documentation alone is not DONE.
 
-Branch: `chore/zero-cost-pilot-20261031` (based on `hardening/remediation-staging-20261031` at `7f6206b`)
+Branch: `chore/zero-cost-pilot-20261031-rebased`
 
-Last updated: 2026-10-31
+Last updated: 2026-10-31 (release-security remediation: rate limiting, AI spend, Turnstile, storage quotas)
+
+Four-workstream status vocabulary: VERIFIED (implemented + locally tested),
+IMPLEMENTED BUT UNVERIFIED (code/tests exist, production activation or live
+evidence still required), PARTIAL, BLOCKED, NOT APPLICABLE.
 
 ## A. Account and login protection
 
@@ -16,10 +20,11 @@ Last updated: 2026-10-31
 | DONE | Repeated lockout → 5/15/30/60 minutes | escalation test + configured steps |
 | DONE | Successful auth/reset clears counters | `test_cooldown_expiry_and_success_reset` |
 | DONE | Account counters across IPs | `test_account_counter_is_not_ip_scoped` |
-| DONE | Independent IP throttling | `DbRateLimiter`; shared-store test |
-| NOT STARTED | Automated bot challenge | No challenge provider configured |
+| VERIFIED | Independent IP throttling / shared-store counters | `DbRateLimiter`; ten-teacher isolation + concurrency tests |
+| IMPLEMENTED BUT UNVERIFIED | Automated bot challenge (Turnstile) | Backend + widget + 15 tests; production widget/secret/Render env not configured |
 | PARTIAL | Account enumeration protection | Login generic; registration 409 reveals existing email |
 | PARTIAL | Lockout DoS load test | bounded cooldown + recovery; no distributed load test |
+| VERIFIED | Authenticated operations limited per account, not per shared peer | `AUTHENTICATED_BUDGETS`; `test_shared_proxy_isolation.py`; `test_integrated_release_security.py` |
 
 ## B. Password and session security
 
@@ -43,9 +48,9 @@ Last updated: 2026-10-31
 | DONE | Platform-admin role dependency test | same file |
 | PARTIAL | Per-handler User A/User B negative matrix | existing IDOR/isolation tests; not exhaustive |
 | PARTIAL | Property-level mass-assignment tests | representative |
-| DONE | Shared IP rate limiting | `DbRateLimiter`; local test |
-| PARTIAL | Trusted proxy configuration | interface + forged-header test; Render CIDRs unverified |
-| PARTIAL | Request/resource limits | upload/generation bounds; broader audit pending |
+| VERIFIED | Shared IP rate limiting | `DbRateLimiter`; local, concurrency and ten-teacher tests |
+| BLOCKED | Trusted proxy configuration | interface + forged-header test; Render CIDRs/topology unverified; `TRUST_PROXY_HEADERS=false` |
+| VERIFIED | Request/resource limits | upload/file/prompt/output limits, per-account budgets, AI concurrency and storage quotas; targeted tests |
 
 ## D. File and web security
 
@@ -67,8 +72,10 @@ Last updated: 2026-10-31
 | BLOCKED | DB least privilege | no production/staging DB access |
 | BLOCKED | Backup/restore verified | `DATABASE-BACKUP-AND-RESTORE-REPORT.md`; no restore |
 | BLOCKED | Staging DB isolation | no staging |
-| DONE | AI abuse controls | quotas, credits, bounded fallback, shared IP limits |
-| DONE | Prompt-injection corpus | 14 passed; `CURRICULUM-AI-INPUT-SECURITY.md` |
+| VERIFIED | AI abuse controls | quotas, credits, bounded fallback, shared IP limits, provider budgets |
+| VERIFIED | Teacher credit enforcement and single-charge fallback | reservation/commit/release path; `test_credit_generation.py`, `test_zeli_fallback.py`, `test_ai_spend_controls.py` |
+| VERIFIED | Provider expenditure accounting and hard budget stop | `src/ai_spend.py`; atomic counters, usage ledger, fail-safe stop; 13 tests |
+| VERIFIED | Prompt-injection corpus | 14 passed; `CURRICULUM-AI-INPUT-SECURITY.md` |
 | DONE | DeepSeek/Groq local verification | prior live runs; preserved |
 | DONE | Credit/cache behaviour | fallback/quota tests |
 | DONE | Webhook signature/replay/idempotency | payment tests |
@@ -132,9 +139,11 @@ DEFERRED (reserved for paid infrastructure), NOT STARTED.
 | PREPARED | Frontend on a separate Render free pilot service | No pilot service created; exact build/start commands documented |
 | PREPARED | Backend on a separate Render free pilot service | No pilot service created; exact build/start commands documented |
 | PREPARED | Isolated pilot PostgreSQL database | Neon production URL identified; no pilot project created; do not branch production data |
-| NOT STARTED | Durable storage wiring for uploaded originals | Uploads still use ephemeral `~/teachflow_data/uploads`; R2 bucket exists but is only used by `/api/ready` |
-| DONE | AI quota, bounded fallback and output-token guards | `src/ai_quota.py`; `src/engines/zeli_generation.py`; `ZELI_MAX_TOKENS=2000`; quota/fallback tests |
-| PREPARED | Provider spend limit and owner-side usage alerting | DeepSeek balance/spend limit not inspected; no live call made |
+| IMPLEMENTED BUT UNVERIFIED | Durable storage wiring for uploaded originals | Storage adapter now writes originals to the private `production/` R2 prefix when `STORAGE_BACKEND=s3`; local restart-survival test passes; production R2 env/plan not observed here |
+| DONE | AI quota, bounded fallback and output-token guards | `src/ai_quota.py`; `src/engines/zeli_generation.py`; `AI_MAX_OUTPUT_TOKENS`; quota/fallback tests |
+| VERIFIED | Provider spend limit and owner usage summary | `src/ai_spend.py`; shared budget/concurrency counters; `GET /api/platform-admin/ai-spend`; 13 tests |
+| IMPLEMENTED BUT UNVERIFIED | Cloudflare Turnstile bot challenge | Backend Siteverify + accessible widget + 15 tests; production widget/sitekey/secret/Render env pending |
+| VERIFIED | Per-teacher and global storage quotas | `src/storage_quota.py`; atomic ledger reservations; 16 tests; reconciliation command |
 | PREPARED | Manual Paystack webhook recovery workflow | `.github/workflows/pilot-webhook-recovery.yml`; `workflow_dispatch` only; no schedule; no secret configured |
 | BLOCKED | Automatic scheduled recovery | No `PILOT_DATABASE_URL` GitHub secret; scheduled workflows also disable after 60 days of repo inactivity |
 | PREPARED | Monitoring and alert delivery | Structured logs + `/api/health` + `/api/ready` exist; no central alert webhook configured |
@@ -152,8 +161,9 @@ DEFERRED (reserved for paid infrastructure), NOT STARTED.
 1. `onboarding@resend.dev` cannot email external teachers; self-service password reset is blocked until a domain is verified or owner-side resets are used.
 2. DeepSeek generation is usage-billed; the account balance and spend limit are unverified.
 3. Render free services sleep, restart and share 750 instance hours across six existing services.
-4. Uploaded originals and local exports are ephemeral; a restart before multi-subject confirmation can require re-upload.
+4. Uploaded originals are durable only when `STORAGE_BACKEND=s3` and the R2 credentials are present; the production R2 plan/usage and live storage activation were not verified locally. Local originals remain on disk by design.
 5. No automatic database backup or restore test exists for the pilot.
+6. Turnstile production activation needs the Cloudflare widget plus Render backend/frontend keys; without it, registration/password-reset challenges are disabled.
 
 ## J. ASVS 5.0 and OWASP API Top 10
 
@@ -165,6 +175,10 @@ API Top 10: 3 VERIFIED, 7 PARTIAL, 0 FAIL. No certification is claimed.
 
 | Status | Item | Evidence |
 |---|---|---|
+| VERIFIED | Shared Render peer isolation / per-account budgets | `docs/security/SHARED-PROXY-RATE-LIMIT-ISOLATION.md`; `test_shared_proxy_isolation.py`; `test_integrated_release_security.py` |
+| VERIFIED | AI teacher credits + provider spend controls | `docs/security/AI-GENERATION-AND-PROVIDER-SPEND-CONTROLS.md`; `test_ai_spend_controls.py`; 13 passed |
+| IMPLEMENTED BUT UNVERIFIED | Turnstile bot protection | `docs/security/SCHEMEKNIT-TURNSTILE-BOT-PROTECTION.md`; `test_turnstile.py` 15 passed; `turnstile-auth.js` 4/4 local test-key browser passes; production widget/keys pending |
+| IMPLEMENTED BUT UNVERIFIED | Durable R2 originals + storage quotas | `docs/operations/SCHEMEKNIT-STORAGE-QUOTAS-AND-RECOVERY.md`; `test_storage_quotas.py` 16 passed; live R2 plan/usage pending |
 | VERIFIED | Field-level authorization / mass assignment | `normalize_lesson_updates` allowlist before mutation; `test_lesson_update_mass_assignment.py` 31 passed; protected fields return 422 |
 | PARTIAL | Frontend/backend HSTS and CSP | Headers implemented without unsafe-eval; production activation/header verification pending |
 | VERIFIED | Platform-admin MFA enforcement | Production mutations require enrolled MFA; enrollment remains reachable; `test_session_lifecycle.py` |
@@ -196,6 +210,10 @@ verification remain open. The ordered plan and exact tests are in the assessment
 
 ## Linked reports
 
+- `docs/security/SHARED-PROXY-RATE-LIMIT-ISOLATION.md`
+- `docs/security/AI-GENERATION-AND-PROVIDER-SPEND-CONTROLS.md`
+- `docs/security/SCHEMEKNIT-TURNSTILE-BOT-PROTECTION.md`
+- `docs/operations/SCHEMEKNIT-STORAGE-QUOTAS-AND-RECOVERY.md`
 - `docs/release/CI-VALIDATION-REPORT.md`
 - `docs/release/STAGING-VALIDATION-REPORT.md`
 - `docs/release/STAGING-PROVISIONING-RUNBOOK.md`
