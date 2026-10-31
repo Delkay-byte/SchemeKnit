@@ -14,6 +14,7 @@ import { validateEmail } from '@/lib/password-policy'
 import { isDesktop } from '@/lib/build-target'
 import { TurnstileWidget, TURNSTILE_SITE_KEY } from '@/components/turnstile-widget'
 import type { ApiError } from '@/lib/api'
+import { authHref, currentNextPath } from '@/lib/purchase-return'
 import { Building2, Shield, GraduationCap, KeyRound, AlertCircle, ArrowRight } from 'lucide-react'
 
 /**
@@ -99,11 +100,23 @@ export function RoleLogin({ entry }: { entry: EntryRole }) {
   const [challengeRequired, setChallengeRequired] = useState(false)
   const [challengeToken, setChallengeToken] = useState('')
   const [challengeReset, setChallengeReset] = useState(0)
+  const [nextPath, setNextPath] = useState<string | null>(null)
 
   const copy = ENTRY_COPY[entry]
 
   useEffect(() => {
+    setNextPath(entry === 'teacher' ? currentNextPath() : null)
+  }, [entry])
+
+  useEffect(() => {
     if (!authLoading && user) {
+      const target = entry === 'teacher' ? currentNextPath() : null
+      // A validated purchase return wins for teachers only. Admin roles keep
+      // their existing destinations and never enter teacher checkout.
+      if (entry === 'teacher' && user.role === 'teacher' && target) {
+        router.push(target)
+        return
+      }
       if (user.role === 'school_admin') {
         router.push('/school-admin')
       } else if (!isDesktop && user.role === 'platform_admin') {
@@ -124,7 +137,7 @@ export function RoleLogin({ entry }: { entry: EntryRole }) {
       .catch(() => {
         setChecking(false)
       })
-  }, [user, authLoading, router])
+  }, [user, authLoading, router, entry])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -205,7 +218,7 @@ export function RoleLogin({ entry }: { entry: EntryRole }) {
             ))}
             {entry === 'teacher' && (
               <Link
-                href="/signup"
+                href={authHref('/signup', nextPath)}
                 className="text-xs font-semibold text-[#04A9CE] hover:text-[#0389a8] underline underline-offset-2"
               >
                 Create teacher account
@@ -370,7 +383,7 @@ export function RoleLogin({ entry }: { entry: EntryRole }) {
       {entry === 'teacher' && (
         <div className="mt-4">
           <Link
-            href="/signup"
+            href={authHref('/signup', nextPath)}
             className="inline-flex h-11 w-full items-center justify-center rounded-lg border border-[#04A9CE]/40 bg-[#04A9CE]/10 text-sm font-semibold text-[#0389a8] transition hover:bg-[#04A9CE]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#04A9CE]/50"
           >
             Create teacher account

@@ -10,6 +10,7 @@ import { ArrowLeft, Building, Smartphone, Clock } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { PageHeader } from '@/components/ui/page-header'
 import { api } from '@/lib/api'
+import { upgradePath } from '@/lib/purchase-return'
 import type { CataloguePlan, CreditStatus } from '@/types'
 
 type Charge = {
@@ -46,18 +47,43 @@ export default function UpgradePage() {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      router.push('/login')
+      const wanted = params.get('package')
+      const target = wanted ? upgradePath(wanted) : null
+      router.push(
+        target ? `/login?next=${encodeURIComponent(target)}` : '/login',
+      )
       return
     }
     if (!user) return
+    if (user.role === 'school_admin') {
+      router.push('/school-admin')
+      return
+    }
+    if (user.role === 'platform_admin') {
+      router.push('/platform-admin')
+      return
+    }
+    if (user.role !== 'teacher') {
+      router.push('/dashboard')
+      return
+    }
     api.getCatalogue()
       .then((d) => {
         const purchasable = (d.plans || []).filter((p: CataloguePlan) => p.active)
         setPlans(purchasable)
         const wanted = params.get('package')
-        setSelected(purchasable.some((p: CataloguePlan) => p.slug === wanted)
-          ? String(wanted)
-          : purchasable[0]?.slug || '')
+        if (wanted) {
+          const valid = purchasable.some((p: CataloguePlan) => p.slug === wanted)
+          setSelected(valid ? String(wanted) : '')
+          if (!valid) {
+            setError(
+              'The selected package is no longer available. Choose a current '
+              + 'package below; no payment has been started.',
+            )
+          }
+        } else {
+          setSelected(purchasable[0]?.slug || '')
+        }
       })
       .catch(() => setError('Packages could not be loaded. No payment can be started.'))
     api.getCredits().then(setCredits).catch(() => {})
@@ -271,6 +297,8 @@ export default function UpgradePage() {
                       <div><dt className="text-xs uppercase text-slate-500">Bank</dt><dd>{charge.payment_details.bank_name}</dd></div>
                       <div><dt className="text-xs uppercase text-slate-500">Account number</dt><dd className="font-mono text-base">{charge.payment_details.account_number}</dd></div>
                       <div><dt className="text-xs uppercase text-slate-500">Account name</dt><dd>{charge.payment_details.account_name}</dd></div>
+                      <div><dt className="text-xs uppercase text-slate-500">Amount due</dt><dd className="font-semibold">{plan ? money(plan.price_pesewas) : '—'}</dd></div>
+                      <div><dt className="text-xs uppercase text-slate-500">Transfer reference</dt><dd className="font-mono break-all">{charge.payment_details.transaction_reference || charge.reference}</dd></div>
                       <div><dt className="text-xs uppercase text-slate-500">Expires</dt><dd>{charge.payment_details.account_expires_at ? new Date(charge.payment_details.account_expires_at).toLocaleString() : '—'}</dd></div>
                     </dl>
                     <p className="mt-3 text-xs text-slate-500">
