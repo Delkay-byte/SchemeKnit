@@ -20,7 +20,7 @@ from src.database import LoginFailureDB, get_db
 from src.login_security import (
     account_key, check_lockout, clear_failures, record_failure,
 )
-from src.security import DbRateLimiter, client_ip
+from src.security import DbRateLimiter, RATE_LIMITS, client_ip
 from tests.conftest import make_user
 
 
@@ -124,18 +124,19 @@ def test_db_rate_limiter_is_shared_and_persistent(db_engine):
     Session = sessionmaker(bind=db_engine)
     limiter = DbRateLimiter(session_factory=Session)
     now = 1_700_000_000.0
-    for i in range(20):
+    budget = max(m for p, m, _ in RATE_LIMITS if p == "/api/auth/login")
+    for i in range(budget):
         allowed, _ = limiter.is_allowed(
-            "203.0.113.9", "/api/auth/login", now=now + i)
+            "203.0.113.9", "/api/auth/login", now=now)
         assert allowed, i
     allowed, info = limiter.is_allowed(
-        "203.0.113.9", "/api/auth/login", now=now + 21)
+        "203.0.113.9", "/api/auth/login", now=now)
     assert allowed is False
-    assert info["limit"] == 20
+    assert info["limit"] == budget
     assert info["reset"] >= 1
     # A different client has an independent bucket.
     allowed, _ = limiter.is_allowed(
-        "203.0.113.10", "/api/auth/login", now=now + 22)
+        "203.0.113.10", "/api/auth/login", now=now)
     assert allowed is True
 
 

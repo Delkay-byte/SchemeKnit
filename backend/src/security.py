@@ -87,21 +87,24 @@ def safe_join(root: str, *names: str) -> str:
 # multi-worker deployments should front with a reverse-proxy limiter (documented).
 
 # (path prefix, max requests, window seconds)
+# IP budgets are a broad abuse signal, not a per-teacher quota. Render may
+# present one shared proxy peer, so authenticated operations are deliberately
+# generous here; their primary control is the per-account budget below.
 RATE_LIMITS: List[Tuple[str, int, int]] = [
-    ("/api/auth/login", 20, 60),
+    ("/api/auth/login", 200, 60),           # account lockout is primary
     ("/api/auth/setup", 10, 300),
-    ("/api/auth/activation/validate", 30, 300),
+    ("/api/auth/activation/validate", 120, 300),
     ("/api/auth/setup-school-admin", 10, 300),
-    ("/api/auth/users/", 30, 60),          # password reset / initiate-reset
-    ("/api/auth/setup-platform-admin", 5, 300),   # bootstrap (very strict)
-    ("/api/auth/change-password", 10, 60),
-    ("/api/auth/confirm-password-reset", 10, 300),
-    ("/api/auth/reset-token/validate", 20, 300),
-    ("/api/platform-admin/activate", 30, 300),
-    ("/api/documents/upload", 10, 300),
-    ("/api/templates/analyze", 10, 300),
-    ("/api/templates/upload", 10, 300),
-    ("/api/generation/", 30, 60),
+    ("/api/auth/users/", 120, 60),
+    ("/api/auth/setup-platform-admin", 5, 300),   # bootstrap stays strict
+    ("/api/auth/change-password", 60, 60),
+    ("/api/auth/confirm-password-reset", 60, 300),
+    ("/api/auth/reset-token/validate", 120, 300),
+    ("/api/platform-admin/activate", 120, 300),
+    ("/api/documents/upload", 120, 300),
+    ("/api/templates/analyze", 120, 300),
+    ("/api/templates/upload", 120, 300),
+    ("/api/generation/", 300, 60),
 ]
 
 RATE_LIMIT_EXEMPT_IPS = {"127.0.0.1", "::1", "localhost"}
@@ -419,10 +422,13 @@ def client_key(address: str) -> str:
 #: independent of the source IP, so rotating X-Forwarded-For or switching
 #: networks cannot create a fresh budget for the same account.
 AUTHENTICATED_BUDGETS = {
-    "upload": (10, 900),
-    "generate": (20, 600),
-    "resume": (10, 600),
-    "export": (30, 600),
+    # 30 uploads / 15 min supports several subjects, corrections and retries.
+    "upload": (30, 900),
+    # 30 generation requests / 10 min is above normal multi-indicator work but
+    # well below a runaway loop. Credits still bound billable generation.
+    "generate": (30, 600),
+    "resume": (20, 600),
+    "export": (60, 600),
 }
 
 
