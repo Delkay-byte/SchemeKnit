@@ -54,3 +54,34 @@ def log_error(event: str, error: str = "", **kwargs):
 def log_security(event: str, **kwargs):
     logger = get_logger("security")
     logger.warning(event, **kwargs)
+
+
+def alert_security(event: str, severity: str = "warning", **kwargs) -> bool:
+    """Record a security event and optionally deliver it to a webhook.
+
+    Returns True only when a configured webhook accepted the request. With no
+    webhook configured the event is logged and delivery is reported False, so
+    callers cannot claim central delivery exists.
+    """
+    log_security(event, severity=severity, **kwargs)
+    try:
+        from .config import get_settings
+        url = (getattr(get_settings(), "SECURITY_ALERT_WEBHOOK_URL", "") or "").strip()
+    except Exception:
+        return False
+    if not url:
+        return False
+    try:
+        import requests
+        response = requests.post(
+            url,
+            json={"event": event, "severity": severity, **kwargs},
+            timeout=5,
+        )
+        if response.status_code >= 300:
+            log_error("security_alert_delivery_failed", error=str(response.status_code))
+            return False
+        return True
+    except Exception as exc:
+        log_error("security_alert_delivery_failed", error=type(exc).__name__)
+        return False

@@ -99,6 +99,9 @@ class Settings(BaseSettings):
     TRUSTED_PROXY_CIDRS: str = ""
     ENABLE_HSTS: bool = False
     CSP_REPORT_ONLY: bool = True
+    #: Optional central security-alert webhook (Slack-style JSON endpoint).
+    #: Empty = no central delivery; structured security logs still record.
+    SECURITY_ALERT_WEBHOOK_URL: str = ""
 
     # File Storage
     # STORAGE_BACKEND=local (default) or s3 for S3-compatible object storage.

@@ -288,6 +288,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 if client not in RATE_LIMIT_EXEMPT_IPS:
                     allowed, info = limiter.is_allowed(client, path)
                     if not allowed:
+                        try:
+                            from .logging_config import alert_security
+                            alert_security(
+                                "rate_limit_exceeded", severity="warning",
+                                path=path, client=client)
+                        except Exception:
+                            pass
                         return JSONResponse(
                             status_code=429,
                             content={"error": True,

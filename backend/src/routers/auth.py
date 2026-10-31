@@ -34,7 +34,7 @@ from ..mfa import (
     generate_recovery_codes, generate_secret, hash_recovery_codes,
     provisioning_uri, verify_recovery_code, verify_totp,
 )
-from ..logging_config import log_security
+from ..logging_config import log_security, alert_security
 from ..validation import (
     validate_password, validate_email, normalize_email, password_policy_hint,
 )
@@ -52,7 +52,7 @@ VALID_LOGIN_ENTRIES = frozenset({"teacher", "school_admin", "platform_admin"})
 def _entry_matches_role(user: User, entry: str) -> bool:
     """True when ``entry`` is the correct entry point for this DB identity.
 
-    The role is read from the database row — never from the request body or a
+    The role is read from the database row â€” never from the request body or a
     token claim. ``is_admin`` keeps legacy school administrators working.
     """
     role = (getattr(user, "role", "") or "").strip().lower()
@@ -154,6 +154,11 @@ class MfaDisableRequest(BaseModel):
     code: str
 
 
+class MfaRegenerateRequest(BaseModel):
+    password: str
+    code: str
+
+
 class SetupRequest(BaseModel):
     name: str
     email: str
@@ -173,7 +178,7 @@ class ProfileUpdateRequest(BaseModel):
 
     The client PUTs a JSON body; the field must be declared here or the write
     is silently discarded (a JSON body is NOT bound to bare function
-    parameters — that is how the school silently failed to persist).
+    parameters â€” that is how the school silently failed to persist).
     """
 
     full_name: Optional[str] = None
@@ -268,7 +273,7 @@ class IndividualActivateRequest(BaseModel):
 @router.post("/activation/validate")
 async def validate_activation_code(req: ActivationValidateRequest, db: Session = Depends(get_db)):
     """Public code check for the onboarding UX. Reveals display info only
-    (school name, plan, seats, period) — no secrets, no redemption."""
+    (school name, plan, seats, period) â€” no secrets, no redemption."""
     code = db.query(ActivationCodeDB).filter(
         ActivationCodeDB.code == req.activation_code.strip()).first()
     if not code:
@@ -434,7 +439,7 @@ async def setup_school_admin(req: SetupSchoolAdminRequest, db: Session = Depends
 
     The code is validated AND redeemed atomically in one transaction together
     with admin creation: single-winner redeem, no replay, full audit trail.
-    The school always comes from the code's license — never from the client.
+    The school always comes from the code's license â€” never from the client.
     """
     if not req.activation_code or not req.activation_code.strip():
         raise HTTPException(status_code=422, detail="Activation code is required")
@@ -590,7 +595,7 @@ async def login(req: LoginRequest, db: Session = Depends(get_db)):
     if not password_ok:
         cooldown = record_failure(db, lookup)
         if cooldown:
-            log_security("account_cooldown", account=account_key(lookup),
+            alert_security("account_cooldown", account=account_key(lookup),
                          cooldown_seconds=cooldown)
             raise HTTPException(
                 status_code=429,
@@ -614,7 +619,7 @@ async def login(req: LoginRequest, db: Session = Depends(get_db)):
     if entry not in VALID_LOGIN_ENTRIES or not _entry_matches_role(user, entry):
         cooldown = record_failure(db, lookup)
         if cooldown:
-            log_security("account_cooldown", account=account_key(lookup),
+            alert_security("account_cooldown", account=account_key(lookup),
                          cooldown_seconds=cooldown)
             raise HTTPException(
                 status_code=429,
@@ -735,6 +740,37 @@ async def mfa_disable(
     return {"enabled": False}
 
 
+@router.get("/mfa/status")
+async def mfa_status(
+    user: User = Depends(require_platform_admin),
+):
+    return {
+        "enabled": bool(user.mfa_enabled),
+        "recovery_codes_remaining": len(user.mfa_recovery_codes or []),
+    }
+
+
+@router.post("/mfa/recovery/regenerate")
+async def mfa_regenerate_recovery(
+    req: MfaRegenerateRequest,
+    user: User = Depends(require_platform_admin),
+    db: Session = Depends(get_db),
+):
+    if not user.mfa_enabled:
+        raise HTTPException(status_code=400, detail="MFA is not enabled")
+    if not verify_password(req.password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    step = verify_totp(user.mfa_secret or "", req.code)
+    recovery = verify_recovery_code(req.code, user.mfa_recovery_codes or [])
+    if step is None and recovery is None:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    codes = generate_recovery_codes()
+    user.mfa_recovery_codes = hash_recovery_codes(codes)
+    db.commit()
+    log_security("mfa_recovery_regenerated", user_id=user.id)
+    return {"recovery_codes": codes}
+
+
 @router.post("/logout")
 async def logout(
     credentials: HTTPAuthorizationCredentials = Depends(security),
@@ -793,7 +829,7 @@ async def register_individual_teacher(
     """Self-registration for individual teachers (no school required).
 
     Creates a teacher account on the Free Teacher plan. School selection is
-    deliberately omitted — individual teachers start with school_id = NULL.
+    deliberately omitted â€” individual teachers start with school_id = NULL.
     """
     ok, msg = validate_email(req.email)
     if not ok:
@@ -827,7 +863,7 @@ async def register_individual_teacher(
 
     # Create Free Tier entitlement. Lesson plans are 5 per CALENDAR MONTH and
     # AI is 5 per CALENDAR MONTH (both enforced server-side via the usage
-    # ledgers, PART 16-18) — never a lifetime cap.
+    # ledgers, PART 16-18) â€” never a lifetime cap.
     free_ent = EntitlementDB(
         id=generate_id(),
         user_id=new_user.id,
@@ -849,7 +885,7 @@ async def register_individual_teacher(
     db.refresh(new_user)
 
     # Referral attribution: only for this newly created account, only once.
-    # Registration alone never grants credits — the reward waits for the
+    # Registration alone never grants credits â€” the reward waits for the
     # first verified paid package purchase.
     try:
         from .. import referrals
@@ -930,7 +966,7 @@ async def get_my_plan(
 
 @router.get("/users")
 async def list_users(admin: User = Depends(require_admin), db: Session = Depends(get_db)):
-    """List users. School admins see only users in their own school (§2 isolation)."""
+    """List users. School admins see only users in their own school (Â§2 isolation)."""
     if admin.school_id:
         users = db.query(User).filter(User.school_id == admin.school_id).all()
     else:
@@ -944,9 +980,9 @@ async def get_my_school(
     db: Session = Depends(get_db),
 ):
     """
-    School-scoped overview for the SCHOOL ADMIN dashboard (§13):
+    School-scoped overview for the SCHOOL ADMIN dashboard (Â§13):
     school name, license status, seats used/available, teacher roster.
-    Returns only this admin's school — never platform-wide data.
+    Returns only this admin's school â€” never platform-wide data.
     """
     from ..database import SchoolDB, SchoolLicenseDB, ProductPlanDB
     from sqlalchemy import func
@@ -1216,9 +1252,9 @@ async def reset_password(user_id: str, req: LoginRequest, admin: User = Depends(
     return {"message": "Password reset successfully"}
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # PLATFORM ADMIN BOOTSTRAP
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 
 def _platform_admin_exists(db: Session) -> bool:
@@ -1233,7 +1269,7 @@ def _platform_admin_exists(db: Session) -> bool:
 async def platform_admin_setup_status(db: Session = Depends(get_db)):
     """Public check: is the one-time platform-admin bootstrap still open?
 
-    Reveals only a boolean — no secrets, no account data.
+    Reveals only a boolean â€” no secrets, no account data.
     """
     return {"bootstrap_required": not _platform_admin_exists(db)}
 
@@ -1355,9 +1391,9 @@ async def setup_platform_admin(req: PlatformAdminBootstrapRequest, db: Session =
     }
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # SELF-SERVICE PASSWORD CHANGE (all roles)
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 
 class ChangePasswordRequest(BaseModel):
@@ -1410,9 +1446,9 @@ async def change_password(
     }
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # TOKEN-BASED PASSWORD RESET (admin-initiated)
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 RESET_TOKEN_TTL = timedelta(minutes=get_settings().PASSWORD_RESET_TOKEN_TTL_MINUTES)
 
@@ -1508,7 +1544,7 @@ async def initiate_password_reset(
     # Cross-school isolation (platform admins bypass).
     _require_same_school(admin, target)
 
-    # Nobody resets themselves here — use the self-service change-password.
+    # Nobody resets themselves here â€” use the self-service change-password.
     if target.id == admin.id:
         raise HTTPException(
             status_code=400,

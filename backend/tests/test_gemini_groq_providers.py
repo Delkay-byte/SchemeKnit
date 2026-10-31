@@ -660,6 +660,10 @@ class TestLiveGroq:
         if not out and p.last_error in ("auth_failed", "invalid_api_key",
                                         "missing_api_key", "model_not_found",
                                         "http_404"):
-            pytest.skip(f"Groq blocked (last_error={p.last_error}) — verify GROQ_API_KEY/GROQ_MODEL")
+            pytest.skip(f"Groq blocked (last_error={p.last_error}) - verify GROQ_API_KEY/GROQ_MODEL")
+        if not out and p.last_error and (
+            p.last_error.startswith("http_5") or p.last_error == "rate_limit"
+        ):
+            pytest.skip(f"Groq transient throttle (last_error={p.last_error}) - retry later")
         assert out, f"Groq returned empty (last_error={p.last_error})"
         assert "learning_objectives" in out or "starter" in out or "assessment" in out

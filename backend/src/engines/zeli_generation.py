@@ -38,7 +38,7 @@ ZELI_PROVIDER_KEY = "deepseek"
 #: Method label persisted on jobs/lessons.
 ZELI_METHOD = "zeli"
 #: Bump when the prompt/contract changes enough to invalidate cached output.
-ZELI_PROMPT_VERSION = "zeli-generation-v5"
+ZELI_PROMPT_VERSION = "zeli-generation-v6"
 
 #: The canonical V2 sections a whole Zeli lesson must carry. A partial object
 #: is rejected before any of it is applied to the deterministic scaffold.

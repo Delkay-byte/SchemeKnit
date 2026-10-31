@@ -74,6 +74,32 @@ def test_enrollment_login_replay_and_recovery(db):
         assert reused.status_code == 401
 
 
+def test_status_and_recovery_regeneration(db):
+    admin = make_user(db, role="platform_admin", is_admin=True,
+                      email="mfa-regen@test.com")
+    app = _app(db, admin)
+    with TestClient(app) as client:
+        secret = client.post("/api/auth/mfa/setup").json()["secret"]
+        step = step_at()
+        codes = client.post("/api/auth/mfa/verify-setup", json={
+            "code": totp(secret, step + 1)}).json()["recovery_codes"]
+        status = client.get("/api/auth/mfa/status")
+        assert status.status_code == 200
+        assert status.json()["enabled"] is True
+        assert status.json()["recovery_codes_remaining"] == 8
+        regen = client.post("/api/auth/mfa/recovery/regenerate", json={
+            "password": "testpass123", "code": totp(secret, step + 1)})
+        assert regen.status_code == 200
+        new_codes = regen.json()["recovery_codes"]
+        assert len(new_codes) == 8
+        assert new_codes != codes
+        # Old recovery code no longer works.
+        assert _login(client, admin.email, "testpass123",
+                      recovery_code=codes[0]).status_code == 401
+        assert _login(client, admin.email, "testpass123",
+                      recovery_code=new_codes[0]).status_code == 200
+
+
 def test_disable_requires_password_and_code(db):
     admin = make_user(db, role="platform_admin", is_admin=True,
                       email="mfa-disable@test.com")

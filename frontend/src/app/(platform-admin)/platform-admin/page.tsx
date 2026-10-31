@@ -26,6 +26,7 @@ import { PageHeader } from '@/components/ui/page-header'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatCurrency, formatActivationDate } from '@/lib/utils-display'
 import { ChangePasswordCard } from '@/components/change-password'
+import { MfaSettingsCard } from '@/components/mfa-settings-card'
 
 type Tab = 'dashboard' | 'schools' | 'licenses' | 'plans' | 'teachers' | 'payments' | 'activations' | 'audit' | 'accounts' | 'settings'
 
@@ -1203,6 +1204,7 @@ export default function PlatformAdminPage() {
                   <p className="text-sm text-muted-foreground">Your admin credentials and site-wide maintenance.</p>
                 </div>
                 <ChangePasswordCard />
+                <MfaSettingsCard />
                 <MaintenanceControl />
               </div>
             )}
