@@ -102,16 +102,30 @@ class ApiService {
 
   // Auth API — `entry` is the login page's intended entry point and is
   // validated server-side against the user's database role.
-  async login(email: string, password: string, entry: 'teacher' | 'school_admin' | 'platform_admin'): Promise<any> {
+  async login(
+    email: string,
+    password: string,
+    entry: 'teacher' | 'school_admin' | 'platform_admin',
+    mfaCode?: string,
+    recoveryCode?: string,
+  ): Promise<any> {
     return this.request('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password, entry }),
+      body: JSON.stringify({
+        email, password, entry,
+        ...(mfaCode ? { mfa_code: mfaCode } : {}),
+        ...(recoveryCode ? { recovery_code: recoveryCode } : {}),
+      }),
     })
   }
 
   // Server-side logout: revokes this session's token id until it expires.
   async logout(): Promise<void> {
     await this.request('/api/auth/logout', { method: 'POST' })
+  }
+
+  async logoutAll(): Promise<{ ok: boolean; revoked_sessions: number }> {
+    return this.request('/api/auth/logout-all', { method: 'POST' })
   }
 
   async getSetupStatus(): Promise<{ needs_setup: boolean; user_count: number }> {
@@ -132,10 +146,16 @@ class ApiService {
     })
   }
 
-  async registerIndividual(email: string, password: string, fullName: string, referralCode?: string): Promise<any> {
+  async registerIndividual(email: string, password: string, fullName: string, referralCode?: string, inviteCode?: string): Promise<any> {
     return this.request('/api/auth/register/individual', {
       method: 'POST',
-      body: JSON.stringify({ email, password, full_name: fullName, referral_code: referralCode || '' }),
+      body: JSON.stringify({
+        email,
+        password,
+        full_name: fullName,
+        referral_code: referralCode || '',
+        invite_code: inviteCode || '',
+      }),
     })
   }
 
@@ -259,6 +279,35 @@ class ApiService {
         current_password: currentPassword,
         new_password: newPassword,
       }),
+    })
+  }
+
+  async getMfaStatus(): Promise<{ enabled: boolean; recovery_codes_remaining: number }> {
+    return this.request('/api/auth/mfa/status')
+  }
+
+  async beginMfaSetup(): Promise<{ secret: string; otpauth_uri: string; digits: number; period_seconds: number }> {
+    return this.request('/api/auth/mfa/setup', { method: 'POST' })
+  }
+
+  async verifyMfaSetup(code: string): Promise<{ enabled: boolean; recovery_codes: string[] }> {
+    return this.request('/api/auth/mfa/verify-setup', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    })
+  }
+
+  async disableMfa(password: string, code: string): Promise<{ enabled: boolean }> {
+    return this.request('/api/auth/mfa/disable', {
+      method: 'POST',
+      body: JSON.stringify({ password, code }),
+    })
+  }
+
+  async regenerateMfaRecovery(password: string, code: string): Promise<{ recovery_codes: string[] }> {
+    return this.request('/api/auth/mfa/recovery/regenerate', {
+      method: 'POST',
+      body: JSON.stringify({ password, code }),
     })
   }
 

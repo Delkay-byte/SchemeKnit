@@ -1,6 +1,14 @@
 import Link from 'next/link'
 import { PublicPage } from '@/components/public-page'
 import { Button } from '@/components/ui/button'
+import { pageMetadata } from '@/lib/site-url'
+
+export const metadata = pageMetadata({
+  title: 'Lesson Planning Features',
+  description:
+    'See how SchemeKnit turns a Ghanaian Scheme of Learning into editable, indicator-level lesson plans for KG, primary and JHS teachers.',
+  path: '/features',
+})
 
 const AUDIENCES = [
   {
@@ -9,7 +17,7 @@ const AUDIENCES = [
   },
   {
     title: 'Basic 1–6 class teachers',
-    body: 'Upload the scheme for your class and subject. TeachFlow extracts the week, strand, sub-strand, content standard and indicators for you to check and correct.',
+    body: 'Upload the scheme for your class and subject. SchemeKnit extracts the week, strand, sub-strand, content standard and indicators for you to check and correct.',
   },
   {
     title: 'JHS subject teachers',
@@ -22,7 +30,7 @@ export default function FeaturesPage() {
     <PublicPage
       eyebrow="Features"
       title="Your Scheme of Learning. Your Lesson Plans. Made Easier."
-      description="TeachFlow starts with the scheme you upload, not a generic library of pre-written lessons. You stay in control of the curriculum; the application does the repetitive assembly."
+      description="SchemeKnit starts with the scheme you upload, not a generic library of pre-written lessons. You stay in control of the curriculum; the application does the repetitive assembly."
     >
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
         <h2 className="text-2xl font-bold text-[#102A43]">Five steps, one scheme</h2>
@@ -46,7 +54,7 @@ export default function FeaturesPage() {
       <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
         <h2 className="text-2xl font-bold text-[#102A43]">One week, several indicators, separate plans</h2>
         <p className="mt-3 text-sm leading-relaxed text-slate-600">
-          A single scheme week can contain more than one indicator. TeachFlow
+          A single scheme week can contain more than one indicator. SchemeKnit
           generates a separate, independently teachable plan for each indicator
           you select. A week with three indicators can produce three plans and
           consume three credits.

@@ -87,6 +87,9 @@ export function RoleLogin({ entry }: { entry: EntryRole }) {
   const { login, user, loading: authLoading } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [mfaCode, setMfaCode] = useState('')
+  const [recoveryCode, setRecoveryCode] = useState('')
+  const [useRecovery, setUseRecovery] = useState(false)
   const [error, setError] = useState('')
   const [showForgot, setShowForgot] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -128,7 +131,13 @@ export function RoleLogin({ entry }: { entry: EntryRole }) {
     setError('')
     setLoading(true)
     try {
-      await login(email, password, entry)
+      await login(
+        email,
+        password,
+        entry,
+        entry === 'platform_admin' && !useRecovery ? mfaCode : undefined,
+        entry === 'platform_admin' && useRecovery ? recoveryCode : undefined,
+      )
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Authentication failed')
     } finally {
@@ -244,6 +253,35 @@ export function RoleLogin({ entry }: { entry: EntryRole }) {
             className="h-11 rounded-lg border-input bg-white px-3.5 text-sm text-[#102A43] shadow-[0_1px_2px_rgba(16,42,67,0.04)] transition-all hover:border-[#04A9CE]/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#04A9CE]/45 focus-visible:border-[#04A9CE]/70"
           />
         </AuthField>
+
+        {entry === 'platform_admin' && (
+          <AuthField
+            id={`${entry}-mfa`}
+            label={useRecovery ? 'Recovery code' : 'Authenticator code'}
+            hint={
+              <button
+                type="button"
+                onClick={() => setUseRecovery((v) => !v)}
+                className="text-[#04A9CE] font-semibold hover:text-[#0389a8]"
+              >
+                {useRecovery ? 'Use authenticator code' : 'Use recovery code'}
+              </button>
+            }
+          >
+            <Input
+              id={`${entry}-mfa`}
+              type="text"
+              inputMode={useRecovery ? 'text' : 'numeric'}
+              value={useRecovery ? recoveryCode : mfaCode}
+              onChange={(e) => useRecovery
+                ? setRecoveryCode(e.target.value)
+                : setMfaCode(e.target.value)}
+              placeholder={useRecovery ? 'XXXX-XXXX' : '6-digit code'}
+              autoComplete="one-time-code"
+              maxLength={useRecovery ? 20 : 6}
+            />
+          </AuthField>
+        )}
 
         {showForgot && copy.showForgot && (
           <div

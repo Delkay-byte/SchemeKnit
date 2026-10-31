@@ -1,13 +1,21 @@
 import Link from 'next/link'
 import { PublicPage } from '@/components/public-page'
 import { Button } from '@/components/ui/button'
+import { pageMetadata } from '@/lib/site-url'
+
+export const metadata = pageMetadata({
+  title: 'About SchemeKnit',
+  description:
+    'SchemeKnit is a lesson-planning workspace for Ghanaian teachers, built around the Scheme of Learning they already use.',
+  path: '/about',
+})
 
 export default function AboutPage() {
   return (
     <PublicPage
       eyebrow="About"
       title="Built around the scheme teachers already use"
-      description="TeachFlow is a lesson-planning workspace for Ghanaian teachers. It starts from the teacher's own scheme of learning and turns selected indicators into editable, exportable plans."
+      description="SchemeKnit is a lesson-planning workspace for Ghanaian teachers. It starts from the teacher's own scheme of learning and turns selected indicators into editable, exportable plans."
     >
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
         <h2 className="text-xl font-bold text-[#102A43]">Why we built it</h2>
@@ -15,7 +23,7 @@ export default function AboutPage() {
           Lesson planning takes time that teachers would rather spend on
           teaching. Much of that time is repetitive: reading the same scheme
           week after week, finding the indicator, and assembling the same
-          lesson structure around it. TeachFlow does the repetitive assembly
+          lesson structure around it. SchemeKnit does the repetitive assembly
           while keeping the teacher's scheme and professional judgement in
           charge.
         </p>

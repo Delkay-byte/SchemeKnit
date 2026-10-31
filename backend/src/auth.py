@@ -8,19 +8,45 @@ from datetime import datetime, timedelta
 from typing import Optional
 import uuid
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from jose import JWTError, jwt
+import jwt
+from jwt import InvalidTokenError
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 from .config import get_settings
-from .database import get_db, User, RevokedTokenDB
+from .database import get_db, User, RevokedTokenDB, UserSessionDB
 
 settings = get_settings()
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-security = HTTPBearer()
+
+
+class _BearerUnauthorized(HTTPBearer):
+    """HTTP Bearer scheme that reports missing credentials as 401.
+
+    FastAPI's default ``HTTPBearer`` raises 403 for a missing Authorization
+    header. Missing authentication is not an authorization decision: the
+    correct contract is ``401 Unauthorized`` with a ``WWW-Authenticate``
+    challenge. Invalid, expired and revoked tokens already raise 401 in
+    ``_authenticate_user``; this makes the missing-credential case consistent.
+    """
+
+    async def __call__(self, request: Request):
+        try:
+            return await super().__call__(request)
+        except HTTPException as exc:
+            if exc.status_code == status.HTTP_403_FORBIDDEN:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Not authenticated",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            raise
+
+
+security = _BearerUnauthorized()
 
 
 def hash_password(password: str) -> str:
@@ -59,7 +85,7 @@ def decode_token(token: str) -> dict:
     try:
         payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
         return payload
-    except JWTError:
+    except InvalidTokenError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
@@ -108,14 +134,46 @@ def _authenticate_user(credentials: HTTPAuthorizationCredentials, db: Session) -
                 detail="You have signed out. Please sign in again.",
             )
 
+        # New sessions are server-verifiable: idle, absolute and revoke-all
+        # checks. Tokens issued before this table existed have no row and keep
+        # working until their JWT expiry (legacy compatibility).
+        session = db.query(UserSessionDB).filter(
+            UserSessionDB.jti == jti).first()
+        if session is not None:
+            now = datetime.utcnow()
+            if session.revoked_at is not None:
+                raise HTTPException(
+                    status_code=401,
+                    detail="This session has ended. Please sign in again.",
+                )
+            if session.expires_at <= now:
+                raise HTTPException(
+                    status_code=401,
+                    detail="Your session has expired. Please sign in again.",
+                )
+            idle_limit = timedelta(
+                minutes=max(1, int(getattr(settings, "SESSION_IDLE_MINUTES", 30)))
+            )
+            if now - session.last_seen_at > idle_limit:
+                raise HTTPException(
+                    status_code=401,
+                    detail="Your session expired after inactivity. Please sign in again.",
+                )
+            # Throttle writes: one touch per minute is enough for a 30-minute
+            # idle window and avoids a DB write on every request.
+            if (now - session.last_seen_at).total_seconds() >= 60:
+                session.last_seen_at = now
+                db.commit()
+
     return user
 
 
-def create_user_token(user: User, expires_delta: Optional[timedelta] = None) -> str:
+def create_user_token(user: User, expires_delta: Optional[timedelta] = None,
+                      jti: Optional[str] = None) -> str:
     """Create a JWT for ``user`` stamped with the current password version.
 
-    Each token also carries a unique ``jti`` so logout can revoke exactly that
-    session without affecting the user's other devices.
+    Each token carries a unique ``jti`` so logout/revoke-all can invalidate the
+    server-side session without affecting other devices.
     """
     return create_access_token(
         {
@@ -123,10 +181,43 @@ def create_user_token(user: User, expires_delta: Optional[timedelta] = None) -> 
             "email": user.email,
             "role": user.role,
             "pwv": _password_version(user),
-            "jti": uuid.uuid4().hex,
+            "jti": jti or uuid.uuid4().hex,
         },
         expires_delta=expires_delta,
     )
+
+
+def create_session_record(db: Session, user_id: str, jti: str) -> UserSessionDB:
+    """Create the server-side row for a newly issued login token."""
+    now = datetime.utcnow()
+    row = UserSessionDB(
+        jti=jti,
+        user_id=user_id,
+        created_at=now,
+        last_seen_at=now,
+        expires_at=now + timedelta(
+            hours=max(1, int(getattr(settings, "SESSION_ABSOLUTE_HOURS", 12)))
+        ),
+    )
+    db.add(row)
+    db.commit()
+    return row
+
+
+def revoke_user_sessions(db: Session, user_id: str,
+                         except_jti: Optional[str] = None) -> int:
+    """Revoke all active sessions for a user, optionally keeping the current one."""
+    now = datetime.utcnow()
+    query = db.query(UserSessionDB).filter(
+        UserSessionDB.user_id == user_id,
+        UserSessionDB.revoked_at.is_(None),
+    )
+    if except_jti:
+        query = query.filter(UserSessionDB.jti != except_jti)
+    count = query.update({UserSessionDB.revoked_at: now},
+                         synchronize_session=False)
+    db.commit()
+    return int(count or 0)
 
 
 async def get_current_user(
@@ -163,14 +254,42 @@ async def require_admin(
     return user
 
 
-async def require_platform_admin(
+async def require_platform_admin_unenrolled(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db),
 ) -> User:
-    """Require platform-level admin. Only platform_admin role."""
+    """Platform-admin identity without requiring MFA enrollment.
+
+    Used only for the MFA status/setup/verify endpoints so an admin can enroll.
+    """
     user = _authenticate_user(credentials, db)
     if user.role != "platform_admin":
         raise HTTPException(status_code=403, detail="Platform administrator access required")
+    return user
+
+
+async def require_platform_admin(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db),
+    request: Request = None,
+) -> User:
+    """Require platform-level admin; mutations require enrolled MFA.
+
+    Reads remain available so the admin console and MFA enrollment card load.
+    In local DEBUG, enforcement is skipped for the existing test fixture set;
+    production runs with DEBUG=false and enforces it.
+    """
+    user = _authenticate_user(credentials, db)
+    if user.role != "platform_admin":
+        raise HTTPException(status_code=403, detail="Platform administrator access required")
+    method = request.method if request is not None else "GET"
+    if (not settings.DEBUG
+            and method not in {"GET", "HEAD", "OPTIONS"}
+            and not user.mfa_enabled):
+        raise HTTPException(
+            status_code=403,
+            detail="MFA enrollment is required before privileged administration.",
+        )
     return user
 
 

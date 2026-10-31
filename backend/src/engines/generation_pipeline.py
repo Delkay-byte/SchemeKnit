@@ -31,7 +31,7 @@ from ..models import (
     CurriculumCoverage, LessonPlan, GenerationJob, JobStatus,
     LessonStatus, TemplateType, AIMode, ValidationIssue, ValidationSeverity,
     Holiday, EducationalLevel, CLASS_LEVEL_TO_EDUCATIONAL_LEVEL,
-    Subject, ClassLevel, GenerationMethod,
+    Subject, ClassLevel, GenerationMethod, ContentSource,
 )
 from .calendar_engine import CalendarEngine
 from ..ai_resource_text import normalize_structured_references
@@ -49,6 +49,8 @@ from .ai_provider import get_provider, resolve_provider_mode
 from .zeli_generation import (
     ZeliGenerationError,
     generate_zeli_content,
+    generate_zeli_with_fallback,
+    get_zeli_fallback_provider,
     get_zeli_provider,
     zeli_lesson_context,
 )
@@ -438,7 +440,8 @@ class GenerationPipeline:
     ) -> List[Path]:
         return self.docx_engine.export_batch_custom(lesson_plans, structure, output_dir, context=context)
 
-    def _complete_zeli_timeline(self, lp: LessonPlan) -> None:
+    def _complete_zeli_timeline(self, lp: LessonPlan,
+                                content: Optional[dict] = None) -> None:
         """Place the provider's starter/plenary into the lesson timeline.
 
         The V2 provider returns the starter and plenary as separate sections,
@@ -447,9 +450,12 @@ class GenerationPipeline:
         boundary and whose minutes sum exactly to the lesson duration.
 
         This is structural normalisation, not invented content: every row's
-        text comes verbatim from the provider's own starter/conclusion. The
-        remainder is distributed deterministically so the printed timetable is
-        always arithmetically possible.
+        text comes verbatim from the provider's own starter/conclusion. When
+        the provider supplied explicit minutes for those sections they are
+        honoured (the first real DeepSeek run exposed an invented 15-minute
+        exit slip because the provider's 5 minutes were ignored); only the
+        remaining slack is distributed deterministically so the printed
+        timetable is always arithmetically possible.
         """
         from ..curriculum.lesson_rubric import phase_rows
         from ..models import TeachingActivity
@@ -457,36 +463,82 @@ class GenerationPipeline:
         duration = int(lp.duration_minutes or 0)
         if duration <= 0:
             return
+        content = content if isinstance(content, dict) else {}
+
+        def _section(name: str) -> dict:
+            value = content.get(name)
+            return value if isinstance(value, dict) else {}
+
+        def _provider_minutes(section: dict) -> int:
+            try:
+                value = int(section.get("duration_minutes") or 0)
+            except (TypeError, ValueError):
+                return 0
+            return value if 0 < value < duration else 0
 
         activities = list(lp.main_activities or [])
         p1, _p2, p3 = phase_rows(lp)
-        spent = sum(int(a.duration_minutes or 0) for a in activities)
-        if spent > duration:
-            activities = _fit_activity_durations(activities, duration)
+        starter_text = (lp.starter_activity or "").strip()
+        plenary_text = (lp.conclusion or "").strip()
+
+        # Default boundary budgets (used only when the provider gave no
+        # explicit minutes) keep the opening/closing short for a 60-minute
+        # lesson instead of sweeping all leftover time into the plenary.
+        default_boundary = max(1, min(10, duration // 12))
+        starter_wanted = 0
+        plenary_wanted = 0
+        if starter_text and not p1:
+            starter_wanted = (
+                _provider_minutes(_section("starter")) or default_boundary)
+        if plenary_text and not p3:
+            plenary_wanted = (
+                _provider_minutes(_section("plenary")) or default_boundary)
+
+        # Never let the boundary rows crowd out the main learning.
+        if starter_wanted + plenary_wanted >= duration:
+            scale = (duration - 1) / max(starter_wanted + plenary_wanted, 1)
+            starter_wanted = int(starter_wanted * scale)
+            plenary_wanted = int(plenary_wanted * scale)
+
+        main_budget = max(duration - starter_wanted - plenary_wanted, 0)
+        if activities:
             spent = sum(int(a.duration_minutes or 0) for a in activities)
+            if spent > main_budget:
+                activities = _fit_activity_durations(activities, main_budget)
+                spent = sum(int(a.duration_minutes or 0) for a in activities)
+            # Absorb any slack into the last teaching phase so the printed
+            # timetable always sums to the lesson duration.
+            slack = main_budget - spent
+            if slack > 0:
+                activities[-1].duration_minutes = int(
+                    activities[-1].duration_minutes or 0) + slack
+        else:
+            # No main phases: give the remaining time to the boundary rows.
+            starter_wanted += main_budget // 2
+            plenary_wanted += main_budget - main_budget // 2
 
-        remainder = max(duration - spent, 0)
-
-        if not p1 and remainder > 0 and (lp.starter_activity or "").strip():
-            minutes = max(1, min(10, remainder // 4))
+        if starter_text and not p1 and starter_wanted > 0:
             activities.insert(0, TeachingActivity(
                 phase="STARTER",
                 description=lp.starter_activity,
-                duration_minutes=minutes,
+                duration_minutes=starter_wanted,
+                source=ContentSource.AI,
             ))
-            remainder -= minutes
-
-        if not p3 and remainder > 0 and (lp.conclusion or "").strip():
+        if plenary_text and not p3 and plenary_wanted > 0:
             activities.append(TeachingActivity(
                 phase="PLENARY",
                 description=lp.conclusion,
-                duration_minutes=remainder,
+                duration_minutes=plenary_wanted,
+                source=ContentSource.AI,
             ))
-            remainder = 0
 
-        if remainder > 0 and activities:
-            activities[-1].duration_minutes = (
-                int(activities[-1].duration_minutes or 0) + remainder)
+        # Final arithmetic guard for any branch that skipped a boundary row.
+        total = sum(int(a.duration_minutes or 0) for a in activities)
+        if activities and total < duration:
+            activities[-1].duration_minutes = int(
+                activities[-1].duration_minutes or 0) + (duration - total)
+        elif activities and total > duration:
+            activities = _fit_activity_durations(activities, duration)
 
         lp.main_activities = activities
 
@@ -513,8 +565,24 @@ class GenerationPipeline:
         exactly as in the enrichment path.
         """
         provider = get_zeli_provider()
-        provider_name = provider.get_name() if hasattr(provider, "get_name") else "zeli"
-        model = str(getattr(provider, "model", "") or "")
+        fallback = get_zeli_fallback_provider()
+        primary_name = provider.get_name() if hasattr(provider, "get_name") else "zeli"
+        primary_model = str(getattr(provider, "model", "") or "")
+        # Sanitized, per-job provider provenance. The router persists the
+        # actual successful provider on every lesson; these fields explain
+        # whether a fallback was used and why the primary failed.
+        job._zeli_primary_provider = primary_name
+        job._zeli_primary_model = primary_model
+        job._zeli_primary_error = None
+        job._zeli_fallback_provider = (
+            fallback.get_name() if fallback is not None
+            and hasattr(fallback, "get_name") else None)
+        job._zeli_fallback_model = (
+            str(getattr(fallback, "model", "") or "") if fallback is not None else "")
+        job._zeli_fallback_used = False
+        job._zeli_attempts = []
+        job._zeli_fresh_calls = 0
+        job._zeli_cache_hits = 0
 
         sorted_plans = sorted(lesson_plans, key=lambda lp: lp.lesson_sequence)
         for idx, lp in enumerate(sorted_plans):
@@ -547,13 +615,25 @@ class GenerationPipeline:
             )
             job.ai_enrichment_total_attempted += 1
 
-            content = generate_zeli_content(
-                provider=provider, context=context, db=db)
+            content, meta = generate_zeli_with_fallback(
+                primary=provider, fallback=fallback, context=context, db=db)
+            job._zeli_attempts.extend(meta.get("attempts") or [])
+            if meta.get("fallback_used"):
+                job._zeli_fallback_used = True
+                job._zeli_primary_error = meta.get("primary_error")
+            if meta.get("external_calls"):
+                job._zeli_fresh_calls += 1
+            if meta.get("cache_hit"):
+                job._zeli_cache_hits += 1
+            provider_name = meta.get("provider") or primary_name
+            model = meta.get("model") or primary_model
 
             # Apply the validated whole-lesson content. Curriculum fields and
-            # teacher-owned metadata are protected inside _apply_v2_content.
-            self._apply_v2_content(lp, content, config)
-            self._complete_zeli_timeline(lp)
+            # teacher-owned metadata are protected inside _apply_v2_content;
+            # whole_lesson=True lets the provider's own teaching moves,
+            # materials and prior knowledge replace the deterministic scaffold.
+            self._apply_v2_content(lp, content, config, whole_lesson=True)
+            self._complete_zeli_timeline(lp, content)
 
             lp.ai_generated = True
             lp.generation_method = "zeli"
@@ -562,9 +642,102 @@ class GenerationPipeline:
             job.ai_enrichment_succeeded += 1
 
         logger.info(
-            "Zeli generated %d lesson(s) with provider=%s for job %s",
-            job.ai_enrichment_succeeded, provider_name, job.id,
+            "Zeli generated %d lesson(s) with provider=%s fallback_used=%s "
+            "for job %s",
+            job.ai_enrichment_succeeded, primary_name,
+            job._zeli_fallback_used, job.id,
         )
+
+    def regenerate_zeli_with_fallback(
+        self,
+        job: GenerationJob,
+        config: TermConfig,
+        db=None,
+        *,
+        lesson_ids: Optional[List[str]] = None,
+    ) -> bool:
+        """One bounded fallback for lessons rejected by the quality gate.
+
+        The primary provider succeeded at the HTTP/schema level, but its
+        content was unacceptable. Re-run ONLY the rejected lessons on the
+        configured fallback provider, through the same strict validator and
+        mapping path. Returns True when at least one lesson was regenerated.
+        The caller must re-run the quality gate before persisting anything.
+        """
+        fallback = get_zeli_fallback_provider()
+        if fallback is None or not fallback.is_available():
+            return False
+        if getattr(job, "_zeli_fallback_used", False):
+            # A provider-level fallback already ran; do not spend a third call.
+            return False
+        if getattr(job, "_quality_fallback_attempted", False):
+            return False
+        job._quality_fallback_attempted = True
+
+        wanted = set(lesson_ids or [])
+        sorted_plans = sorted(
+            job._lesson_plans or [], key=lambda lp: lp.lesson_sequence)
+        regenerated = 0
+        for idx, lp in enumerate(sorted_plans):
+            if wanted and lp.id not in wanted:
+                continue
+            if bool(getattr(lp, "special_period_label", "") or ""):
+                continue
+            prev_context = None
+            next_context = None
+            if idx > 0:
+                prev_lp = sorted_plans[idx - 1]
+                prev_context = (
+                    f"Previous lesson: {prev_lp.strand} - {prev_lp.sub_strand}. "
+                    f"Indicator: {prev_lp.indicators[0] if prev_lp.indicators else 'N/A'}"
+                )
+            if idx < len(sorted_plans) - 1:
+                next_lp = sorted_plans[idx + 1]
+                next_context = (
+                    f"Next lesson: {next_lp.strand} - {next_lp.sub_strand}. "
+                    f"Indicator: {next_lp.indicators[0] if next_lp.indicators else 'N/A'}"
+                )
+            context = zeli_lesson_context(
+                lp, config,
+                previous_lesson_context=prev_context,
+                next_lesson_context=next_context,
+            )
+            try:
+                content = generate_zeli_content(
+                    provider=fallback, context=context, db=db)
+            except ZeliGenerationError:
+                continue
+            self._apply_v2_content(lp, content, config, whole_lesson=True)
+            self._complete_zeli_timeline(lp, content)
+            lp.generation_method = "zeli"
+            lp.ai_generated = True
+            lp.ai_provider = (
+                fallback.get_name() if hasattr(fallback, "get_name") else "groq")
+            lp.ai_model = str(getattr(fallback, "model", "") or "")
+            job._zeli_fallback_used = True
+            job._zeli_fallback_provider = lp.ai_provider
+            job._zeli_fallback_model = lp.ai_model
+            job._zeli_primary_error = (
+                getattr(job, "_zeli_primary_error", None)
+                or "quality_gate_rejected")
+            if not getattr(fallback, "last_cache_hit", False):
+                job._zeli_fresh_calls = int(
+                    getattr(job, "_zeli_fresh_calls", 0) or 0) + 1
+            else:
+                job._zeli_cache_hits = int(
+                    getattr(job, "_zeli_cache_hits", 0) or 0) + 1
+            job._zeli_attempts.append({
+                "provider": lp.ai_provider,
+                "model": lp.ai_model,
+                "ok": True,
+                "status": 200,
+                "error": None,
+                "cache_hit": bool(getattr(fallback, "last_cache_hit", False)),
+                "duration_seconds": 0.0,
+                "reason": "quality_gate_rejected",
+            })
+            regenerated += 1
+        return regenerated > 0
 
     def _enrich_with_ai(
         self,
@@ -745,7 +918,8 @@ class GenerationPipeline:
                 job.ai_enrichment_errors[lp.id] = f"{type(e).__name__}: {e}"
                 # ai_generated remains False — deterministic fallback
 
-    def _apply_v2_content(self, lp: LessonPlan, content: dict, config: TermConfig = None):
+    def _apply_v2_content(self, lp: LessonPlan, content: dict, config: TermConfig = None,
+                          *, whole_lesson: bool = False):
         """Apply V2 structured content to a lesson plan.
 
         Maps the V2 output schema to the existing LessonPlan fields.
@@ -754,6 +928,12 @@ class GenerationPipeline:
         Teacher-supplied metadata (keywords, TLRs, core competencies,
         references) is MERGED with — never replaced by — the AI output, so the
         teacher's explicit input survives AI enrichment.
+
+        ``whole_lesson`` distinguishes the "Generate with Zeli" method from the
+        optional enrichment path. Zeli writes the whole lesson, so its own
+        prior knowledge, teaching moves, resources and vocabulary must survive;
+        the deterministic scaffold is only the fallback when the provider did
+        not supply a field. Enrichment keeps the scaffold as the authority.
         """
 
         def _merge_unique(base, extra):
@@ -771,12 +951,21 @@ class GenerationPipeline:
 
         # ── AI overwrite guards (Section P) ────────────────────────────────
         # Precedence: AUTHORITATIVE SOURCE > TEACHER > AI.
-        # Snapshot teacher-owned fields so AI cannot replace them.
-        teacher_keywords = list(lp.keywords or [])
-        if config:
-            for k in (getattr(config, "keywords", []) or []):
-                if k and k.lower() not in {x.lower() for x in teacher_keywords}:
-                    teacher_keywords.append(k)
+        # Snapshot teacher-owned fields so AI cannot replace them. For a
+        # whole-lesson Zeli run the deterministic scaffold's keyword guesses
+        # are NOT teacher input; only the batch config carries teacher terms.
+        teacher_keywords = []
+        if whole_lesson:
+            if config:
+                for k in (getattr(config, "keywords", []) or []):
+                    if k and k not in teacher_keywords:
+                        teacher_keywords.append(k)
+        else:
+            teacher_keywords = list(lp.keywords or [])
+            if config:
+                for k in (getattr(config, "keywords", []) or []):
+                    if k and k.lower() not in {x.lower() for x in teacher_keywords}:
+                        teacher_keywords.append(k)
         lesson_source_tlrs = list(getattr(lp, "source_tlrs", None) or [])
         # OTHER TLRs are TEACHER-ADDED ONLY (PART I): the batch config seed is
         # never copied into per-lesson other_tlrs — that would fabricate data
@@ -825,22 +1014,30 @@ class GenerationPipeline:
                     objectives.append(LearningObjective(
                         description=obj,
                         indicator_code=lp.indicator_codes[0] if lp.indicator_codes else "",
+                        source=ContentSource.AI,
                     ))
                 elif isinstance(obj, dict):
                     objectives.append(LearningObjective(
                         description=obj.get("description", obj.get("objective", "")),
                         indicator_code=lp.indicator_codes[0] if lp.indicator_codes else "",
+                        source=ContentSource.AI,
                     ))
             if objectives:
                 lp.learning_objectives = objectives
 
         # Key vocabulary: teacher-supplied terms FIRST and always retained, then
         # AI-suggested indicator vocabulary added on top. AI never replaces.
+        # A whole-lesson run starts from the teacher/config terms only: the
+        # deterministic keyword guesses are not teacher input and were being
+        # echoed back as if they were (e.g. "watch", "notice", "materials").
         if "key_vocabulary" in content and content["key_vocabulary"]:
-            lp.keywords = _merge_unique(teacher_keywords or lp.keywords,
-                                        content["key_vocabulary"])
+            base_keywords = [] if whole_lesson else list(lp.keywords or [])
+            lp.keywords = _merge_unique(
+                _merge_unique(base_keywords, teacher_keywords),
+                content["key_vocabulary"])
         elif teacher_keywords:
-            lp.keywords = _merge_unique(lp.keywords, teacher_keywords)
+            base_keywords = [] if whole_lesson else list(lp.keywords or [])
+            lp.keywords = _merge_unique(base_keywords, teacher_keywords)
 
         # Starter — keep the provider's teacher/learner actions with it so the
         # opening is a complete teaching move, not a lone instruction.
@@ -868,6 +1065,7 @@ class GenerationPipeline:
                         description=phase.get("activity", ""),
                         duration_minutes=phase.get("duration_minutes", 15),
                         resources=_clean_resources(phase.get("resources_used", [])),
+                        source=ContentSource.AI,
                     ))
             if activities:
                 lp.main_activities = _fit_activity_durations(
@@ -882,6 +1080,7 @@ class GenerationPipeline:
                         description=item.get("description", item.get("activity", "")),
                         duration_minutes=item.get("duration_minutes", 15),
                         resources=_clean_resources(item.get("resources_used", [])),
+                        source=ContentSource.AI,
                     ))
             if activities:
                 lp.main_activities = _fit_activity_durations(
@@ -909,45 +1108,84 @@ class GenerationPipeline:
                 if activities:
                     lp.learner_activities = _dedupe_activities(activities)
 
-        # Teacher/learner columns: the deterministic builder supplies these for
-        # every lesson, so the provider's per-phase actions are used only to
-        # fill genuinely empty columns (e.g. a provider-only path). Replacing
-        # curriculum-grounded rows with looser model prose would weaken them.
+        # Teacher/learner columns. Optional enrichment keeps the deterministic
+        # curriculum-grounded rows and only fills genuinely empty columns. A
+        # whole-lesson Zeli run is different: the provider wrote the lesson's
+        # teaching moves, so its per-phase actions replace the generic scaffold
+        # rows instead of sitting beside contradictory ones.
         if isinstance(main, dict):
-            if not getattr(lp, "teacher_activities", None):
-                from ..models import TeachingActivity
-                rows = []
-                for phase_key, phase in main.items():
-                    if not isinstance(phase, dict):
-                        continue
-                    action = str(phase.get("teacher_action") or "").strip()
-                    if not action:
-                        continue
-                    rows.append(TeachingActivity(
-                        phase=str(phase.get("name", phase_key)).upper(),
-                        description=_compose_prose(
-                            phase.get("activity"), f"Teacher: {action}"),
-                        duration_minutes=phase.get("duration_minutes", 15),
-                    ))
-                if rows:
-                    lp.teacher_activities = _dedupe_activities(rows)
-            if not getattr(lp, "learner_activities", None):
-                from ..models import TeachingActivity
-                rows = []
-                for phase_key, phase in main.items():
-                    if not isinstance(phase, dict):
-                        continue
-                    action = str(phase.get("learner_action") or "").strip()
-                    if not action:
-                        continue
-                    rows.append(TeachingActivity(
-                        phase=str(phase.get("name", phase_key)).upper(),
-                        description=_compose_prose(
-                            phase.get("activity"), f"Learners: {action}"),
-                        duration_minutes=phase.get("duration_minutes", 15),
-                    ))
-                if rows:
-                    lp.learner_activities = _dedupe_activities(rows)
+            from ..models import TeachingActivity
+            if whole_lesson:
+                phase_rows_source = [p for p in main.values()
+                                     if isinstance(p, dict)]
+                mapped_by_phase = {
+                    str(getattr(act, "phase", "") or "").upper(): act
+                    for act in (lp.main_activities or [])
+                }
+                teacher_rows = []
+                learner_rows = []
+                for idx, phase in enumerate(phase_rows_source):
+                    name = str(phase.get("name") or "").upper()
+                    mapped = mapped_by_phase.get(name)
+                    if mapped is None and idx < len(lp.main_activities or []):
+                        mapped = (lp.main_activities or [])[idx]
+                    minutes = int(
+                        getattr(mapped, "duration_minutes", 0) or 0)
+                    teacher_action = str(
+                        phase.get("teacher_action") or "").strip()
+                    learner_action = str(
+                        phase.get("learner_action") or "").strip()
+                    if teacher_action:
+                        teacher_rows.append(TeachingActivity(
+                            phase=name or "MAIN",
+                            description=teacher_action,
+                            duration_minutes=minutes,
+                            source=ContentSource.AI,
+                        ))
+                    if learner_action:
+                        learner_rows.append(TeachingActivity(
+                            phase=name or "MAIN",
+                            description=learner_action,
+                            duration_minutes=minutes,
+                            source=ContentSource.AI,
+                        ))
+                if teacher_rows:
+                    lp.teacher_activities = _dedupe_activities(teacher_rows)
+                if learner_rows:
+                    lp.learner_activities = _dedupe_activities(learner_rows)
+            else:
+                if not getattr(lp, "teacher_activities", None):
+                    rows = []
+                    for phase_key, phase in main.items():
+                        if not isinstance(phase, dict):
+                            continue
+                        action = str(phase.get("teacher_action") or "").strip()
+                        if not action:
+                            continue
+                        rows.append(TeachingActivity(
+                            phase=str(phase.get("name", phase_key)).upper(),
+                            description=_compose_prose(
+                                phase.get("activity"), f"Teacher: {action}"),
+                            duration_minutes=phase.get("duration_minutes", 15),
+                        ))
+                    if rows:
+                        lp.teacher_activities = _dedupe_activities(rows)
+                if not getattr(lp, "learner_activities", None):
+                    rows = []
+                    for phase_key, phase in main.items():
+                        if not isinstance(phase, dict):
+                            continue
+                        action = str(phase.get("learner_action") or "").strip()
+                        if not action:
+                            continue
+                        rows.append(TeachingActivity(
+                            phase=str(phase.get("name", phase_key)).upper(),
+                            description=_compose_prose(
+                                phase.get("activity"), f"Learners: {action}"),
+                            duration_minutes=phase.get("duration_minutes", 15),
+                        ))
+                    if rows:
+                        lp.learner_activities = _dedupe_activities(rows)
 
         # Assessment — the provider's success criteria are the evidence the
         # teacher checks, so they belong with the task (never dropped).
@@ -959,6 +1197,62 @@ class GenerationPipeline:
                 task, f"Success criteria: {criteria}" if criteria else "")
         elif isinstance(assessment, str):
             lp.assessment = assessment
+
+        # Class assignment and assessment items are provider-authored on a
+        # whole-lesson run. The deterministic filler is only a fallback when
+        # the provider omits these fields (backward-compatible with older
+        # prompts/cached lessons).
+        if whole_lesson:
+            from ..models import AssessmentItem
+            class_task = content.get("class_assignment")
+            if isinstance(class_task, dict):
+                class_task = (
+                    class_task.get("task")
+                    or class_task.get("description")
+                    or class_task.get("activity")
+                    or "")
+            class_task = str(class_task or "").strip()
+            if class_task:
+                lp.class_assignment = class_task
+
+            raw_items = content.get("assessment_items")
+            if isinstance(raw_items, list):
+                items = []
+                for item in raw_items:
+                    if isinstance(item, str):
+                        prompt = item.strip()
+                        if not prompt:
+                            continue
+                        items.append(AssessmentItem(
+                            prompt=prompt, source=ContentSource.AI))
+                        continue
+                    if not isinstance(item, dict):
+                        continue
+                    prompt = str(
+                        item.get("prompt") or item.get("question")
+                        or item.get("task") or "").strip()
+                    if not prompt:
+                        continue
+                    try:
+                        dok = int(item.get("dok_level") or 1)
+                    except (TypeError, ValueError):
+                        dok = 1
+                    items.append(AssessmentItem(
+                        prompt=prompt,
+                        dok_level=max(1, min(4, dok)),
+                        bloom_category=str(
+                            item.get("bloom_category") or "recall"),
+                        expected_evidence=str(
+                            item.get("expected_evidence")
+                            or item.get("success_criteria") or ""),
+                        marking_guidance=str(
+                            item.get("marking_guidance") or ""),
+                        misconception=str(item.get("misconception") or ""),
+                        follow_up=str(item.get("follow_up") or ""),
+                        source=ContentSource.AI,
+                    ))
+                if items:
+                    lp.assessment_items = items
 
         # Plenary / conclusion — keep the provider's closing actions and exit
         # check so the lesson ends with evidence, not just a summary.
@@ -998,11 +1292,14 @@ class GenerationPipeline:
                 lp.homework = home_task
                 lp.home_assignment = home_task
 
-        # Teacher notes
-        if "teacher_notes" in content:
-            # Store in previous_knowledge field (which is underutilized)
-            if not lp.previous_knowledge:
-                lp.previous_knowledge = content["teacher_notes"]
+        # Prior knowledge: the provider states exactly what learners need to
+        # know before this lesson. This is the field the template renders; the
+        # old code ignored it and stored teacher notes here instead. Teacher
+        # notes are not prior knowledge and have no template cell, so they are
+        # deliberately not persisted as one.
+        prior_knowledge = str(content.get("prior_knowledge") or "").strip()
+        if prior_knowledge and not getattr(lp, "teacher_edited", False):
+            lp.previous_knowledge = prior_knowledge
 
         # Teacher-supplied metadata must survive AI enrichment (merge, never
         # replace). AI suggestions are appended after the teacher's own values.
@@ -1050,10 +1347,21 @@ class GenerationPipeline:
                 resources_block.get("suggested_alternatives", [])))
         # Do NOT pull "source_resources" from AI — source comes from the scheme.
         if ai_resources:
-            lp.teaching_learning_resources = _merge_unique(
-                list(lp.source_tlrs or []) + list(lp.other_tlrs or []),
-                _merge_unique(lp.teaching_learning_resources, ai_resources),
-            )
+            if whole_lesson:
+                # The provider chose the materials for its own activities.
+                # Keep the source TLRs (authoritative) and teacher-added TLRs,
+                # but drop the deterministic scaffold's generic science kit
+                # ("hand lens", "containers", ...), which does not describe
+                # this lesson and bloated the printed resource row.
+                lp.teaching_learning_resources = _merge_unique(
+                    list(lp.source_tlrs or []) + list(lp.other_tlrs or []),
+                    ai_resources,
+                )
+            else:
+                lp.teaching_learning_resources = _merge_unique(
+                    list(lp.source_tlrs or []) + list(lp.other_tlrs or []),
+                    _merge_unique(lp.teaching_learning_resources, ai_resources),
+                )
 
     def _lesson_to_dict(self, lp: LessonPlan) -> dict:
         """Convert a LessonPlan to a dict for the quality gate."""

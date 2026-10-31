@@ -18,16 +18,24 @@ from sqlalchemy.orm import Session
 from ..database import (
     get_db, User, generate_id, SchoolLicenseDB, SchoolMembershipDB,
     ActivationCodeDB, SchoolDB, ProductPlanDB, PlatformAuditLogDB,
-    PasswordResetTokenDB, RevokedTokenDB,
+    PasswordResetTokenDB, RevokedTokenDB, UserSessionDB,
 )
 from ..auth import (
     hash_password, verify_password, create_user_token,
+    create_session_record, revoke_user_sessions,
     get_current_user, require_admin, require_platform_admin,
-    decode_token, security,
+    require_platform_admin_unenrolled, decode_token, security,
 )
 from ..service import data_service
 from ..config import get_settings
-from ..logging_config import log_security
+from ..login_security import (
+    account_key, check_lockout, clear_failures, record_failure,
+)
+from ..mfa import (
+    generate_recovery_codes, generate_secret, hash_recovery_codes,
+    provisioning_uri, verify_recovery_code, verify_totp,
+)
+from ..logging_config import log_security, alert_security
 from ..validation import (
     validate_password, validate_email, normalize_email, password_policy_hint,
 )
@@ -45,7 +53,7 @@ VALID_LOGIN_ENTRIES = frozenset({"teacher", "school_admin", "platform_admin"})
 def _entry_matches_role(user: User, entry: str) -> bool:
     """True when ``entry`` is the correct entry point for this DB identity.
 
-    The role is read from the database row — never from the request body or a
+    The role is read from the database row â€” never from the request body or a
     token claim. ``is_admin`` keeps legacy school administrators working.
     """
     role = (getattr(user, "role", "") or "").strip().lower()
@@ -130,10 +138,26 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+    mfa_code: Optional[str] = None
+    recovery_code: Optional[str] = None
     #: The login entry point the client is using. The backend validates it
     #: against the user's authoritative database role, so a platform admin
     #: cannot obtain a session through the teacher entry (and vice versa).
     entry: Optional[str] = None
+
+
+class MfaCodeRequest(BaseModel):
+    code: str
+
+
+class MfaDisableRequest(BaseModel):
+    password: str
+    code: str
+
+
+class MfaRegenerateRequest(BaseModel):
+    password: str
+    code: str
 
 
 class SetupRequest(BaseModel):
@@ -155,7 +179,7 @@ class ProfileUpdateRequest(BaseModel):
 
     The client PUTs a JSON body; the field must be declared here or the write
     is silently discarded (a JSON body is NOT bound to bare function
-    parameters — that is how the school silently failed to persist).
+    parameters â€” that is how the school silently failed to persist).
     """
 
     full_name: Optional[str] = None
@@ -173,6 +197,7 @@ def user_response(user: User):
         "role": user.role,
         "school_id": user.school_id,
         "subscription_type": getattr(user, "subscription_type", None),
+        "mfa_enabled": bool(getattr(user, "mfa_enabled", False)),
     }
 
 
@@ -250,7 +275,7 @@ class IndividualActivateRequest(BaseModel):
 @router.post("/activation/validate")
 async def validate_activation_code(req: ActivationValidateRequest, db: Session = Depends(get_db)):
     """Public code check for the onboarding UX. Reveals display info only
-    (school name, plan, seats, period) — no secrets, no redemption."""
+    (school name, plan, seats, period) â€” no secrets, no redemption."""
     code = db.query(ActivationCodeDB).filter(
         ActivationCodeDB.code == req.activation_code.strip()).first()
     if not code:
@@ -416,7 +441,7 @@ async def setup_school_admin(req: SetupSchoolAdminRequest, db: Session = Depends
 
     The code is validated AND redeemed atomically in one transaction together
     with admin creation: single-winner redeem, no replay, full audit trail.
-    The school always comes from the code's license — never from the client.
+    The school always comes from the code's license â€” never from the client.
     """
     if not req.activation_code or not req.activation_code.strip():
         raise HTTPException(status_code=422, detail="Activation code is required")
@@ -524,19 +549,69 @@ async def register(req: RegisterRequest, user: User = Depends(require_admin), db
     }
 
 
+_DUMMY_PASSWORD_HASH = None
+
+
+def _dummy_password_check(password: str) -> None:
+    """Perform a bcrypt verification for an unknown identifier.
+
+    Keeps timing closer to a real account check and avoids a trivial
+    account-existence oracle. The result is deliberately ignored.
+    """
+    global _DUMMY_PASSWORD_HASH
+    if _DUMMY_PASSWORD_HASH is None:
+        _DUMMY_PASSWORD_HASH = hash_password("schemeKnit-dummy-password-check")
+    try:
+        verify_password(password, _DUMMY_PASSWORD_HASH)
+    except Exception:
+        pass
+
+
 @router.post("/login")
 async def login(req: LoginRequest, db: Session = Depends(get_db)):
     # The email is the login identifier and is compared normalized, so casing
     # at the keyboard never changes which account is matched.
     lookup = normalize_email(req.email) or req.email
+
+    # Account-level cooldown is checked before password verification. The
+    # counter is keyed opaquely and applies across all source IPs. Unknown
+    # identifiers are tracked too, so the response never reveals existence.
+    retry_after = check_lockout(db, lookup)
+    if retry_after:
+        log_security("login_locked", account=account_key(lookup),
+                     retry_after=retry_after)
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                "Too many sign-in attempts. Please wait before trying again."
+            ),
+            headers={"Retry-After": str(retry_after)},
+        )
+
     user = db.query(User).filter(User.email == lookup).first()
-    if not user or not verify_password(req.password, user.hashed_password):
-        # Security audit: identifier + result only. Never passwords, hashes, tokens.
-        # Same message whether the email exists or not (no enumeration oracle).
-        log_security("login_failed", email=req.email, reason="bad_credentials")
+    password_ok = bool(user) and verify_password(
+        req.password, user.hashed_password)
+    if not user:
+        # Equalise timing for unknown identifiers; never disclose existence.
+        _dummy_password_check(req.password)
+    if not password_ok:
+        cooldown = record_failure(db, lookup)
+        if cooldown:
+            alert_security("account_cooldown", account=account_key(lookup),
+                         cooldown_seconds=cooldown)
+            raise HTTPException(
+                status_code=429,
+                detail=(
+                    "Too many sign-in attempts. Please wait before trying again."
+                ),
+                headers={"Retry-After": str(cooldown)},
+            )
+        log_security("login_failed", account=account_key(lookup),
+                     reason="bad_credentials")
         raise HTTPException(status_code=401, detail="Invalid email or password")
     if not user.is_active:
-        log_security("login_failed", email=req.email, reason="disabled")
+        log_security("login_failed", account=account_key(lookup),
+                     reason="disabled")
         raise HTTPException(status_code=403, detail="Account disabled")
 
     # Entry-point boundary: the client says WHICH login it is using; the
@@ -544,15 +619,163 @@ async def login(req: LoginRequest, db: Session = Depends(get_db)):
     # indistinguishable from bad credentials in the response.
     entry = (req.entry or "").strip().lower()
     if entry not in VALID_LOGIN_ENTRIES or not _entry_matches_role(user, entry):
-        log_security("login_failed", email=req.email, reason="entry_mismatch")
+        cooldown = record_failure(db, lookup)
+        if cooldown:
+            alert_security("account_cooldown", account=account_key(lookup),
+                         cooldown_seconds=cooldown)
+            raise HTTPException(
+                status_code=429,
+                detail=(
+                    "Too many sign-in attempts. Please wait before trying again."
+                ),
+                headers={"Retry-After": str(cooldown)},
+            )
+        log_security("login_failed", account=account_key(lookup),
+                     reason="entry_mismatch")
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    token = create_user_token(user)
+    if user.mfa_enabled:
+        matched_step = None
+        recovery_index = None
+        if req.recovery_code:
+            recovery_index = verify_recovery_code(
+                req.recovery_code, user.mfa_recovery_codes or [])
+        elif req.mfa_code:
+            matched_step = verify_totp(user.mfa_secret or "", req.mfa_code)
+            if matched_step is not None and user.mfa_last_step is not None \
+                    and matched_step <= user.mfa_last_step:
+                matched_step = None  # replay of an already-used code
+        if recovery_index is None and matched_step is None:
+            cooldown = record_failure(db, lookup)
+            log_security("mfa_failed", account=account_key(lookup))
+            if cooldown:
+                raise HTTPException(
+                    status_code=429,
+                    detail="Too many sign-in attempts. Please wait before trying again.",
+                    headers={"Retry-After": str(cooldown)},
+                )
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+        if recovery_index is not None:
+            codes = list(user.mfa_recovery_codes or [])
+            codes.pop(recovery_index)
+            user.mfa_recovery_codes = codes
+            log_security("mfa_recovery_used", user_id=user.id)
+        else:
+            user.mfa_last_step = matched_step
+            log_security("mfa_verified", user_id=user.id)
+        db.commit()
+
+    clear_failures(db, lookup)
+    jti = secrets.token_hex(16)
+    token = create_user_token(user, jti=jti)
+    create_session_record(db, user.id, jti)
     return {
         "access_token": token,
         "token_type": "bearer",
         "user": user_response(user),
+        "mfa_enrollment_required": bool(
+            user.role == "platform_admin" and not user.mfa_enabled
+        ),
     }
+
+
+@router.post("/mfa/setup")
+async def mfa_setup(
+    user: User = Depends(require_platform_admin_unenrolled),
+    db: Session = Depends(get_db),
+):
+    """Start TOTP enrollment. Existing admins are not forced to enroll."""
+    if user.mfa_enabled:
+        raise HTTPException(status_code=400, detail="MFA is already enabled")
+    secret = generate_secret()
+    user.mfa_secret = secret
+    user.mfa_enabled = False
+    db.commit()
+    log_security("mfa_setup_started", user_id=user.id)
+    return {
+        "secret": secret,
+        "otpauth_uri": provisioning_uri(secret, user.email),
+        "digits": 6,
+        "period_seconds": 30,
+    }
+
+
+@router.post("/mfa/verify-setup")
+async def mfa_verify_setup(
+    req: MfaCodeRequest,
+    user: User = Depends(require_platform_admin_unenrolled),
+    db: Session = Depends(get_db),
+):
+    if not user.mfa_secret:
+        raise HTTPException(status_code=400, detail="Start MFA setup first")
+    step = verify_totp(user.mfa_secret, req.code)
+    if step is None:
+        log_security("mfa_setup_failed", user_id=user.id)
+        raise HTTPException(status_code=400, detail="Invalid verification code")
+    codes = generate_recovery_codes()
+    user.mfa_recovery_codes = hash_recovery_codes(codes)
+    user.mfa_last_step = step
+    user.mfa_enabled = True
+    db.commit()
+    log_security("mfa_enabled", user_id=user.id)
+    return {"enabled": True, "recovery_codes": codes}
+
+
+@router.post("/mfa/disable")
+async def mfa_disable(
+    req: MfaDisableRequest,
+    user: User = Depends(require_platform_admin),
+    db: Session = Depends(get_db),
+):
+    if not user.mfa_enabled:
+        raise HTTPException(status_code=400, detail="MFA is not enabled")
+    if not verify_password(req.password, user.hashed_password):
+        log_security("mfa_disable_failed", user_id=user.id, reason="password")
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    step = verify_totp(user.mfa_secret or "", req.code)
+    recovery = verify_recovery_code(
+        req.code, user.mfa_recovery_codes or [])
+    if step is None and recovery is None:
+        log_security("mfa_disable_failed", user_id=user.id, reason="code")
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    user.mfa_enabled = False
+    user.mfa_secret = None
+    user.mfa_recovery_codes = []
+    user.mfa_last_step = None
+    db.commit()
+    log_security("mfa_disabled", user_id=user.id)
+    return {"enabled": False}
+
+
+@router.get("/mfa/status")
+async def mfa_status(
+    user: User = Depends(require_platform_admin_unenrolled),
+):
+    return {
+        "enabled": bool(user.mfa_enabled),
+        "recovery_codes_remaining": len(user.mfa_recovery_codes or []),
+    }
+
+
+@router.post("/mfa/recovery/regenerate")
+async def mfa_regenerate_recovery(
+    req: MfaRegenerateRequest,
+    user: User = Depends(require_platform_admin),
+    db: Session = Depends(get_db),
+):
+    if not user.mfa_enabled:
+        raise HTTPException(status_code=400, detail="MFA is not enabled")
+    if not verify_password(req.password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    step = verify_totp(user.mfa_secret or "", req.code)
+    recovery = verify_recovery_code(req.code, user.mfa_recovery_codes or [])
+    if step is None and recovery is None:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    codes = generate_recovery_codes()
+    user.mfa_recovery_codes = hash_recovery_codes(codes)
+    db.commit()
+    log_security("mfa_recovery_regenerated", user_id=user.id)
+    return {"recovery_codes": codes}
 
 
 @router.post("/logout")
@@ -587,6 +810,10 @@ async def logout(
             except Exception:
                 # A concurrent logout of the same token already recorded it.
                 db.rollback()
+        session = db.query(UserSessionDB).filter(UserSessionDB.jti == jti).first()
+        if session is not None and session.revoked_at is None:
+            session.revoked_at = datetime.utcnow()
+            db.commit()
     # Bounded cleanup: expired rows can never match a live token.
     try:
         db.query(RevokedTokenDB).filter(
@@ -598,6 +825,36 @@ async def logout(
     return {"ok": True}
 
 
+@router.post("/logout-all")
+async def logout_all(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Revoke every active server-side session for this account."""
+    count = revoke_user_sessions(db, user.id)
+    log_security("sessions_revoked_all", user_id=user.id, count=count)
+    return {"ok": True, "revoked_sessions": count}
+
+
+def _registration_allowed(mode: str, expected_code: str, supplied_code: str) -> bool:
+    """Apply the configured self-registration gate.
+
+    ``open`` preserves the historical behaviour. ``invite_only`` requires a
+    non-empty configured code and a constant-time match. ``closed`` rejects
+    every self-registration attempt; the owner creates accounts instead.
+    """
+    mode = (mode or "open").strip().lower()
+    if mode == "open":
+        return True
+    if mode == "closed":
+        return False
+    expected = (expected_code or "").strip()
+    supplied = (supplied_code or "").strip()
+    if not expected or not supplied:
+        return False
+    return secrets.compare_digest(expected, supplied)
+
+
 class IndividualRegisterRequest(BaseModel):
     email: str
     password: str
@@ -605,6 +862,8 @@ class IndividualRegisterRequest(BaseModel):
     #: Captured from a referral link and submitted with the new account. May
     #: be blank. Attribution happens exactly once, at registration.
     referral_code: str = ""
+    #: Required only when the deployment is in invite-only pilot mode.
+    invite_code: str = ""
 @router.post("/register/individual")
 async def register_individual_teacher(
     req: IndividualRegisterRequest,
@@ -613,8 +872,19 @@ async def register_individual_teacher(
     """Self-registration for individual teachers (no school required).
 
     Creates a teacher account on the Free Teacher plan. School selection is
-    deliberately omitted — individual teachers start with school_id = NULL.
+    deliberately omitted â€” individual teachers start with school_id = NULL.
     """
+    settings = get_settings()
+    if not _registration_allowed(
+        settings.REGISTRATION_MODE,
+        settings.PILOT_INVITE_CODE,
+        req.invite_code,
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="A valid pilot invite code is required to create an account",
+        )
+
     ok, msg = validate_email(req.email)
     if not ok:
         raise HTTPException(status_code=422, detail=msg)
@@ -647,7 +917,7 @@ async def register_individual_teacher(
 
     # Create Free Tier entitlement. Lesson plans are 5 per CALENDAR MONTH and
     # AI is 5 per CALENDAR MONTH (both enforced server-side via the usage
-    # ledgers, PART 16-18) — never a lifetime cap.
+    # ledgers, PART 16-18) â€” never a lifetime cap.
     free_ent = EntitlementDB(
         id=generate_id(),
         user_id=new_user.id,
@@ -669,7 +939,7 @@ async def register_individual_teacher(
     db.refresh(new_user)
 
     # Referral attribution: only for this newly created account, only once.
-    # Registration alone never grants credits — the reward waits for the
+    # Registration alone never grants credits â€” the reward waits for the
     # first verified paid package purchase.
     try:
         from .. import referrals
@@ -750,7 +1020,7 @@ async def get_my_plan(
 
 @router.get("/users")
 async def list_users(admin: User = Depends(require_admin), db: Session = Depends(get_db)):
-    """List users. School admins see only users in their own school (§2 isolation)."""
+    """List users. School admins see only users in their own school (Â§2 isolation)."""
     if admin.school_id:
         users = db.query(User).filter(User.school_id == admin.school_id).all()
     else:
@@ -764,9 +1034,9 @@ async def get_my_school(
     db: Session = Depends(get_db),
 ):
     """
-    School-scoped overview for the SCHOOL ADMIN dashboard (§13):
+    School-scoped overview for the SCHOOL ADMIN dashboard (Â§13):
     school name, license status, seats used/available, teacher roster.
-    Returns only this admin's school — never platform-wide data.
+    Returns only this admin's school â€” never platform-wide data.
     """
     from ..database import SchoolDB, SchoolLicenseDB, ProductPlanDB
     from sqlalchemy import func
@@ -1032,12 +1302,14 @@ async def reset_password(user_id: str, req: LoginRequest, admin: User = Depends(
     user.password_changed_at = datetime.utcnow()
     _school_audit(db, admin.id, admin.role, "teacher_password_reset", "user", user.id, {})
     db.commit()
+    clear_failures(db, user.email)
+    revoke_user_sessions(db, user.id)
     return {"message": "Password reset successfully"}
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # PLATFORM ADMIN BOOTSTRAP
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 
 def _platform_admin_exists(db: Session) -> bool:
@@ -1052,7 +1324,7 @@ def _platform_admin_exists(db: Session) -> bool:
 async def platform_admin_setup_status(db: Session = Depends(get_db)):
     """Public check: is the one-time platform-admin bootstrap still open?
 
-    Reveals only a boolean — no secrets, no account data.
+    Reveals only a boolean â€” no secrets, no account data.
     """
     return {"bootstrap_required": not _platform_admin_exists(db)}
 
@@ -1122,10 +1394,13 @@ async def setup_platform_admin(req: PlatformAdminBootstrapRequest, db: Session =
         result = db.execute(text("""
             INSERT INTO users (id, email, full_name, hashed_password,
                                is_admin, is_active, role, school_id,
-                               password_changed_at, created_at, updated_at)
+                               password_changed_at, mfa_enabled, mfa_secret,
+                               mfa_recovery_codes, mfa_last_step,
+                               created_at, updated_at)
             SELECT :id, :email, :name, :password,
                    TRUE, TRUE, 'platform_admin', NULL,
-                   :now, :now, :now
+                   :now, FALSE, NULL, NULL, NULL,
+                   :now, :now
             WHERE NOT EXISTS (
                 SELECT 1 FROM users
                 WHERE role = 'platform_admin' AND is_active = TRUE
@@ -1171,9 +1446,9 @@ async def setup_platform_admin(req: PlatformAdminBootstrapRequest, db: Session =
     }
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # SELF-SERVICE PASSWORD CHANGE (all roles)
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 
 class ChangePasswordRequest(BaseModel):
@@ -1214,10 +1489,14 @@ async def change_password(
 
     _school_audit(db, user.id, user.role, "password_changed", "user", user.id, {})
     db.commit()
+    clear_failures(db, user.email)
+    revoke_user_sessions(db, user.id)
 
-    # Issue a fresh token stamped with the new password version so the
-    # current session remains valid; every OTHER token is now stale.
-    token = create_user_token(user)
+    # Issue a fresh token/session stamped with the new password version so the
+    # current device stays usable; every OTHER token is now stale.
+    jti = secrets.token_hex(16)
+    token = create_user_token(user, jti=jti)
+    create_session_record(db, user.id, jti)
     return {
         "message": "Password changed successfully",
         "access_token": token,
@@ -1225,9 +1504,9 @@ async def change_password(
     }
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # TOKEN-BASED PASSWORD RESET (admin-initiated)
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 RESET_TOKEN_TTL = timedelta(minutes=get_settings().PASSWORD_RESET_TOKEN_TTL_MINUTES)
 
@@ -1323,7 +1602,7 @@ async def initiate_password_reset(
     # Cross-school isolation (platform admins bypass).
     _require_same_school(admin, target)
 
-    # Nobody resets themselves here — use the self-service change-password.
+    # Nobody resets themselves here â€” use the self-service change-password.
     if target.id == admin.id:
         raise HTTPException(
             status_code=400,
@@ -1420,6 +1699,8 @@ async def confirm_password_reset(
         {"method": record.method},
     )
     db.commit()
+    clear_failures(db, target.email)
+    revoke_user_sessions(db, target.id)
 
     log_security("password_reset_completed", user_id=target.id)
     # No token returned: the user must sign in fresh.

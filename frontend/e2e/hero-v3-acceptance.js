@@ -103,13 +103,13 @@ const LOGIN_SIGNALS = {
 
 async function hasCanvasMesh(page) {
   return page.evaluate(() => {
-    const c = document.querySelector('canvas')
+    const c = document.querySelector('[data-particle-canvas]') || document.querySelector('canvas')
     if (!c) return false
     const ctx = c.getContext('2d')
     if (!ctx || !c.width || !c.height) return true
-    const data = ctx.getImageData(0, 0, Math.min(c.width, 200), Math.min(c.height, 150)).data
+    const data = ctx.getImageData(0, 0, c.width, c.height).data
     let painted = 0
-    for (let i = 3; i < data.length; i += 4) if (data[i] > 0) painted++
+    for (let i = 3; i < data.length; i += 16) if (data[i] > 0) painted++
     return painted > 20
   })
 }
@@ -134,15 +134,13 @@ async function logoReadable(page) {
 /** Coarse pixel signature of the mesh canvas (top-left sample window). */
 async function meshSignature(page) {
   return page.evaluate(() => {
-    const c = document.querySelector('canvas')
+    const c = document.querySelector('[data-particle-canvas]') || document.querySelector('canvas')
     if (!c) return null
     const ctx = c.getContext('2d')
     if (!ctx) return null
-    const w = Math.min(c.width, 240)
-    const h = Math.min(c.height, 160)
-    const d = ctx.getImageData(0, 0, w, h).data
+    const d = ctx.getImageData(0, 0, c.width, c.height).data
     let s = 0
-    for (let i = 0; i < d.length; i += 32) s += d[i] + d[i + 3]
+    for (let i = 0; i < d.length; i += 64) s += d[i] + d[i + 3]
     return s
   })
 }
@@ -151,7 +149,8 @@ async function meshSignature(page) {
 async function seamMetrics(page) {
   return page.evaluate(() => {
     const hero = document.querySelector('section[aria-labelledby="hero-heading"]')
-    const next = document.getElementById('how-it-works')
+    const next = document.getElementById('curriculum-pipeline-section') ||
+      document.getElementById('how-it-works')
     if (!hero || !next) return null
     const hr = hero.getBoundingClientRect()
     const nr = next.getBoundingClientRect()
@@ -200,27 +199,32 @@ async function main() {
   log(landingMesh >= 1, 'landing: data-mesh present', `mesh=${landingMesh}`)
 
   const meshPainted = await page.evaluate(() => {
-    const canvas = document.querySelector('section[aria-labelledby="hero-heading"] canvas') || document.querySelector('canvas')
+    const canvas = document.querySelector('[data-particle-canvas]') || document.querySelector('canvas')
     if (!canvas) return false
     const ctx = canvas.getContext('2d')
     if (!ctx) return false
-    const d = ctx.getImageData(0, 0, Math.min(canvas.width || 1, 300), Math.min(canvas.height || 1, 200)).data
+    const d = ctx.getImageData(0, 0, canvas.width || 1, canvas.height || 1).data
     let n = 0
-    for (let i = 3; i < d.length; i += 4) if (d[i] > 0) n++
+    for (let i = 3; i < d.length; i += 16) if (d[i] > 0) n++
     return n > 50
   })
-  log(meshPainted, 'landing: mesh painted')
+  log(meshPainted, 'landing: particle logo field painted')
 
   const before = await meshSignature(page)
-  await page.mouse.move(400, 300)
-  await page.mouse.move(700, 400, { steps: 12 })
+  await page.evaluate(() => window.scrollTo(0, 220))
   await page.waitForTimeout(350)
   const during = await meshSignature(page)
-  log(before !== null && during !== null && before !== during, 'landing: cursor deformation changes pixels', `before=${before} during=${during}`)
-  await shot(page, 'landing-desktop-cursor.png')
+  log(before !== null && during !== null && before !== during, 'landing: scroll scrub changes particle pixels', `before=${before} during=${during}`)
+  await page.evaluate(() => window.scrollTo(0, 0))
+  await page.waitForTimeout(350)
+  await shot(page, 'landing-desktop-scroll.png')
 
+  await page.evaluate(() => window.scrollTo(0, 140))
+  await page.waitForTimeout(400)
   const landingLogo = await logoReadable(page)
   log(landingLogo.ok, 'landing: light logo capsule', JSON.stringify(landingLogo))
+  await page.evaluate(() => window.scrollTo(0, 0))
+  await page.waitForTimeout(250)
 
   const ov = await overflow(page)
   log(ov.scrollW <= ov.clientW + 1, 'landing: no horizontal overflow', `${ov.scrollW}/${ov.clientW}`)
@@ -339,16 +343,16 @@ async function main() {
   await rmPage.waitForTimeout(700)
   await shot(rmPage, 'landing-reduced-motion.png')
   const rmPainted = await rmPage.evaluate(() => {
-    const c = document.querySelector('canvas')
+    const c = document.querySelector('[data-particle-canvas]') || document.querySelector('canvas')
     if (!c) return false
     const ctx = c.getContext('2d')
     if (!ctx) return false
-    const d = ctx.getImageData(0, 0, Math.min(c.width, 200), Math.min(c.height, 150)).data
+    const d = ctx.getImageData(0, 0, c.width || 1, c.height || 1).data
     let n = 0
-    for (let i = 3; i < d.length; i += 4) if (d[i] > 0) n++
+    for (let i = 3; i < d.length; i += 16) if (d[i] > 0) n++
     return n > 40
   })
-  log(rmPainted, 'reduced-motion: static mesh still painted')
+  log(rmPainted, 'reduced-motion: static particle logo still painted')
   const rmA = await meshSignature(rmPage)
   await rmPage.waitForTimeout(400)
   const rmB = await meshSignature(rmPage)
@@ -443,72 +447,27 @@ async function main() {
   const tRest = await meshSignature(tPage)
   await shot(tPage, 'mobile-rest.png')
 
-  // Touch down → pixel change
-  await tPage.touchscreen.tap(195, 420)
-  // tap is instantaneous; use dispatchEvent sequence for hold
-  const tDown = await (async () => {
-    // Fire pointerdown at center of hero via CDP-free path: touchscreen.tap
-    // already lifted; instead simulate press using evaluate dispatch.
-    return tPage.evaluate(() => {
-      const c = document.querySelector('canvas')
-      if (!c) return null
-      const ctx = c.getContext('2d')
-      const w = Math.min(c.width, 240)
-      const h = Math.min(c.height, 160)
-      const d = ctx.getImageData(0, 0, w, h).data
-      let s = 0
-      for (let i = 0; i < d.length; i += 32) s += d[i] + d[i + 3]
-      return s
-    })
-  })()
-  // Use page.touchscreen for a real touch press-hold-move via CDP if available
-  try {
-    const client = await touchContext.newCDPSession(tPage)
-    // touchStart at (195, 420)
-    await client.send('Input.dispatchTouchEvent', {
-      type: 'touchStart',
-      touchPoints: [{ x: 195, y: 420, id: 1 }],
-    })
-    await tPage.waitForTimeout(280)
-    await shot(tPage, 'mobile-touch-down.png')
-    const tHold = await meshSignature(tPage)
-    log(
-      tRest !== null && tHold !== null && tRest !== tHold,
-      'touch: pointer down changes pixels',
-      `rest=${tRest} hold=${tHold}`,
-    )
+  // The hero is now scroll-scrubbed, not pointer-deformed. A touch device
+  // must still pan normally and the particles must respond to that scroll.
+  await tPage.evaluate(() => window.scrollTo(0, 220))
+  await tPage.waitForTimeout(400)
+  await shot(tPage, 'mobile-scroll-scrub.png')
+  const tDuring = await meshSignature(tPage)
+  log(
+    tRest !== null && tDuring !== null && tRest !== tDuring,
+    'touch: vertical scroll changes particle signature',
+    `rest=${tRest} during=${tDuring}`,
+  )
 
-    // Move touch → different signature
-    await client.send('Input.dispatchTouchEvent', {
-      type: 'touchMove',
-      touchPoints: [{ x: 240, y: 480, id: 1 }],
-    })
-    await client.send('Input.dispatchTouchEvent', {
-      type: 'touchMove',
-      touchPoints: [{ x: 280, y: 540, id: 1 }],
-    })
-    await tPage.waitForTimeout(220)
-    await shot(tPage, 'mobile-touch-drag.png')
-    const tDrag = await meshSignature(tPage)
-    log(
-      tHold !== null && tDrag !== null && tHold !== tDrag,
-      'touch: moving touch changes pixel signature',
-      `hold=${tHold} drag=${tDrag}`,
-    )
-
-    // Release → settling (signature differs from drag, moves toward rest)
-    await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
-    await tPage.waitForTimeout(500)
-    await shot(tPage, 'mobile-settled.png')
-    const tSettle = await meshSignature(tPage)
-    log(
-      tDrag !== null && tSettle !== null && tSettle !== tDrag,
-      'touch: release allows settling (signature changes)',
-      `drag=${tDrag} settle=${tSettle}`,
-    )
-  } catch (err) {
-    log(false, 'touch: CDP touch sequence', String(err && err.message ? err.message : err))
-  }
+  await tPage.evaluate(() => window.scrollTo(0, 0))
+  await tPage.waitForTimeout(450)
+  await shot(tPage, 'mobile-settled.png')
+  const tRestored = await meshSignature(tPage)
+  log(
+    tRestored !== null && tDuring !== null && tRestored !== tDuring,
+    'touch: scrolling back restores the logo field',
+    `during=${tDuring} restored=${tRestored}`,
+  )
 
   // No horizontal overflow on mobile
   const tOv = await overflow(tPage)

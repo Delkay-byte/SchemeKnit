@@ -13,6 +13,17 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+# The developer .env keeps PAYSTACK_ENABLED=false for safety. Payment tests
+# exercise the mocked Paystack test-mode flows; a targeted autouse fixture
+# below enables test mode only for those modules. No live key or live
+# transaction is used. Individual tests can still override these variables.
+
+# Payment tests use mocked test-mode flows; the targeted fixture below enables
+# them. The suite uses the in-memory limiter because middleware cannot use the
+# per-test DB override; production defaults to the shared DB limiter and a
+# dedicated test exercises that implementation directly.
+os.environ.setdefault("RATE_LIMIT_BACKEND", "memory")
+
 # Ensure backend src is importable
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
@@ -22,6 +33,42 @@ pytest_plugins = []
 
 from src.database import Base, generate_id
 from src.auth import hash_password, create_access_token
+
+
+_PAYSTACK_TEST_MODULES = (
+    "test_prepaid_payments",
+    "test_paystack_subscriptions",
+    "test_webhook_sweeper",
+    "test_paystack_live_readiness",
+)
+
+
+@pytest.fixture(autouse=True)
+def _paystack_test_mode(request, monkeypatch):
+    """Enable mocked test-mode payments only for payment-suite modules.
+
+    Local runtime keeps PAYSTACK_ENABLED=false. Production-config tests and
+    every non-payment test therefore see that safe disabled value. Payment
+    tests explicitly exercise the test-mode code path with mocked transport.
+    """
+    path = str(getattr(request.node, "fspath", ""))
+    if not any(module in path for module in _PAYSTACK_TEST_MODULES):
+        yield
+        return
+    monkeypatch.setenv("PAYSTACK_ENABLED", "true")
+    monkeypatch.setenv("PAYSTACK_MODE", "test")
+    try:
+        from src.config import get_settings
+        get_settings.cache_clear()
+    except Exception:
+        pass
+    yield
+    try:
+        from src.config import get_settings
+        get_settings.cache_clear()
+    except Exception:
+        pass
+
 
 
 def _test_database_url():

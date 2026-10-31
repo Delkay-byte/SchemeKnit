@@ -161,6 +161,26 @@ NETWORK_AND_CLIENT_EVIDENCE.md · LESSON_QUALITY_COMPARISON.md*
 
 ---
 
+## Continuing product-quality workstreams — 2026-10-28
+
+The REA audit's release-blocking defects are closed in the working tree (see
+`FINAL_ACCEPTANCE_REPORT.md` §10), and the cinematic landing hero is
+implemented and locally accepted (§11). **These five priorities remain active.**
+Passing the existing suites is necessary but not sufficient: each item below
+still needs output-level or field evidence before it can be closed.
+
+| Priority | Current evidence | Next local-first deliverable | Acceptance evidence required |
+|---|---|---|---|
+| **1 — Lesson quality** | 70/70 frozen-corpus lessons teacher-ready (11/40/19; means 74.0/73.3/72.3); corpus-wide prose regression passes; deterministic builder and quality gate covered | Add real GES Basic/SHS source rows and a teacher-edit sample; inspect topic specificity, phase coherence, timing and sequencing on generated lessons | No hard failures; prose assertions pass; a reviewed sample shows fewer substantive edits and no timing gaps |
+| **2 — Ghanaian context** | Early-years localization reaches the real KG/Nursery builder path; 12-profile context bank wired; localization tests pass | Audit localization coverage by subject and level (Nursery/KG through Basic/SHS); check for repetition and age appropriateness in real outputs | A per-level lesson sample uses correct local examples/terminology without displacing the teacher's source |
+| **3 — Assessment and differentiation** | DoK/assessment/rubric tests and 4-band export checks pass; assessment fields exist in generated lessons | Audit actual assessment items, rubric bands and MA/HP/NS support across subjects and levels, not just field presence | Reviewed outputs show aligned DoK, usable marking guidance and differentiated support that a teacher can act on |
+| **4 - Reliability** | True same-job resume; PostgreSQL advisory lock; quota atomicity; cache-key/idempotency; **5 true two-process PostgreSQL tests** (same-scheme 409, different schemes, killed-worker lock release, cross-process resume, retry idempotency); heartbeat-backed stale policy with deterministic boundaries; post-commit recovery tests; LibreOffice DOCX->PDF fidelity with no empty/truncated pages | Stage a live multi-worker uvicorn run and a post-commit drill in that deployment; add cache-hit/observability assertions | No duplicate lessons or charges across independent OS processes; crashed-worker lock release and resume; post-commit response truthful; converter output complete and ordered |
+| **5 — Less teacher effort** | Autopilot browser journey 39/39; one-action path, blockers and quota messaging verified; ambiguous schemes interrupt only when required | Measure residual decisions on clean vs ambiguous schemes; keep improving quota-limited/blocked/resumable reporting | Browser journey shows zero unnecessary prompts, accurate generated/already/pending/blocked counts, and no false success |
+
+The current local release slice includes the landing hero and the reliability/export hardening recorded in `FINAL_ACCEPTANCE_REPORT.md` section 13. Priorities 1-5 remain active and are not relabelled complete.
+
+---
+
 ## Completion status (mission pass, 2026-10-16)
 
 All five backlog items are now closed with pinned tests. Evidence:
@@ -176,3 +196,52 @@ All five backlog items are now closed with pinned tests. Evidence:
 Regression gate at closure: frozen corpora 11/40/19 = 100% first-pass / 100%
 teacher-ready (mean rubric 74.2 / 73.3 / 72.3 of 75); P4 + quality-gate suites
 131 passed; quota/entitlement suites 123 passed (4 PG-only skipped).
+
+---
+
+## Zeli generation method — 2026-10-29 (local-only evidence)
+
+The product now offers a **second, user-selectable generation method** alongside
+the existing Standard path. Nothing below closes priorities 1–5; it adds a
+provider-authored path whose output still has to pass the same quality gate.
+
+| What changed | Evidence |
+|---|---|
+| Zeli is a first-class `GenerationMethod` (`standard` \| `zeli`) persisted on the job/lesson, independent of the enrichment `AI Mode` (OFF/BASIC/ENHANCED). | `test_zeli_generation_method.py` (48 tests); browser journey asserts both buttons, `aria-pressed` persistence, and that Standard still offers OFF/BASIC/ENHANCED. |
+| Zeli's verified runtime provider is the existing Groq integration: provider `groq`, model `openai/gpt-oss-120b`, base `https://api.groq.com/openai/v1`. No new SDK/endpoint/model was invented. | Real provider probe in the isolated environment: `available: True`, `last_error: None`, `validate_zeli_content → OK`; persisted lessons carry `ai_provider=groq`, `ai_model=openai/gpt-oss-120b`. |
+| Credentials stay server-side. `ZELI_*` settings fall back to `GROQ_*`; the status endpoint returns booleans/reason text only. | Settings/availability tests; teacher-surface audit in the journey (`groq`, `gpt-oss`, `openai/gpt`, `api key`, `rate_limit` absent from the page). |
+| Zeli does whole-lesson V2 generation, strict validation, structural timeline normalisation, then the **unchanged** quality gate. Output failing the gate is dropped and not replaced by deterministic content. | `test_zeli_generation_method.py`; `_run_quality_gate(..., allow_rebuild=False)`; real-Groq gate detail: **5/5 accepted**, mean 69.4, hard/soft rejections `{}` (post-fix). Pre-fix 1/5 evidence is preserved separately. |
+| Quota, credits, cache, retries and resume stay intact. Zeli consumes one existing AI credit per successful job (job-id idempotent); lesson quota remains per accepted indicator code. The cache key includes method, provider, model, prompt version and every material input. | Zeli cache/credit/quota tests; isolated DB job `completed`, 5/5 lessons, 0 failed, `generation_method=zeli` on every row; `zeli_generation_cache` populated. |
+| Teacher-facing failures map to truthful codes (429/503/504/502) and never silent-fallback. | Failure-classification tests; result copy distinguishes Zeli, Standard and no-content runs. |
+
+**Local verifications:** typecheck clean; production build succeeded; whole-lesson
+browser journey **24/24**; real-Groq diagnostic **5/5 accepted**; isolated DB
+shows all five lessons persisted with Zeli provenance. Full-suite and targeted
+backend results are recorded in `FINAL_ACCEPTANCE_REPORT.md` section 14.
+
+**Limitations:** Groq is the only verified Zeli provider; no live staging or
+production deployment was exercised; real-model quality varies by lesson and
+the gate remains the authority; Zeli is one whole-scheme job, not per-lesson
+retry UI beyond the existing resume/retry contract.
+## Guided configuration and professional lesson output — 2026-10-29 (local-only evidence)
+
+One coordinated round against the Basic 9 Science GES-format regression fixture.
+None of the five product-quality priorities is closed by this; it advances
+**lesson quality (1)**, **reduced teacher effort (5)** and **reliability (4)**.
+
+| What changed | Priority | Evidence |
+|---|---|---|
+| Guided configuration: the seven plan-wide lesson fields (school, teacher, class size, reference, duration, periods, teaching days) are set in ONE "Configure lesson rubrics" modal after extraction and before generation; saved per plan; server-validated with readiness reporting; the UI blocks generation while required fields are unsaved. | 5 (teacher effort) | `test_guided_lesson_configuration.py` (7 passed); browser journey `e2e/lesson-config-acceptance.js` 9/9. |
+| No invented data: fabricated class-size defaults (24/11) removed everywhere; blank stays blank; generation 409s on missing required configuration. | 4 | `test_guided_lesson_configuration.py::test_generate_without_required_configuration_is_refused`. |
+| Week sequence: the parser no longer merges two weekly sections whose label repeats — the fixture's "Week 1, 2, 2, 3, 4" class of defect is split and renumbered to a gapless sequence; real multi-strand weeks preserved. | 1 / 4 | `test_week_and_header_regression.py` (18 passed) + Basic 7/Basic 9 real-document non-regression. |
+| Professional output: drafting artefacts removed at source ("What to look for:", "Quick check (unprompted):", mid-dot step labels, raw woven NS:/MA: markers, "…" truncations); deterministic text-hygiene layer + quality-gate hard failures shared by deterministic AND Zeli output; header = School / Teacher / Week 1 first page, week-only after; DATE/DAY row shows teaching days, never dates. | 1 | Real-pipeline export inspection: every fixture artefact string absent, week sequence 1..12 monotonic; `test_week_and_header_regression.py`. |
+| Reliability preserved: quota, cache identity (Zeli cache key carries class size/duration/period), idempotency, resume (original snapshot kept), WAPEF contracts untouched. | 4 | Full backend suite + WAPEF acceptance tests green after the changes. |
+
+**Local verifications:** backend suite (final counts in
+`FINAL_ACCEPTANCE_REPORT.md` §15.4), frontend typecheck + production build,
+browser journey 9/9, real-pipeline DOCX content inspection.
+
+**Limitations:** local-only (no deploy); the recovered fixture copy was
+shallow so the week-defect test reconstructs the documented failure rather
+than parsing the original 23-page file; indicator wording itself is preserved
+verbatim where it reads awkwardly (source authority).

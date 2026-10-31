@@ -83,6 +83,17 @@ schemeknit.png
 diagnostics.log
 backend/opencode-be.err
 
+# Local agent state and generated demo output (never release scope)
+.agents/
+brag-output/
+
+# Local database backups (never release scope)
+backend/teachflow.db.bak-*
+
+# TypeScript incremental build state (generated; the tracked root file must
+# still be excluded explicitly from a release commit)
+*.tsbuildinfo
+
 # Backend test outputs (generated, not source)
 backend/output/
 frontend/e2e/wapef-acceptance/

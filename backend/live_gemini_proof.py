@@ -45,7 +45,7 @@ def main():
         "email": EMAIL, "password": PASSWORD, "full_name": "Gemini Proof"})
     check("register individual", r.status_code in (200, 201, 400), r.status_code)
     r = requests.post(f"{BASE}/api/auth/login",
-                      json={"email": EMAIL, "password": PASSWORD})
+                      json={"email": EMAIL, "password": PASSWORD, "entry": "teacher"})
     check("login", r.status_code == 200, r.status_code)
     H = {"Authorization": f"Bearer {r.json()['access_token']}"}
 

@@ -4,6 +4,7 @@ SchemeKnit Production Configuration
 Environment-based settings. All secrets come from .env.
 """
 
+import ipaddress
 import os
 from pathlib import Path
 from functools import lru_cache
@@ -71,7 +72,11 @@ class Settings(BaseSettings):
     # JWT Authentication
     JWT_SECRET_KEY: str = "CHANGE-ME-IN-PRODUCTION"
     JWT_ALGORITHM: str = "HS256"
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
+    #: Access-token lifetime. Idle and absolute limits are enforced against
+    #: the server-side user_sessions record.
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 120
+    SESSION_IDLE_MINUTES: int = 30
+    SESSION_ABSOLUTE_HOURS: int = 12
 
     # Platform Admin Bootstrap
     # One-time secret required to create the FIRST platform admin via
@@ -81,6 +86,38 @@ class Settings(BaseSettings):
 
     # Password reset token lifetime (minutes)
     PASSWORD_RESET_TOKEN_TTL_MINUTES: int = 30
+
+    # Security counters / progressive lockout.
+    #: Keyed HMAC secret for account identifiers in counters and security logs.
+    #: Set a distinct value in production; empty falls back to SECRET_KEY only
+    #: for local/development compatibility.
+    SECURITY_HMAC_KEY: str = ""
+    LOGIN_MAX_FAILURES: int = 5
+    LOGIN_FAILURE_WINDOW_MINUTES: int = 15
+    #: Comma-separated cooldown steps in minutes; the last value is the cap.
+    LOGIN_LOCKOUT_STEPS: str = "1,5,15,30,60"
+    LOGIN_LOCKOUT_TRACK_HOURS: int = 24
+    #: db (production default) or memory (tests/local only).
+    RATE_LIMIT_BACKEND: str = "db"
+    TRUST_PROXY_HEADERS: bool = False
+    #: Comma-separated trusted proxy IPs/CIDRs. Empty trusts no proxy.
+    TRUSTED_PROXY_CIDRS: str = ""
+    ENABLE_HSTS: bool = False
+    CSP_REPORT_ONLY: bool = True
+    #: Optional central security-alert webhook (Slack-style JSON endpoint).
+    #: Empty = no central delivery; structured security logs still record.
+    SECURITY_ALERT_WEBHOOK_URL: str = ""
+    #: Owner-only alert recipient. Empty keeps alerts in logs/webhook only.
+    OWNER_ALERT_EMAIL: str = ""
+
+    # Registration gate for private pilots. "open" preserves the current
+    # public self-registration flow. "invite_only" requires PILOT_INVITE_CODE;
+    # "closed" rejects self-registration entirely. The owner creates pilot
+    # accounts manually when registration is closed.
+    REGISTRATION_MODE: str = "open"
+    #: Shared pilot code. Never commit a real value. Only used when
+    #: REGISTRATION_MODE=invite_only; compared in constant time.
+    PILOT_INVITE_CODE: str = ""
 
     # File Storage
     # STORAGE_BACKEND=local (default) or s3 for S3-compatible object storage.
@@ -142,6 +179,10 @@ class Settings(BaseSettings):
     # ``zeli_generation.get_zeli_provider``); see docs/ZELI_ENVIRONMENT.md.
     ZELI_ENABLED: bool = True
     ZELI_PROVIDER: str = "deepseek"
+    #: Secondary whole-lesson provider. One bounded attempt is made only for
+    #: eligible provider failures (network/timeout/429/5xx/malformed output).
+    #: Empty disables fallback. Default "groq" reuses GROQ_* configuration.
+    ZELI_FALLBACK_PROVIDER: str = "groq"
     ZELI_MODEL: str = ""
     ZELI_BASE_URL: str = ""
     ZELI_API_KEY: str = ""
@@ -228,6 +269,19 @@ class Settings(BaseSettings):
             )
         return provider
 
+    @field_validator("ZELI_FALLBACK_PROVIDER")
+    @classmethod
+    def _validate_zeli_fallback_provider(cls, value: str) -> str:
+        from .engines.ai_provider import NAMED_PROVIDERS
+
+        provider = (value or "").strip().lower()
+        if provider and provider not in NAMED_PROVIDERS:
+            raise ValueError(
+                "ZELI_FALLBACK_PROVIDER must be empty or one of: "
+                + ", ".join(sorted(NAMED_PROVIDERS))
+            )
+        return provider
+
     @field_validator("ZELI_MODEL", "ZELI_BASE_URL", "ZELI_API_KEY", "DEEPSEEK_API_KEY")
     @classmethod
     def _validate_zeli_text(cls, value: str) -> str:
@@ -287,6 +341,71 @@ class Settings(BaseSettings):
             raise ValueError("ZELI_MAX_RETRIES must be between 0 and 5")
         return value
 
+    @field_validator("LOGIN_LOCKOUT_STEPS")
+    @classmethod
+    def _validate_lockout_steps(cls, value: str) -> str:
+        raw = [p.strip() for p in str(value or "").split(",") if p.strip()]
+        try:
+            steps = [int(p) for p in raw]
+        except ValueError:
+            raise ValueError("LOGIN_LOCKOUT_STEPS must be comma-separated minutes")
+        if not steps or any(s <= 0 for s in steps) or steps != sorted(steps):
+            raise ValueError("LOGIN_LOCKOUT_STEPS must be positive and ascending")
+        if steps[-1] > 60:
+            raise ValueError("LOGIN_LOCKOUT_STEPS must not exceed 60 minutes")
+        return ",".join(str(s) for s in steps)
+
+    @field_validator("REGISTRATION_MODE")
+    @classmethod
+    def _validate_registration_mode(cls, value: str) -> str:
+        mode = (value or "open").strip().lower()
+        if mode not in {"open", "invite_only", "closed"}:
+            raise ValueError(
+                "REGISTRATION_MODE must be 'open', 'invite_only' or 'closed'"
+            )
+        return mode
+
+    @field_validator("TRUSTED_PROXY_CIDRS")
+    @classmethod
+    def _validate_trusted_proxy_cidrs(cls, value: str) -> str:
+        """Validate the explicit proxy allowlist, never broaden it."""
+        raw = (value or "").strip()
+        if not raw:
+            return ""
+        parsed = []
+        for part in raw.split(","):
+            entry = part.strip()
+            if not entry:
+                raise ValueError("TRUSTED_PROXY_CIDRS contains an empty entry")
+            try:
+                network = ipaddress.ip_network(entry, strict=False)
+            except ValueError:
+                raise ValueError(
+                    f"TRUSTED_PROXY_CIDRS contains an invalid CIDR: {entry}"
+                )
+            if network.prefixlen == 0:
+                raise ValueError(
+                    "TRUSTED_PROXY_CIDRS must not trust every address (0.0.0.0/0 or ::/0)"
+                )
+            parsed.append(str(network))
+        return ",".join(parsed)
+
+    @model_validator(mode="after")
+    def _require_proxy_allowlist_when_enabled(self):
+        if self.TRUST_PROXY_HEADERS and not self.TRUSTED_PROXY_CIDRS.strip():
+            raise ValueError(
+                "TRUSTED_PROXY_CIDRS is required when TRUST_PROXY_HEADERS=true"
+            )
+        return self
+
+    @field_validator("RATE_LIMIT_BACKEND")
+    @classmethod
+    def _validate_rate_limit_backend(cls, value: str) -> str:
+        backend = (value or "db").strip().lower()
+        if backend not in ("db", "memory"):
+            raise ValueError("RATE_LIMIT_BACKEND must be 'db' or 'memory'")
+        return backend
+
     def validate_production(self):
         """Fail fast when mandatory production secrets are missing/default.
 
@@ -328,6 +447,21 @@ class Settings(BaseSettings):
         if not self.DATABASE_URL or self.DATABASE_URL.startswith("sqlite"):
             problems.append(
                 "DATABASE_URL (production must use PostgreSQL, not SQLite)"
+            )
+
+        # Rate limiting must be shared in production; a process-local counter
+        # would silently reset on restart and diverge across workers. SQLite is
+        # the local/test profile; PostgreSQL production must use the DB store.
+        if (self.RATE_LIMIT_BACKEND != "db"
+                and not self.DATABASE_URL.startswith("sqlite")):
+            problems.append(
+                "RATE_LIMIT_BACKEND (production must use 'db', not process memory)"
+            )
+
+        # Invite-only registration must have a code to check against.
+        if self.REGISTRATION_MODE == "invite_only" and not self.PILOT_INVITE_CODE.strip():
+            problems.append(
+                "PILOT_INVITE_CODE (required when REGISTRATION_MODE=invite_only)"
             )
 
         # Public URLs must not contain localhost in production

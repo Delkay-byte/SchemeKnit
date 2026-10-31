@@ -17,7 +17,7 @@ interface User {
 interface AuthContextType {
   user: User | null
   token: string | null
-  login: (email: string, password: string, entry: 'teacher' | 'school_admin' | 'platform_admin') => Promise<void>
+  login: (email: string, password: string, entry: 'teacher' | 'school_admin' | 'platform_admin', mfaCode?: string, recoveryCode?: string) => Promise<void>
   logout: () => void
   loading: boolean
 }
@@ -44,8 +44,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false)
   }, [])
 
-  const login = async (email: string, password: string, entry: 'teacher' | 'school_admin' | 'platform_admin') => {
-    const response = await api.login(email, password, entry)
+  const login = async (
+    email: string,
+    password: string,
+    entry: 'teacher' | 'school_admin' | 'platform_admin',
+    mfaCode?: string,
+    recoveryCode?: string,
+  ) => {
+    const response = await api.login(email, password, entry, mfaCode, recoveryCode)
     setToken(response.access_token)
     setUser(response.user)
     sessionStorage.setItem('teachflow_token', response.access_token)

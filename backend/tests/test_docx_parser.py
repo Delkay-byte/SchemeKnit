@@ -33,7 +33,9 @@ from src.parsers.docx_parser import (
 from src.models import WeekType, ValidationSeverity
 
 
-FIXTURES_DIR = Path(r"C:\Users\SAVIOUR\Documents\DScience\Lesson Plan")
+_LOCAL_DOCS = Path(r"C:\Users\SAVIOUR\Documents\DScience\Lesson Plan")
+FIXTURES_DIR = _LOCAL_DOCS if _LOCAL_DOCS.is_dir() else (
+    Path(__file__).resolve().parent.parent / "real_documents")
 SCIENCE_FILE = FIXTURES_DIR / "BASIC 9 SCIENCE SCHEME OF LEARNING.docx"
 MATH_FILE = FIXTURES_DIR / "BASIC 9 MATH SCHEME OF LEARNING.docx"
 

@@ -786,6 +786,9 @@ class TestLiveZeliGroq:
         if p.last_error in ("auth_failed", "invalid_api_key", "missing_api_key",
                             "model_not_found", "http_404"):
             pytest.skip(f"Groq blocked (last_error={p.last_error}) — verify key/model")
+        if p.last_error and (p.last_error.startswith("http_5")
+                             or p.last_error == "rate_limit"):
+            pytest.skip(f"Groq transient throttle (last_error={p.last_error}) - retry later")
         assert out and "answer" in out, \
             f"Groq live call failed (last_error={p.last_error})"
 
@@ -809,6 +812,9 @@ class TestLiveZeliGroq:
                                         "missing_api_key", "model_not_found",
                                         "http_404"):
             pytest.skip(f"Groq blocked (last_error={p.last_error}) — verify key/model")
+        if not out and p.last_error and (p.last_error.startswith("http_5")
+                                         or p.last_error == "rate_limit"):
+            pytest.skip(f"Groq transient throttle (last_error={p.last_error}) - retry later")
         assert out and isinstance(out.get("assessment"), str) and \
             len(out["assessment"]) >= 20, \
             f"strict schema rewrite failed (last_error={p.last_error})"

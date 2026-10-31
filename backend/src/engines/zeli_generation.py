@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
@@ -37,7 +38,7 @@ ZELI_PROVIDER_KEY = "deepseek"
 #: Method label persisted on jobs/lessons.
 ZELI_METHOD = "zeli"
 #: Bump when the prompt/contract changes enough to invalidate cached output.
-ZELI_PROMPT_VERSION = "zeli-generation-v2"
+ZELI_PROMPT_VERSION = "zeli-generation-v6"
 
 #: The canonical V2 sections a whole Zeli lesson must carry. A partial object
 #: is rejected before any of it is applied to the deterministic scaffold.
@@ -73,6 +74,8 @@ class ZeliGenerationError(RuntimeError):
         super().__init__(message)
         self.message = message
         self.status_code = int(status_code)
+        #: Sanitized provider-attempt diagnostics for the job/response layer.
+        self.attempts: list[dict] = []
 
 
 @dataclass(frozen=True)
@@ -88,6 +91,60 @@ class ZeliConfig:
     connect_timeout: float = 10.0
     read_timeout: float = 90.0
     max_retries: int = 2
+    fallback_provider: str = ""
+    fallback_model: str = ""
+    fallback_base_url: str = ""
+    fallback_api_key: str = ""
+
+
+def _provider_endpoint(provider: str, settings) -> tuple[str, str, str]:
+    """Resolve (model, base_url, api_key) for one named provider.
+
+    Only configuration is read; no secret is logged or returned to a caller
+    outside this module. Unknown providers get empty values and are rejected
+    by the settings validator before reaching here.
+    """
+    s = settings
+    if provider == "deepseek":
+        return (
+            (getattr(s, "ZELI_MODEL", "") or "").strip() or DEFAULT_DEEPSEEK_MODEL,
+            (getattr(s, "ZELI_BASE_URL", "") or "").strip() or DEFAULT_DEEPSEEK_BASE_URL,
+            (getattr(s, "ZELI_API_KEY", "") or "").strip()
+            or (getattr(s, "DEEPSEEK_API_KEY", "") or "").strip(),
+        )
+    if provider == "groq":
+        return (
+            (getattr(s, "GROQ_MODEL", "") or "").strip(),
+            (getattr(s, "GROQ_BASE_URL", "") or "").strip(),
+            (getattr(s, "GROQ_API_KEY", "") or "").strip(),
+        )
+    if provider == "gemini":
+        return (
+            (getattr(s, "GEMINI_MODEL", "") or "").strip(),
+            "",
+            (getattr(s, "GEMINI_API_KEY", "") or "").strip(),
+        )
+    if provider == "openai":
+        return (
+            (getattr(s, "OPENAI_MODEL", "") or "").strip(),
+            "",
+            (getattr(s, "OPENAI_API_KEY", "") or "").strip(),
+        )
+    if provider == "opencode-zen":
+        return (
+            (getattr(s, "OPENCODE_ZEN_MODEL", "") or "").strip(),
+            (getattr(s, "OPENCODE_ZEN_BASE_URL", "") or "").strip(),
+            (getattr(s, "OPENCODE_ZEN_API_KEY", "") or "").strip(),
+        )
+    if provider == "minimax":
+        return ("", "", (getattr(s, "MINIMAX_API_KEY", "") or "").strip())
+    if provider == "ollama":
+        return (
+            (getattr(s, "OLLAMA_MODEL", "") or "").strip(),
+            (getattr(s, "OLLAMA_BASE_URL", "") or "").strip(),
+            "",
+        )
+    return ("", "", "")
 
 
 def _zeli_config(settings=None) -> ZeliConfig:
@@ -99,23 +156,25 @@ def _zeli_config(settings=None) -> ZeliConfig:
     ``ZELI_PROVIDER=groq`` falls back to ``GROQ_MODEL`` / ``GROQ_BASE_URL`` /
     ``GROQ_API_KEY``, so the earlier integration keeps working and a Groq key is
     never sent to DeepSeek (or vice versa).
+
+    ``ZELI_FALLBACK_PROVIDER`` is resolved independently. It defaults to Groq
+    and always reuses that provider's own model/base/key settings; it never
+    receives the primary provider's credential.
     """
     s = settings or get_settings()
     provider = (getattr(s, "ZELI_PROVIDER", "") or ZELI_PROVIDER_KEY).strip().lower()
     enabled = bool(getattr(s, "ZELI_ENABLED", True))
 
-    model = (getattr(s, "ZELI_MODEL", "") or "").strip()
-    base_url = (getattr(s, "ZELI_BASE_URL", "") or "").strip()
-    api_key = (getattr(s, "ZELI_API_KEY", "") or "").strip()
-    if provider == "deepseek":
-        model = model or DEFAULT_DEEPSEEK_MODEL
-        base_url = base_url or DEFAULT_DEEPSEEK_BASE_URL
-        api_key = api_key or (
-            getattr(s, "DEEPSEEK_API_KEY", "") or "").strip()
-    elif provider == "groq":
-        model = model or (getattr(s, "GROQ_MODEL", "") or "").strip()
-        base_url = base_url or (getattr(s, "GROQ_BASE_URL", "") or "").strip()
-        api_key = api_key or (getattr(s, "GROQ_API_KEY", "") or "").strip()
+    model, base_url, api_key = _provider_endpoint(provider, s)
+
+    fallback_provider = (
+        getattr(s, "ZELI_FALLBACK_PROVIDER", "") or "").strip().lower()
+    if fallback_provider == provider:
+        fallback_provider = ""
+    fallback_model = fallback_base_url = fallback_api_key = ""
+    if fallback_provider:
+        fallback_model, fallback_base_url, fallback_api_key = _provider_endpoint(
+            fallback_provider, s)
 
     return ZeliConfig(
         enabled=enabled, provider=provider, model=model,
@@ -129,11 +188,38 @@ def _zeli_config(settings=None) -> ZeliConfig:
         read_timeout=float(
             getattr(s, "ZELI_READ_TIMEOUT_SECONDS", 90.0) or 90.0),
         max_retries=int(getattr(s, "ZELI_MAX_RETRIES", 2) or 0),
+        fallback_provider=fallback_provider,
+        fallback_model=fallback_model,
+        fallback_base_url=fallback_base_url,
+        fallback_api_key=fallback_api_key,
     )
 
 
+def _build_configured_provider(name: str, model: str, base_url: str,
+                               api_key: str, config: ZeliConfig):
+    """Construct one provider and apply only its own validated settings."""
+    provider = get_provider(name)
+    provider.api_key = api_key
+    if model:
+        provider.model = model
+    if base_url and hasattr(provider, "base_url"):
+        provider.base_url = base_url
+    # Tuning is only consumed by the DeepSeek transport; assigning it to other
+    # providers is inert but keeps the contract uniform for tests.
+    for attr, value in (
+        ("temperature", config.temperature),
+        ("max_tokens", config.max_tokens),
+        ("thinking_mode", config.thinking_mode),
+        ("connect_timeout", config.connect_timeout),
+        ("read_timeout", config.read_timeout),
+        ("max_retries", config.max_retries),
+    ):
+        setattr(provider, attr, value)
+    return provider
+
+
 def get_zeli_provider(settings=None):
-    """Build the configured Zeli provider or raise ``ZeliGenerationError``.
+    """Build the configured Zeli primary provider or raise safely.
 
     Configuration is validated HERE (server-side) — never in the browser — and
     the key is attached only to the in-process provider instance.
@@ -152,27 +238,33 @@ def get_zeli_provider(settings=None):
             503,
         )
 
-    provider = get_provider(config.provider)
-    # Apply the validated overrides explicitly. Constructing with kwargs would
-    # let ``get_provider`` silently drop them on a TypeError; assigning after
-    # construction keeps the endpoint/model/key exactly as configured.
-    provider.api_key = config.api_key
-    if config.model:
-        provider.model = config.model
-    if config.base_url and hasattr(provider, "base_url"):
-        provider.base_url = config.base_url
-    # Tuning is only consumed by the DeepSeek transport; assigning it to other
-    # providers is inert but keeps the contract uniform for tests.
-    for attr, value in (
-        ("temperature", config.temperature),
-        ("max_tokens", config.max_tokens),
-        ("thinking_mode", config.thinking_mode),
-        ("connect_timeout", config.connect_timeout),
-        ("read_timeout", config.read_timeout),
-        ("max_retries", config.max_retries),
-    ):
-        setattr(provider, attr, value)
-    return provider
+    return _build_configured_provider(
+        config.provider, config.model, config.base_url, config.api_key, config)
+
+
+def get_zeli_fallback_provider(settings=None):
+    """Build the configured Zeli fallback provider, or return ``None``.
+
+    A missing fallback key is NOT an error while the primary is healthy. The
+    caller attempts this provider only after an eligible primary failure. The
+    fallback never receives the primary provider's credential.
+    """
+    try:
+        config = _zeli_config(settings)
+    except Exception:
+        return None
+    if not config.enabled or not config.fallback_provider:
+        return None
+    if config.fallback_provider == config.provider:
+        return None
+    if config.fallback_provider not in NAMED_PROVIDERS:
+        return None
+    try:
+        return _build_configured_provider(
+            config.fallback_provider, config.fallback_model,
+            config.fallback_base_url, config.fallback_api_key, config)
+    except Exception:
+        return None
 
 
 def zeli_availability(settings=None) -> Dict[str, Any]:
@@ -306,7 +398,14 @@ def zeli_lesson_context(
         "term": getattr(config, "term", None),
         "teaching_week": getattr(lp, "teaching_week", None),
         "period": getattr(lp, "period", None),
-        "teacher_keywords": list(getattr(lp, "keywords", None) or []),
+        "teacher_keywords": (
+            # Only teacher-entered terms. The deterministic scaffold's keyword
+            # guesses are not teacher input and were being sent to the provider
+            # as if they were (then echoed back into the lesson).
+            list(getattr(config, "keywords", None) or [])
+            if config is not None
+            else list(getattr(lp, "keywords", None) or [])
+        ),
         "other_tlrs": list(getattr(lp, "other_tlrs", None) or []),
         "core_competencies": list(
             getattr(lp, "core_competencies", None) or []),
@@ -427,11 +526,13 @@ def generate_zeli_content(
         )
     provider_name = provider.get_name() if hasattr(provider, "get_name") else "zeli"
     model = str(getattr(provider, "model", "") or "")
+    provider.last_cache_hit = False
     cache_key = zeli_cache_key(
         provider=provider_name, model=model, lesson_payload=context)
 
     cached = read_zeli_cache(db, cache_key)
     if cached is not None and validate_zeli_content(cached) == "":
+        provider.last_cache_hit = True
         return cached
 
     kwargs = {
@@ -453,6 +554,7 @@ def generate_zeli_content(
     if problem:
         # The provider answered, but the output cannot be trusted. Never merge
         # it into the lesson; report a safe generation failure instead.
+        provider.last_error = f"schema_invalid:{problem}"[:300]
         raise ZeliGenerationError(
             "Zeli returned an incomplete lesson plan, so nothing was saved "
             "and no lesson-plan quota was used. Please try again, or choose "
@@ -465,6 +567,184 @@ def generate_zeli_content(
         provider=provider_name, model=model,
     )
     return content
+
+
+def _safe_provider_error_code(provider) -> str:
+    """Return a short, secret-free diagnostic code for one provider attempt."""
+    raw = str(getattr(provider, "last_error", "") or "").strip().lower()
+    if not raw:
+        return "unknown_error"
+    for token in (
+        "missing_api_key", "auth_failed", "invalid_api_key", "model_not_found",
+        "invalid_request", "rate_limit", "timeout", "connection",
+        "insufficient_balance", "malformed_response", "malformed_json",
+        "schema_invalid", "empty_output", "content_refusal",
+        "http_401", "http_402", "http_403", "http_404", "http_408",
+        "http_429", "http_500", "http_502", "http_503", "http_504",
+    ):
+        if token in raw:
+            return token
+    if raw.startswith("http_5"):
+        return raw.split(":", 1)[0][:40]
+    if "connection" in raw or "timeout" in raw:
+        return "timeout" if "timeout" in raw else "connection"
+    return "provider_error"
+
+
+#: Provider diagnostics that must NOT trigger a fallback. A broken primary
+#: credential/model configuration is an operational fault; hiding it behind a
+#: second provider would conceal the misconfiguration.
+_FALLBACK_BLOCKED_ERRORS = frozenset({
+    "missing_api_key", "auth_failed", "invalid_api_key", "model_not_found",
+    "invalid_request", "http_401", "http_403", "http_404",
+})
+
+#: Provider diagnostics that are eligible for exactly one bounded fallback.
+_FALLBACK_ELIGIBLE_ERRORS = frozenset({
+    "rate_limit", "timeout", "connection", "insufficient_balance",
+    "http_402", "http_408", "http_429",
+    "malformed_response", "malformed_json", "schema_invalid",
+    "empty_output", "content_refusal",
+})
+
+
+def zeli_fallback_eligible(error: "ZeliGenerationError", provider) -> bool:
+    """True when a failed primary attempt may be retried on the fallback.
+
+    Eligible: transport/timeouts, 429/5xx, malformed/schema-invalid output and
+    a quality-gate rejection. Not eligible: missing/invalid credentials, an
+    unknown model, an invalid request, or any non-provider application error.
+    """
+    code = _safe_provider_error_code(provider)
+    if code in _FALLBACK_BLOCKED_ERRORS:
+        return False
+    if code in _FALLBACK_ELIGIBLE_ERRORS or code.startswith("http_5"):
+        return True
+    # The strict lesson validator / provider parser classifications are
+    # provider-content failures, even when no low-level error code was set.
+    if getattr(error, "status_code", 502) in (429, 502, 504):
+        return True
+    return False
+
+
+def _zeli_attempt(provider, context: Dict[str, Any], db: Optional[Session]):
+    """Run one provider attempt and return (ok, content, error, record)."""
+    started = time.monotonic()
+    provider_name = (
+        provider.get_name() if hasattr(provider, "get_name") else "zeli")
+    model = str(getattr(provider, "model", "") or "")
+    try:
+        content = generate_zeli_content(provider=provider, context=context, db=db)
+        record = {
+            "provider": provider_name,
+            "model": model,
+            "ok": True,
+            "status": 200,
+            "error": None,
+            "cache_hit": bool(getattr(provider, "last_cache_hit", False)),
+            "duration_seconds": round(max(0.0, time.monotonic() - started), 3),
+        }
+        return True, content, None, record
+    except ZeliGenerationError as exc:
+        record = {
+            "provider": provider_name,
+            "model": model,
+            "ok": False,
+            "status": int(exc.status_code),
+            "error": _safe_provider_error_code(provider),
+            "cache_hit": False,
+            "duration_seconds": round(max(0.0, time.monotonic() - started), 3),
+        }
+        return False, None, exc, record
+    except Exception:
+        err = zeli_failure_from_provider(
+            getattr(provider, "last_error", None))
+        record = {
+            "provider": provider_name,
+            "model": model,
+            "ok": False,
+            "status": int(err.status_code),
+            "error": _safe_provider_error_code(provider),
+            "cache_hit": False,
+            "duration_seconds": round(max(0.0, time.monotonic() - started), 3),
+        }
+        return False, None, err, record
+
+
+def generate_zeli_with_fallback(
+    *,
+    primary,
+    fallback=None,
+    context: Dict[str, Any],
+    db: Optional[Session] = None,
+) -> tuple[Dict[str, Any], Dict[str, Any]]:
+    """Generate one lesson on DeepSeek, with ONE bounded Groq fallback.
+
+    Returns ``(content, metadata)``. Metadata records the actual successful
+    provider and model, whether fallback was used, sanitized attempt records,
+    cache-hit status and the number of external calls. It never contains a
+    credential or a raw provider body.
+
+    The same ``generate_zeli_content`` contract (cache, strict validation,
+    schema checks) is applied to both providers. No deterministic or MOCK
+    content is ever substituted.
+    """
+    attempts: list[dict] = []
+    ok, content, primary_error, record = _zeli_attempt(primary, context, db)
+    attempts.append(record)
+    primary_name = record["provider"]
+    primary_model = record["model"]
+
+    if ok:
+        return content, {
+            "provider": primary_name,
+            "model": primary_model,
+            "fallback_used": False,
+            "primary_provider": primary_name,
+            "primary_model": primary_model,
+            "primary_error": None,
+            "attempts": attempts,
+            "cache_hit": record["cache_hit"],
+            "external_calls": 0 if record["cache_hit"] else 1,
+        }
+
+    eligible = zeli_fallback_eligible(primary_error, primary)
+    fallback_available = bool(
+        fallback is not None and getattr(fallback, "is_available", lambda: False)())
+    if not eligible or not fallback_available:
+        primary_error.attempts = attempts
+        raise primary_error
+
+    ok, content, fallback_error, record = _zeli_attempt(fallback, context, db)
+    attempts.append(record)
+    if ok:
+        return content, {
+            "provider": record["provider"],
+            "model": record["model"],
+            "fallback_used": True,
+            "primary_provider": primary_name,
+            "primary_model": primary_model,
+            "primary_error": attempts[0]["error"],
+            "attempts": attempts,
+            "cache_hit": record["cache_hit"],
+            "external_calls": sum(
+                1 for a in attempts if not a.get("cache_hit")),
+        }
+
+    # Both providers failed. Preserve the classified primary status when it is
+    # more specific; otherwise report a safe 503/502. No lesson is written and
+    # no quota/credit is consumed by the caller.
+    status = 503 if any(a["status"] == 503 for a in attempts) else 502
+    if any(a["status"] == 429 for a in attempts):
+        status = 429
+    combined = ZeliGenerationError(
+        "Zeli could not generate a usable lesson plan. No lesson plans were "
+        "saved and no lesson-plan quota was used. Please try again later, or "
+        "choose Standard generation.",
+        status,
+    )
+    combined.attempts = attempts
+    raise combined
 
 
 def zeli_failure_from_provider(last_error: Optional[str]) -> ZeliGenerationError:

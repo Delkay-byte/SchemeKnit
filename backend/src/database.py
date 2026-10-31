@@ -100,6 +100,12 @@ class User(Base):
     # carries a `pwv` claim with this value; a mismatch means the token was
     # issued before the password changed and must be rejected.
     password_changed_at = Column(DateTime, default=datetime.utcnow)
+    # Privileged-account MFA. The secret is only active when mfa_enabled is
+    # true; recovery codes are bcrypt hashes and are single-use.
+    mfa_enabled = Column(Boolean, default=False, nullable=False)
+    mfa_secret = Column(String, nullable=True)
+    mfa_recovery_codes = Column(JSON, default=list)
+    mfa_last_step = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -1301,6 +1307,65 @@ class RevokedTokenDB(Base):
 
     __table_args__ = (
         Index("ix_revoked_token_expiry", "expires_at"),
+    )
+
+
+class UserSessionDB(Base):
+    """Server-verifiable login session for JWT idle/absolute/revoke-all checks.
+
+    Only the JWT id and timestamps are stored. No token, password or raw IP is
+    kept. ``revoked_at`` marks individual logout or revoke-all.
+    """
+    __tablename__ = "user_sessions"
+
+    jti = Column(String, primary_key=True)
+    user_id = Column(String, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    last_seen_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    expires_at = Column(DateTime, nullable=False, index=True)
+    revoked_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index("ix_user_sessions_user", "user_id", "revoked_at"),
+        Index("ix_user_sessions_expiry", "expires_at"),
+    )
+
+
+class LoginFailureDB(Base):
+    """Per-account failed-login state for progressive cooldown.
+
+    The account key is an HMAC of the normalized identifier, never a plaintext
+    email. Counters are account-scoped so changing IP cannot bypass them.
+    """
+
+    __tablename__ = "login_failure_counters"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    account_key = Column(String, nullable=False, unique=True, index=True)
+    failed_count = Column(Integer, default=0, nullable=False)
+    window_started_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    last_failed_at = Column(DateTime, nullable=True)
+    lockout_count = Column(Integer, default=0, nullable=False)
+    last_lockout_at = Column(DateTime, nullable=True)
+    lockout_until = Column(DateTime, nullable=True, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class RateLimitCounterDB(Base):
+    """Shared fixed-window rate-limit counter (SQLite/PostgreSQL)."""
+
+    __tablename__ = "rate_limit_counters"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    bucket_key = Column(String, nullable=False)
+    window_start = Column(Integer, nullable=False)  # Unix seconds
+    count = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("bucket_key", "window_start",
+                         name="uq_rate_limit_bucket_window"),
+        Index("ix_rate_limit_window", "window_start"),
     )
 
 

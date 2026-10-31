@@ -1,0 +1,72 @@
+name: Pilot webhook recovery (manual)
+
+# PREPARED, NOT SCHEDULED. This workflow exists so the owner can run one
+# bounded Paystack webhook recovery cycle without paying for Render Cron.
+# It never runs automatically. Do not add a `schedule:` trigger until a pilot
+# database and a dedicated GitHub secret have been verified.
+#
+# Required repository secret (Settings > Secrets and variables > Actions):
+#   PILOT_DATABASE_URL = direct (non-pooler) PostgreSQL URL for the PILOT
+#                        database only. Never the production database URL.
+#
+# The job refuses to run unless the URL looks like a pilot database.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "sweep" to run one bounded recovery cycle'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pilot-webhook-recovery
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    name: One bounded webhook recovery cycle
+    if: ${{ inputs.confirm == 'sweep' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+
+      - name: Refuse a missing or non-pilot database URL
+        env:
+          DATABASE_URL: ${{ secrets.PILOT_DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::PILOT_DATABASE_URL is not configured"
+            exit 1
+          fi
+          case "$DATABASE_URL" in
+            *pilot*) ;;
+            *)
+              echo "::error::Refusing to sweep: URL does not identify a pilot database"
+              exit 1
+              ;;
+          esac
+
+      - name: Install backend dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run one bounded recovery cycle
+        env:
+          DATABASE_URL: ${{ secrets.PILOT_DATABASE_URL }}
+          DEBUG: 'true'
+          PAYSTACK_ENABLED: 'false'
+          PAYSTACK_MODE: 'test'
+          RATE_LIMIT_BACKEND: db
+        run: python -m src.webhook_sweeper --max-batches 1

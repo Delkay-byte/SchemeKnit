@@ -1,9 +1,17 @@
 import Link from 'next/link'
 import { PublicPage } from '@/components/public-page'
+import { pageMetadata } from '@/lib/site-url'
+
+export const metadata = pageMetadata({
+  title: 'Help & Frequently Asked Questions',
+  description:
+    'Answers about SchemeKnit lesson plans, Scheme of Learning uploads, credits and exports.',
+  path: '/help',
+})
 
 const FAQ = [
   {
-    q: 'Do I need to pay before I can use TeachFlow?',
+    q: 'Do I need to pay before I can use SchemeKnit?',
     a: 'No. Create a free account and you receive two lesson-plan generations every calendar month. You can upload schemes, review extracted content, generate within the allowance, edit saved plans and export existing work.',
   },
   {
@@ -31,8 +39,8 @@ const FAQ = [
     a: 'Invite a teacher with your referral link. When they make their first successful paid package purchase, you receive 5 bonus credits and they receive 3. Registration alone does not earn a reward, and a pending or failed payment does not qualify.',
   },
   {
-    q: 'Is TeachFlow officially approved by GES?',
-    a: 'TeachFlow does not claim GES approval or endorsement. It is a lesson-planning tool that follows the scheme you upload. Review every generated plan before you teach or submit it.',
+    q: 'Is SchemeKnit officially approved by GES?',
+    a: 'SchemeKnit does not claim GES approval or endorsement. It is a lesson-planning tool that follows the scheme you upload. Review every generated plan before you teach or submit it.',
   },
   {
     q: 'Can I still access plans after a package expires?',

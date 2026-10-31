@@ -16,12 +16,12 @@ import type { RefObject } from 'react'
  */
 
 interface Props {
-  trackRef: RefObject<HTMLElement>
-  stageRef: RefObject<HTMLDivElement>
-  markRef: RefObject<HTMLSpanElement>
-  logoRef: RefObject<HTMLDivElement>
-  copyRef: RefObject<HTMLDivElement>
-  cueRef: RefObject<HTMLDivElement>
+  trackRef: RefObject<HTMLElement | null>
+  stageRef: RefObject<HTMLDivElement | null>
+  markRef: RefObject<HTMLSpanElement | null>
+  logoRef: RefObject<HTMLDivElement | null>
+  copyRef: RefObject<HTMLDivElement | null>
+  cueRef: RefObject<HTMLDivElement | null>
   className?: string
 }
 

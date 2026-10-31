@@ -22,6 +22,10 @@ export default function IndividualSignupPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [referralCode, setReferralCode] = useState('')
+  const [inviteCode, setInviteCode] = useState('')
+  // Set only on an invite-only pilot deployment. The code is checked again
+  // server-side; this flag only controls whether the field is shown.
+  const inviteRequired = process.env.NEXT_PUBLIC_PILOT_INVITE_REQUIRED === 'true'
 
   // Referral attribution: capture the code from the link and keep it for a
   // later registration in this browser. It is submitted once, at signup.
@@ -59,12 +63,22 @@ export default function IndividualSignupPage() {
       setError('Passwords do not match.')
       return
     }
+    if (inviteRequired && !inviteCode.trim()) {
+      setError('Enter the pilot invite code from your invitation.')
+      return
+    }
 
     setError('')
     setLoading(true)
 
     try {
-      const res = await api.registerIndividual(email, password, fullName.trim(), referralCode)
+      const res = await api.registerIndividual(
+        email,
+        password,
+        fullName.trim(),
+        referralCode,
+        inviteRequired ? inviteCode.trim() : '',
+      )
       if (res.access_token) {
         await login(email, password, 'teacher')
       }
@@ -159,6 +173,20 @@ export default function IndividualSignupPage() {
         </AuthField>
 
         <PasswordMatchIndicator password={password} confirm={confirm} />
+
+        {inviteRequired && (
+          <AuthField id="signup-invite" label="Pilot invite code">
+            <Input
+              id="signup-invite"
+              type="text"
+              value={inviteCode}
+              onChange={(e) => setInviteCode(e.target.value)}
+              required
+              placeholder="From your invitation"
+              autoComplete="off"
+            />
+          </AuthField>
+        )}
 
         <AuthField id="signup-referral" label="Referral code (optional)">
           <Input

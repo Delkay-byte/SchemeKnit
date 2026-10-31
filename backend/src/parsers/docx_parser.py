@@ -1324,9 +1324,17 @@ class DOCXParser:
                             # source anomaly reported below.
                             segments.setdefault(code, segment)
                         for code in codes:
-                            desc = segments.get(code, "")
-                            if not desc:
+                            if len(codes) == 1:
+                                # A single code owns the whole cell: keep its
+                                # prose AND a range tail ("K2.1.1.1.1-3")
+                                # through the canonical cleaner. Segmenting a
+                                # one-code cell would strip the hyphen and
+                                # turn the family into a bare "3".
                                 desc = self._clean_description(ind_text, code)
+                            else:
+                                # Adjacent codes have no prose of their own;
+                                # never let the NEXT code become a description.
+                                desc = segments.get(code, "")
                             if any(i.code == code for i in all_indicators):
                                 existing = next(
                                     i for i in all_indicators if i.code == code)
@@ -1335,7 +1343,7 @@ class DOCXParser:
                                         severity=ValidationSeverity.WARNING,
                                         message=(
                                             f"Duplicate indicator code {code} in "
-                                            f"week {current_week} carries different "
+                                            f"week {row.get('week_number', '?')} carries different "
                                             "text in the source; the first occurrence "
                                             "was kept and the row needs review."
                                         ),

@@ -50,6 +50,7 @@ def _fake_settings(**overrides):
     base = dict(
         ZELI_ENABLED=True, ZELI_PROVIDER="deepseek", ZELI_MODEL="",
         ZELI_BASE_URL="", ZELI_API_KEY="", DEEPSEEK_API_KEY="test-deepseek-key",
+        ZELI_FALLBACK_PROVIDER="",
         GROQ_API_KEY="gsk_test_key", GROQ_MODEL="openai/gpt-oss-120b",
         GROQ_BASE_URL="https://api.groq.com/openai/v1",
         ZELI_TEMPERATURE=0.3, ZELI_MAX_TOKENS=2000,
@@ -93,6 +94,7 @@ def _ok(content='{"learning_objectives": ["x"]}', usage=True):
 def test_defaults_are_deepseek(clean_env):
     s = _settings()
     assert s.ZELI_PROVIDER == "deepseek"
+    assert s.ZELI_FALLBACK_PROVIDER == "groq"
     assert s.ZELI_MODEL == ""
     assert s.ZELI_BASE_URL == ""
     assert s.ZELI_TEMPERATURE == 0.3
@@ -159,6 +161,37 @@ def test_groq_selection_never_uses_deepseek_key():
     assert cfg.api_key == "gsk-groq"
     assert cfg.model == "openai/gpt-oss-120b"
     assert cfg.base_url == "https://api.groq.com/openai/v1"
+
+
+def test_fallback_groq_uses_its_own_model_and_key():
+    cfg = zg._zeli_config(_fake_settings(
+        ZELI_FALLBACK_PROVIDER="groq",
+        DEEPSEEK_API_KEY="test-ds-key", GROQ_API_KEY="gsk-groq"))
+    assert cfg.provider == "deepseek"
+    assert cfg.api_key == "test-ds-key"
+    assert cfg.fallback_provider == "groq"
+    assert cfg.fallback_model == "openai/gpt-oss-120b"
+    assert cfg.fallback_base_url == "https://api.groq.com/openai/v1"
+    assert cfg.fallback_api_key == "gsk-groq"
+    assert cfg.fallback_api_key != cfg.api_key
+
+
+def test_fallback_can_be_disabled():
+    cfg = zg._zeli_config(_fake_settings(ZELI_FALLBACK_PROVIDER=""))
+    assert cfg.fallback_provider == ""
+    assert zg.get_zeli_fallback_provider(_fake_settings(
+        ZELI_FALLBACK_PROVIDER="")) is None
+
+
+def test_fallback_cannot_be_the_same_as_primary():
+    cfg = zg._zeli_config(_fake_settings(ZELI_FALLBACK_PROVIDER="deepseek"))
+    assert cfg.fallback_provider == ""
+
+
+@pytest.mark.parametrize("value", ["not-a-provider", "openai-ish", "groq-gateway"])
+def test_invalid_fallback_provider_is_rejected(clean_env, value):
+    with pytest.raises(ValidationError):
+        _settings(ZELI_FALLBACK_PROVIDER=value)
 
 
 def test_tuning_is_wired_onto_the_provider():

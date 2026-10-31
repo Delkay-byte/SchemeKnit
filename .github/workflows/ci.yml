@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, 'hardening/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DEBUG: "true"
+  SECRET_KEY: "ci-only-secret-not-production"
+  JWT_SECRET_KEY: "ci-only-jwt-secret-not-production"
+  PAYSTACK_ENABLED: "true"
+  PAYSTACK_MODE: "test"
+  CORS_ORIGINS: '["http://localhost:3000","http://localhost:3100","http://127.0.0.1:3100","http://localhost:5173","http://localhost:18235"]'
+
+jobs:
+  backend:
+    name: Backend tests and compile
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Compile
+        run: python -m compileall -q src tests
+      - name: Test suite
+        run: python -m pytest -q
+      - name: Dependency audit
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.txt
+
+  frontend:
+    name: Frontend typecheck and build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run build
+      - name: Dependency audit (high and critical)
+        run: npm audit --omit=dev --audit-level=high
+
+  postgres:
+    name: PostgreSQL migration harness
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: schemeknit
+          POSTGRES_PASSWORD: schemeknit_test
+          POSTGRES_DB: schemeknit_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Migration harness
+        env:
+          POSTGRES_MIGRATION_TEST_URL: postgresql://schemeknit:schemeknit_test@localhost:5432/schemeknit_test
+        run: python -m pytest -q tests/test_postgres_migrations.py
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -52,7 +52,7 @@ export function Banner({
       <div className="min-w-0 flex-1">
         {title && <p className="font-semibold">{title}</p>}
         {children != null && (
-          <div className={cn('break-words', title && 'mt-0.5')}>{children}</div>
+          <div className={cn('break-words', title ? 'mt-0.5' : undefined)}>{children}</div>
         )}
       </div>
       {action}

@@ -193,7 +193,8 @@ class TestOneTimeDownloadUrl:
 
     def _stub_render(self, monkeypatch, tmp_path):
         """Skip the real DOCX render; the token contract is what's under test."""
-        def _fake_combined(label, lessons, tt, out_path, template_id=None):
+        def _fake_combined(label, lessons, tt, out_path, template_id=None,
+                           context=None):
             out_path = Path(out_path)
             out_path.parent.mkdir(parents=True, exist_ok=True)
             out_path.write_bytes(b"PK\x03\x04stub docx body")

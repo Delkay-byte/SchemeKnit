@@ -1,0 +1,24 @@
+PASS  fresh teacher account created — zeli.method.1793281067409@schemeknit.test
+PASS  real Computing scheme uploaded and extracted — 8736f188-efc4-4aff-94f0-6f1a65bd5020
+PASS  "Generate with Zeli" is offered
+PASS  Standard generation is still offered alongside it
+PASS  the Zeli method is the selected choice
+PASS  AI Mode (OFF/BASIC/ENHANCED) is disabled while Zeli is selected
+PASS  backend reports Zeli is configured and ready — zeli status rendered
+PASS  generation produced lesson plans — 5 lesson(s)
+PASS  the persisted lesson records generation_method=zeli — zeli
+PASS  the lesson records AI-generated content
+PASS  the persisted provenance names the real provider (id) — groq
+PASS  Zeli wrote the starter — Think‑pair‑share: Learners are shown a picture of 
+PASS  Zeli wrote the assessment — Individually, the teacher asks each learner to **e
+PASS  Zeli wrote the plenary/conclusion
+PASS  the result tells the teacher Zeli generated the lessons
+PASS  no deterministic-fallback claim on a Zeli run
+PASS  teacher surface hides "groq"
+PASS  teacher surface hides "gpt-oss"
+PASS  teacher surface hides "openai/gpt"
+PASS  teacher surface hides "api key"
+PASS  teacher surface hides "rate_limit"
+PASS  the Zeli choice persists across a reload
+PASS  choosing Standard re-enables OFF/BASIC/ENHANCED
+PASS  existing OFF / BASIC / ENHANCED options are intact — OFF - Deterministic only | BASIC - Zeli suggestions | ENHANCED - Zeli assistance

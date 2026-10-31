@@ -12,6 +12,7 @@ import { Select } from '@/components/ui/select'
 import { Field } from '@/components/ui/field'
 import { api } from '@/lib/api'
 import { WhatsAppButton } from '@/components/whatsapp-button'
+import { UploadPrivacyNotice } from '@/components/upload-privacy-notice'
 import { formatFileSize } from '@/lib/utils-display'
 
 // The three phases the upload screen moves through: the teacher always knows
@@ -475,6 +476,9 @@ export default function UploadPage() {
             )
           ) : (
             <>
+              {/* Privacy notice — before the teacher can select or drop a file. */}
+              <UploadPrivacyNotice />
+
               {/* Dropzone */}
               <SurfaceCard data-dropzone accent="bg-gradient-to-r from-[#102A43] to-[#04A9CE]" className="mb-4 p-3">
                 <div

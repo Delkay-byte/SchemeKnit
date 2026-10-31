@@ -1,10 +1,11 @@
 import { LegalPageLayout, LegalSection } from '@/components/legal-page-layout'
-import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/site-url'
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: 'Data Retention Policy',
   description: 'How long SchemeKnit keeps different types of data.',
-}
+  path: '/data-retention',
+})
 
 export default function DataRetentionPage() {
   return (
