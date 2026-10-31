@@ -41,8 +41,36 @@ export default function UploadPage() {
   // at all. The teacher must still tell SchemeKnit which subject they teach, so
   // offer the subject catalogue for the detected class level.
   const [fallbackSubjects, setFallbackSubjects] = useState<string[]>([])
+  const [storage, setStorage] = useState<{
+    used_bytes: number
+    quota_bytes: number
+    remaining_bytes: number
+    max_file_bytes: number
+    used_human: string
+    quota_human: string
+    remaining_human: string
+    max_file_human: string
+  } | null>(null)
 
   const validExtensions = ['.docx', '.pdf']
+
+  useEffect(() => {
+    let cancelled = false
+    api.getStorageUsage()
+      .then((value) => { if (!cancelled) setStorage(value) })
+      .catch(() => { /* usage is informational; upload remains authoritative */ })
+    return () => { cancelled = true }
+  }, [])
+
+  const checkStorageCapacity = (size: number): string | null => {
+    if (storage && size > storage.max_file_bytes) {
+      return `This file is larger than the ${storage.max_file_human} per-file limit.`
+    }
+    if (storage && size > storage.remaining_bytes) {
+      return `This file needs ${formatFileSize(size)} but only ${storage.remaining_human} is available. Delete a document you no longer need, or contact support if your storage display appears incorrect.`
+    }
+    return null
+  }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
@@ -50,6 +78,11 @@ export default function UploadPage() {
       const fileExtension = '.' + selectedFile.name.split('.').pop()?.toLowerCase()
       if (!validExtensions.includes(fileExtension)) {
         setError('Please select a .docx or .pdf file')
+        return
+      }
+      const capacityError = checkStorageCapacity(selectedFile.size)
+      if (capacityError) {
+        setError(capacityError)
         return
       }
       setFile(selectedFile)
@@ -84,6 +117,7 @@ export default function UploadPage() {
       setUploadProgress(100)
       setResult(response)
       setSuccess(true)
+      api.getStorageUsage().then(setStorage).catch(() => {})
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed')
       setUploadProgress(0)
@@ -105,6 +139,11 @@ export default function UploadPage() {
       const ext = '.' + droppedFile.name.split('.').pop()?.toLowerCase()
       if (!validExtensions.includes(ext)) {
         setError('Please select a .docx or .pdf file')
+        return
+      }
+      const capacityError = checkStorageCapacity(droppedFile.size)
+      if (capacityError) {
+        setError(capacityError)
         return
       }
       setFile(droppedFile)
@@ -479,6 +518,34 @@ export default function UploadPage() {
               {/* Privacy notice — before the teacher can select or drop a file. */}
               <UploadPrivacyNotice />
 
+              {storage && (
+                <div className="mb-4 rounded-xl border border-border bg-[#F4F7FA] px-4 py-3 text-sm shadow-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-semibold text-[#102A43]">
+                      Storage: {storage.used_human} of {storage.quota_human} used
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {storage.remaining_human} available · {storage.max_file_human} per file
+                    </p>
+                  </div>
+                  <div
+                    role="progressbar"
+                    aria-label="Storage used"
+                    aria-valuemin={0}
+                    aria-valuemax={storage.quota_bytes}
+                    aria-valuenow={Math.min(storage.used_bytes, storage.quota_bytes)}
+                    className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200"
+                  >
+                    <div
+                      className="h-2 rounded-full bg-gradient-to-r from-[#102A43] to-[#04A9CE]"
+                      style={{
+                        width: `${Math.min(100, Math.round((storage.used_bytes / Math.max(storage.quota_bytes, 1)) * 100))}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* Dropzone */}
               <SurfaceCard data-dropzone accent="bg-gradient-to-r from-[#102A43] to-[#04A9CE]" className="mb-4 p-3">
                 <div
@@ -530,7 +597,7 @@ export default function UploadPage() {
                         </p>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Word (.docx) or PDF · up to 50 MB
+                        Word (.docx) or PDF · up to {storage?.max_file_human || '50 MiB'}
                       </p>
                       <input
                         ref={fileInputRef}

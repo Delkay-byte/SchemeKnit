@@ -374,10 +374,25 @@ class ApiService {
       const error = await response.json().catch(() => ({
         detail: 'Upload failed'
       }))
-      throw new Error(error.detail || 'Upload failed')
+      throw errorFromDetail(error?.detail)
     }
 
     return response.json()
+  }
+
+  async getStorageUsage(): Promise<{
+    used_bytes: number
+    reserved_bytes: number
+    total_bytes: number
+    quota_bytes: number
+    remaining_bytes: number
+    max_file_bytes: number
+    used_human: string
+    quota_human: string
+    remaining_human: string
+    max_file_human: string
+  }> {
+    return this.request('/api/documents/storage')
   }
 
   // ── Multi-subject document detection (§4) ────────────────────────────

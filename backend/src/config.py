@@ -153,6 +153,16 @@ class Settings(BaseSettings):
     S3_BUCKET: str = ""
     S3_ACCESS_KEY: str = ""
     S3_SECRET_KEY: str = ""
+    #: Private production prefix inside the bucket. Quota accounting and
+    #: reconciliation are scoped to this prefix.
+    STORAGE_PREFIX: str = "production/"
+    #: Per-teacher retained original-document quota (500 MiB).
+    STORAGE_USER_QUOTA_BYTES: int = 500 * 1024 * 1024
+    #: Global SchemeKnit production-prefix cap (8 GiB, below the 10 GB free
+    #: R2 allocation to preserve headroom).
+    STORAGE_GLOBAL_QUOTA_BYTES: int = 8 * 1024 * 1024 * 1024
+    #: Single-file maximum (50 MiB).
+    STORAGE_MAX_FILE_BYTES: int = 50 * 1024 * 1024
 
     # Transactional email (Resend)
     # Server-side ONLY. NEVER expose RESEND_API_KEY to browser code
@@ -445,6 +455,19 @@ class Settings(BaseSettings):
         if not 1 <= value <= 50:
             raise ValueError(
                 "LOGIN_TURNSTILE_AFTER_FAILURES must be between 1 and 50")
+        return value
+
+    @field_validator(
+        "STORAGE_USER_QUOTA_BYTES", "STORAGE_GLOBAL_QUOTA_BYTES",
+        "STORAGE_MAX_FILE_BYTES",
+    )
+    @classmethod
+    def _validate_storage_quota(cls, value: int) -> int:
+        value = int(value)
+        if value < 1024 * 1024:
+            raise ValueError("storage quota values must be at least 1 MiB")
+        if value > 1024 * 1024 * 1024 * 1024:
+            raise ValueError("storage quota values must not exceed 1 TiB")
         return value
 
     @field_validator("LOGIN_LOCKOUT_STEPS")

@@ -1426,6 +1426,46 @@ class LoginFailureDB(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class StorageLedgerDB(Base):
+    """One reserved, committed or deleted original-document object.
+
+    ``object_key`` is the opaque storage key, never the teacher filename.
+    ``size_bytes`` is measured from the actual upload body, not Content-Length.
+    The idempotency key makes a retried reservation refer to the same row.
+    """
+    __tablename__ = "storage_ledger"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    owner_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    object_key = Column(String, unique=True, nullable=False, index=True)
+    document_id = Column(String, nullable=True, index=True)
+    size_bytes = Column(BigInteger, nullable=False, default=0)
+    file_type = Column(String, nullable=False, default="")
+    state = Column(String, nullable=False, default="reserved")  # reserved|committed|released|deleted
+    idempotency_key = Column(String, unique=True, nullable=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    committed_at = Column(DateTime, nullable=True)
+    deleted_at = Column(DateTime, nullable=True)
+
+
+class StorageCounterDB(Base):
+    """Shared atomic storage quota counter (SQLite/PostgreSQL)."""
+    __tablename__ = "storage_counters"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    scope = Column(String, nullable=False)      # user|global
+    key = Column(String, nullable=False, default="")
+    committed_bytes = Column(BigInteger, nullable=False, default=0)
+    reserved_bytes = Column(BigInteger, nullable=False, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("scope", "key", name="uq_storage_counter_scope"),
+    )
+
+
 class TurnstileTokenDB(Base):
     """One successfully verified Turnstile token, for single-use replay denial.
 
