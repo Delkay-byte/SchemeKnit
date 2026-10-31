@@ -11,6 +11,7 @@ import { PasswordInput, PasswordMatchIndicator } from '@/components/password-inp
 import { AuthShell } from '@/components/auth/auth-shell'
 import { AuthField, AuthError } from '@/components/auth/auth-field'
 import { validateEmail, validatePassword, PASSWORD_POLICY } from '@/lib/password-policy'
+import { authHref, currentNextPath } from '@/lib/purchase-return'
 
 export default function IndividualSignupPage() {
   const router = useRouter()
@@ -23,6 +24,7 @@ export default function IndividualSignupPage() {
   const [loading, setLoading] = useState(false)
   const [referralCode, setReferralCode] = useState('')
   const [inviteCode, setInviteCode] = useState('')
+  const [nextPath, setNextPath] = useState<string | null>(null)
   // Set only on an invite-only pilot deployment. The code is checked again
   // server-side; this flag only controls whether the field is shown.
   const inviteRequired = process.env.NEXT_PUBLIC_PILOT_INVITE_REQUIRED === 'true'
@@ -30,6 +32,7 @@ export default function IndividualSignupPage() {
   // Referral attribution: capture the code from the link and keep it for a
   // later registration in this browser. It is submitted once, at signup.
   useEffect(() => {
+    setNextPath(currentNextPath())
     const fromUrl = new URLSearchParams(window.location.search).get('ref') || ''
     const stored = (() => {
       try { return localStorage.getItem('teachflow_referral') || '' } catch { return '' }
@@ -82,7 +85,7 @@ export default function IndividualSignupPage() {
       if (res.access_token) {
         await login(email, password, 'teacher')
       }
-      router.push('/dashboard')
+      router.push(currentNextPath() || '/dashboard')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed')
     } finally {
@@ -104,7 +107,7 @@ export default function IndividualSignupPage() {
         <p className="text-center text-sm text-muted-foreground">
           Already have an account?{' '}
           <Link
-            href="/login"
+            href={authHref('/login', nextPath)}
             className="font-semibold text-[#04A9CE] underline underline-offset-2"
           >
             Sign in
