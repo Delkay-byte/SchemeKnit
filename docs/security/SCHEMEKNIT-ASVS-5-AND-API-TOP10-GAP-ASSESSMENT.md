@@ -98,11 +98,11 @@ are bearer tokens in tab-scoped `sessionStorage`, not cookies.
 | 2.4.1 | Anti-automation controls | PARTIAL | Rate limits and account lockout; no bot challenge or device/behaviour signal. |
 | 3.2.2 | Safe text rendering | VERIFIED | React escaping; only static JSON-LD uses `dangerouslySetInnerHTML`. |
 | 3.3.1 | Secure cookies | NOT APPLICABLE | No cookie-based session. Bearer token in `sessionStorage`. |
-| 3.4.1 | HSTS on all responses | FAIL | HSTS is opt-in and only backend middleware; frontend headers are not configured. |
+| 3.4.1 | HSTS on all responses | PARTIAL | Frontend and backend now emit HSTS when enabled; production activation still requires `ENABLE_HSTS=true` and a verified HTTPS host. |
 | 3.4.2 | CORS allow-list | VERIFIED | Exact origin list; `test_cors_registration_preflight.py`. |
-| 3.4.3 | CSP | PARTIAL | Backend CSP is report-only and allows `unsafe-inline`/`unsafe-eval`; frontend HTML has no CSP. |
-| 3.4.4 | `X-Content-Type-Options: nosniff` | PARTIAL | Set on API responses; not verified on Next.js HTML. |
-| 3.4.6 | Frame-ancestors protection | PARTIAL | Backend sets `frame-ancestors 'self'` and XFO; frontend does not. |
+| 3.4.3 | CSP | PARTIAL | Frontend enforces CSP without `unsafe-eval`; backend CSP is enforced when `CSP_REPORT_ONLY=false`. Production header verification pending. |
+| 3.4.4 | `X-Content-Type-Options: nosniff` | VERIFIED | Frontend `headers()` and backend middleware set it; source test pins both. |
+| 3.4.6 | Frame-ancestors protection | VERIFIED | Frontend CSP/XFO and backend CSP/XFO both set; source test pins it. |
 | 4.1.1 | Correct response Content-Type | VERIFIED | FastAPI JSON/file responses; Next.js standard responses. |
 | 4.1.3 | Trusted proxy header handling | BLOCKED | Parser hardened (right-to-left, bounded, IPv6/mapped, fail-closed) and 34 tests pass; Render peer address/CIDRs remain unverified. Trust stays disabled. |
 | 4.1.4 | Explicit HTTP methods | VERIFIED | FastAPI route methods; TRACE not enabled. |
@@ -117,7 +117,7 @@ are bearer tokens in tab-scoped `sessionStorage`, not cookies.
 | 6.2.3 | Current password on change | VERIFIED | `change-password` verifies current password; `test_auth_lifecycle.py`. |
 | 6.2.4 | Breached-password check | FAIL | No breached-password or common-password list; only composition rules. |
 | 6.3.1 | Brute-force / credential-stuffing controls | VERIFIED | Account lockout + DB rate limiter; `test_login_lockout.py` 7 passed. |
-| 6.3.3 | MFA for privileged access | PARTIAL | TOTP MFA exists but is optional; platform admins can remain single-factor. |
+| 6.3.3 | MFA for privileged access | VERIFIED | Production platform-admin mutations require enrolled MFA; enrollment/status stay reachable. Tested. |
 | 6.3.8 | No user enumeration on auth failure | VERIFIED | Generic 401; unknown-user timing equalisation; lockout keyed opaquely. |
 | 6.4.1 | Secure reset/activation secrets | VERIFIED | `secrets.token_urlsafe`; hashed reset tokens; single use. |
 | 6.4.3 | Forgotten-password process | PARTIAL | Reset invalidates sessions and is single-use; it does not require an existing MFA factor. |
@@ -125,10 +125,10 @@ are bearer tokens in tab-scoped `sessionStorage`, not cookies.
 | 7.1.1 | Session timeout documentation | PARTIAL | 24-hour JWT lifetime in config; no inactivity timeout or user-facing session policy. |
 | 7.2.1 | Backend token verification | VERIFIED | JWT signature, expiry, user lookup, password version, JTI revocation. |
 | 7.2.4 | New session token on login | VERIFIED | New `jti` every login/token creation. |
-| 7.3.1 | Inactivity timeout | FAIL | No idle timeout; token remains valid for 24 hours. |
-| 7.3.2 | Absolute session lifetime | PARTIAL | 24-hour absolute expiry; not risk-documented and no refresh/rotation design. |
+| 7.3.1 | Inactivity timeout | VERIFIED | Server-side `user_sessions.last_seen_at` enforces 30-minute idle expiry. |
+| 7.3.2 | Absolute session lifetime | VERIFIED | 12-hour absolute server session expiry; 2-hour access token; documented in env example. |
 | 7.4.1 | Logout invalidates session | VERIFIED | JTI inserted into `revoked_tokens`; `test_logout_revocation.py` 7 passed. |
-| 7.5.2 | View/terminate all sessions | FAIL | No session inventory or “sign out everywhere” UI/API. |
+| 7.5.2 | View/terminate all sessions | VERIFIED | `POST /api/auth/logout-all` revokes all server sessions; Settings exposes “Sign out all devices”. |
 | 8.1.1 | Authorization documentation | VERIFIED | `docs/security/AUTHORIZATION-MATRIX.md`; route inventory test. |
 | 8.2.1 | Function-level authorization | VERIFIED | 105 non-public handlers checked; privileged routes require role dependency. |
 | 8.2.2 | Data-specific authorization | PARTIAL | Owner-scoped IDOR tests cover schemes, lessons, jobs, templates; not every ID type/export token. |
@@ -168,7 +168,7 @@ are bearer tokens in tab-scoped `sessionStorage`, not cookies.
 | 16.3.1 | Authentication events logged | VERIFIED | Login success/failure, lockout, MFA, reset events. |
 | 16.3.2 | Authorization failures logged | PARTIAL | Some security events logged; not every 403. |
 | 16.4.2 | Log access/modification protection | PARTIAL | Render log access controlled by account; no immutability/WORM. |
-| 16.4.3 | Central log/alert delivery | BLOCKED | No `SECURITY_ALERT_WEBHOOK_URL`; no central SIEM. |
+| 16.4.3 | Central log/alert delivery | PARTIAL | Throttled webhook/owner-email fallback implemented; production recipient and one live alert not yet verified. |
 | 16.5.1 | Generic error to consumer | VERIFIED | Global 500 handler returns generic message; details logged server-side. |
 
 ## 4. OWASP API Security Top 10 (2023) traceability
@@ -214,7 +214,7 @@ are bearer tokens in tab-scoped `sessionStorage`, not cookies.
 
 | Suite | Result |
 |---|---|
-| Full backend suite (local, after proxy/mass-assignment fixes) | **2999 passed, 21 skipped, 0 failed** |
+| Full backend suite (local, after proxy/mass-assignment fixes) | **3010 passed, 22 skipped, 0 failed** |
 | Targeted security suites | **177 passed, 0 failed** |
 | Lesson mass-assignment regression | **31 passed** |
 | Proxy/client-IP and spoofing regression | **34 passed** |
@@ -278,16 +278,14 @@ The targeted run covered all suites listed above and completed with 177 passed.
   support evidence. Trust remains disabled.
 - **See:** `docs/security/RENDER-PROXY-AND-CLIENT-IP-VERIFICATION.md`.
 
-### H3 — Platform-admin MFA is optional (HIGH)
+### H3 — Platform-admin MFA enforcement (HIGH) — REMEDIATED 2026-10-31
 
 - **ID:** API2; ASVS 6.3.3.
-- **Evidence:** `login` challenges MFA only when `user.mfa_enabled`; `mfa_setup` is available but
-  never forced for `platform_admin`.
-- **Impact:** one stolen platform-admin password gives full tenant/user administration.
-- **Fix:** require MFA enrollment before platform-admin login or before privileged mutations;
-  enforce step-up for activation, resets and maintenance changes.
+- **Fix applied:** production platform-admin mutations now require `mfa_enabled`; enrollment and
+  status remain reachable without MFA; recovery/TOTP replay tests pass.
+- **Remaining:** step-up for every sensitive read is not implemented; mutations are enforced.
 
-### H4 — Frontend security headers absent; backend CSP/HSTS not enforced (HIGH)
+### H4 — Frontend/backend security headers (HIGH) — CODE IMPLEMENTED, DEPLOYMENT VERIFICATION PENDING
 
 - **ID:** API8; ASVS 3.4.1, 3.4.3, 3.4.4, 3.4.6.
 - **Evidence:** `frontend/next.config.js` has no `headers()`; `frontend/src/middleware.ts` sets
@@ -298,15 +296,13 @@ The targeted run covered all suites listed above and completed with 177 passed.
 - **Fix:** add headers at the frontend/CDN, remove unsafe CSP directives after nonce/hash
   migration, enforce CSP, enable HSTS on a verified HTTPS host.
 
-### H5 — Session lifetime and token exposure (HIGH)
+### H5 — Session lifetime and token exposure (HIGH) — CODE REMEDIATED, DEPLOYMENT VERIFICATION PENDING
 
 - **ID:** API2; ASVS 7.3.1, 7.3.2, 14.3.3.
-- **Evidence:** 24-hour JWT; no inactivity timeout; token and user object in `sessionStorage`;
-  no session inventory or “sign out everywhere”.
-- **Impact:** a stolen token is usable for up to 24 hours. `sessionStorage` limits cross-tab
-  persistence but does not protect against XSS in the active tab.
-- **Fix:** shorter access lifetime plus refresh rotation, idle timeout, session list/revoke-all,
-  and CSP/XSS hardening.
+- **Fix applied:** 2-hour JWT, 30-minute server-verified idle timeout, 12-hour absolute
+  session, logout-all API/UI, password-change/reset revocation. Token remains in
+  `sessionStorage`; no refresh-token rotation was introduced.
+- **Remaining:** XSS containment still depends on CSP and frontend code quality.
 
 ### H6 — No tested backup/restore or central alerting (HIGH operational)
 

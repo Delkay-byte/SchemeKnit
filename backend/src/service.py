@@ -293,8 +293,12 @@ class DataService:
                         SchemeDB.storage_filename == storage).count()
                     if refs == 0:
                         import os
+                        from pathlib import Path
                         if os.path.exists(storage):
                             os.unlink(storage)
+                        elif (get_settings().STORAGE_BACKEND or "").lower() == "s3":
+                            from .storage import get_storage
+                            get_storage().delete(storage)
                 except Exception:
                     pass
             return True

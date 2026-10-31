@@ -124,6 +124,10 @@ class ApiService {
     await this.request('/api/auth/logout', { method: 'POST' })
   }
 
+  async logoutAll(): Promise<{ ok: boolean; revoked_sessions: number }> {
+    return this.request('/api/auth/logout-all', { method: 'POST' })
+  }
+
   async getSetupStatus(): Promise<{ needs_setup: boolean; user_count: number }> {
     return this.request('/api/auth/setup/status')
   }

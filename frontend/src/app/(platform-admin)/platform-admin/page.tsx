@@ -483,6 +483,12 @@ export default function PlatformAdminPage() {
           </TabsList>
         </Tabs>
 
+        {!((user as { mfa_enabled?: boolean }).mfa_enabled) && (
+          <Banner tone="warning" className="mb-4" title="MFA enrollment required">
+            Privileged changes are blocked until you enable TOTP MFA in the
+            Settings tab. Reads remain available so you can enroll.
+          </Banner>
+        )}
         {error && <Banner tone="danger" className="mb-4">{error}</Banner>}
 
         {loading ? (

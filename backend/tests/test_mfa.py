@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 BACKEND = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BACKEND))
 
-from src.auth import require_platform_admin
+from src.auth import require_platform_admin, require_platform_admin_unenrolled
 from src.database import get_db
 from src.mfa import step_at, totp
 from tests.conftest import make_user
@@ -22,6 +22,7 @@ def _app(db, admin):
     app.include_router(auth_router.router, prefix="/api/auth")
     app.dependency_overrides[get_db] = lambda: db
     app.dependency_overrides[require_platform_admin] = lambda: admin
+    app.dependency_overrides[require_platform_admin_unenrolled] = lambda: admin
     return app
 
 

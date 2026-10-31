@@ -8,6 +8,8 @@ All endpoints enforce user ownership.
 import asyncio
 import io
 import os
+import tempfile
+import uuid
 import zipfile
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from fastapi.responses import FileResponse
@@ -23,6 +25,7 @@ from ..database import WeekDB
 from ..models import SchemeOfWork, Subject, ClassLevel
 from ..logging_config import get_logger, log_event
 from ..security import enforce_authenticated_budget
+from ..storage import get_storage
 
 router = APIRouter()
 logger = get_logger()
@@ -107,6 +110,43 @@ def _get_upload_dir() -> Path:
     upload_dir = Path(base) / "uploads"
     upload_dir.mkdir(parents=True, exist_ok=True)
     return upload_dir
+
+
+def _durable_upload_enabled() -> bool:
+    return (os.environ.get("STORAGE_BACKEND", "local") or "local").lower() == "s3"
+
+
+def _durable_upload_key(user_id: str, ext: str) -> str:
+    """Opaque production key; never derived from the teacher filename."""
+    return f"production/uploads/{user_id}/{uuid.uuid4().hex}{ext}"
+
+
+def _materialize_upload(scheme):
+    """Return ``(path, temporary)`` for a scheme original.
+
+    Legacy/local rows store an absolute filesystem path. Durable rows store a
+    private object key; download to a short-lived temp file for parsing.
+    """
+    raw = getattr(scheme, "storage_filename", None)
+    if not raw:
+        return None, None
+    local = Path(raw)
+    if local.exists():
+        return local, None
+    if not _durable_upload_enabled():
+        return None, None
+    suffix = Path(raw).suffix or ".docx"
+    handle, tmp = tempfile.mkstemp(suffix=suffix)
+    os.close(handle)
+    try:
+        get_storage().download_to_file(raw, tmp)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        return None, None
+    return Path(tmp), Path(tmp)
 
 
 def _write_file_sync(path: Path, data: bytes):
@@ -206,6 +246,7 @@ async def upload_scheme(
     upload_dir = _get_upload_dir()
     safe_filename = f"{user.id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}{ext}"
     file_path = upload_dir / safe_filename
+    storage_key = None
 
     try:
         # Write file using executor to avoid blocking event loop
@@ -230,9 +271,16 @@ async def upload_scheme(
         if detection.get("detection_status") == "multiple":
             scheme.weeks = []
 
+        # Persist the ORIGINAL before reporting success. Production uses the
+        # private R2 bucket; local development keeps the filesystem path.
+        if _durable_upload_enabled():
+            storage_key = _durable_upload_key(user.id, ext)
+            await loop.run_in_executor(
+                None, get_storage().save_file, file_path, storage_key)
+
         db_scheme = data_service.create_scheme(db, user.id, scheme, school_id=user.school_id)
         # Track storage location for safe orphan cleanup on delete (server-side only).
-        db_scheme.storage_filename = str(file_path)
+        db_scheme.storage_filename = storage_key or str(file_path)
 
         # ── Multi-subject document detection (§4) ───────────────────────────────
         # Inspect the document for subject sections. When more than one subject
@@ -251,6 +299,12 @@ async def upload_scheme(
             db_scheme.detection_status = "extraction_failed"
             db_scheme.status = "extraction_failed"
         db.commit()
+        if storage_key:
+            try:
+                if file_path.exists():
+                    file_path.unlink()
+            except OSError:
+                pass
         log_event("scheme_uploaded", user_id=user.id, scheme_id=scheme.id,
                   filename=file.filename,
                   detection_status=db_scheme.detection_status)
@@ -285,9 +339,19 @@ async def upload_scheme(
             },
         }
     except HTTPException:
+        if storage_key:
+            try:
+                get_storage().delete(storage_key)
+            except Exception:
+                pass
         raise
     except Exception as e:
-        # Clean up file on failure
+        # Clean up file and any already-uploaded object on failure.
+        if storage_key:
+            try:
+                get_storage().delete(storage_key)
+            except Exception:
+                pass
         try:
             if file_path.exists():
                 file_path.unlink()
@@ -474,32 +538,38 @@ async def confirm_subject_section(
             ),
         )
 
-    storage = scheme.storage_filename
-    if not storage:
+    file_path, temp_path = _materialize_upload(scheme)
+    if file_path is None:
         raise HTTPException(status_code=409, detail="The uploaded file is no longer available")
-    file_path = Path(storage)
-    if not file_path.exists():
-        raise HTTPException(status_code=409, detail="The uploaded file is no longer available")
-
-    document_parser = get_document_parser(file_path)
-    if document_parser is None:
-        raise HTTPException(status_code=400, detail="Unsupported file type")
 
     try:
-        extracted = await document_parser.parse(
-            file_path,
-            original_filename=scheme.filename,
-            target_subject=subject.value,
-        )
-    except Exception as e:
-        log_event("subject_confirm_failed", user_id=user.id, scheme_id=scheme_id, error=str(e))
-        raise HTTPException(status_code=422, detail="Could not re-read the subject section")
+        document_parser = get_document_parser(file_path)
+        if document_parser is None:
+            raise HTTPException(status_code=400, detail="Unsupported file type")
 
-    if not extracted.weeks:
-        raise HTTPException(
-            status_code=422,
-            detail="No curriculum content found in that subject section",
-        )
+        try:
+            extracted = await document_parser.parse(
+                file_path,
+                original_filename=scheme.filename,
+                target_subject=subject.value,
+            )
+        except Exception as e:
+            log_event("subject_confirm_failed", user_id=user.id,
+                      scheme_id=scheme_id, error=str(e))
+            raise HTTPException(status_code=422,
+                                detail="Could not re-read the subject section")
+
+        if not extracted.weeks:
+            raise HTTPException(
+                status_code=422,
+                detail="No curriculum content found in that subject section",
+            )
+    finally:
+        if temp_path is not None:
+            try:
+                temp_path.unlink()
+            except OSError:
+                pass
 
     # Replace the scheme's extracted curriculum with the confirmed section.
     db.query(WeekDB).filter(WeekDB.scheme_id == scheme_id).delete()

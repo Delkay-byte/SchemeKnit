@@ -1310,6 +1310,27 @@ class RevokedTokenDB(Base):
     )
 
 
+class UserSessionDB(Base):
+    """Server-verifiable login session for JWT idle/absolute/revoke-all checks.
+
+    Only the JWT id and timestamps are stored. No token, password or raw IP is
+    kept. ``revoked_at`` marks individual logout or revoke-all.
+    """
+    __tablename__ = "user_sessions"
+
+    jti = Column(String, primary_key=True)
+    user_id = Column(String, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    last_seen_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    expires_at = Column(DateTime, nullable=False, index=True)
+    revoked_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index("ix_user_sessions_user", "user_id", "revoked_at"),
+        Index("ix_user_sessions_expiry", "expires_at"),
+    )
+
+
 class LoginFailureDB(Base):
     """Per-account failed-login state for progressive cooldown.
 

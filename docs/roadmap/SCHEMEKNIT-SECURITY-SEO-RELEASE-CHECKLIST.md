@@ -159,30 +159,30 @@ DEFERRED (reserved for paid infrastructure), NOT STARTED.
 
 Full evidence: `docs/security/SCHEMEKNIT-ASVS-5-AND-API-TOP10-GAP-ASSESSMENT.md`.
 
-Assessment result after remediation: **84 requirement rows assessed; 43 VERIFIED,
-1 IMPLEMENTED BUT UNVERIFIED, 27 PARTIAL, 9 FAIL, 3 BLOCKED, 1 NOT APPLICABLE.**
+Assessment result after remediation: **84 requirement rows assessed; 47 VERIFIED,
+1 IMPLEMENTED BUT UNVERIFIED, 28 PARTIAL, 5 FAIL, 2 BLOCKED, 1 NOT APPLICABLE.**
 API Top 10: 3 VERIFIED, 7 PARTIAL, 0 FAIL. No certification is claimed.
 
 | Status | Item | Evidence |
 |---|---|---|
 | VERIFIED | Field-level authorization / mass assignment | `normalize_lesson_updates` allowlist before mutation; `test_lesson_update_mass_assignment.py` 31 passed; protected fields return 422 |
-| FAIL | Frontend HSTS/CSP baseline | `frontend/next.config.js` has no headers; backend CSP report-only with unsafe directives |
-| PARTIAL | Platform-admin MFA enforcement | TOTP exists; login only challenges when `mfa_enabled` |
-| PARTIAL | Session idle timeout / revoke-all | 24h JWT; no idle timeout or session list |
+| PARTIAL | Frontend/backend HSTS and CSP | Headers implemented without unsafe-eval; production activation/header verification pending |
+| VERIFIED | Platform-admin MFA enforcement | Production mutations require enrolled MFA; enrollment remains reachable; `test_session_lifecycle.py` |
+| VERIFIED | Session idle timeout / revoke-all | `user_sessions` 30m idle, 12h absolute, logout-all API/UI; session tests 5 passed |
 | VERIFIED | Client-IP parser / spoofing resistance | `client_ip()` right-to-left chain, bounded parser, IPv4-mapped handling; `test_client_ip_proxy.py` 34 passed |
 | BLOCKED | Render live proxy topology | `TRUST_PROXY_HEADERS=false`; no published inbound CIDR/XFF contract; staging verification pending — `docs/security/RENDER-PROXY-AND-CLIENT-IP-VERIFICATION.md` |
 | BLOCKED | Backup/restore evidence | Runbook prepared; no restore executed |
-| BLOCKED | Central alert delivery | `SECURITY_ALERT_WEBHOOK_URL` unset |
+| PARTIAL | Central alert delivery | Throttled webhook/owner-email fallback implemented; live recipient test pending |
 | VERIFIED | Function-level authorization inventory | 105 non-public handlers checked, 0 missing |
 | VERIFIED | Auth logout/revocation | `test_logout_revocation.py` 7 passed |
 | VERIFIED | Upload container validation | `test_upload_security.py` 9 passed |
 | VERIFIED | AI prompt-injection corpus | 14 passed |
 | VERIFIED | Paystack test-mode signature/idempotency | 22 + 13 tests passed |
 
-Pre-pilot gate: complete staging proxy/CIDR verification, require admin MFA and add frontend
-security headers before inviting teachers. Mass assignment and parser hardening are closed;
-live proxy topology remains BLOCKED. The ordered plan and exact tests are in the assessment,
-sections 10–11.
+Pre-pilot gate: complete staging proxy/CIDR verification and verify deployed HSTS/CSP headers
+before inviting teachers. Mass assignment, MFA enforcement, sessions, headers code, parser
+hardening and R2 upload wiring are implemented. Live proxy topology and production header
+verification remain open. The ordered plan and exact tests are in the assessment, sections 10–11.
 
 ## Open blockers
 

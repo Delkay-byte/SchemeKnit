@@ -12,6 +12,7 @@ import { PageHeader } from '@/components/ui/page-header'
 import { Save, Plus, Trash2, User } from 'lucide-react'
 import { api } from '@/lib/api'
 import { ChangePasswordCard } from '@/components/change-password'
+import { SessionSecurityCard } from '@/components/session-security-card'
 import { Holiday, PlanResolution } from '@/types'
 
 export default function SettingsPage() {
@@ -284,6 +285,7 @@ export default function SettingsPage() {
             </SurfaceCard>
 
             <ChangePasswordCard />
+            <SessionSecurityCard />
           </section>
 
           {/* ── Planning ────────────────────────────────────────────── */}

@@ -18,12 +18,13 @@ from sqlalchemy.orm import Session
 from ..database import (
     get_db, User, generate_id, SchoolLicenseDB, SchoolMembershipDB,
     ActivationCodeDB, SchoolDB, ProductPlanDB, PlatformAuditLogDB,
-    PasswordResetTokenDB, RevokedTokenDB,
+    PasswordResetTokenDB, RevokedTokenDB, UserSessionDB,
 )
 from ..auth import (
     hash_password, verify_password, create_user_token,
+    create_session_record, revoke_user_sessions,
     get_current_user, require_admin, require_platform_admin,
-    decode_token, security,
+    require_platform_admin_unenrolled, decode_token, security,
 )
 from ..service import data_service
 from ..config import get_settings
@@ -196,6 +197,7 @@ def user_response(user: User):
         "role": user.role,
         "school_id": user.school_id,
         "subscription_type": getattr(user, "subscription_type", None),
+        "mfa_enabled": bool(getattr(user, "mfa_enabled", False)),
     }
 
 
@@ -664,17 +666,22 @@ async def login(req: LoginRequest, db: Session = Depends(get_db)):
         db.commit()
 
     clear_failures(db, lookup)
-    token = create_user_token(user)
+    jti = secrets.token_hex(16)
+    token = create_user_token(user, jti=jti)
+    create_session_record(db, user.id, jti)
     return {
         "access_token": token,
         "token_type": "bearer",
         "user": user_response(user),
+        "mfa_enrollment_required": bool(
+            user.role == "platform_admin" and not user.mfa_enabled
+        ),
     }
 
 
 @router.post("/mfa/setup")
 async def mfa_setup(
-    user: User = Depends(require_platform_admin),
+    user: User = Depends(require_platform_admin_unenrolled),
     db: Session = Depends(get_db),
 ):
     """Start TOTP enrollment. Existing admins are not forced to enroll."""
@@ -696,7 +703,7 @@ async def mfa_setup(
 @router.post("/mfa/verify-setup")
 async def mfa_verify_setup(
     req: MfaCodeRequest,
-    user: User = Depends(require_platform_admin),
+    user: User = Depends(require_platform_admin_unenrolled),
     db: Session = Depends(get_db),
 ):
     if not user.mfa_secret:
@@ -742,7 +749,7 @@ async def mfa_disable(
 
 @router.get("/mfa/status")
 async def mfa_status(
-    user: User = Depends(require_platform_admin),
+    user: User = Depends(require_platform_admin_unenrolled),
 ):
     return {
         "enabled": bool(user.mfa_enabled),
@@ -803,6 +810,10 @@ async def logout(
             except Exception:
                 # A concurrent logout of the same token already recorded it.
                 db.rollback()
+        session = db.query(UserSessionDB).filter(UserSessionDB.jti == jti).first()
+        if session is not None and session.revoked_at is None:
+            session.revoked_at = datetime.utcnow()
+            db.commit()
     # Bounded cleanup: expired rows can never match a live token.
     try:
         db.query(RevokedTokenDB).filter(
@@ -812,6 +823,17 @@ async def logout(
     except Exception:
         db.rollback()
     return {"ok": True}
+
+
+@router.post("/logout-all")
+async def logout_all(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Revoke every active server-side session for this account."""
+    count = revoke_user_sessions(db, user.id)
+    log_security("sessions_revoked_all", user_id=user.id, count=count)
+    return {"ok": True, "revoked_sessions": count}
 
 
 def _registration_allowed(mode: str, expected_code: str, supplied_code: str) -> bool:
@@ -1281,6 +1303,7 @@ async def reset_password(user_id: str, req: LoginRequest, admin: User = Depends(
     _school_audit(db, admin.id, admin.role, "teacher_password_reset", "user", user.id, {})
     db.commit()
     clear_failures(db, user.email)
+    revoke_user_sessions(db, user.id)
     return {"message": "Password reset successfully"}
 
 
@@ -1467,10 +1490,13 @@ async def change_password(
     _school_audit(db, user.id, user.role, "password_changed", "user", user.id, {})
     db.commit()
     clear_failures(db, user.email)
+    revoke_user_sessions(db, user.id)
 
-    # Issue a fresh token stamped with the new password version so the
-    # current session remains valid; every OTHER token is now stale.
-    token = create_user_token(user)
+    # Issue a fresh token/session stamped with the new password version so the
+    # current device stays usable; every OTHER token is now stale.
+    jti = secrets.token_hex(16)
+    token = create_user_token(user, jti=jti)
+    create_session_record(db, user.id, jti)
     return {
         "message": "Password changed successfully",
         "access_token": token,
@@ -1674,6 +1700,7 @@ async def confirm_password_reset(
     )
     db.commit()
     clear_failures(db, target.email)
+    revoke_user_sessions(db, target.id)
 
     log_security("password_reset_completed", user_id=target.id)
     # No token returned: the user must sign in fresh.

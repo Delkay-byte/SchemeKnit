@@ -72,7 +72,11 @@ class Settings(BaseSettings):
     # JWT Authentication
     JWT_SECRET_KEY: str = "CHANGE-ME-IN-PRODUCTION"
     JWT_ALGORITHM: str = "HS256"
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
+    #: Access-token lifetime. Idle and absolute limits are enforced against
+    #: the server-side user_sessions record.
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 120
+    SESSION_IDLE_MINUTES: int = 30
+    SESSION_ABSOLUTE_HOURS: int = 12
 
     # Platform Admin Bootstrap
     # One-time secret required to create the FIRST platform admin via
@@ -103,6 +107,8 @@ class Settings(BaseSettings):
     #: Optional central security-alert webhook (Slack-style JSON endpoint).
     #: Empty = no central delivery; structured security logs still record.
     SECURITY_ALERT_WEBHOOK_URL: str = ""
+    #: Owner-only alert recipient. Empty keeps alerts in logs/webhook only.
+    OWNER_ALERT_EMAIL: str = ""
 
     # Registration gate for private pilots. "open" preserves the current
     # public self-registration flow. "invite_only" requires PILOT_INVITE_CODE;

@@ -6,6 +6,7 @@ JSON-structured logging for production observability.
 
 import logging
 import sys
+import time
 from datetime import datetime
 
 import structlog
@@ -56,32 +57,64 @@ def log_security(event: str, **kwargs):
     logger.warning(event, **kwargs)
 
 
-def alert_security(event: str, severity: str = "warning", **kwargs) -> bool:
-    """Record a security event and optionally deliver it to a webhook.
+_alert_last_sent: dict[str, float] = {}
+_ALERT_THROTTLE_SECONDS = 900
 
-    Returns True only when a configured webhook accepted the request. With no
-    webhook configured the event is logged and delivery is reported False, so
-    callers cannot claim central delivery exists.
+
+def _alert_summary(event: str, severity: str, kwargs: dict) -> str:
+    safe = []
+    for key, value in kwargs.items():
+        text = str(value)
+        if len(text) > 300:
+            text = text[:300] + "…"
+        safe.append(f"{key}={text}")
+    return (f"event={event}; severity={severity}; "
+            f"time={datetime.utcnow().isoformat()}Z; " + "; ".join(safe))
+
+
+def alert_security(event: str, severity: str = "warning", **kwargs) -> bool:
+    """Record a security event and deliver at most one alert per 15 minutes.
+
+    Delivery uses the configured webhook, then the owner email fallback. The
+    structured log entry is always written first. No secret or raw IP is added
+    by this function; callers pass HMAC identifiers where applicable.
     """
     log_security(event, severity=severity, **kwargs)
+    now = time.time()
+    if now - _alert_last_sent.get(event, 0) < _ALERT_THROTTLE_SECONDS:
+        return False
+    _alert_last_sent[event] = now
+
+    summary = _alert_summary(event, severity, kwargs)
     try:
         from .config import get_settings
-        url = (getattr(get_settings(), "SECURITY_ALERT_WEBHOOK_URL", "") or "").strip()
+        settings = get_settings()
+        url = (getattr(settings, "SECURITY_ALERT_WEBHOOK_URL", "") or "").strip()
+        owner = (getattr(settings, "OWNER_ALERT_EMAIL", "") or "").strip()
     except Exception:
         return False
-    if not url:
-        return False
-    try:
-        import requests
-        response = requests.post(
-            url,
-            json={"event": event, "severity": severity, **kwargs},
-            timeout=5,
-        )
-        if response.status_code >= 300:
-            log_error("security_alert_delivery_failed", error=str(response.status_code))
-            return False
-        return True
-    except Exception as exc:
-        log_error("security_alert_delivery_failed", error=type(exc).__name__)
-        return False
+
+    if url:
+        try:
+            import requests
+            response = requests.post(
+                url,
+                json={"event": event, "severity": severity, **kwargs},
+                timeout=5,
+            )
+            if response.status_code < 300:
+                return True
+            log_error("security_alert_delivery_failed",
+                      error=str(response.status_code))
+        except Exception as exc:
+            log_error("security_alert_delivery_failed",
+                      error=type(exc).__name__)
+
+    if owner:
+        try:
+            from .email_service import get_email
+            result = get_email().send_owner_alert(owner, event, summary)
+            return bool(result.success)
+        except Exception as exc:
+            log_error("owner_alert_delivery_failed", error=type(exc).__name__)
+    return False

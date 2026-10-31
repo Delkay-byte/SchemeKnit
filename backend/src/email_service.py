@@ -169,6 +169,22 @@ class EmailService:
                  f"This link expires in {hours_str}.",
         )
 
+    def send_owner_alert(self, to: str, subject: str, summary: str) -> EmailResult:
+        """Sanitized operational/security alert to the owner only."""
+        return self._send(
+            to=to,
+            subject=f"[SchemeKnit] {subject}",
+            html=(
+                "<div style='font-family:sans-serif;max-width:560px;margin:auto'>"
+                "<h2 style='color:#102A43'>SchemeKnit alert</h2>"
+                f"<p>{summary}</p>"
+                "<p style='color:#666'>Check Render logs and /api/ready. "
+                "No credentials or personal records are included.</p>"
+                "</div>"
+            ),
+            text=summary,
+        )
+
     def send_welcome(self, to: str, name: str = "") -> EmailResult:
         """Welcome a newly created account."""
         greeting = f"Welcome, {name}!" if name else "Welcome!"

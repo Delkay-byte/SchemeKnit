@@ -205,7 +205,7 @@ one observed address, DNS, outbound ranges, or Cloudflare ranges.
 | Login lockout + hardening + proxy tests | 83 passed |
 | Upload/IDOR targeted suite | 99 passed |
 | Generation/export/upload targeted suite | 95 passed |
-| Full backend suite | **2999 passed, 21 skipped, 0 failed** |
+| Full backend suite | **3010 passed, 22 skipped, 0 failed** |
 
 ## 9. Privacy and logging
 
