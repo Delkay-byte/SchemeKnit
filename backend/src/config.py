@@ -4,6 +4,7 @@ SchemeKnit Production Configuration
 Environment-based settings. All secrets come from .env.
 """
 
+import ipaddress
 import os
 from pathlib import Path
 from functools import lru_cache
@@ -357,6 +358,39 @@ class Settings(BaseSettings):
                 "REGISTRATION_MODE must be 'open', 'invite_only' or 'closed'"
             )
         return mode
+
+    @field_validator("TRUSTED_PROXY_CIDRS")
+    @classmethod
+    def _validate_trusted_proxy_cidrs(cls, value: str) -> str:
+        """Validate the explicit proxy allowlist, never broaden it."""
+        raw = (value or "").strip()
+        if not raw:
+            return ""
+        parsed = []
+        for part in raw.split(","):
+            entry = part.strip()
+            if not entry:
+                raise ValueError("TRUSTED_PROXY_CIDRS contains an empty entry")
+            try:
+                network = ipaddress.ip_network(entry, strict=False)
+            except ValueError:
+                raise ValueError(
+                    f"TRUSTED_PROXY_CIDRS contains an invalid CIDR: {entry}"
+                )
+            if network.prefixlen == 0:
+                raise ValueError(
+                    "TRUSTED_PROXY_CIDRS must not trust every address (0.0.0.0/0 or ::/0)"
+                )
+            parsed.append(str(network))
+        return ",".join(parsed)
+
+    @model_validator(mode="after")
+    def _require_proxy_allowlist_when_enabled(self):
+        if self.TRUST_PROXY_HEADERS and not self.TRUSTED_PROXY_CIDRS.strip():
+            raise ValueError(
+                "TRUSTED_PROXY_CIDRS is required when TRUST_PROXY_HEADERS=true"
+            )
+        return self
 
     @field_validator("RATE_LIMIT_BACKEND")
     @classmethod

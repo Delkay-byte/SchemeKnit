@@ -22,6 +22,7 @@ from ..parsers.pdf_parser import get_document_parser
 from ..database import WeekDB
 from ..models import SchemeOfWork, Subject, ClassLevel
 from ..logging_config import get_logger, log_event
+from ..security import enforce_authenticated_budget
 
 router = APIRouter()
 logger = get_logger()
@@ -165,6 +166,7 @@ async def upload_scheme(
     user: User = Depends(require_teacher_workflow),
     db=Depends(get_db),
 ):
+    enforce_authenticated_budget(user.id, "upload")
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")
 

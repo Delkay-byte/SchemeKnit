@@ -9,13 +9,17 @@ Centralized, dependency-free hardening helpers:
 Documented limits live here; operational tuning via environment (see .env.example).
 """
 
+import hashlib
+import hmac
 import ipaddress
 import logging
 import os
 import re
 import time
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
+
+from fastapi import HTTPException
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -102,6 +106,20 @@ RATE_LIMITS: List[Tuple[str, int, int]] = [
 
 RATE_LIMIT_EXEMPT_IPS = {"127.0.0.1", "::1", "localhost"}
 
+
+def _rate_limit_exempt(address: str) -> bool:
+    """Exempt loopback only in local/debug mode.
+
+    Production must never exempt a real peer merely because a proxy or
+    sidecar presents it as localhost.
+    """
+    try:
+        if get_settings().DEBUG:
+            return address in RATE_LIMIT_EXEMPT_IPS
+    except Exception:
+        pass
+    return False
+
 # Safe methods are never budgeted. The workspace legitimately fires dozens of
 # reads a minute (scheme status polling while lessons render, per-reload
 # status + options + provenance fetches), so counting them against the same
@@ -143,6 +161,24 @@ class RateLimiter:
                             "reset": window}
             self.hits[bucket] = stamps
         return allowed, info
+
+    def is_allowed_for(self, key: str, prefix: str, maximum: int,
+                       window: int, now: float = None) -> Tuple[bool, dict]:
+        """Explicit budget, used for authenticated-user limits."""
+        now = now if now is not None else time.time()
+        bucket = f"{key}|{prefix}"
+        stamps = [t for t in self.hits.get(bucket, []) if now - t < window]
+        if len(stamps) >= maximum:
+            return False, {
+                "limit": maximum, "remaining": 0,
+                "reset": int(max(stamps)) + window - int(now),
+            }
+        stamps.append(now)
+        self.hits[bucket] = stamps
+        return True, {
+            "limit": maximum, "remaining": maximum - len(stamps),
+            "reset": window,
+        }
 
     def reset(self):
         self.hits.clear()
@@ -217,16 +253,74 @@ class DbRateLimiter:
         finally:
             db.close()
 
+    def is_allowed_for(self, key: str, prefix: str, maximum: int,
+                       window: int, now: float = None) -> Tuple[bool, dict]:
+        """Explicit shared budget, used for authenticated-user limits."""
+        now = now if now is not None else time.time()
+        db = self._session_factory()
+        try:
+            return self._allowed_for_rule(
+                db, key, prefix, maximum, window, now)
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
+
+#: Forwarded-header parsing bounds. A legitimate proxy chain is tiny; anything
+#: larger is treated as malformed and falls back to the direct peer.
+MAX_XFF_HEADER_FIELDS = 8
+MAX_XFF_TOTAL_CHARS = 2048
+MAX_XFF_HOPS = 32
+MAX_XFF_VALUE_CHARS = 128
+
+
+def _normalize_ip(value: str) -> Optional[str]:
+    """Return a canonical IPv4/IPv6 string, or None when the value is unsafe.
+
+    Handles bracketed IPv6 with a port, IPv4 with a port, and IPv4-mapped IPv6
+    (``::ffff:192.0.2.1`` -> ``192.0.2.1``). Never guesses.
+    """
+    raw = str(value or "").strip().strip('"')
+    if not raw or len(raw) > MAX_XFF_VALUE_CHARS:
+        return None
+    address = raw
+    if raw.startswith("["):
+        end = raw.find("]")
+        if end < 0:
+            return None
+        address = raw[1:end]
+        suffix = raw[end + 1:]
+        if suffix and (not suffix.startswith(":") or not suffix[1:].isdigit()):
+            return None
+    elif raw.count(":") == 1 and "." in raw:
+        host, port = raw.rsplit(":", 1)
+        if not port.isdigit():
+            return None
+        address = host
+    try:
+        parsed = ipaddress.ip_address(address)
+    except ValueError:
+        return None
+    if isinstance(parsed, ipaddress.IPv6Address) and parsed.ipv4_mapped:
+        return str(parsed.ipv4_mapped)
+    return str(parsed)
+
 
 def _trusted_proxy(host: str) -> bool:
+    """True only when the direct peer is in the explicit proxy allowlist."""
     settings = get_settings()
     if not settings.TRUST_PROXY_HEADERS:
         return False
     raw = (settings.TRUSTED_PROXY_CIDRS or "").strip()
     if not raw:
         return False
+    normalized = _normalize_ip(host)
+    if normalized is None:
+        return False
     try:
-        address = ipaddress.ip_address(host)
+        address = ipaddress.ip_address(normalized)
     except ValueError:
         return False
     for part in raw.split(","):
@@ -234,28 +328,133 @@ def _trusted_proxy(host: str) -> bool:
         if not part:
             continue
         try:
-            if address in ipaddress.ip_network(part, strict=False):
-                return True
+            network = ipaddress.ip_network(part, strict=False)
         except ValueError:
+            # Startup validation rejects this; fail closed if a runtime
+            # mutation or test monkeypatch bypassed it.
             continue
+        if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped:
+            address = address.ipv4_mapped
+        if address in network:
+            return True
     return False
 
 
-def client_ip(request: Request) -> str:
-    """Return the rate-limit key for the request's client address.
+def _forwarded_chain(request: Request) -> Optional[List[str]]:
+    """Parse all X-Forwarded-For fields into left-to-right hops.
 
-    Forwarding headers are trusted ONLY when the direct peer is inside the
-    configured trusted-proxy CIDRs. Otherwise a forged X-Forwarded-For is
-    ignored and the direct socket address is used. When enabled, the first
-    address in X-Forwarded-For is treated as the original client; this must be
-    verified against the actual Render proxy topology before enabling.
+    Returns None for a missing, empty, malformed or oversized chain. The
+    ``Forwarded`` (RFC 7239) header is deliberately not used: Render's managed
+    ingress is not documented to maintain it, so accepting it would add an
+    unverified trust path.
     """
-    direct = request.client.host if request.client else "unknown"
+    try:
+        values = request.headers.getlist("x-forwarded-for")
+    except Exception:
+        return None
+    if not values:
+        return None
+    if len(values) > MAX_XFF_HEADER_FIELDS:
+        return None
+    if sum(len(v) for v in values) > MAX_XFF_TOTAL_CHARS:
+        return None
+
+    chain: List[str] = []
+    for raw in values:
+        if len(raw) > MAX_XFF_TOTAL_CHARS:
+            return None
+        for part in raw.split(","):
+            if len(chain) >= MAX_XFF_HOPS:
+                return None
+            normalized = _normalize_ip(part)
+            if normalized is None:
+                return None
+            chain.append(normalized)
+    return chain or None
+
+
+def client_ip(request: Request) -> str:
+    """Return the security-relevant client address, never a spoofed leftmost hop.
+
+    Forwarded headers are ignored unless the direct socket peer is explicitly
+    in ``TRUSTED_PROXY_CIDRS``. For a trusted chain, walk right-to-left and
+    return the first hop that is not itself a trusted proxy. A malformed or
+    oversized chain fails closed to the direct peer.
+    """
+    raw_direct = request.client.host if request.client else "unknown"
+    # A real socket peer is always an IP. Keep a non-IP sentinel (tests,
+    # embedded servers) as-is so all such requests share one bounded bucket
+    # instead of collapsing to a value that bypasses the caller's bucket key.
+    direct = _normalize_ip(raw_direct) or str(raw_direct or "unknown")
     if not _trusted_proxy(direct):
         return direct
-    forwarded = request.headers.get("x-forwarded-for", "")
-    first = forwarded.split(",")[0].strip() if forwarded else ""
-    return first or direct
+
+    forwarded = _forwarded_chain(request)
+    if not forwarded:
+        return direct
+
+    # Rightmost entry is nearest the application; skip only verified proxies.
+    for candidate in reversed(forwarded + [direct]):
+        if _trusted_proxy(candidate):
+            continue
+        return candidate
+    # Every supplied hop is itself a trusted proxy. There is no verified
+    # client address in the chain, so fail closed to the direct peer.
+    return direct
+
+
+def client_key(address: str) -> str:
+    """Privacy-safe, stable rate-limit/log key for a client address."""
+    settings = get_settings()
+    raw = (getattr(settings, "SECURITY_HMAC_KEY", "") or "").strip()
+    key = raw.encode("utf-8") if raw else (
+        getattr(settings, "SECRET_KEY", "") or "schemeKnit-local-security"
+    ).encode("utf-8")
+    return hmac.new(
+        key, f"client-ip:{address}".encode("utf-8"), hashlib.sha256
+    ).hexdigest()
+
+
+#: Per-authenticated-user budgets for expensive/mutating operations. These are
+#: independent of the source IP, so rotating X-Forwarded-For or switching
+#: networks cannot create a fresh budget for the same account.
+AUTHENTICATED_BUDGETS = {
+    "upload": (10, 900),
+    "generate": (20, 600),
+    "resume": (10, 600),
+    "export": (30, 600),
+}
+
+
+def enforce_authenticated_budget(user_id: str, action: str) -> None:
+    """Fail-closed per-user budget for an expensive operation.
+
+    Uses the same shared limiter backend as the IP middleware. A storage
+    failure returns 503 rather than allowing the operation; a legitimate
+    request never depends on an unverified forwarded IP.
+    """
+    maximum, window = AUTHENTICATED_BUDGETS[action]
+    limiter = get_rate_limiter()
+    checker = getattr(limiter, "is_allowed_for", None)
+    if checker is None:
+        return
+    key = client_key(f"user:{user_id}")
+    try:
+        allowed, info = checker(key, f"user:{action}", maximum, window)
+    except Exception:
+        logger.error("authenticated_budget_store_unavailable action=%s", action)
+        raise HTTPException(
+            status_code=503,
+            detail="Security controls are temporarily unavailable. "
+                   "Please try again shortly.",
+            headers={"Retry-After": "30"},
+        )
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many requests for this account. Please wait and try again.",
+            headers={"Retry-After": str(max(info.get("reset", 60), 1))},
+        )
 
 
 def get_rate_limiter():
@@ -285,14 +484,18 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             limiter = get_rate_limiter()
             if rate_limiter._rules_for(path):
                 client = client_ip(request)
-                if client not in RATE_LIMIT_EXEMPT_IPS:
-                    allowed, info = limiter.is_allowed(client, path)
+                if not _rate_limit_exempt(client):
+                    # Hash the address before it reaches the shared counter
+                    # table or security logs: the limiter only needs a stable
+                    # bucket, not the raw client IP.
+                    limiter_key = client_key(client)
+                    allowed, info = limiter.is_allowed(limiter_key, path)
                     if not allowed:
                         try:
                             from .logging_config import alert_security
                             alert_security(
                                 "rate_limit_exceeded", severity="warning",
-                                path=path, client=client)
+                                path=path, client=limiter_key)
                         except Exception:
                             pass
                         return JSONResponse(

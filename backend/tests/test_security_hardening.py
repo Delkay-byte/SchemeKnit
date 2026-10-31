@@ -16,6 +16,7 @@ from src.security import (
     RateLimiter,
     RateLimitMiddleware,
     rate_limiter,
+    client_key,
     RATE_LIMITS,
 )
 from src.config import Settings
@@ -146,8 +147,9 @@ class TestBudgetPolicyAndCorsOn429:
     @staticmethod
     def _exhaust(bucket_host: str):
         budget = max(m for p, m, _w in RATE_LIMITS if p == "/api/generation/")
+        key = client_key(bucket_host)
         for _ in range(budget + 1):
-            rate_limiter.is_allowed(bucket_host, "/api/generation/x")
+            rate_limiter.is_allowed(key, "/api/generation/x")
 
     def test_reads_bypass_an_exhausted_budget(self):
         from fastapi.testclient import TestClient

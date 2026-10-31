@@ -24,6 +24,7 @@ from ..config import get_settings
 from ..database import get_db, SessionLocal
 from ..auth import get_current_user, get_optional_user, require_teacher_workflow
 from ..database import GenerationJobDB, User
+from ..security import enforce_authenticated_budget
 from ..service import data_service, UnsupportedLessonFieldError
 from ..entitlements import require_ai_entitlement, consume_ai_generation
 from ..models import (
@@ -1249,6 +1250,8 @@ def _generate_lesson_plans(
     scheme_db = data_service.get_scheme(db, scheme_id, user.id)
     if not scheme_db:
         raise HTTPException(status_code=404, detail="Scheme not found")
+    if not resume:
+        enforce_authenticated_budget(user.id, "generate")
 
     # ── Subject-section confirmation gate (§4) ──────────────────────────
     # A document that contains several subject sections must be confirmed before
@@ -2286,6 +2289,7 @@ def _resume_lesson_plans(
     job = data_service.get_job(db, job_id, user.id)
     if not job or job.scheme_id != scheme_id:
         raise HTTPException(status_code=404, detail="Generation job not found")
+    enforce_authenticated_budget(user.id, "resume")
 
     if job.status in ("pending", "processing"):
         data_service.reconcile_stale_generation_jobs(db)
@@ -2667,6 +2671,7 @@ async def export_docx(
     job = data_service.get_job(db, job_id, user.id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+    enforce_authenticated_budget(user.id, "export")
 
     lessons = data_service.get_lesson_plans_for_job(db, job_id, user.id)
     if not lessons:
@@ -2816,6 +2821,7 @@ async def export_pdf(
     job = data_service.get_job(db, job_id, user.id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+    enforce_authenticated_budget(user.id, "export")
 
     lessons = data_service.get_lesson_plans_for_job(db, job_id, user.id)
     if not lessons:
@@ -2948,6 +2954,7 @@ async def issue_download_url(
     job = data_service.get_job(db, job_id, user.id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+    enforce_authenticated_budget(user.id, "export")
     lessons = data_service.get_lesson_plans_for_job(db, job_id, user.id)
     if not lessons:
         raise HTTPException(status_code=404, detail="No lesson plans found")
@@ -3074,6 +3081,7 @@ async def export_xlsx(
     job = data_service.get_job(db, job_id, user.id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+    enforce_authenticated_budget(user.id, "export")
 
     lessons = data_service.get_lesson_plans_for_job(db, job_id, user.id)
     if not lessons:
@@ -3104,6 +3112,7 @@ async def export_zip(
     job = data_service.get_job(db, job_id, user.id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+    enforce_authenticated_budget(user.id, "export")
 
     lessons = data_service.get_lesson_plans_for_job(db, job_id, user.id)
     if not lessons:

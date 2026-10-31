@@ -104,7 +104,7 @@ are bearer tokens in tab-scoped `sessionStorage`, not cookies.
 | 3.4.4 | `X-Content-Type-Options: nosniff` | PARTIAL | Set on API responses; not verified on Next.js HTML. |
 | 3.4.6 | Frame-ancestors protection | PARTIAL | Backend sets `frame-ancestors 'self'` and XFO; frontend does not. |
 | 4.1.1 | Correct response Content-Type | VERIFIED | FastAPI JSON/file responses; Next.js standard responses. |
-| 4.1.3 | Trusted proxy header handling | BLOCKED | `client_ip()` is correct in design, but Render proxy CIDRs and actual peer address are unverified. |
+| 4.1.3 | Trusted proxy header handling | BLOCKED | Parser hardened (right-to-left, bounded, IPv6/mapped, fail-closed) and 34 tests pass; Render peer address/CIDRs remain unverified. Trust stays disabled. |
 | 4.1.4 | Explicit HTTP methods | VERIFIED | FastAPI route methods; TRACE not enabled. |
 | 5.1.1 | Documented upload types/sizes | VERIFIED | `.docx/.pdf`, 50 MB, archive limits in `routers/documents.py`; docs describe them. |
 | 5.2.1 | Processable file size | VERIFIED | 50 MB request cap; streaming size check. |
@@ -161,7 +161,7 @@ are bearer tokens in tab-scoped `sessionStorage`, not cookies.
 | 15.1.2 | SBOM/component inventory | FAIL | No SBOM generation in CI. |
 | 15.2.1 | Components within remediation window | VERIFIED | CI runs `pip-audit` and `npm audit --omit=dev --audit-level=high`; recent run green. |
 | 15.3.3 | Mass-assignment controls | VERIFIED | Lesson update rejects every field outside the explicit allowlist before mutation; regression tests cover ownership, school, subject, class, scheme, template and structural fields. |
-| 15.3.4 | Trusted client IP propagation | PARTIAL | `TRUST_PROXY_HEADERS=false`; Render CIDRs unverified. |
+| 15.3.4 | Trusted client IP propagation | PARTIAL | Trust remains off; explicit CIDR validation, right-to-left parsing, HMAC keys and per-user budgets implemented and locally tested. Live Render peer/CIDRs unverified. |
 | 15.4.2 | State checks and actions atomic | VERIFIED | Quota update uses guarded SQL; generation uses advisory lock. |
 | 16.1.1 | Logging inventory | PARTIAL | Structured logs exist; no complete log inventory/retention/access document. |
 | 16.2.1 | Log metadata | VERIFIED | structlog timestamp, level, event, user/account context. |
@@ -214,9 +214,10 @@ are bearer tokens in tab-scoped `sessionStorage`, not cookies.
 
 | Suite | Result |
 |---|---|
-| Full backend suite (local, after mass-assignment fix) | **2965 passed, 21 skipped, 0 failed** |
+| Full backend suite (local, after proxy/mass-assignment fixes) | **2999 passed, 21 skipped, 0 failed** |
 | Targeted security suites | **177 passed, 0 failed** |
 | Lesson mass-assignment regression | **31 passed** |
+| Proxy/client-IP and spoofing regression | **34 passed** |
 | Auth lifecycle | 42 tests |
 | Logout/revocation | 7 tests |
 | Login lockout | 7 tests |
@@ -264,12 +265,18 @@ The targeted run covered all suites listed above and completed with 177 passed.
 
 - **ID:** API4; ASVS 4.1.3, 15.3.4.
 - **Evidence:** `TRUST_PROXY_HEADERS=false`; `client_ip()` uses the direct peer unless the peer
-  is in `TRUSTED_PROXY_CIDRS`. No verified Render CIDRs.
+  is in `TRUSTED_PROXY_CIDRS`. No verified Render CIDRs. Render documents TLS termination and
+  HTTP forwarding but publishes no inbound proxy CIDRs or XFF contract.
 - **Impact:** with forwarding off, the API may see Render's proxy address, collapsing all
-  teachers into one rate-limit and lockout key. Enabling forwarding without correct CIDRs lets
-  a client forge `X-Forwarded-For` and evade limits.
-- **Fix:** verify the actual Render peer/CIDRs from request logs, configure the narrowest
-  trusted range, add forged-header and multi-client tests.
+  teachers into one rate-limit key. Enabling forwarding without correct CIDRs lets a client
+  forge `X-Forwarded-For` and evade limits.
+- **Code remediation:** `client_ip()` now walks right-to-left, rejects malformed/oversized
+  chains, normalizes IPv4-mapped IPv6, and only trusts the direct peer when explicitly
+  allowlisted. Configuration rejects empty/invalid/wildcard CIDRs. Per-account budgets reduce
+  dependence on IP identity. 34 proxy tests pass.
+- **Remaining blocker:** runtime peer/CIDR verification requires isolated staging or Render
+  support evidence. Trust remains disabled.
+- **See:** `docs/security/RENDER-PROXY-AND-CLIENT-IP-VERIFICATION.md`.
 
 ### H3 — Platform-admin MFA is optional (HIGH)
 
@@ -360,7 +367,7 @@ The targeted run covered all suites listed above and completed with 177 passed.
 | Order | Action | Addresses | Effort |
 |---|---|---|---|
 | 1 | **DONE** — Replace lesson-update `setattr` loop with an explicit editable-field allowlist; reject immutable/provenance fields | H1, API3, ASVS 8.2.3/15.3.3 | Small |
-| 2 | Verify Render peer/CIDRs; configure `TRUSTED_PROXY_CIDRS`; add forged-XFF and multi-client tests | H2, API4, ASVS 4.1.3 | Medium |
+| 2 | **CODE DONE / LIVE BLOCKED** — Harden proxy parsing, validate CIDRs, add forged-XFF and per-user budget tests; verify Render peer/CIDRs on isolated staging before enabling trust | H2, API4, ASVS 4.1.3 | Medium |
 | 3 | Require MFA for platform admins; add step-up for activation/reset/maintenance | H3, API2, ASVS 6.3.3 | Medium |
 | 4 | Add frontend CSP/HSTS/XFO/referrer/nosniff; remove `unsafe-inline`/`unsafe-eval`; enforce CSP | H4, API8, ASVS 3.4.x | Medium |
 | 5 | Shorten access token, add refresh rotation/idle timeout, session list/revoke-all | H5, API2, ASVS 7.3/7.5 | Medium |
