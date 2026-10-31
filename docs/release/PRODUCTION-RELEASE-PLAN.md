@@ -7,8 +7,8 @@ Status: **NOT AUTHORIZED — staging infrastructure unavailable**
 
 | Item | Value |
 |---|---|
-| Source branch | `hardening/security-seo-staging-20261031` |
-| Candidate commit | `72168ee` |
+| Source branch | `hardening/remediation-staging-20261031` |
+| Candidate commit | `3652a55` |
 | Reconciliation merge | `0f054de` |
 | Target branch | `main` |
 | Target remote | `origin` |
