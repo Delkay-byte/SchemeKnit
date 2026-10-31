@@ -7,8 +7,8 @@ Status: **NOT AUTHORIZED — staging infrastructure unavailable**
 
 | Item | Value |
 |---|---|
-| Source branch | `hardening/deepseek-groq-staging-20261030` |
-| Candidate commit | `4f15111` |
+| Source branch | `hardening/security-seo-staging-20261031` |
+| Candidate commit | `72168ee` |
 | Reconciliation merge | `0f054de` |
 | Target branch | `main` |
 | Target remote | `origin` |

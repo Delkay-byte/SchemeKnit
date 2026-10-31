@@ -1,8 +1,9 @@
 # Staging Release Baseline
 
 Date: 2026-10-31  
-Release candidate branch: `hardening/deepseek-groq-staging-20261030`  
-Release candidate SHA: `4f15111`
+Release candidate branch: `hardening/security-seo-staging-20261031`  
+Hardening commit: `72168ee`  
+Code baseline: `4f15111`
 
 ## Git state
 
