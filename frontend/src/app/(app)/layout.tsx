@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Header } from '@/components/header'
 import { useAuth } from '@/lib/auth-context'
+import { safeNextPath } from '@/lib/purchase-return'
 
 /**
  * Teacher workspace route group — `(app)` (Batch 2, auth gate Batch 4).
@@ -25,7 +26,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!loading && !user) {
-      router.push('/login')
+      // Preserve a direct paid-checkout destination through authentication.
+      // Only the validated /upgrade route is used; other workspace routes go
+      // to the normal login flow.
+      const here = typeof window !== 'undefined'
+        ? `${window.location.pathname}${window.location.search}`
+        : ''
+      const target = here.startsWith('/upgrade') ? safeNextPath(here) : null
+      if (target) {
+        router.push(`/login?next=${encodeURIComponent(target)}`)
+      } else {
+        router.push('/login')
+      }
     }
   }, [loading, user, router])
 

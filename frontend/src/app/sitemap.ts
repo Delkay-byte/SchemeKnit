@@ -14,6 +14,7 @@ const PUBLIC_PATHS = [
   '/privacy-policy',
   '/refunds-cancellation',
   '/terms',
+  '/cookie-policy',
 ]
 
 export default function sitemap(): MetadataRoute.Sitemap {
