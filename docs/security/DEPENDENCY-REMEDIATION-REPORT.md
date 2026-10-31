@@ -52,6 +52,8 @@ Full frontend audit retains 16 moderate findings in ESLint/TypeScript tooling. T
 
 ## Verification
 
-- Backend full suite: pending final rerun after this report.
+- Backend deterministic suite: 2,920 passed, 21 skipped, 5 live deselected.
+- Live provider suite: 1 passed, 4 skipped due transient provider throttling.
 - Frontend typecheck/build: passed.
-- Provider/auth/payment/parser regression tests: included in suite.
+- GitHub Actions run 41168965791: all four jobs success.
+- `pip-audit`: 0 vulnerabilities. `npm audit --omit=dev`: 0 vulnerabilities.
