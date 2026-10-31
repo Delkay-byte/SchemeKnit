@@ -30,12 +30,18 @@ export default function PrivacyPolicyPage() {
           Business address: {BUSINESS_ADDRESS}
         </p>
         <p>
-          BloomCore Technologies has not supplied a confirmed Ghana Data
-          Protection Commission registration number or certificate for
-          publication. This policy therefore makes no claim that BloomCore is
-          DPC-registered. Business-name registration and Data Protection
-          Commission registration are separate matters. BloomCore will update
-          this policy if a verified registration is completed.
+          BloomCore Technologies is registered with the Office of the Registrar
+          of Companies, Ghana, as a business name under the Registration of
+          Business Names Act, 1962 (No. 151). Its business-name registration
+          number is {BUSINESS_REGISTRATION_NUMBER}, and its certificate is
+          dated {BUSINESS_REGISTRATION_DATE}.
+        </p>
+        <p>
+          Business-name registration is separate from registration with the
+          Ghana Data Protection Commission (DPC). BloomCore Technologies is
+          pursuing the separate DPC registration process. This Privacy Policy
+          does not claim that DPC registration has been completed. The policy
+          will be updated when the separate DPC registration is confirmed.
         </p>
       </LegalSection>
 

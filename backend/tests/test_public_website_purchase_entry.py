@@ -142,7 +142,7 @@ def test_privacy_policy_reflects_actual_processing_and_rights():
     page = _text(APP / "privacy-policy" / "page.tsx")
     assert "Act 843" in page
     assert "Data Protection Commission" in page
-    assert "makes no claim" in page
+    assert "does not claim that DPC registration has been completed" in page
     assert "not a student records" in page
     assert "DeepSeek and Groq" in page
     assert "Cloudflare R2" in page
@@ -202,8 +202,8 @@ def test_confirmed_business_address_is_public_and_old_missing_address_wording_is
 
 def test_no_false_dpc_registration_or_certificate_page_is_published():
     privacy = _text(APP / "privacy-policy" / "page.tsx")
-    assert "makes no claim that BloomCore is" in privacy
-    assert "DPC-registered" in privacy
+    assert "does not claim that DPC registration has been completed" in privacy
+    assert "pursuing the separate DPC registration process" in privacy
     assert "application is pending" not in privacy
     assert "registration number is" not in privacy
     for path in APP.rglob("page.tsx"):
@@ -260,3 +260,30 @@ def test_sitemap_contains_only_public_routes():
         assert f"'{private}'" not in sitemap, private
     for public in ("/privacy-policy", "/terms", "/refunds-cancellation", "/data-retention", "/license-subscription", "/cookie-policy"):
         assert f"'{public}'" in sitemap, public
+
+
+def test_orc_business_registration_is_not_confused_with_dpc_registration():
+    page = " ".join(_text(APP / "privacy-policy" / "page.tsx").split())
+    assert "Office of the Registrar of Companies, Ghana" in page
+    assert "Registration of Business Names Act, 1962 (No. 151)" in page
+    assert "BUSINESS_REGISTRATION_NUMBER" in page
+    assert "BUSINESS_REGISTRATION_DATE" in page
+    contact = _text(SRC / "lib" / "contact.ts")
+    assert "BN428031125" in contact
+    assert "7 November 2025" in contact
+    assert "separate from registration with the" in page
+    assert "Ghana Data Protection Commission (DPC)" in page
+    assert "does not claim that DPC registration has been completed" in page
+    assert "DPC registration number is BN" not in page
+    assert "business-name registration number is a DPC" not in page
+    assert "P0066415551" not in page
+
+
+def test_tin_is_absent_from_production_frontend_output_when_built():
+    static = FRONTEND / ".next" / "static"
+    if not static.exists():
+        return
+    for path in static.rglob("*"):
+        if path.is_file():
+            data = path.read_bytes()
+            assert b"P0066415551" not in data, path

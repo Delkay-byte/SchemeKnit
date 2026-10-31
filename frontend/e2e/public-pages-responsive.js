@@ -48,7 +48,7 @@ function log(ok, label, detail = '') {
       await page.goto(BASE + '/privacy-policy', { waitUntil: 'domcontentloaded' })
       const privacyText = await page.locator('body').innerText()
       log(privacyText.includes('L7 Olive St., Akast Road, Akatsi, Volta Region, Ghana.'), `${label}: privacy address`)
-      log(privacyText.includes('makes no claim that BloomCore is'), `${label}: no false DPC claim`)
+      log(privacyText.includes('does not claim that DPC registration has been completed'), `${label}: no false DPC claim`)
       const dpc = await page.goto(BASE + '/dpc-registration', { waitUntil: 'domcontentloaded' })
       log(dpc && dpc.status() === 404, `${label}: no DPC certificate page`)
 
