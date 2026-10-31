@@ -1694,6 +1694,7 @@ def _generate_lesson_plans(
                 scheme, config,
                 template_id=config.template_id,
                 db=db,
+                owner_id=user.id,
             )
 
         # generate_all() records engine errors on the job instead of raising

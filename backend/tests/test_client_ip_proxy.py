@@ -258,7 +258,7 @@ class TestLimiterIdentity:
         monkeypatch.setattr("src.security.get_rate_limiter", lambda: limiter)
         user_one = "user-one"
         user_two = "user-two"
-        for _ in range(20):
+        for _ in range(30):
             enforce_authenticated_budget(user_one, "generate")
         with pytest.raises(HTTPException) as exc:
             enforce_authenticated_budget(user_one, "generate")

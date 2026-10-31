@@ -9,6 +9,7 @@ import { AuthShell } from '@/components/auth/auth-shell'
 import { AuthField, AuthError } from '@/components/auth/auth-field'
 import { validatePassword, PASSWORD_POLICY } from '@/lib/password-policy'
 import { api } from '@/lib/api'
+import { TurnstileWidget, TURNSTILE_SITE_KEY } from '@/components/turnstile-widget'
 import { useSearchParams } from 'next/navigation'
 import { ArrowRight, ShieldCheck, CheckCircle2 } from 'lucide-react'
 
@@ -27,6 +28,8 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false)
   const [validating, setValidating] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [turnstileToken, setTurnstileToken] = useState('')
+  const [turnstileReset, setTurnstileReset] = useState(0)
 
   const match = passwordMatchStatus(newPassword, confirmPassword)
 
@@ -85,13 +88,19 @@ export default function ResetPasswordPage() {
       setError('Passwords do not match.')
       return
     }
+    if (TURNSTILE_SITE_KEY && !turnstileToken) {
+      setError('Please complete the bot-verification challenge first.')
+      return
+    }
 
     setLoading(true)
     try {
-      await api.confirmPasswordReset(token.trim(), newPassword)
+      await api.confirmPasswordReset(token.trim(), newPassword, turnstileToken)
       setSuccess(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Password reset failed')
+      setTurnstileToken('')
+      setTurnstileReset((value) => value + 1)
     } finally {
       setLoading(false)
     }
@@ -209,11 +218,18 @@ export default function ResetPasswordPage() {
         </AuthField>
         <PasswordMatchIndicator password={newPassword} confirm={confirmPassword} />
 
+        <TurnstileWidget
+          siteKey={TURNSTILE_SITE_KEY}
+          action="password_reset"
+          onToken={setTurnstileToken}
+          resetKey={turnstileReset}
+        />
+
         <AuthError message={error} />
 
         <Button
           type="submit"
-          disabled={loading || (!match.matched && confirmPassword.length > 0)}
+          disabled={loading || (!match.matched && confirmPassword.length > 0) || Boolean(TURNSTILE_SITE_KEY && !turnstileToken)}
           className="h-11 w-full rounded-lg bg-[#102A43] text-white font-semibold shadow-[0_4px_14px_rgba(16,42,67,0.25)] hover:bg-[#0d2740] active:scale-[0.98] transition focus-visible:ring-2 focus-visible:ring-[#04A9CE] focus-visible:ring-offset-2 disabled:opacity-60"
         >
           {loading ? (

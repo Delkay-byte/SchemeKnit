@@ -299,6 +299,9 @@ class DataService:
                         elif (get_settings().STORAGE_BACKEND or "").lower() == "s3":
                             from .storage import get_storage
                             get_storage().delete(storage)
+                        # Release the ledger exactly once after physical delete.
+                        from . import storage_quota
+                        storage_quota.release_object(db, storage)
                 except Exception:
                     pass
             return True

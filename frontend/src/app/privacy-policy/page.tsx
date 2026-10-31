@@ -156,7 +156,30 @@ export default function PrivacyPolicyPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="8. Your rights under Ghana's Data Protection Act, 2012 (Act 843)">
+      <LegalSection title="8. Bot Protection and Cloudflare Turnstile">
+        <p>
+          To protect registration, sign-in and password-reset forms from
+          automated abuse, we use Cloudflare Turnstile. When a challenge is
+          shown, Cloudflare processes technical signals from your browser,
+          your IP address and the result of the challenge to decide whether
+          the request appears to come from a person. Cloudflare acts as a
+          service provider for this purpose and may process data outside your
+          country. The Turnstile token is verified on our server and is not
+          used for advertising or profiling. See Cloudflare&apos;s privacy
+          policy at{' '}
+          <a
+            href="https://www.cloudflare.com/privacypolicy/"
+            className="text-brand-cyan underline"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            cloudflare.com/privacypolicy
+          </a>
+          .
+        </p>
+      </LegalSection>
+
+      <LegalSection title="9. Your rights under Ghana's Data Protection Act, 2012 (Act 843)">
         <p>
           Subject to the Act and applicable exceptions, you may:
         </p>
@@ -183,7 +206,7 @@ export default function PrivacyPolicyPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="9. Contact">
+      <LegalSection title="10. Contact">
         <p>
           Privacy questions and complaints: {BUSINESS_NAME},{' '}
           <a href={contactMailtoUrl('SchemeKnit — Privacy and Data Request')} className="text-brand-cyan underline break-all">

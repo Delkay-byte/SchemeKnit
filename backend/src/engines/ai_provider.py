@@ -356,6 +356,7 @@ class GeminiProvider(AIProvider):
         self._client = None
         self._model_checked = False
         self._model_accessible = False
+        self.max_tokens = 4096
 
     def _get_client(self):
         if self._client is None:
@@ -383,7 +384,7 @@ class GeminiProvider(AIProvider):
         client = self._get_client()
         config: Dict[str, Any] = {
             "temperature": 0.7,
-            "max_output_tokens": 4096,
+            "max_output_tokens": int(getattr(self, "max_tokens", 4096) or 4096),
         }
         if json_mode:
             config["response_mime_type"] = "application/json"
@@ -607,6 +608,10 @@ class GroqProvider(AIProvider):
         self.api_key = api_key or _env("GROQ_API_KEY")
         self.model = (model or _env("GROQ_MODEL", DEFAULT_GROQ_MODEL) or DEFAULT_GROQ_MODEL).strip()
         self.base_url = _env("GROQ_BASE_URL", self.BASE_URL) or self.BASE_URL
+        #: Completion budget; the spend-control layer may clamp this value.
+        self.max_tokens = 4096
+        #: Actual token usage of the last successful response, when supplied.
+        self.last_usage: Optional[Dict[str, Any]] = None
 
     def _chat(self, prompt: str, *, json_mode: bool = False,
               system: Optional[str] = None,
@@ -615,6 +620,7 @@ class GroqProvider(AIProvider):
         import time
 
         self.last_error = None
+        self.last_usage = None
         if not self.is_available():
             self.last_error = "missing_api_key"
             return ""
@@ -626,7 +632,7 @@ class GroqProvider(AIProvider):
             "model": self.model,
             "messages": messages,
             "temperature": 0.7,
-            "max_tokens": 4096,
+            "max_tokens": int(getattr(self, "max_tokens", 4096) or 4096),
         }
         # Strict Structured Outputs: the gpt-oss family enforces the supplied
         # JSON Schema natively, so a section rewrite is guaranteed schema-valid
@@ -708,6 +714,7 @@ class GroqProvider(AIProvider):
             # A transient blip that succeeded on a later attempt is healthy.
             self.last_error = None
             data = resp.json()
+            self._record_usage(data)
             choices = data.get("choices") or []
             if not choices:
                 self.last_error = "empty_output"
@@ -725,6 +732,26 @@ class GroqProvider(AIProvider):
         except Exception as exc:
             _record_error(self, exc)
             return ""
+
+    def _record_usage(self, data: Dict[str, Any]) -> None:
+        """Capture actual token usage for provider-cost accounting."""
+        usage = data.get("usage") if isinstance(data, dict) else None
+        if not isinstance(usage, dict):
+            self.last_usage = None
+            return
+        details = usage.get("prompt_tokens_details")
+        cached = (
+            details.get("cached_tokens")
+            if isinstance(details, dict) else usage.get("cached_tokens")
+        )
+        self.last_usage = {
+            "provider": "groq",
+            "model": self.model,
+            "input_tokens": usage.get("prompt_tokens"),
+            "output_tokens": usage.get("completion_tokens"),
+            "total_tokens": usage.get("total_tokens"),
+            "cached_input_tokens": cached,
+        }
 
     def generate_lesson_content(self, indicator, strand, sub_strand, content_standard,
                                  lesson_type="instruction", context=None):
@@ -1030,6 +1057,7 @@ class OpenAIProvider(AIProvider):
     def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
         self.api_key = api_key or _env("OPENAI_API_KEY")
         self.model = (model or _env("OPENAI_MODEL", DEFAULT_OPENAI_MODEL) or DEFAULT_OPENAI_MODEL).strip()
+        self.max_tokens = 4096
 
     def _chat(self, prompt: str, *, json_mode: bool = False,
               system: Optional[str] = None) -> str:
@@ -1053,7 +1081,7 @@ class OpenAIProvider(AIProvider):
                 model=self.model,
                 messages=messages,
                 temperature=0.7,
-                max_tokens=4096,
+                max_tokens=int(getattr(self, "max_tokens", 4096) or 4096),
             )
             if json_mode:
                 kwargs["response_format"] = {"type": "json_object"}
@@ -1151,6 +1179,7 @@ class OpenCodeZenProvider(AIProvider):
         self.api_key = api_key or _env("OPENCODE_ZEN_API_KEY")
         self.model = model or _env("OPENCODE_ZEN_MODEL", "nemotron-3-ultra-free")
         self.base_url = _env("OPENCODE_ZEN_BASE_URL", "https://opencode.ai/zen/v1")
+        self.max_tokens = 2000
 
     def _chat(self, prompt: str, *, json_mode: bool = False,
               system: Optional[str] = None) -> str:
@@ -1175,7 +1204,7 @@ class OpenCodeZenProvider(AIProvider):
                 model=self.model,
                 messages=messages,
                 temperature=0.7,
-                max_tokens=2000,
+                max_tokens=int(getattr(self, "max_tokens", 2000) or 2000),
             )
             choices = response.choices or []
             if not choices:

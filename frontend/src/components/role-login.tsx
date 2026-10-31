@@ -12,6 +12,8 @@ import { AuthShell } from '@/components/auth/auth-shell'
 import { AuthField, AuthError } from '@/components/auth/auth-field'
 import { validateEmail } from '@/lib/password-policy'
 import { isDesktop } from '@/lib/build-target'
+import { TurnstileWidget, TURNSTILE_SITE_KEY } from '@/components/turnstile-widget'
+import type { ApiError } from '@/lib/api'
 import { authHref, currentNextPath } from '@/lib/purchase-return'
 import { Building2, Shield, GraduationCap, KeyRound, AlertCircle, ArrowRight } from 'lucide-react'
 
@@ -95,6 +97,9 @@ export function RoleLogin({ entry }: { entry: EntryRole }) {
   const [showForgot, setShowForgot] = useState(false)
   const [loading, setLoading] = useState(false)
   const [checking, setChecking] = useState(true)
+  const [challengeRequired, setChallengeRequired] = useState(false)
+  const [challengeToken, setChallengeToken] = useState('')
+  const [challengeReset, setChallengeReset] = useState(0)
   const [nextPath, setNextPath] = useState<string | null>(null)
 
   const copy = ENTRY_COPY[entry]
@@ -150,9 +155,20 @@ export function RoleLogin({ entry }: { entry: EntryRole }) {
         entry,
         entry === 'platform_admin' && !useRecovery ? mfaCode : undefined,
         entry === 'platform_admin' && useRecovery ? recoveryCode : undefined,
+        challengeToken || undefined,
       )
     } catch (err) {
+      const apiError = err as ApiError
       setError(err instanceof Error ? err.message : 'Authentication failed')
+      if (apiError?.code === 'turnstile_required'
+          || apiError?.code?.startsWith('turnstile_')) {
+        setChallengeRequired(true)
+      }
+      if (challengeRequired) {
+        // Tokens are single-use: every failed attempt needs a fresh one.
+        setChallengeToken('')
+        setChallengeReset((value) => value + 1)
+      }
     } finally {
       setLoading(false)
     }
@@ -311,11 +327,20 @@ export function RoleLogin({ entry }: { entry: EntryRole }) {
           </div>
         )}
 
+        {challengeRequired && (
+          <TurnstileWidget
+            siteKey={TURNSTILE_SITE_KEY}
+            action="login"
+            onToken={setChallengeToken}
+            resetKey={challengeReset}
+          />
+        )}
+
         <AuthError message={error} />
 
         <Button
           type="submit"
-          disabled={loading}
+          disabled={loading || (challengeRequired && !challengeToken)}
           className="h-11 w-full rounded-lg bg-[#102A43] text-white font-semibold shadow-[0_4px_14px_rgba(16,42,67,0.25)] hover:bg-[#0d2740] active:scale-[0.98] transition focus-visible:ring-2 focus-visible:ring-[#04A9CE] focus-visible:ring-offset-2 disabled:opacity-60"
         >
           {loading ? (

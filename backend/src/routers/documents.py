@@ -26,6 +26,7 @@ from ..models import SchemeOfWork, Subject, ClassLevel
 from ..logging_config import get_logger, log_event
 from ..security import enforce_authenticated_budget
 from ..storage import get_storage
+from .. import storage_quota
 
 router = APIRouter()
 logger = get_logger()
@@ -159,6 +160,27 @@ def _read_file_sync(path: Path) -> bytes:
     return path.read_bytes()
 
 
+def _cleanup_storage_reservation(db, reservation, object_key: str,
+                                 committed: bool) -> None:
+    """Release quota and remove a partially written object after a failure."""
+    if committed and object_key:
+        try:
+            if get_storage().exists(object_key):
+                get_storage().delete(object_key)
+        except Exception:
+            pass
+        try:
+            storage_quota.release_object(db, object_key)
+        except Exception:
+            pass
+        return
+    if reservation is not None:
+        try:
+            storage_quota.release(db, reservation)
+        except Exception:
+            pass
+
+
 def _analyze_document(document_parser, file_path: Path,
                       original_filename: str = None) -> dict:
     """Run section detection, degrading safely when it fails.
@@ -226,7 +248,11 @@ async def upload_scheme(
     if content_type not in allowed_content_types:
         raise HTTPException(status_code=400, detail="Unsupported file type")
 
-    # Stream-read to check size before loading full content
+    # Stream-read to check size before loading full content. The effective
+    # limit is the stricter of the storage policy and the legacy upload cap;
+    # a client-supplied Content-Length is never trusted.
+    quota_limits = storage_quota.limits()
+    max_file_bytes = quota_limits["max_file_bytes"]
     chunks = []
     total_size = 0
     while True:
@@ -234,8 +260,14 @@ async def upload_scheme(
         if not chunk:
             break
         total_size += len(chunk)
-        if total_size > MAX_UPLOAD_SIZE:
-            raise HTTPException(status_code=413, detail="File too large (max 50MB)")
+        if total_size > max_file_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail=(
+                    f"File too large. The maximum size is "
+                    f"{storage_quota.human_bytes(max_file_bytes)}."
+                ),
+            )
         chunks.append(chunk)
     content = b"".join(chunks)
     if ext == ".docx":
@@ -244,11 +276,27 @@ async def upload_scheme(
         _validate_pdf_signature(content)
 
     upload_dir = _get_upload_dir()
-    safe_filename = f"{user.id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}{ext}"
+    safe_filename = f"{user.id}_{uuid.uuid4().hex}{ext}"
     file_path = upload_dir / safe_filename
     storage_key = None
+    object_key = None
+    reservation = None
+    quota_committed = False
 
     try:
+        # Reserve quota from the ACTUAL bytes read, before writing anything.
+        storage_key = (
+            _durable_upload_key(user.id, ext)
+            if _durable_upload_enabled() else str(file_path)
+        )
+        object_key = storage_key
+        reservation = storage_quota.reserve(
+            db, user.id,
+            object_key=object_key,
+            size_bytes=total_size,
+            file_type=ext,
+        )
+
         # Write file using executor to avoid blocking event loop
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(None, _write_file_sync, file_path, content)
@@ -274,13 +322,22 @@ async def upload_scheme(
         # Persist the ORIGINAL before reporting success. Production uses the
         # private R2 bucket; local development keeps the filesystem path.
         if _durable_upload_enabled():
-            storage_key = _durable_upload_key(user.id, ext)
             await loop.run_in_executor(
                 None, get_storage().save_file, file_path, storage_key)
+            object_key = storage_key
+
+        # The object exists now; commit the held bytes before the scheme row.
+        # If the scheme write fails, the cleanup path removes the object and
+        # releases the committed quota exactly once.
+        if reservation is not None:
+            storage_quota.commit(db, reservation)
+            quota_committed = True
 
         db_scheme = data_service.create_scheme(db, user.id, scheme, school_id=user.school_id)
         # Track storage location for safe orphan cleanup on delete (server-side only).
         db_scheme.storage_filename = storage_key or str(file_path)
+        if reservation is not None:
+            storage_quota.attach_document(db, object_key, db_scheme.id)
 
         # ── Multi-subject document detection (§4) ───────────────────────────────
         # Inspect the document for subject sections. When more than one subject
@@ -299,7 +356,7 @@ async def upload_scheme(
             db_scheme.detection_status = "extraction_failed"
             db_scheme.status = "extraction_failed"
         db.commit()
-        if storage_key:
+        if _durable_upload_enabled():
             try:
                 if file_path.exists():
                     file_path.unlink()
@@ -339,19 +396,30 @@ async def upload_scheme(
             },
         }
     except HTTPException:
-        if storage_key:
-            try:
-                get_storage().delete(storage_key)
-            except Exception:
-                pass
+        _cleanup_storage_reservation(
+            db, reservation, object_key, quota_committed)
+        try:
+            if file_path.exists():
+                file_path.unlink()
+        except OSError:
+            pass
         raise
+    except storage_quota.StorageQuotaError as exc:
+        _cleanup_storage_reservation(
+            db, reservation, object_key, quota_committed)
+        try:
+            if file_path.exists():
+                file_path.unlink()
+        except OSError:
+            pass
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail={"code": exc.code, "message": exc.message, **exc.details},
+        ) from exc
     except Exception as e:
         # Clean up file and any already-uploaded object on failure.
-        if storage_key:
-            try:
-                get_storage().delete(storage_key)
-            except Exception:
-                pass
+        _cleanup_storage_reservation(
+            db, reservation, object_key, quota_committed)
         try:
             if file_path.exists():
                 file_path.unlink()
@@ -388,6 +456,15 @@ async def list_schemes(
             for s in schemes
         ]
     }
+
+
+@router.get("/storage")
+async def get_storage_usage(
+    user: User = Depends(get_current_user),
+    db=Depends(get_db),
+):
+    """Current teacher storage usage. Only the caller's own usage is returned."""
+    return storage_quota.usage(db, user.id)
 
 
 @router.get("/{scheme_id}")

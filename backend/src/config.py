@@ -119,6 +119,24 @@ class Settings(BaseSettings):
     #: REGISTRATION_MODE=invite_only; compared in constant time.
     PILOT_INVITE_CODE: str = ""
 
+    # ── Cloudflare Turnstile bot protection ───────────────────────────────
+    # TURNSTILE_ENABLED=False keeps local/dev builds usable. Production must
+    # set it to True after creating the widget and adding BOTH the secret
+    # (backend only) and the public site key (frontend build).
+    TURNSTILE_ENABLED: bool = False
+    #: Backend-only Siteverify secret. NEVER expose to the browser.
+    TURNSTILE_SECRET_KEY: str = ""
+    #: Public widget site key (also supplied to the frontend build as
+    #: NEXT_PUBLIC_TURNSTILE_SITE_KEY). Kept here only for config validation.
+    TURNSTILE_SITE_KEY: str = ""
+    TURNSTILE_VERIFY_URL: str = (
+        "https://challenges.cloudflare.com/turnstile/v0/siteverify")
+    #: Comma-separated exact hostnames accepted from Siteverify.
+    TURNSTILE_ALLOWED_HOSTNAMES: str = "schemeknit-frontend.onrender.com"
+    TURNSTILE_TIMEOUT_SECONDS: float = 5.0
+    #: Require a login challenge after this many recent failed attempts.
+    LOGIN_TURNSTILE_AFTER_FAILURES: int = 3
+
     # File Storage
     # STORAGE_BACKEND=local (default) or s3 for S3-compatible object storage.
     UPLOAD_DIR: str = "uploads"
@@ -135,6 +153,16 @@ class Settings(BaseSettings):
     S3_BUCKET: str = ""
     S3_ACCESS_KEY: str = ""
     S3_SECRET_KEY: str = ""
+    #: Private production prefix inside the bucket. Quota accounting and
+    #: reconciliation are scoped to this prefix.
+    STORAGE_PREFIX: str = "production/"
+    #: Per-teacher retained original-document quota (500 MiB).
+    STORAGE_USER_QUOTA_BYTES: int = 500 * 1024 * 1024
+    #: Global SchemeKnit production-prefix cap (8 GiB, below the 10 GB free
+    #: R2 allocation to preserve headroom).
+    STORAGE_GLOBAL_QUOTA_BYTES: int = 8 * 1024 * 1024 * 1024
+    #: Single-file maximum (50 MiB).
+    STORAGE_MAX_FILE_BYTES: int = 50 * 1024 * 1024
 
     # Transactional email (Resend)
     # Server-side ONLY. NEVER expose RESEND_API_KEY to browser code
@@ -198,6 +226,29 @@ class Settings(BaseSettings):
     ZELI_READ_TIMEOUT_SECONDS: float = 90.0
     #: Bounded retries for transient failures (429 / 5xx / network only).
     ZELI_MAX_RETRIES: int = 2
+
+    # ── AI provider spending controls (application-level) ──────────────────
+    # Separate from teacher credits: these cap the REAL provider bill across
+    # every SchemeKnit account. Money is accounted in micro-USD in the shared
+    # database, so multiple workers cannot each spend the full budget.
+    # Defaults are deliberately conservative. 0 disables a specific cap;
+    # the monthly total remains the hard ceiling. Set values in Render to
+    # change them — no redeploy-time secret is involved.
+    AI_SPEND_CONTROL_ENABLED: bool = True
+    AI_MONTHLY_BUDGET_USD: float = 10.0
+    #: Optional daily guard against a runaway day. 0 disables it.
+    AI_DAILY_BUDGET_USD: float = 2.0
+    #: Per-provider monthly caps. 0 disables the provider-specific cap.
+    AI_DEEPSEEK_MONTHLY_BUDGET_USD: float = 8.0
+    AI_GROQ_MONTHLY_BUDGET_USD: float = 2.0
+    #: Emit one owner alert when spent/budget reaches this fraction.
+    AI_BUDGET_WARNING_THRESHOLD: float = 0.8
+    #: Reject an oversized prompt BEFORE any provider request is made.
+    AI_MAX_INPUT_CHARS: int = 60000
+    #: Hard ceiling for provider completion tokens (also clamps ZELI_MAX_TOKENS).
+    AI_MAX_OUTPUT_TOKENS: int = 2000
+    AI_MAX_CONCURRENT_PER_TEACHER: int = 2
+    AI_GLOBAL_MAX_CONCURRENT: int = 8
 
     # Paystack (payments) — optional; absent keys disable new payment initiation.
     # Server-side secret only; never expose PAYSTACK_SECRET_KEY to the browser.
@@ -341,6 +392,84 @@ class Settings(BaseSettings):
             raise ValueError("ZELI_MAX_RETRIES must be between 0 and 5")
         return value
 
+    @field_validator(
+        "AI_MONTHLY_BUDGET_USD", "AI_DAILY_BUDGET_USD",
+        "AI_DEEPSEEK_MONTHLY_BUDGET_USD", "AI_GROQ_MONTHLY_BUDGET_USD",
+    )
+    @classmethod
+    def _validate_ai_budget(cls, value: float) -> float:
+        value = float(value)
+        if value < 0:
+            raise ValueError("AI budget values must be zero or greater")
+        if value > 10000:
+            raise ValueError("AI budget values must not exceed 10000 USD")
+        return value
+
+    @field_validator("AI_BUDGET_WARNING_THRESHOLD")
+    @classmethod
+    def _validate_ai_warning_threshold(cls, value: float) -> float:
+        value = float(value)
+        if not 0.1 <= value <= 1.0:
+            raise ValueError(
+                "AI_BUDGET_WARNING_THRESHOLD must be between 0.1 and 1.0"
+            )
+        return value
+
+    @field_validator("AI_MAX_INPUT_CHARS")
+    @classmethod
+    def _validate_ai_max_input_chars(cls, value: int) -> int:
+        value = int(value)
+        if not 1000 <= value <= 500000:
+            raise ValueError("AI_MAX_INPUT_CHARS must be between 1000 and 500000")
+        return value
+
+    @field_validator("AI_MAX_OUTPUT_TOKENS")
+    @classmethod
+    def _validate_ai_max_output_tokens(cls, value: int) -> int:
+        value = int(value)
+        if not 1 <= value <= 8192:
+            raise ValueError("AI_MAX_OUTPUT_TOKENS must be between 1 and 8192")
+        return value
+
+    @field_validator("AI_MAX_CONCURRENT_PER_TEACHER", "AI_GLOBAL_MAX_CONCURRENT")
+    @classmethod
+    def _validate_ai_concurrency(cls, value: int) -> int:
+        value = int(value)
+        if not 1 <= value <= 100:
+            raise ValueError("AI concurrency limits must be between 1 and 100")
+        return value
+
+    @field_validator("TURNSTILE_TIMEOUT_SECONDS")
+    @classmethod
+    def _validate_turnstile_timeout(cls, value: float) -> float:
+        value = float(value)
+        if not 1.0 <= value <= 15.0:
+            raise ValueError(
+                "TURNSTILE_TIMEOUT_SECONDS must be between 1 and 15 seconds")
+        return value
+
+    @field_validator("LOGIN_TURNSTILE_AFTER_FAILURES")
+    @classmethod
+    def _validate_login_turnstile_threshold(cls, value: int) -> int:
+        value = int(value)
+        if not 1 <= value <= 50:
+            raise ValueError(
+                "LOGIN_TURNSTILE_AFTER_FAILURES must be between 1 and 50")
+        return value
+
+    @field_validator(
+        "STORAGE_USER_QUOTA_BYTES", "STORAGE_GLOBAL_QUOTA_BYTES",
+        "STORAGE_MAX_FILE_BYTES",
+    )
+    @classmethod
+    def _validate_storage_quota(cls, value: int) -> int:
+        value = int(value)
+        if value < 1024 * 1024:
+            raise ValueError("storage quota values must be at least 1 MiB")
+        if value > 1024 * 1024 * 1024 * 1024:
+            raise ValueError("storage quota values must not exceed 1 TiB")
+        return value
+
     @field_validator("LOGIN_LOCKOUT_STEPS")
     @classmethod
     def _validate_lockout_steps(cls, value: str) -> str:
@@ -457,6 +586,25 @@ class Settings(BaseSettings):
             problems.append(
                 "RATE_LIMIT_BACKEND (production must use 'db', not process memory)"
             )
+
+        # Turnstile is opt-in until the owner creates the widget. When enabled,
+        # both keys and at least one allowed production hostname are required;
+        # a missing secret must never silently degrade to no bot protection.
+        if self.TURNSTILE_ENABLED:
+            if not self.TURNSTILE_SECRET_KEY.strip():
+                problems.append(
+                    "TURNSTILE_SECRET_KEY (required when TURNSTILE_ENABLED=true)"
+                )
+            if not self.TURNSTILE_SITE_KEY.strip():
+                problems.append(
+                    "TURNSTILE_SITE_KEY (required when TURNSTILE_ENABLED=true)"
+                )
+            if not [h for h in self.TURNSTILE_ALLOWED_HOSTNAMES.split(",")
+                    if h.strip()]:
+                problems.append(
+                    "TURNSTILE_ALLOWED_HOSTNAMES (required when "
+                    "TURNSTILE_ENABLED=true)"
+                )
 
         # Invite-only registration must have a code to check against.
         if self.REGISTRATION_MODE == "invite_only" and not self.PILOT_INVITE_CODE.strip():

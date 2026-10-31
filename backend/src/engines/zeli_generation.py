@@ -180,7 +180,10 @@ def _zeli_config(settings=None) -> ZeliConfig:
         enabled=enabled, provider=provider, model=model,
         base_url=base_url, api_key=api_key,
         temperature=float(getattr(s, "ZELI_TEMPERATURE", 0.3) or 0.3),
-        max_tokens=int(getattr(s, "ZELI_MAX_TOKENS", 2000) or 2000),
+        max_tokens=min(
+            int(getattr(s, "ZELI_MAX_TOKENS", 2000) or 2000),
+            int(getattr(s, "AI_MAX_OUTPUT_TOKENS", 2000) or 2000),
+        ),
         thinking_mode=str(
             getattr(s, "ZELI_THINKING_MODE", "disabled") or "auto").strip().lower(),
         connect_timeout=float(
@@ -511,12 +514,18 @@ def generate_zeli_content(
     provider,
     context: Dict[str, Any],
     db: Optional[Session] = None,
+    user_id: Optional[str] = None,
+    request_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Generate one whole lesson, cache first, then validate strictly.
 
     Raises ``ZeliGenerationError`` on any failure. It NEVER returns a
     deterministic or partial substitute: the caller decides how to report the
     failure, and the existing lesson content is left untouched.
+
+    Every actual provider call also passes through the shared AI spend
+    controls: a conservative estimate is reserved first, then the provider's
+    reported usage (or a conservative estimate on failure) is settled.
     """
     if provider is None:
         raise ZeliGenerationError(
@@ -535,32 +544,85 @@ def generate_zeli_content(
         provider.last_cache_hit = True
         return cached
 
+    # Prompt size is bounded BEFORE any provider (or spend reservation) work.
+    # The serialized context plus a template allowance is conservative: the
+    # real prompt includes system instructions and formatting.
+    from .. import ai_spend
+
+    try:
+        serialized_context = json.dumps(
+            context or {}, ensure_ascii=False, sort_keys=True, default=str)
+        prompt_chars = ai_spend.ensure_prompt_size(
+            serialized_context + (" " * 8000)
+        ) - 8000
+    except ai_spend.AISpendError as exc:
+        err = ZeliGenerationError(exc.message, exc.status_code)
+        err.budget_blocked = True
+        raise err from exc
+
     kwargs = {
         key: context[key] for key in _CONTEXT_KWARGS if key in context
     }
+
+    attempt = None
+    try:
+        attempt = ai_spend.begin_attempt(
+            db,
+            provider=provider_name,
+            model=model,
+            prompt_chars=prompt_chars,
+            user_id=user_id,
+            request_id=request_id,
+        )
+    except ai_spend.AISpendError as exc:
+        err = ZeliGenerationError(exc.message, exc.status_code)
+        err.budget_blocked = True
+        raise err from exc
+
     try:
         content = provider.generate_lesson_v2(**kwargs)
     except ZeliGenerationError:
+        if attempt is not None:
+            attempt.finish(
+                "failure", error_code=_safe_provider_error_code(provider))
         raise
     except Exception:
+        if attempt is not None:
+            attempt.finish(
+                "failure", error_code=_safe_provider_error_code(provider))
         raise zeli_failure_from_provider(
             getattr(provider, "last_error", None))
 
     if not content:
+        if attempt is not None:
+            attempt.finish(
+                "failure", error_code=_safe_provider_error_code(provider))
         raise zeli_failure_from_provider(
             getattr(provider, "last_error", None))
 
     problem = validate_zeli_content(content)
     if problem:
         # The provider answered, but the output cannot be trusted. Never merge
-        # it into the lesson; report a safe generation failure instead.
+        # it into the lesson; report a safe generation failure instead. The
+        # provider may still have billed tokens for this response, so the
+        # attempt is recorded as a schema failure.
         provider.last_error = f"schema_invalid:{problem}"[:300]
+        if attempt is not None:
+            attempt.finish(
+                "schema_invalid",
+                usage=getattr(provider, "last_usage", None),
+                error_code="schema_invalid",
+            )
         raise ZeliGenerationError(
             "Zeli returned an incomplete lesson plan, so nothing was saved "
             "and no lesson-plan quota was used. Please try again, or choose "
             "Standard generation.",
             502,
         )
+
+    if attempt is not None:
+        provider.last_cost_micros = attempt.finish(
+            "success", usage=getattr(provider, "last_usage", None))
 
     write_zeli_cache(
         db, cache_key=cache_key, content=content,
@@ -613,8 +675,11 @@ def zeli_fallback_eligible(error: "ZeliGenerationError", provider) -> bool:
 
     Eligible: transport/timeouts, 429/5xx, malformed/schema-invalid output and
     a quality-gate rejection. Not eligible: missing/invalid credentials, an
-    unknown model, an invalid request, or any non-provider application error.
+    unknown model, an invalid request, a spend-budget block (a second provider
+    would also be blocked), or any non-provider application error.
     """
+    if getattr(error, "budget_blocked", False):
+        return False
     code = _safe_provider_error_code(provider)
     if code in _FALLBACK_BLOCKED_ERRORS:
         return False
@@ -627,14 +692,18 @@ def zeli_fallback_eligible(error: "ZeliGenerationError", provider) -> bool:
     return False
 
 
-def _zeli_attempt(provider, context: Dict[str, Any], db: Optional[Session]):
+def _zeli_attempt(provider, context: Dict[str, Any], db: Optional[Session],
+                  user_id: Optional[str] = None,
+                  request_id: Optional[str] = None):
     """Run one provider attempt and return (ok, content, error, record)."""
     started = time.monotonic()
     provider_name = (
         provider.get_name() if hasattr(provider, "get_name") else "zeli")
     model = str(getattr(provider, "model", "") or "")
     try:
-        content = generate_zeli_content(provider=provider, context=context, db=db)
+        content = generate_zeli_content(
+            provider=provider, context=context, db=db,
+            user_id=user_id, request_id=request_id)
         record = {
             "provider": provider_name,
             "model": model,
@@ -643,6 +712,13 @@ def _zeli_attempt(provider, context: Dict[str, Any], db: Optional[Session]):
             "error": None,
             "cache_hit": bool(getattr(provider, "last_cache_hit", False)),
             "duration_seconds": round(max(0.0, time.monotonic() - started), 3),
+            "input_tokens": (getattr(provider, "last_usage", None) or {}).get(
+                "input_tokens"),
+            "output_tokens": (getattr(provider, "last_usage", None) or {}).get(
+                "output_tokens"),
+            "cost_usd": round(
+                int(getattr(provider, "last_cost_micros", 0) or 0)
+                / 1_000_000.0, 6),
         }
         return True, content, None, record
     except ZeliGenerationError as exc:
@@ -677,6 +753,8 @@ def generate_zeli_with_fallback(
     fallback=None,
     context: Dict[str, Any],
     db: Optional[Session] = None,
+    user_id: Optional[str] = None,
+    request_id: Optional[str] = None,
 ) -> tuple[Dict[str, Any], Dict[str, Any]]:
     """Generate one lesson on DeepSeek, with ONE bounded Groq fallback.
 
@@ -690,7 +768,8 @@ def generate_zeli_with_fallback(
     content is ever substituted.
     """
     attempts: list[dict] = []
-    ok, content, primary_error, record = _zeli_attempt(primary, context, db)
+    ok, content, primary_error, record = _zeli_attempt(
+        primary, context, db, user_id=user_id, request_id=request_id)
     attempts.append(record)
     primary_name = record["provider"]
     primary_model = record["model"]
@@ -715,7 +794,8 @@ def generate_zeli_with_fallback(
         primary_error.attempts = attempts
         raise primary_error
 
-    ok, content, fallback_error, record = _zeli_attempt(fallback, context, db)
+    ok, content, fallback_error, record = _zeli_attempt(
+        fallback, context, db, user_id=user_id, request_id=request_id)
     attempts.append(record)
     if ok:
         return content, {

@@ -11,7 +11,7 @@ import uuid
 
 from sqlalchemy import (
     create_engine, Column, String, Integer, Float, Boolean, DateTime, Date,
-    Text, ForeignKey, JSON, Enum as SAEnum, Index, UniqueConstraint,
+    Text, ForeignKey, JSON, Enum as SAEnum, Index, UniqueConstraint, BigInteger,
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
@@ -1231,6 +1231,81 @@ class CreditReservationDB(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class AIProviderUsageDB(Base):
+    """One recorded AI provider attempt for spend accounting.
+
+    This is a cost ledger, not a teacher-credit ledger: a failed DeepSeek
+    attempt followed by a successful Groq fallback produces TWO rows (the
+    provider spent money on both calls) while the teacher is charged once.
+    ``attempt_id`` is unique so replaying the same attempt record cannot
+    double-count expenditure.
+    """
+    __tablename__ = "ai_provider_usage"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    attempt_id = Column(String, unique=True, nullable=False, index=True)
+    reservation_id = Column(String, nullable=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=True, index=True)
+    request_id = Column(String, nullable=True, index=True)
+    provider = Column(String, nullable=False, default="")
+    model = Column(String, nullable=False, default="")
+    input_tokens = Column(Integer, nullable=False, default=0)
+    cached_input_tokens = Column(Integer, nullable=False, default=0)
+    output_tokens = Column(Integer, nullable=False, default=0)
+    total_tokens = Column(Integer, nullable=False, default=0)
+    usage_source = Column(String, nullable=False, default="actual")  # actual|estimated|none
+    pricing_version = Column(String, nullable=False, default="")
+    cost_micros = Column(BigInteger, nullable=False, default=0)
+    cost_usd = Column(Float, nullable=False, default=0.0)
+    outcome = Column(String, nullable=False, default="success")
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+class AISpendCounterDB(Base):
+    """Shared atomic budget/concurrency counter (SQLite and PostgreSQL).
+
+    Money is stored in integer micro-USD to avoid float drift. A reservation
+    increments ``reserved_micros`` under a guarded UPDATE; settlement moves it
+    to ``spent_micros``. Concurrent workers therefore share one budget.
+    """
+    __tablename__ = "ai_spend_counters"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    scope = Column(String, nullable=False)        # monthly|daily|provider_monthly|concurrency
+    period_key = Column(String, nullable=False, default="")
+    provider = Column(String, nullable=False, default="")
+    reserved_micros = Column(BigInteger, nullable=False, default=0)
+    spent_micros = Column(BigInteger, nullable=False, default=0)
+    active_requests = Column(Integer, nullable=False, default=0)
+    expires_at = Column(DateTime, nullable=True)
+    warning_sent = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("scope", "period_key", "provider",
+                         name="uq_ai_spend_counter_scope"),
+    )
+
+
+class AISpendReservationDB(Base):
+    """A held provider-spend estimate awaiting actual usage settlement."""
+    __tablename__ = "ai_spend_reservations"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    attempt_id = Column(String, unique=True, nullable=False, index=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=True, index=True)
+    request_id = Column(String, nullable=True)
+    provider = Column(String, nullable=False, default="")
+    model = Column(String, nullable=False, default="")
+    estimated_micros = Column(BigInteger, nullable=False, default=0)
+    settled_micros = Column(BigInteger, nullable=False, default=0)
+    status = Column(String, nullable=False, default="held")  # held|settled|released
+    scopes = Column(JSON, default=list)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class ReferralCodeDB(Base):
     """One stable referral code/link per eligible account."""
     __tablename__ = "referral_codes"
@@ -1349,6 +1424,63 @@ class LoginFailureDB(Base):
     last_lockout_at = Column(DateTime, nullable=True)
     lockout_until = Column(DateTime, nullable=True, index=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class StorageLedgerDB(Base):
+    """One reserved, committed or deleted original-document object.
+
+    ``object_key`` is the opaque storage key, never the teacher filename.
+    ``size_bytes`` is measured from the actual upload body, not Content-Length.
+    The idempotency key makes a retried reservation refer to the same row.
+    """
+    __tablename__ = "storage_ledger"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    owner_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    object_key = Column(String, unique=True, nullable=False, index=True)
+    document_id = Column(String, nullable=True, index=True)
+    size_bytes = Column(BigInteger, nullable=False, default=0)
+    file_type = Column(String, nullable=False, default="")
+    state = Column(String, nullable=False, default="reserved")  # reserved|committed|released|deleted
+    idempotency_key = Column(String, unique=True, nullable=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    committed_at = Column(DateTime, nullable=True)
+    deleted_at = Column(DateTime, nullable=True)
+
+
+class StorageCounterDB(Base):
+    """Shared atomic storage quota counter (SQLite/PostgreSQL)."""
+    __tablename__ = "storage_counters"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    scope = Column(String, nullable=False)      # user|global
+    key = Column(String, nullable=False, default="")
+    committed_bytes = Column(BigInteger, nullable=False, default=0)
+    reserved_bytes = Column(BigInteger, nullable=False, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("scope", "key", name="uq_storage_counter_scope"),
+    )
+
+
+class TurnstileTokenDB(Base):
+    """One successfully verified Turnstile token, for single-use replay denial.
+
+    Cloudflare tokens are single-use, but SchemeKnit also records the token
+    digest so a replayed siteverify result cannot authorise a second action.
+    Only a SHA-256 digest is stored; the raw token is never persisted.
+    """
+    __tablename__ = "turnstile_tokens"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    token_hash = Column(String, unique=True, nullable=False, index=True)
+    action = Column(String, nullable=False, default="")
+    hostname = Column(String, nullable=False, default="")
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 class RateLimitCounterDB(Base):

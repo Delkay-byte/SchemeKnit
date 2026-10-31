@@ -51,6 +51,7 @@ from __future__ import annotations
 
 import os
 import shutil
+from datetime import datetime
 from pathlib import Path
 from typing import Optional, Protocol, runtime_checkable
 
@@ -102,6 +103,10 @@ class StorageBackend(Protocol):
     def get_response(self, key: str, filename: str = "",
                      media_type: str = "application/octet-stream") -> Response:
         """Return a FastAPI response that streams the file to the client."""
+        ...
+
+    def list_objects(self, prefix: str = "") -> list[tuple[str, int, object]]:
+        """Return ``(key, size_bytes, last_modified)`` under ``prefix``."""
         ...
 
 
@@ -163,6 +168,22 @@ class LocalStorage:
             media_type=media_type,
             headers={"X-TeachFlow-Filename": filename} if filename else None,
         )
+
+    def list_objects(self, prefix: str = "") -> list[tuple[str, int, object]]:
+        base = self._full(prefix) if prefix else self.root
+        if not str(base).startswith(str(self.root)):
+            raise ValueError(f"prefix escapes storage root: {prefix}")
+        if not base.exists():
+            return []
+        items = []
+        for path in base.rglob("*"):
+            if not path.is_file():
+                continue
+            key = path.relative_to(self.root).as_posix()
+            stat = path.stat()
+            items.append((key, int(stat.st_size), datetime.utcfromtimestamp(
+                stat.st_mtime)))
+        return items
 
 
 # ── S3-compatible object storage backend ────────────────────────────────
@@ -243,6 +264,18 @@ class S3Storage:
         body = self.get_bytes(key)
         headers = {"X-TeachFlow-Filename": filename} if filename else None
         return Response(content=body, media_type=media_type, headers=headers)
+
+    def list_objects(self, prefix: str = "") -> list[tuple[str, int, object]]:
+        items = []
+        paginator = self.client.get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=self.bucket, Prefix=prefix):
+            for obj in page.get("Contents") or []:
+                items.append((
+                    obj.get("Key", ""),
+                    int(obj.get("Size") or 0),
+                    obj.get("LastModified"),
+                ))
+        return items
 
 
 # ── Factory ──────────────────────────────────────────────────────────────
