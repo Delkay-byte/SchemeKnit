@@ -14,7 +14,8 @@ Source of truth: `backend/src/config.py` (`Settings`), consumed by
 | Variable | Default | Validation | Consumed by / effect |
 |---|---|---|---|
 | `ZELI_ENABLED` | `true` | Boolean | `zeli_generation.zeli_availability()` / `get_zeli_provider()`. `false` hides the method and rejects generation with 503 before any quota. Standard generation is unaffected. |
-| `ZELI_PROVIDER` | `deepseek` | Must be a member of `NAMED_PROVIDERS` (`gemini`, `groq`, `deepseek`, `openai`, `minimax`, `ollama`, `opencode-zen`); lowercased/trimmed | Selects the provider class. `groq` keeps the previous integration and uses `GROQ_*`; any mismatch is `INVALID_CONFIG`. |
+| `ZELI_PROVIDER` | `deepseek` | Must be a member of `NAMED_PROVIDERS` (`gemini`, `groq`, `deepseek`, `openai`, `minimax`, `ollama`, `opencode-zen`); lowercased/trimmed | Selects the primary provider class. `groq` keeps the previous integration and uses `GROQ_*`; any mismatch is `INVALID_CONFIG`. |
+| `ZELI_FALLBACK_PROVIDER` | `groq` | Empty, or a member of `NAMED_PROVIDERS`; must differ from `ZELI_PROVIDER` | Secondary provider for ONE bounded attempt after an eligible primary failure (network, timeout, 429/5xx, malformed/schema-invalid output, or quality-gate rejection). Empty disables fallback. It always uses its own provider configuration (`GROQ_*` for Groq) and never receives the primary key. Missing/invalid primary credentials do NOT trigger fallback. |
 | `ZELI_MODEL` | `deepseek-flash` when provider is `deepseek` (blank falls back) | Trimmed string | Model id in every request body and in the cache key. |
 | `ZELI_BASE_URL` | `https://api.deepseek.com` (blank falls back) | Trimmed string | Base for `POST {base}/chat/completions`. |
 | `ZELI_API_KEY` | empty | Trimmed string; never logged | Highest-precedence credential. Falls back to `DEEPSEEK_API_KEY` (provider `deepseek`) or `GROQ_API_KEY` (provider `groq`). |
@@ -35,16 +36,20 @@ consuming an AI credit.
 
 ## Precedence summary
 
-1. `ZELI_API_KEY` (if non-empty) wins for any provider.
-2. Provider `deepseek`: `DEEPSEEK_API_KEY`.
-3. Provider `groq`: `GROQ_API_KEY`.
+1. `ZELI_API_KEY` (if non-empty) wins for the primary provider.
+2. Primary provider `deepseek`: `DEEPSEEK_API_KEY`.
+3. Primary provider `groq`: `GROQ_API_KEY`.
 4. Blank `ZELI_MODEL` / `ZELI_BASE_URL` resolve to the provider defaults.
+5. The fallback is resolved independently from `ZELI_FALLBACK_PROVIDER`
+   (default `groq`) and always uses that provider's own `GROQ_MODEL` /
+   `GROQ_BASE_URL` / `GROQ_API_KEY`. It never inherits the primary key.
 
 ## Example (placeholders only)
 
 ```dotenv
 ZELI_ENABLED=true
 ZELI_PROVIDER=deepseek
+ZELI_FALLBACK_PROVIDER=groq
 ZELI_MODEL=deepseek-flash
 ZELI_BASE_URL=https://api.deepseek.com
 ZELI_API_KEY=

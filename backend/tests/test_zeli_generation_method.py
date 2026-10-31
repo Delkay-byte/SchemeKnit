@@ -330,6 +330,8 @@ def _run_pipeline(db, monkeypatch, provider, method="zeli", weeks=2):
     scheme = data_service.scheme_to_model(scheme_db)
     monkeypatch.setattr(
         "src.engines.generation_pipeline.get_zeli_provider", lambda: provider)
+    monkeypatch.setattr(
+        "src.engines.generation_pipeline.get_zeli_fallback_provider", lambda: None)
     job = GenerationPipeline().generate_all(
         scheme, _config(scheme_db.id, method=method), db=db)
     return job, scheme_db
@@ -528,6 +530,8 @@ def test_identical_run_reuses_cached_lessons(db, monkeypatch):
 
     monkeypatch.setattr(
         "src.engines.generation_pipeline.get_zeli_provider", lambda: provider)
+    monkeypatch.setattr(
+        "src.engines.generation_pipeline.get_zeli_fallback_provider", lambda: None)
     job2 = GenerationPipeline().generate_all(
         data_service.scheme_to_model(scheme_db),
         _config(scheme_db.id, method="zeli"), db=db)
@@ -578,6 +582,8 @@ def test_generate_with_zeli_persists_method_and_provenance(db, monkeypatch):
     )
     monkeypatch.setattr(
         "src.engines.generation_pipeline.get_zeli_provider", lambda: provider)
+    monkeypatch.setattr(
+        "src.engines.generation_pipeline.get_zeli_fallback_provider", lambda: None)
 
     with TestClient(_app(db, user)) as client:
         resp = client.post(
@@ -627,6 +633,8 @@ def test_generate_with_zeli_does_not_expose_credentials(db, monkeypatch):
     )
     monkeypatch.setattr(
         "src.engines.generation_pipeline.get_zeli_provider", lambda: provider)
+    monkeypatch.setattr(
+        "src.engines.generation_pipeline.get_zeli_fallback_provider", lambda: None)
 
     with TestClient(_app(db, user)) as client:
         resp = client.post(
@@ -710,6 +718,8 @@ def _run_http_zeli(db, monkeypatch, user, scheme, provider, weeks=1):
     )
     monkeypatch.setattr(
         "src.engines.generation_pipeline.get_zeli_provider", lambda: provider)
+    monkeypatch.setattr(
+        "src.engines.generation_pipeline.get_zeli_fallback_provider", lambda: None)
     with TestClient(_app(db, user)) as client:
         return client.post(
             f"/api/generation/{scheme.id}/generate",

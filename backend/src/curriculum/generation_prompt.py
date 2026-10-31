@@ -75,6 +75,15 @@ LESSON_OUTPUT_SCHEMA = """
     "success_criteria": "How to know learners achieved the indicator",
     "duration_minutes": 10
   },
+  "assessment_items": [
+    {
+      "prompt": "A specific question or observable task for this indicator",
+      "expected_evidence": "What a correct learner response or product shows",
+      "marking_guidance": "How the teacher marks or checks it",
+      "misconception": "A likely wrong answer or confusion to watch for"
+    }
+  ],
+  "class_assignment": "A specific, teacher-ready in-class task that produces evidence for the indicator",
   "plenary": {
     "activity": "Reflection/summary activity",
     "duration_minutes": 5,
@@ -349,7 +358,15 @@ CRITICAL RULES:
 16. Every example MUST satisfy the indicator's category exactly. For a "binary
     compound", use only compounds of exactly two elements (water, sodium
     chloride, carbon dioxide); NEVER present a carbonate, bicarbonate or other
-    three-or-more-element compound as a binary compound.""")
+    three-or-more-element compound as a binary compound.
+17. class_assignment MUST be a specific, usable in-class task tied to this
+    indicator and its objectives. It MUST state what learners produce or
+    demonstrate. NEVER write "complete the assignment given by the teacher" or
+    similar filler.
+18. assessment_items MUST test the actual objectives and indicator. Each item
+    needs a concrete prompt and the evidence a correct response provides. Do
+    NOT use generic experimental-variable language unless the indicator itself
+    requires it.""")
 
     return "\n\n".join(sections)
 

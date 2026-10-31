@@ -24,6 +24,7 @@ from .models import (
 )
 from .ai_resource_text import (
     normalize_text_items,
+    normalize_resource_items,
     normalize_structured_references,
     strip_internal_markers,
 )
@@ -611,6 +612,12 @@ class DataService:
             if hasattr(lp, key) and key not in ("id", "job_id", "owner_id", "scheme_id", "created_at"):
                 if key == "structured_references":
                     value = normalize_structured_references(value)
+                elif key == "teaching_learning_resources":
+                    # A comma is part of a real material description; do not
+                    # split it into fragments at the save boundary.
+                    value = normalize_resource_items(value)
+                    value = [strip_internal_markers(v) for v in value]
+                    value = [v for v in value if v]
                 elif key in text_list_fields:
                     value = normalize_text_items(value)
                     # PART 21: an internal/harness marker can never persist

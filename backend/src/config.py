@@ -142,6 +142,10 @@ class Settings(BaseSettings):
     # ``zeli_generation.get_zeli_provider``); see docs/ZELI_ENVIRONMENT.md.
     ZELI_ENABLED: bool = True
     ZELI_PROVIDER: str = "deepseek"
+    #: Secondary whole-lesson provider. One bounded attempt is made only for
+    #: eligible provider failures (network/timeout/429/5xx/malformed output).
+    #: Empty disables fallback. Default "groq" reuses GROQ_* configuration.
+    ZELI_FALLBACK_PROVIDER: str = "groq"
     ZELI_MODEL: str = ""
     ZELI_BASE_URL: str = ""
     ZELI_API_KEY: str = ""
@@ -224,6 +228,19 @@ class Settings(BaseSettings):
         if provider not in NAMED_PROVIDERS:
             raise ValueError(
                 "ZELI_PROVIDER must be one of: "
+                + ", ".join(sorted(NAMED_PROVIDERS))
+            )
+        return provider
+
+    @field_validator("ZELI_FALLBACK_PROVIDER")
+    @classmethod
+    def _validate_zeli_fallback_provider(cls, value: str) -> str:
+        from .engines.ai_provider import NAMED_PROVIDERS
+
+        provider = (value or "").strip().lower()
+        if provider and provider not in NAMED_PROVIDERS:
+            raise ValueError(
+                "ZELI_FALLBACK_PROVIDER must be empty or one of: "
                 + ", ".join(sorted(NAMED_PROVIDERS))
             )
         return provider

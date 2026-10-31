@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 import uuid
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -20,7 +20,32 @@ from .database import get_db, User, RevokedTokenDB
 settings = get_settings()
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-security = HTTPBearer()
+
+
+class _BearerUnauthorized(HTTPBearer):
+    """HTTP Bearer scheme that reports missing credentials as 401.
+
+    FastAPI's default ``HTTPBearer`` raises 403 for a missing Authorization
+    header. Missing authentication is not an authorization decision: the
+    correct contract is ``401 Unauthorized`` with a ``WWW-Authenticate``
+    challenge. Invalid, expired and revoked tokens already raise 401 in
+    ``_authenticate_user``; this makes the missing-credential case consistent.
+    """
+
+    async def __call__(self, request: Request):
+        try:
+            return await super().__call__(request)
+        except HTTPException as exc:
+            if exc.status_code == status.HTTP_403_FORBIDDEN:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Not authenticated",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            raise
+
+
+security = _BearerUnauthorized()
 
 
 def hash_password(password: str) -> str:

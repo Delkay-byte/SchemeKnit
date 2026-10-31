@@ -307,6 +307,83 @@ def _parse_bracketed(text: str) -> List[str] | None:
         return [inner]
 
 
+def normalize_exact_items(value: Any) -> List[str]:
+    """Canonical list without splitting punctuation inside one entry.
+
+    Used for curriculum indicators, where a semicolon or comma belongs to the
+    indicator sentence. Only an explicit serialized list is parsed into items.
+    """
+    if value is None:
+        return []
+    if isinstance(value, str):
+        parsed = _parse_bracketed(value)
+        raw_items = parsed if parsed is not None else [value]
+    elif isinstance(value, (list, tuple, set)):
+        raw_items = [str(v) for v in value]
+    else:
+        raw_items = [str(value)]
+
+    items = []
+    for raw in raw_items:
+        text = str(raw).strip() if raw is not None else ""
+        if not text or text.lower() in ("null", "none", "undefined", "n/a", "na"):
+            continue
+        items.append(re.sub(r"\s+", " ", text).strip())
+    seen = set()
+    out = []
+    for item in items:
+        key = item.lower()
+        if key not in seen:
+            seen.add(key)
+            out.append(item)
+    return out
+
+
+def normalize_resource_items(value: Any) -> List[str]:
+    """Canonical teaching-resource list WITHOUT comma splitting.
+
+    Provider resources are complete descriptions, not CSV rows. A comma can be
+    part of one real material description ("Samples of table salt, water and
+    baking soda (for observation only)") so splitting on every comma created
+    meaningless fragments and lost qualifiers. Items are separated only by an
+    explicit list structure, newlines or semicolons. Whitespace is normalised
+    and duplicates are removed case-insensitively.
+    """
+    if value is None:
+        return []
+
+    if isinstance(value, str):
+        parsed = _parse_bracketed(value)
+        if parsed is not None:
+            raw_items = parsed
+        else:
+            raw_items = re.split(r"[\r\n;]+", value)
+    elif isinstance(value, (list, tuple, set)):
+        raw_items = [str(v) for v in value]
+    else:
+        raw_items = [str(value)]
+
+    items: List[str] = []
+    for raw in raw_items:
+        text = str(raw).strip() if raw is not None else ""
+        if not text or text.lower() in (
+                "null", "none", "undefined", "n/a", "na", "-", "..."):
+            continue
+        text = clean_serialized_text(text)
+        text = re.sub(r"\s+", " ", text).strip(" \t\r\n;")
+        if text:
+            items.append(text)
+
+    seen = set()
+    out: List[str] = []
+    for item in items:
+        key = item.lower()
+        if key not in seen:
+            seen.add(key)
+            out.append(item)
+    return out
+
+
 def normalize_text_items(value: Any) -> List[str]:
     """Canonical list[str] for ANY stored list-typed value (PART 11).
 

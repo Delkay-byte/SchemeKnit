@@ -32,7 +32,10 @@ from ..models import (
 )
 from ..engines.generation_pipeline import GenerationPipeline
 from ..engines.zeli_generation import ZeliGenerationError, zeli_availability
-from ..ai_resource_text import normalize_text_items, normalize_structured_references
+from ..ai_resource_text import (
+    normalize_exact_items, normalize_resource_items, normalize_text_items,
+    normalize_structured_references,
+)
 from ..logging_config import get_logger, log_event, log_error
 
 router = APIRouter()
@@ -1768,6 +1771,27 @@ def _generate_lesson_plans(
             )
             accepted = gate_report["accepted"]
             gate_metrics = gate_report["metrics"]
+            # Quality-gate rejection is an eligible provider-content failure:
+            # make ONE bounded fallback attempt on the rejected lessons, then
+            # re-run the same gate. Nothing is persisted before it passes.
+            _rejected_ids = [
+                r.lesson_id for r in gate_report["reports"]
+                if not r.accepted
+            ]
+            if (_rejected_ids
+                    and config.generation_method == GenerationMethod.ZELI
+                    and pipeline.regenerate_zeli_with_fallback(
+                        job, config, db, lesson_ids=_rejected_ids)):
+                log_event(
+                    "zeli_quality_fallback_attempted", user_id=user.id,
+                    scheme_id=scheme_id, job_id=job_db.id,
+                    rejected=len(_rejected_ids),
+                )
+                gate_report = _run_quality_gate(
+                    job, config, scheme_id, drafts, allow_rebuild=False,
+                )
+                accepted = gate_report["accepted"]
+                gate_metrics = gate_report["metrics"]
             if not accepted:
                 log_event(
                     "quality_gate_run_rejected", user_id=user.id,
@@ -1859,6 +1883,19 @@ def _generate_lesson_plans(
             scheme_total = data_service.count_lessons_for_scheme(
                 db, scheme_id, user.id
             )
+            _job_snapshot = dict(job_db.config_snapshot or {})
+            if config.generation_method == GenerationMethod.ZELI:
+                _job_snapshot["zeli_provider"] = {
+                    "primary_provider": getattr(job, "_zeli_primary_provider", None),
+                    "primary_model": getattr(job, "_zeli_primary_model", None),
+                    "fallback_provider": getattr(job, "_zeli_fallback_provider", None),
+                    "fallback_model": getattr(job, "_zeli_fallback_model", None),
+                    "fallback_used": bool(getattr(job, "_zeli_fallback_used", False)),
+                    "primary_error": getattr(job, "_zeli_primary_error", None),
+                    "cache_hits": int(getattr(job, "_zeli_cache_hits", 0) or 0),
+                    "external_calls": int(getattr(job, "_zeli_fresh_calls", 0) or 0),
+                    "attempts": list(getattr(job, "_zeli_attempts", []) or []),
+                }
             # The terminal job state commits WITH the lessons, replacement,
             # rehome and unused-unit release. Previously the job was marked
             # completed in a separate earlier commit, so a hard failure during
@@ -1870,6 +1907,7 @@ def _generate_lesson_plans(
                 progress=100,
                 heartbeat_at=datetime.utcnow(),
                 completed_at=datetime.utcnow(),
+                config_snapshot=_job_snapshot,
                 commit=False,
             )
             db.commit()
@@ -1996,10 +2034,19 @@ def _generate_lesson_plans(
         # Failed generation, AI OFF without Zeli, or a fully deterministic
         # fallback never consumes AI credits. Local Ollama cannot bypass this.
         ai_credit_remaining = None
+        _is_zeli = config.generation_method == GenerationMethod.ZELI
+        # A Zeli run consumes an AI request credit only when at least one
+        # lesson required a real external call. A pure cache replay (all
+        # lessons served from zeli_generation_cache) consumes none.
         _ai_content_produced = (
-            config.ai_mode != AIMode.OFF
-            or config.generation_method == GenerationMethod.ZELI
-        ) and getattr(job, "ai_enrichment_succeeded", 0) > 0
+            (config.ai_mode != AIMode.OFF
+             and getattr(job, "ai_enrichment_succeeded", 0) > 0)
+            or (
+                _is_zeli
+                and getattr(job, "ai_enrichment_succeeded", 0) > 0
+                and getattr(job, "_zeli_fresh_calls", 0) > 0
+            )
+        )
         if _ai_content_produced:
             try:
                 ai_credit_remaining = consume_ai_generation(
@@ -2043,6 +2090,30 @@ def _generate_lesson_plans(
             "lessons_deterministic": max(job.completed_lessons - ai_lessons, 0),
             "reason": None,
         }
+        if is_zeli:
+            _fallback_used = bool(getattr(job, "_zeli_fallback_used", False))
+            ai_info.update({
+                "primary_provider": getattr(job, "_zeli_primary_provider", None),
+                "primary_model": getattr(job, "_zeli_primary_model", None),
+                "fallback_configured": bool(
+                    getattr(job, "_zeli_fallback_provider", None)),
+                "fallback_used": _fallback_used,
+                # Only the provider/model that actually ran is reported. A
+                # configured-but-unused fallback is not presented as the
+                # source of this lesson.
+                "fallback_provider": (
+                    getattr(job, "_zeli_fallback_provider", None)
+                    if _fallback_used else None),
+                "fallback_model": (
+                    getattr(job, "_zeli_fallback_model", None)
+                    if _fallback_used else None),
+                "primary_error": (
+                    getattr(job, "_zeli_primary_error", None)
+                    if _fallback_used else None),
+                "cache_hits": int(getattr(job, "_zeli_cache_hits", 0) or 0),
+                "external_calls": int(getattr(job, "_zeli_fresh_calls", 0) or 0),
+                "attempts": list(getattr(job, "_zeli_attempts", []) or []),
+            })
         try:
             from ..engines.ai_provider import (
                 resolve_provider_mode, get_provider, provider_status, NAMED_PROVIDERS,
@@ -3624,7 +3695,7 @@ def _serialize_lesson(lp, scheme_db=None) -> dict:
         "sub_strand": lp.sub_strand,
         "content_standard": lp.content_standard,
         "content_standard_code": lp.content_standard_code,
-        "indicators": normalize_text_items(lp.indicators),
+        "indicators": normalize_exact_items(lp.indicators),
         "indicator_codes": lp.indicator_codes or [],
         "lesson_topic": lp.lesson_topic,
         "previous_knowledge": lp.previous_knowledge,
@@ -3637,7 +3708,7 @@ def _serialize_lesson(lp, scheme_db=None) -> dict:
         "core_competencies": normalize_text_items(lp.core_competencies),
         "source_tlrs": normalize_text_items(getattr(lp, "source_tlrs", None)),
         "other_tlrs": normalize_text_items(getattr(lp, "other_tlrs", None)),
-        "teaching_learning_resources": normalize_text_items(
+        "teaching_learning_resources": normalize_resource_items(
             lp.teaching_learning_resources),
         "introduction": lp.introduction,
         "main_activities": lp.main_activities or [],
@@ -3795,7 +3866,8 @@ def _db_to_lesson_model(lp) -> LessonPlan:
         core_competencies=normalize_text_items(lp.core_competencies),
         source_tlrs=normalize_text_items(getattr(lp, "source_tlrs", None)),
         other_tlrs=normalize_text_items(getattr(lp, "other_tlrs", None)),
-        teaching_learning_resources=normalize_text_items(lp.teaching_learning_resources),
+        teaching_learning_resources=normalize_resource_items(
+            lp.teaching_learning_resources),
         introduction=lp.introduction,
         main_activities=_parse_activity_list(lp.main_activities, TeachingActivity),
         learner_activities=_parse_activity_list(lp.learner_activities, TeachingActivity),

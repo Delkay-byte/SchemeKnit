@@ -49,6 +49,8 @@ from .ai_provider import get_provider, resolve_provider_mode
 from .zeli_generation import (
     ZeliGenerationError,
     generate_zeli_content,
+    generate_zeli_with_fallback,
+    get_zeli_fallback_provider,
     get_zeli_provider,
     zeli_lesson_context,
 )
@@ -563,8 +565,24 @@ class GenerationPipeline:
         exactly as in the enrichment path.
         """
         provider = get_zeli_provider()
-        provider_name = provider.get_name() if hasattr(provider, "get_name") else "zeli"
-        model = str(getattr(provider, "model", "") or "")
+        fallback = get_zeli_fallback_provider()
+        primary_name = provider.get_name() if hasattr(provider, "get_name") else "zeli"
+        primary_model = str(getattr(provider, "model", "") or "")
+        # Sanitized, per-job provider provenance. The router persists the
+        # actual successful provider on every lesson; these fields explain
+        # whether a fallback was used and why the primary failed.
+        job._zeli_primary_provider = primary_name
+        job._zeli_primary_model = primary_model
+        job._zeli_primary_error = None
+        job._zeli_fallback_provider = (
+            fallback.get_name() if fallback is not None
+            and hasattr(fallback, "get_name") else None)
+        job._zeli_fallback_model = (
+            str(getattr(fallback, "model", "") or "") if fallback is not None else "")
+        job._zeli_fallback_used = False
+        job._zeli_attempts = []
+        job._zeli_fresh_calls = 0
+        job._zeli_cache_hits = 0
 
         sorted_plans = sorted(lesson_plans, key=lambda lp: lp.lesson_sequence)
         for idx, lp in enumerate(sorted_plans):
@@ -597,8 +615,18 @@ class GenerationPipeline:
             )
             job.ai_enrichment_total_attempted += 1
 
-            content = generate_zeli_content(
-                provider=provider, context=context, db=db)
+            content, meta = generate_zeli_with_fallback(
+                primary=provider, fallback=fallback, context=context, db=db)
+            job._zeli_attempts.extend(meta.get("attempts") or [])
+            if meta.get("fallback_used"):
+                job._zeli_fallback_used = True
+                job._zeli_primary_error = meta.get("primary_error")
+            if meta.get("external_calls"):
+                job._zeli_fresh_calls += 1
+            if meta.get("cache_hit"):
+                job._zeli_cache_hits += 1
+            provider_name = meta.get("provider") or primary_name
+            model = meta.get("model") or primary_model
 
             # Apply the validated whole-lesson content. Curriculum fields and
             # teacher-owned metadata are protected inside _apply_v2_content;
@@ -614,9 +642,102 @@ class GenerationPipeline:
             job.ai_enrichment_succeeded += 1
 
         logger.info(
-            "Zeli generated %d lesson(s) with provider=%s for job %s",
-            job.ai_enrichment_succeeded, provider_name, job.id,
+            "Zeli generated %d lesson(s) with provider=%s fallback_used=%s "
+            "for job %s",
+            job.ai_enrichment_succeeded, primary_name,
+            job._zeli_fallback_used, job.id,
         )
+
+    def regenerate_zeli_with_fallback(
+        self,
+        job: GenerationJob,
+        config: TermConfig,
+        db=None,
+        *,
+        lesson_ids: Optional[List[str]] = None,
+    ) -> bool:
+        """One bounded fallback for lessons rejected by the quality gate.
+
+        The primary provider succeeded at the HTTP/schema level, but its
+        content was unacceptable. Re-run ONLY the rejected lessons on the
+        configured fallback provider, through the same strict validator and
+        mapping path. Returns True when at least one lesson was regenerated.
+        The caller must re-run the quality gate before persisting anything.
+        """
+        fallback = get_zeli_fallback_provider()
+        if fallback is None or not fallback.is_available():
+            return False
+        if getattr(job, "_zeli_fallback_used", False):
+            # A provider-level fallback already ran; do not spend a third call.
+            return False
+        if getattr(job, "_quality_fallback_attempted", False):
+            return False
+        job._quality_fallback_attempted = True
+
+        wanted = set(lesson_ids or [])
+        sorted_plans = sorted(
+            job._lesson_plans or [], key=lambda lp: lp.lesson_sequence)
+        regenerated = 0
+        for idx, lp in enumerate(sorted_plans):
+            if wanted and lp.id not in wanted:
+                continue
+            if bool(getattr(lp, "special_period_label", "") or ""):
+                continue
+            prev_context = None
+            next_context = None
+            if idx > 0:
+                prev_lp = sorted_plans[idx - 1]
+                prev_context = (
+                    f"Previous lesson: {prev_lp.strand} - {prev_lp.sub_strand}. "
+                    f"Indicator: {prev_lp.indicators[0] if prev_lp.indicators else 'N/A'}"
+                )
+            if idx < len(sorted_plans) - 1:
+                next_lp = sorted_plans[idx + 1]
+                next_context = (
+                    f"Next lesson: {next_lp.strand} - {next_lp.sub_strand}. "
+                    f"Indicator: {next_lp.indicators[0] if next_lp.indicators else 'N/A'}"
+                )
+            context = zeli_lesson_context(
+                lp, config,
+                previous_lesson_context=prev_context,
+                next_lesson_context=next_context,
+            )
+            try:
+                content = generate_zeli_content(
+                    provider=fallback, context=context, db=db)
+            except ZeliGenerationError:
+                continue
+            self._apply_v2_content(lp, content, config, whole_lesson=True)
+            self._complete_zeli_timeline(lp, content)
+            lp.generation_method = "zeli"
+            lp.ai_generated = True
+            lp.ai_provider = (
+                fallback.get_name() if hasattr(fallback, "get_name") else "groq")
+            lp.ai_model = str(getattr(fallback, "model", "") or "")
+            job._zeli_fallback_used = True
+            job._zeli_fallback_provider = lp.ai_provider
+            job._zeli_fallback_model = lp.ai_model
+            job._zeli_primary_error = (
+                getattr(job, "_zeli_primary_error", None)
+                or "quality_gate_rejected")
+            if not getattr(fallback, "last_cache_hit", False):
+                job._zeli_fresh_calls = int(
+                    getattr(job, "_zeli_fresh_calls", 0) or 0) + 1
+            else:
+                job._zeli_cache_hits = int(
+                    getattr(job, "_zeli_cache_hits", 0) or 0) + 1
+            job._zeli_attempts.append({
+                "provider": lp.ai_provider,
+                "model": lp.ai_model,
+                "ok": True,
+                "status": 200,
+                "error": None,
+                "cache_hit": bool(getattr(fallback, "last_cache_hit", False)),
+                "duration_seconds": 0.0,
+                "reason": "quality_gate_rejected",
+            })
+            regenerated += 1
+        return regenerated > 0
 
     def _enrich_with_ai(
         self,
@@ -1076,6 +1197,62 @@ class GenerationPipeline:
                 task, f"Success criteria: {criteria}" if criteria else "")
         elif isinstance(assessment, str):
             lp.assessment = assessment
+
+        # Class assignment and assessment items are provider-authored on a
+        # whole-lesson run. The deterministic filler is only a fallback when
+        # the provider omits these fields (backward-compatible with older
+        # prompts/cached lessons).
+        if whole_lesson:
+            from ..models import AssessmentItem
+            class_task = content.get("class_assignment")
+            if isinstance(class_task, dict):
+                class_task = (
+                    class_task.get("task")
+                    or class_task.get("description")
+                    or class_task.get("activity")
+                    or "")
+            class_task = str(class_task or "").strip()
+            if class_task:
+                lp.class_assignment = class_task
+
+            raw_items = content.get("assessment_items")
+            if isinstance(raw_items, list):
+                items = []
+                for item in raw_items:
+                    if isinstance(item, str):
+                        prompt = item.strip()
+                        if not prompt:
+                            continue
+                        items.append(AssessmentItem(
+                            prompt=prompt, source=ContentSource.AI))
+                        continue
+                    if not isinstance(item, dict):
+                        continue
+                    prompt = str(
+                        item.get("prompt") or item.get("question")
+                        or item.get("task") or "").strip()
+                    if not prompt:
+                        continue
+                    try:
+                        dok = int(item.get("dok_level") or 1)
+                    except (TypeError, ValueError):
+                        dok = 1
+                    items.append(AssessmentItem(
+                        prompt=prompt,
+                        dok_level=max(1, min(4, dok)),
+                        bloom_category=str(
+                            item.get("bloom_category") or "recall"),
+                        expected_evidence=str(
+                            item.get("expected_evidence")
+                            or item.get("success_criteria") or ""),
+                        marking_guidance=str(
+                            item.get("marking_guidance") or ""),
+                        misconception=str(item.get("misconception") or ""),
+                        follow_up=str(item.get("follow_up") or ""),
+                        source=ContentSource.AI,
+                    ))
+                if items:
+                    lp.assessment_items = items
 
         # Plenary / conclusion — keep the provider's closing actions and exit
         # check so the lesson ends with evidence, not just a summary.
