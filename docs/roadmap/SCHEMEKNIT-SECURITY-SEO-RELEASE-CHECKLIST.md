@@ -148,7 +148,9 @@ DEFERRED (reserved for paid infrastructure), NOT STARTED.
 | BLOCKED | Automatic scheduled recovery | No `PILOT_DATABASE_URL` GitHub secret; scheduled workflows also disable after 60 days of repo inactivity |
 | PREPARED | Monitoring and alert delivery | Structured logs + `/api/health` + `/api/ready` exist; no central alert webhook configured |
 | PREPARED | Backup and restore | `docs/operations/ZERO-COST-BACKUP-AND-RESTORE-RUNBOOK.md`; no pilot snapshot/dump/restore executed |
-| DONE | Invite-only registration gate | `REGISTRATION_MODE` + `PILOT_INVITE_CODE`; `tests/test_pilot_registration_gate.py` 5 passed; default remains `open` |
+| DONE | Invite-only registration gate | `REGISTRATION_MODE` + `PILOT_INVITE_CODE`; `tests/test_pilot_registration_gate.py`; default remains `open` |
+| DONE | Public registration policy endpoint | `GET /api/auth/registration-policy`; signup reads it at runtime; `NEXT_PUBLIC_PILOT_INVITE_REQUIRED` is fallback only |
+| VERIFIED | Platform Admin TOTP enrollment | QR + manual key at `/platform-admin`; enforced server-side; `tests/test_mfa.py`; operator reset in `src/tools/reset_platform_admin.py` |
 | PREPARED | Pilot invite-only deployment | Code exists; Render env not changed; owner must set mode + code + frontend flag |
 | DONE | Teacher upload privacy notice | `upload-privacy-notice.tsx`; upload page placement; exact wording pinned by `tests/test_upload_privacy_notice_source.py` 4 passed |
 | DONE | Browser acceptance for the privacy notice | `frontend/e2e/upload-privacy-notice.js`; 13/13 passed at 1440 and 390 widths against local backend/frontend on 2026-10-31 |

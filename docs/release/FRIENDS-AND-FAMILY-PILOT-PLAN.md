@@ -23,9 +23,14 @@ period. No public invitation, no live payments.
 - Use Free tier or explicitly granted pilot credits.
 - Do not share accounts.
 - Keep payment disabled.
-- For an invite-only deployment, set backend `REGISTRATION_MODE=invite_only` and
-  `PILOT_INVITE_CODE`, and frontend `NEXT_PUBLIC_PILOT_INVITE_REQUIRED=true`.
-  Never commit the code. Otherwise the owner creates accounts manually.
+- **Public teacher registration is the default.** The backend
+  `REGISTRATION_MODE` defaults to `open` and `/signup` reads
+  `GET /api/auth/registration-policy` at runtime, so no invite code is needed.
+  Turnstile and the password policy stay enforced.
+- Only if the owner explicitly wants a closed friends-and-family cohort, set
+  backend `REGISTRATION_MODE=invite_only` with `PILOT_INVITE_CODE` and frontend
+  `NEXT_PUBLIC_PILOT_INVITE_REQUIRED=true`. Never commit the code. Otherwise
+  the owner creates accounts manually with `closed`.
 
 ## Scenarios
 
