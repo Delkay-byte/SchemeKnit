@@ -113,6 +113,15 @@ def test_postgres_v021_v022_migration_harness():
     assert '"ok": true' in proc.stdout.replace("'", '"')
 
 
+def _pg_engine(url: str):
+    """Use the psycopg v3 driver that backend/requirements.txt installs."""
+    from sqlalchemy import create_engine
+
+    if url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+psycopg://", 1)
+    return create_engine(url)
+
+
 def _scratch_postgres():
     url = _postgres_url()
     if not url:
@@ -131,12 +140,12 @@ def test_v050_migration_is_additive_and_clears_only_legacy_pending():
         pytest.skip("Set POSTGRES_MIGRATION_TEST_URL to a scratch test database")
     import importlib.util
     import sys
-    from sqlalchemy import create_engine, text
+    from sqlalchemy import text
     from sqlalchemy.orm import Session
 
     from src import migrations as migration_module
 
-    engine = create_engine(url)
+    engine = _pg_engine(url)
     with engine.begin() as conn:
         conn.execute(text("DROP TABLE IF EXISTS users CASCADE"))
         conn.execute(text(
@@ -173,7 +182,6 @@ def test_concurrent_setup_converges_on_one_pending_secret_on_postgres():
     from concurrent.futures import ThreadPoolExecutor
     import uuid
 
-    from sqlalchemy import create_engine
     from sqlalchemy.orm import Session
 
     from src.database import Base, User
@@ -182,7 +190,7 @@ def test_concurrent_setup_converges_on_one_pending_secret_on_postgres():
     url = _scratch_postgres()
     if not url:
         pytest.skip("Set POSTGRES_MIGRATION_TEST_URL to a scratch test database")
-    engine = create_engine(url)
+    engine = _pg_engine(url)
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     user_id = str(uuid.uuid4())
