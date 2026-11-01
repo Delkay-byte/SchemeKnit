@@ -19,10 +19,13 @@ def test_mfa_component_and_api_wiring_exist():
         assert method in api
     component = _text("src/components/mfa-settings-card.tsx")
     for fragment in (
-        "Enable MFA", "otpauth_uri", "recovery_codes",
+        "Enable MFA", "MfaEnrollPanel", "recovery_codes",
         "Regenerate recovery codes", "Disable MFA",
     ):
         assert fragment in component
+    panel = _text("src/components/mfa-enroll-panel.tsx")
+    assert "otpauth_uri" in _text("src/lib/api.ts")
+    assert "qr_data_uri" in panel
 
 
 def test_login_sends_second_factor_and_recovery_code():
@@ -37,3 +40,42 @@ def test_platform_admin_page_renders_mfa_settings():
     page = _text("src/app/(platform-admin)/platform-admin/page.tsx")
     assert "MfaSettingsCard" in page
     assert "<MfaSettingsCard" in page
+
+
+def test_enrollment_panel_renders_qr_manual_key_and_recovery_codes():
+    panel = _text("src/components/mfa-enroll-panel.tsx")
+    for fragment in (
+        "qr_data_uri",
+        "Manual setup key",
+        "recovery_codes",
+        "acknowledged",
+        "6-digit code",
+        "Cannot be shown again",
+    ):
+        assert fragment in panel
+
+
+def test_platform_admin_console_blocks_until_enrolled():
+    page = _text("src/app/(platform-admin)/platform-admin/page.tsx")
+    assert "!user.mfa_enabled" in page
+    assert "MfaEnrollPanel" in page
+
+
+def test_auth_context_can_refresh_the_enrolled_user():
+    assert "refreshUser" in _text("src/lib/auth-context.tsx")
+    page = _text("src/app/(platform-admin)/platform-admin/page.tsx")
+    assert "refreshUser" in page
+
+
+def test_login_explains_first_sign_in_enrollment():
+    login = _text("src/components/role-login.tsx")
+    assert "First sign-in?" in login
+    assert "authenticator after signing in" in login
+
+
+def test_settings_card_never_renders_the_secret_after_enrollment():
+    card = _text("src/components/mfa-settings-card.tsx")
+    # The manual key lives only inside the enrollment panel, which the card
+    # renders only while MFA is not enabled.
+    assert "MfaEnrollPanel" in card
+    assert "status?.enabled && (" in card

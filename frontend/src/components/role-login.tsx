@@ -309,6 +309,12 @@ export function RoleLogin({ entry }: { entry: EntryRole }) {
               autoComplete="one-time-code"
               maxLength={useRecovery ? 20 : 6}
             />
+            {!useRecovery && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                First sign-in? Leave this blank. You will set up your
+                authenticator after signing in.
+              </p>
+            )}
           </AuthField>
         )}
 

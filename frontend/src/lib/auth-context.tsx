@@ -12,12 +12,14 @@ interface User {
   is_active: boolean
   role: string
   school_id: string | null
+  mfa_enabled?: boolean
 }
 
 interface AuthContextType {
   user: User | null
   token: string | null
   login: (email: string, password: string, entry: 'teacher' | 'school_admin' | 'platform_admin', mfaCode?: string, recoveryCode?: string, turnstileToken?: string) => Promise<void>
+  refreshUser: () => Promise<void>
   logout: () => void
   loading: boolean
 }
@@ -60,6 +62,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     api.setToken(response.access_token)
   }
 
+  const refreshUser = async () => {
+    // Re-read the authoritative profile (used after MFA enrollment so the
+    // console gate can open without a full reload).
+    const next = await api.getProfile()
+    setUser(next)
+    sessionStorage.setItem('teachflow_user', JSON.stringify(next))
+  }
+
   const logout = () => {
     // Revoke this token server-side first (headers are captured synchronously
     // before the token is cleared). Failures never block the local sign-out.
@@ -72,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, token, login, refreshUser, logout, loading }}>
       {children}
     </AuthContext.Provider>
   )
