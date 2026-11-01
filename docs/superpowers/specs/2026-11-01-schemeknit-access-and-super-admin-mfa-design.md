@@ -124,8 +124,15 @@ validates the code on every request, so direct API calls cannot bypass it.
   `Pragma: no-cache`. It still requires `require_platform_admin_unenrolled`,
   so only the authenticated admin can obtain their own pending secret. Secret
   and URI stay out of logs.
-- Secret is persisted with `mfa_enabled = False`; only `/mfa/verify-setup`
-  flips it to `True` and issues recovery codes.
+- Secret is persisted in `mfa_pending_secret` with
+  `mfa_pending_expires_at` (30 minutes, `MFA_PENDING_TTL_MINUTES`). It is
+  copied to the active `mfa_secret` only when `/mfa/verify-setup` accepts a
+  current code, and only then is `mfa_enabled` set and recovery codes issued.
+- Setup is idempotent: inside the pending window, refreshes, multiple tabs and
+  concurrent requests return the same secret and QR. A single conditional
+  UPDATE installs the pending secret, so competing requests converge.
+- Expired pending secrets are discarded; their codes are rejected and a later
+  setup call starts a fresh enrollment.
 - After enrollment, `/mfa/setup` returns 400, so the secret and QR are never
   shown again. Changing an authenticator requires the existing
   disable flow (password + current TOTP/recovery code) and then a fresh

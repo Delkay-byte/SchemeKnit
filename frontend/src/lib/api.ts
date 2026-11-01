@@ -297,7 +297,7 @@ class ApiService {
     return this.request('/api/auth/mfa/status')
   }
 
-  async beginMfaSetup(): Promise<{ secret: string; otpauth_uri: string; qr_data_uri: string; digits: number; period_seconds: number }> {
+  async beginMfaSetup(): Promise<{ secret: string; otpauth_uri: string; qr_data_uri: string; digits: number; period_seconds: number; expires_at?: string }> {
     return this.request('/api/auth/mfa/setup', { method: 'POST' })
   }
 

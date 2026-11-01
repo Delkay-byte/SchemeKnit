@@ -718,24 +718,71 @@ async def login(req: LoginRequest, db: Session = Depends(get_db),
     }
 
 
+def _mfa_pending_ttl_minutes() -> int:
+    return max(1, int(getattr(
+        get_settings(), "MFA_PENDING_TTL_MINUTES", 30)))
+
+
+def _ensure_pending_mfa_secret(db: Session, user_id: str):
+    """Return one pending enrollment secret for ``user_id``, creating it only
+    when none is unexpired.
+
+    The write is a single conditional UPDATE. Two concurrent requests both try
+    to install a secret, but only the request whose WHERE still matches writes
+    one; both then read the committed row and return the same secret. This is
+    atomic on SQLite and PostgreSQL without relying on row-lock syntax.
+    """
+    now = datetime.utcnow()
+    candidate = generate_secret()
+    expires = now + timedelta(minutes=_mfa_pending_ttl_minutes())
+    from sqlalchemy import or_
+
+    db.query(User).filter(
+        User.id == user_id,
+        User.mfa_enabled == False,  # noqa: E712
+        or_(
+            User.mfa_pending_secret.is_(None),
+            User.mfa_pending_expires_at.is_(None),
+            User.mfa_pending_expires_at <= now,
+        ),
+    ).update(
+        {
+            User.mfa_pending_secret: candidate,
+            User.mfa_pending_expires_at: expires,
+            # Legacy unverified secrets must never be activated.
+            User.mfa_secret: None,
+        },
+        synchronize_session=False,
+    )
+    db.commit()
+
+    row = db.query(User).filter(User.id == user_id).first()
+    if row is None:
+        raise HTTPException(status_code=401, detail="User not found")
+    if not row.mfa_pending_secret or not row.mfa_pending_expires_at:
+        raise HTTPException(
+            status_code=409,
+            detail="MFA enrollment is already active",
+        )
+    return row.mfa_pending_secret, row.mfa_pending_expires_at
+
+
 @router.post("/mfa/setup")
 async def mfa_setup(
     response: Response,
     user: User = Depends(require_platform_admin_unenrolled),
     db: Session = Depends(get_db),
 ):
-    """Start TOTP enrollment.
+    """Start or resume TOTP enrollment.
 
-    The secret stays pending until ``/mfa/verify-setup`` accepts a current
-    code. Operational deployments require enrollment before any platform-admin
-    request; local DEBUG keeps fixtures simple.
+    Repeated calls inside the pending window return the same secret and QR, so
+    refreshes, multiple tabs and concurrent requests cannot invalidate an
+    already displayed code. The secret stays pending until
+    ``/mfa/verify-setup`` accepts a current code.
     """
     if user.mfa_enabled:
         raise HTTPException(status_code=400, detail="MFA is already enabled")
-    secret = generate_secret()
-    user.mfa_secret = secret
-    user.mfa_enabled = False
-    db.commit()
+    secret, expires = _ensure_pending_mfa_secret(db, user.id)
     log_security("mfa_setup_started", user_id=user.id)
     uri = provisioning_uri(secret, user.email)
     # The pending secret must never be cached by a proxy, browser or CDN.
@@ -747,6 +794,7 @@ async def mfa_setup(
         "qr_data_uri": provisioning_qr_data_uri(uri),
         "digits": 6,
         "period_seconds": 30,
+        "expires_at": expires.isoformat() + "Z",
     }
 
 
@@ -756,20 +804,42 @@ async def mfa_verify_setup(
     user: User = Depends(require_platform_admin_unenrolled),
     db: Session = Depends(get_db),
 ):
-    if user.mfa_enabled:
+    # Lock the row so activation and pending-secret clearing are one step.
+    row = db.query(User).filter(
+        User.id == user.id).with_for_update().first()
+    if row is None:
+        raise HTTPException(status_code=401, detail="User not found")
+    if row.mfa_enabled:
         raise HTTPException(status_code=400, detail="MFA is already enabled")
-    if not user.mfa_secret:
-        raise HTTPException(status_code=400, detail="Start MFA setup first")
-    step = verify_totp(user.mfa_secret, req.code)
+
+    now = datetime.utcnow()
+    pending = row.mfa_pending_secret
+    expires = row.mfa_pending_expires_at
+    if not pending or not expires or expires <= now:
+        row.mfa_pending_secret = None
+        row.mfa_pending_expires_at = None
+        row.mfa_secret = None
+        db.commit()
+        log_security("mfa_setup_failed", user_id=row.id, reason="expired")
+        raise HTTPException(
+            status_code=400,
+            detail="Enrollment expired. Start MFA setup again.",
+        )
+
+    step = verify_totp(pending, req.code)
     if step is None:
-        log_security("mfa_setup_failed", user_id=user.id)
+        log_security("mfa_setup_failed", user_id=row.id)
         raise HTTPException(status_code=400, detail="Invalid verification code")
+
     codes = generate_recovery_codes()
-    user.mfa_recovery_codes = hash_recovery_codes(codes)
-    user.mfa_last_step = step
-    user.mfa_enabled = True
+    row.mfa_secret = pending
+    row.mfa_recovery_codes = hash_recovery_codes(codes)
+    row.mfa_last_step = step
+    row.mfa_enabled = True
+    row.mfa_pending_secret = None
+    row.mfa_pending_expires_at = None
     db.commit()
-    log_security("mfa_enabled", user_id=user.id)
+    log_security("mfa_enabled", user_id=row.id)
     return {"enabled": True, "recovery_codes": codes}
 
 
@@ -794,6 +864,8 @@ async def mfa_disable(
     user.mfa_secret = None
     user.mfa_recovery_codes = []
     user.mfa_last_step = None
+    user.mfa_pending_secret = None
+    user.mfa_pending_expires_at = None
     db.commit()
     log_security("mfa_disabled", user_id=user.id)
     return {"enabled": False}

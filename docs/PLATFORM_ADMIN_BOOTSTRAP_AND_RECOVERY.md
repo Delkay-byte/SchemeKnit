@@ -24,12 +24,21 @@ Platform administration requires TOTP MFA. Enrollment is mandatory: with
 refused with 403, and the console shows only the enrollment screen.
 
 - `POST /api/auth/mfa/setup` creates a fresh random secret for the signed-in
-  admin, stores it with `mfa_enabled = false`, and returns the secret, the
-  `otpauth://` URI and an SVG QR code generated locally (`segno`; no external
-  QR service). The response is `Cache-Control: no-store, private`.
-- The secret stays pending until `POST /api/auth/mfa/verify-setup` accepts a
-  current six-digit code (30-second step, ±1 step window). Only then is
-  `mfa_enabled` set and eight single-use recovery codes issued.
+  admin and stores it as a **pending** secret (`mfa_pending_secret`), never as
+  the active secret. It returns the secret, the `otpauth://` URI and an SVG QR
+  code generated locally (`segno`; no external QR service). The response is
+  `Cache-Control: no-store, private`.
+- Setup is idempotent. Refreshing, opening a second tab, or a concurrent
+  request inside the 30-minute pending window returns the same secret and QR,
+  so an already displayed code is not invalidated. The conditional database
+  write lets only one competing request install a secret.
+- After 30 minutes the pending secret expires. The next setup call replaces it;
+  codes from the expired secret are rejected. Override the window with
+  `MFA_PENDING_TTL_MINUTES` (1–1440).
+- The pending secret stays pending until `POST /api/auth/mfa/verify-setup`
+  accepts a current six-digit code (30-second step, ±1 step window). Only then
+  is it copied to the active `mfa_secret`, `mfa_enabled` is set, and eight
+  single-use recovery codes are issued.
 - Recovery codes are stored as bcrypt hashes and shown once. Regenerating them
   requires the password and a current TOTP or recovery code, and invalidates
   every previous code.
