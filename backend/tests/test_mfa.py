@@ -241,3 +241,52 @@ def test_enrollment_endpoints_stay_reachable_before_mfa(db, monkeypatch):
         setup = client.post("/api/auth/mfa/setup", headers=headers)
     assert status.status_code == 200
     assert setup.status_code == 200
+
+
+def test_unenrolled_admin_cannot_use_legacy_admin_routes(db, monkeypatch):
+    """School-admin routes also accept platform admins; MFA gates them too."""
+    from src.auth import create_user_token
+    from src.config import get_settings
+    from src.database import get_db
+
+    monkeypatch.setenv("DEBUG", "false")
+    get_settings.cache_clear()
+    monkeypatch.setattr("src.auth.settings", get_settings())
+
+    admin = make_user(db, role="platform_admin", is_admin=True,
+                      email="legacy-admin@test.com")
+    from src.routers import auth as auth_router
+    app = FastAPI()
+    app.include_router(auth_router.router, prefix="/api/auth")
+    app.dependency_overrides[get_db] = lambda: db
+    headers = {"Authorization": f"Bearer {create_user_token(admin)}"}
+    with TestClient(app) as client:
+        blocked_read = client.get("/api/auth/users", headers=headers)
+        blocked_write = client.post("/api/auth/users", headers=headers, json={
+            "email": "created-by-unenrolled@test.com",
+            "password": "StrongPass#2026",
+            "full_name": "Created",
+        })
+        admin.mfa_enabled = True
+        db.commit()
+        allowed_read = client.get("/api/auth/users", headers=headers)
+    assert blocked_read.status_code == 403
+    assert blocked_write.status_code == 403
+    assert allowed_read.status_code == 200
+
+
+def test_verify_setup_cannot_reissue_codes_after_enrollment(db):
+    admin = make_user(db, role="platform_admin", is_admin=True,
+                      email="mfa-reissue@test.com")
+    app = _app(db, admin)
+    with TestClient(app) as client:
+        secret = client.post("/api/auth/mfa/setup").json()["secret"]
+        step = step_at()
+        first = client.post("/api/auth/mfa/verify-setup", json={
+            "code": totp(secret, step + 1)})
+        assert first.status_code == 200
+        stored = list(admin.mfa_recovery_codes)
+        second = client.post("/api/auth/mfa/verify-setup", json={
+            "code": totp(secret, step)})
+    assert second.status_code == 400
+    assert list(admin.mfa_recovery_codes) == stored

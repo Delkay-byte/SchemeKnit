@@ -48,10 +48,11 @@ function filterAccounts(list: any[], query: string): any[] {
 
 export default function PlatformAdminPage() {
   const router = useRouter()
-  const { user, loading: authLoading, refreshUser } = useAuth()
+  const { user, loading: authLoading, refreshUser, logout } = useAuth()
   const [activeTab, setActiveTab] = useState<Tab>('dashboard')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [enrollError, setEnrollError] = useState<string | null>(null)
 
   // Dashboard data
   const [dashboard, setDashboard] = useState<any>(null)
@@ -481,9 +482,39 @@ export default function PlatformAdminPage() {
             <div className="mt-4">
               <MfaEnrollPanel
                 onComplete={async () => {
-                  await refreshUser()
+                  setEnrollError(null)
+                  try {
+                    await refreshUser()
+                  } catch {
+                    setEnrollError(
+                      'Enrollment succeeded, but your profile could not be refreshed. Retry, or sign out and sign in again.',
+                    )
+                  }
                 }}
               />
+            </div>
+
+            {enrollError && (
+              <p role="alert" className="mt-3 text-sm text-red-600">
+                {enrollError}
+              </p>
+            )}
+
+            <div className="mt-5 flex flex-wrap items-center gap-3 border-t pt-4 text-xs text-muted-foreground">
+              <Button variant="outline" size="sm" onClick={() => void refreshUser().catch(() => setEnrollError('Could not refresh your account status.'))}>
+                Refresh status
+              </Button>
+              <button
+                type="button"
+                onClick={() => logout()}
+                className="font-semibold text-[#04A9CE] underline underline-offset-2"
+              >
+                Sign out
+              </button>
+              <span>
+                Still locked out? Ask the server operator for the documented
+                MFA reset.
+              </span>
             </div>
           </div>
         </main>

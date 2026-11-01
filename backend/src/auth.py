@@ -243,6 +243,20 @@ async def get_optional_user(
     return None
 
 
+def _mfa_enrollment_required(user: User) -> bool:
+    """True when a platform admin must enroll before privileged use.
+
+    Platform admins also satisfy the school-admin dependencies (``is_admin``),
+    so every privileged dependency consults this helper, not just
+    ``require_platform_admin``. DEBUG keeps the local fixture set working.
+    """
+    return (
+        user.role == "platform_admin"
+        and not settings.DEBUG
+        and not user.mfa_enabled
+    )
+
+
 async def require_admin(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db),
@@ -251,6 +265,11 @@ async def require_admin(
     user = _authenticate_user(credentials, db)
     if not user.is_admin and user.role != "school_admin":
         raise HTTPException(status_code=403, detail="Admin access required")
+    if _mfa_enrollment_required(user):
+        raise HTTPException(
+            status_code=403,
+            detail="MFA enrollment is required before privileged administration.",
+        )
     return user
 
 
@@ -302,8 +321,13 @@ def require_school_membership(school_id: str):
         db: Session = Depends(get_db),
     ) -> User:
         user = _authenticate_user(credentials, db)
-        # Platform admins bypass school membership check
+        # Platform admins bypass school membership check, but not MFA.
         if user.role == "platform_admin":
+            if _mfa_enrollment_required(user):
+                raise HTTPException(
+                    status_code=403,
+                    detail="MFA enrollment is required before privileged administration.",
+                )
             return user
         # School admins and teachers must belong to the school
         if user.school_id != school_id:
@@ -379,8 +403,13 @@ async def require_valid_license(
     """
     user = _authenticate_user(credentials, db)
 
-    # Platform admins bypass license check
+    # Platform admins bypass license check, but not MFA enrollment.
     if user.role == "platform_admin":
+        if _mfa_enrollment_required(user):
+            raise HTTPException(
+                status_code=403,
+                detail="MFA enrollment is required before privileged administration.",
+            )
         return user
 
     # Users without a school_id are on free tier (no license needed)

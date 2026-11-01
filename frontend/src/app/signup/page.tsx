@@ -160,6 +160,18 @@ export default function IndividualSignupPage() {
         </p>
       }
     >
+      {policy && !policy.self_registration ? (
+        <div role="status" className="space-y-3 rounded-xl border border-border bg-[#F4F7FA] p-4 text-sm text-muted-foreground">
+          <p>
+            New teacher self-registration is currently closed. Contact your
+            school administrator or SchemeKnit support for access.
+          </p>
+          <Link href="/login" className="font-semibold text-[#04A9CE] underline underline-offset-2">
+            Return to sign in
+          </Link>
+        </div>
+      ) : (
+      <>
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         <AuthField id="signup-name" label="Full name">
           <Input
@@ -274,16 +286,6 @@ export default function IndividualSignupPage() {
           </div>
         )}
 
-        {policy && !policy.self_registration && (
-          <p
-            role="status"
-            className="rounded-lg border border-border bg-[#F4F7FA] px-3 py-2.5 text-xs text-muted-foreground"
-          >
-            New teacher self-registration is currently closed. Contact your
-            school administrator or SchemeKnit support for access.
-          </p>
-        )}
-
         <AuthError message={error} />
 
         <Button
@@ -314,6 +316,8 @@ export default function IndividualSignupPage() {
           Bank Transfer or Mobile Money.
         </p>
       </div>
+      </>
+      )}
     </AuthShell>
   )
 }

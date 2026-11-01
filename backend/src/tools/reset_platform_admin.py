@@ -84,7 +84,8 @@ def reset_platform_admin_mfa(
     account's active sessions so the next sign-in must re-enroll. Passwords,
     roles and the active flag are never touched. Dry-run by default.
     """
-    from src.auth import revoke_user_sessions
+    from datetime import datetime
+
     from src.database import (
         PlatformAuditLogDB, User, UserSessionDB, generate_id,
     )
@@ -122,13 +123,18 @@ def reset_platform_admin_mfa(
     user.mfa_secret = None
     user.mfa_recovery_codes = []
     user.mfa_last_step = None
-    db.commit()
 
-    revoked = revoke_user_sessions(db, user.id)
+    # One transaction: MFA clear, session revocation and audit either all
+    # land or none do.
+    revoked = db.query(UserSessionDB).filter(
+        UserSessionDB.user_id == user.id,
+        UserSessionDB.revoked_at.is_(None),
+    ).update({UserSessionDB.revoked_at: datetime.utcnow()},
+             synchronize_session=False)
     db.add(PlatformAuditLogDB(
         id=generate_id(),
         actor_id=user.id,
-        actor_role="platform_admin",
+        actor_role="cli_operator",
         action="platform_admin_mfa_reset_cli",
         target_type="user",
         target_id=user.id,
@@ -136,13 +142,13 @@ def reset_platform_admin_mfa(
             "method": "cli_operator_mfa_reset",
             "operator": operator,
             "reason": reason,
-            "operator_initiated": True,
+            "target_email": user.email,
         },
     ))
     db.commit()
 
     result["applied"] = True
-    result["sessions_revoked"] = revoked
+    result["sessions_revoked"] = int(revoked or 0)
     return result
 
 

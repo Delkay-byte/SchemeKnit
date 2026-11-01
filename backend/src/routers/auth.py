@@ -724,7 +724,12 @@ async def mfa_setup(
     user: User = Depends(require_platform_admin_unenrolled),
     db: Session = Depends(get_db),
 ):
-    """Start TOTP enrollment. Existing admins are not forced to enroll."""
+    """Start TOTP enrollment.
+
+    The secret stays pending until ``/mfa/verify-setup`` accepts a current
+    code. Operational deployments require enrollment before any platform-admin
+    request; local DEBUG keeps fixtures simple.
+    """
     if user.mfa_enabled:
         raise HTTPException(status_code=400, detail="MFA is already enabled")
     secret = generate_secret()
@@ -751,6 +756,8 @@ async def mfa_verify_setup(
     user: User = Depends(require_platform_admin_unenrolled),
     db: Session = Depends(get_db),
 ):
+    if user.mfa_enabled:
+        raise HTTPException(status_code=400, detail="MFA is already enabled")
     if not user.mfa_secret:
         raise HTTPException(status_code=400, detail="Start MFA setup first")
     step = verify_totp(user.mfa_secret, req.code)
