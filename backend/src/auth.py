@@ -273,19 +273,21 @@ async def require_platform_admin(
     db: Session = Depends(get_db),
     request: Request = None,
 ) -> User:
-    """Require platform-level admin; mutations require enrolled MFA.
+    """Require platform-level admin; every request requires enrolled MFA.
 
-    Reads remain available so the admin console and MFA enrollment card load.
+    Enrollment is not optional for a platform administrator. When DEBUG is
+    off, an unenrolled admin is refused here for reads as well as writes, so a
+    direct API call cannot bypass the console's enrollment gate. The only
+    pre-enrollment surfaces are ``require_platform_admin_unenrolled`` routes
+    under ``/api/auth/mfa``.
+
     In local DEBUG, enforcement is skipped for the existing test fixture set;
     production runs with DEBUG=false and enforces it.
     """
     user = _authenticate_user(credentials, db)
     if user.role != "platform_admin":
         raise HTTPException(status_code=403, detail="Platform administrator access required")
-    method = request.method if request is not None else "GET"
-    if (not settings.DEBUG
-            and method not in {"GET", "HEAD", "OPTIONS"}
-            and not user.mfa_enabled):
+    if not settings.DEBUG and not user.mfa_enabled:
         raise HTTPException(
             status_code=403,
             detail="MFA enrollment is required before privileged administration.",

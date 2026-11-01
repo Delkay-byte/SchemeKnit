@@ -186,3 +186,58 @@ def test_non_admin_cannot_start_platform_admin_enrollment(db):
     assert "secret" not in denied.text
     assert allowed.status_code == 200
     assert allowed.json()["secret"] != ""
+
+
+def test_unenrolled_admin_is_blocked_from_console_api(db, monkeypatch):
+    """Direct API calls cannot bypass enrollment when DEBUG is off."""
+    from fastapi import Depends
+
+    from src.auth import create_user_token, require_platform_admin
+    from src.config import get_settings
+    from src.database import get_db
+
+    monkeypatch.setenv("DEBUG", "false")
+    get_settings.cache_clear()
+    monkeypatch.setattr("src.auth.settings", get_settings())
+
+    admin = make_user(db, role="platform_admin", is_admin=True,
+                      email="unenrolled-admin@test.com")
+    app = FastAPI()
+
+    @app.get("/api/platform-admin/dashboard")
+    async def dashboard(user=Depends(require_platform_admin)):
+        return {"ok": True}
+
+    app.dependency_overrides[get_db] = lambda: db
+    headers = {"Authorization": f"Bearer {create_user_token(admin)}"}
+    with TestClient(app) as client:
+        blocked = client.get("/api/platform-admin/dashboard", headers=headers)
+        admin.mfa_enabled = True
+        db.commit()
+        allowed = client.get("/api/platform-admin/dashboard", headers=headers)
+    assert blocked.status_code == 403
+    assert "MFA enrollment" in blocked.json()["detail"]
+    assert allowed.status_code == 200
+
+
+def test_enrollment_endpoints_stay_reachable_before_mfa(db, monkeypatch):
+    from src.auth import create_user_token
+    from src.config import get_settings
+    from src.database import get_db
+
+    monkeypatch.setenv("DEBUG", "false")
+    get_settings.cache_clear()
+    monkeypatch.setattr("src.auth.settings", get_settings())
+
+    admin = make_user(db, role="platform_admin", is_admin=True,
+                      email="reachable-admin@test.com")
+    from src.routers import auth as auth_router
+    app = FastAPI()
+    app.include_router(auth_router.router, prefix="/api/auth")
+    app.dependency_overrides[get_db] = lambda: db
+    headers = {"Authorization": f"Bearer {create_user_token(admin)}"}
+    with TestClient(app) as client:
+        status = client.get("/api/auth/mfa/status", headers=headers)
+        setup = client.post("/api/auth/mfa/setup", headers=headers)
+    assert status.status_code == 200
+    assert setup.status_code == 200
