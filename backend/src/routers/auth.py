@@ -38,6 +38,7 @@ from ..mfa import (
     generate_recovery_codes, generate_secret, hash_recovery_codes,
     provisioning_uri, verify_recovery_code, verify_totp,
 )
+from ..mfa_qr import provisioning_qr_data_uri
 from ..logging_config import log_security, alert_security
 from ..validation import (
     validate_password, validate_email, normalize_email, password_policy_hint,
@@ -719,6 +720,7 @@ async def login(req: LoginRequest, db: Session = Depends(get_db),
 
 @router.post("/mfa/setup")
 async def mfa_setup(
+    response: Response,
     user: User = Depends(require_platform_admin_unenrolled),
     db: Session = Depends(get_db),
 ):
@@ -730,9 +732,14 @@ async def mfa_setup(
     user.mfa_enabled = False
     db.commit()
     log_security("mfa_setup_started", user_id=user.id)
+    uri = provisioning_uri(secret, user.email)
+    # The pending secret must never be cached by a proxy, browser or CDN.
+    response.headers["Cache-Control"] = "no-store, private"
+    response.headers["Pragma"] = "no-cache"
     return {
         "secret": secret,
-        "otpauth_uri": provisioning_uri(secret, user.email),
+        "otpauth_uri": uri,
+        "qr_data_uri": provisioning_qr_data_uri(uri),
         "digits": 6,
         "period_seconds": 30,
     }
