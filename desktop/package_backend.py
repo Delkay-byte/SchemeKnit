@@ -67,6 +67,7 @@ a = Analysis(
         'src.routers.templates',
         'src.routers.settings',
         'src.routers.auth',
+        'segno',
         'src.routers.payments',
         'src.routers.content_packs',
         'src.routers.ai_regeneration',

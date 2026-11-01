@@ -233,9 +233,8 @@ S3_ACCESS_KEY=<owner-supplied>
 S3_SECRET_KEY=<owner-supplied>
 PAYSTACK_ENABLED=false
 PAYSTACK_MODE=test
-REGISTRATION_MODE=open
-# Optional closed-cohort gate only: set invite_only + PILOT_INVITE_CODE.
-PILOT_INVITE_CODE=
+REGISTRATION_MODE=invite_only
+PILOT_INVITE_CODE=<owner-supplied secret>
 ZELI_ENABLED=true
 ZELI_PROVIDER=deepseek
 ZELI_FALLBACK_PROVIDER=groq
@@ -248,8 +247,7 @@ Frontend:
 NEXT_PUBLIC_SITE_URL=https://<pilot-web>.onrender.com
 NEXT_PUBLIC_API_URL=https://<pilot-api>.onrender.com
 NEXT_PUBLIC_STAGING=true
-# Optional closed cohort only. The signup page follows the backend policy.
-NEXT_PUBLIC_PILOT_INVITE_REQUIRED=false
+NEXT_PUBLIC_PILOT_INVITE_REQUIRED=true
 ```
 
 `NEXT_PUBLIC_STAGING=true` emits noindex protections on the pilot host. Do not put the invite

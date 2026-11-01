@@ -123,6 +123,8 @@ def reset_platform_admin_mfa(
     user.mfa_secret = None
     user.mfa_recovery_codes = []
     user.mfa_last_step = None
+    user.mfa_pending_secret = None
+    user.mfa_pending_expires_at = None
 
     # One transaction: MFA clear, session revocation and audit either all
     # land or none do.

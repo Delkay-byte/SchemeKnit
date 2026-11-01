@@ -739,7 +739,7 @@ def _ensure_pending_mfa_secret(db: Session, user_id: str):
 
     db.query(User).filter(
         User.id == user_id,
-        User.mfa_enabled == False,  # noqa: E712
+        or_(User.mfa_enabled.is_(None), User.mfa_enabled == False),  # noqa: E712
         or_(
             User.mfa_pending_secret.is_(None),
             User.mfa_pending_expires_at.is_(None),
@@ -800,6 +800,7 @@ async def mfa_setup(
 
 @router.post("/mfa/verify-setup")
 async def mfa_verify_setup(
+    response: Response,
     req: MfaCodeRequest,
     user: User = Depends(require_platform_admin_unenrolled),
     db: Session = Depends(get_db),
@@ -840,6 +841,9 @@ async def mfa_verify_setup(
     row.mfa_pending_expires_at = None
     db.commit()
     log_security("mfa_enabled", user_id=row.id)
+    # Recovery codes are shown once; never let a cache hold them.
+    response.headers["Cache-Control"] = "no-store, private"
+    response.headers["Pragma"] = "no-cache"
     return {"enabled": True, "recovery_codes": codes}
 
 
@@ -883,6 +887,7 @@ async def mfa_status(
 
 @router.post("/mfa/recovery/regenerate")
 async def mfa_regenerate_recovery(
+    response: Response,
     req: MfaRegenerateRequest,
     user: User = Depends(require_platform_admin),
     db: Session = Depends(get_db),
@@ -899,6 +904,8 @@ async def mfa_regenerate_recovery(
     user.mfa_recovery_codes = hash_recovery_codes(codes)
     db.commit()
     log_security("mfa_recovery_regenerated", user_id=user.id)
+    response.headers["Cache-Control"] = "no-store, private"
+    response.headers["Pragma"] = "no-cache"
     return {"recovery_codes": codes}
 
 

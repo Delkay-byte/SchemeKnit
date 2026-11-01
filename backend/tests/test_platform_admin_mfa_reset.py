@@ -77,3 +77,18 @@ def test_unknown_or_non_admin_account_is_not_touched(db):
     assert missing["found"] is False
     assert wrong_role["found"] is False
     assert db.query(PlatformAuditLogDB).count() == 0
+
+
+def test_apply_clears_pending_enrollment_too(db):
+    from datetime import datetime, timedelta
+
+    admin = _enrolled_admin(db, email="cli-pending@test.com")
+    admin.mfa_pending_secret = "PENDINGLEGACYSECRET"
+    admin.mfa_pending_expires_at = datetime.utcnow() + timedelta(minutes=10)
+    db.commit()
+    reset_platform_admin_mfa(
+        db, email=admin.email, operator="op@bloomcore.com",
+        reason="Re-enroll", apply=True)
+    db.refresh(admin)
+    assert admin.mfa_pending_secret is None
+    assert admin.mfa_pending_expires_at is None

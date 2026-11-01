@@ -481,6 +481,7 @@ export default function PlatformAdminPage() {
             </p>
             <div className="mt-4">
               <MfaEnrollPanel
+                onRefresh={refreshUser}
                 onComplete={async () => {
                   setEnrollError(null)
                   try {

@@ -155,3 +155,19 @@ def test_enrolled_admin_cannot_reissue_setup(db):
     assert again.status_code == 400
     assert "secret" not in again.text
     assert "qr_data_uri" not in again.text
+
+
+def test_recovery_responses_are_not_cached(db):
+    admin = _admin(db, "pending-cache@test.com")
+    with TestClient(_app(db, admin)) as client:
+        secret = client.post("/api/auth/mfa/setup").json()["secret"]
+        verify = client.post("/api/auth/mfa/verify-setup", json={
+            "code": totp(secret, step_at() + 1)})
+        codes = verify.json()["recovery_codes"]
+        regen = client.post("/api/auth/mfa/recovery/regenerate", json={
+            "password": "testpass123",
+            "code": codes[0]})
+    for res in (verify, regen):
+        assert "no-store" in res.headers["cache-control"]
+        assert "private" in res.headers["cache-control"]
+        assert res.headers["pragma"] == "no-cache"

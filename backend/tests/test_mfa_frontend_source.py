@@ -85,3 +85,15 @@ def test_auth_shell_renders_exactly_one_logo():
     """One logo on every auth page, including Platform Administration."""
     shell = _text("src/components/auth/auth-shell.tsx")
     assert shell.count("<BrandCapsule") == 1
+
+
+def test_cached_session_refreshes_profile_on_mount():
+    ctx = _text("src/lib/auth-context.tsx")
+    assert "api.getProfile()" in ctx
+
+
+def test_expired_enrollment_offers_a_fresh_start():
+    panel = _text("src/components/mfa-enroll-panel.tsx")
+    assert "setSetup(null)" in panel
+    assert "Refresh account status" in panel
+    assert "onRefresh" in panel

@@ -24,7 +24,9 @@ Located in `backend/src/migrations/`:
 
 ## Safety
 
-- **Non-destructive**: New columns are added with defaults, existing data is preserved
+- **Non-destructive**: New columns are added with defaults, existing data is preserved.
+  Exception: v050 clears an unverified `mfa_secret` on accounts with
+  `mfa_enabled = FALSE` (legacy pending enrollment); enrolled secrets are kept.
 - **Idempotent**: Running migrations multiple times is safe
 - **Tracked**: All applied migrations are recorded in `teachflow_migrations` table
 

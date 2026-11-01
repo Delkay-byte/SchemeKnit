@@ -24,8 +24,10 @@ type MfaSetup = {
  */
 export function MfaEnrollPanel({
   onComplete,
+  onRefresh,
 }: {
   onComplete?: (recoveryCodes: string[]) => void
+  onRefresh?: () => Promise<void> | void
 }) {
   const [setup, setSetup] = useState<MfaSetup | null>(null)
   const [code, setCode] = useState('')
@@ -61,7 +63,13 @@ export function MfaEnrollPanel({
       setSetup(null)
       setCode('')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Invalid verification code')
+      const message = err instanceof Error ? err.message : 'Invalid verification code'
+      // An expired pending secret cannot be verified. Drop the stale QR so
+      // the retry control appears and a fresh enrollment can start.
+      if (/expired/i.test(message)) {
+        setSetup(null)
+      }
+      setError(message)
     } finally {
       setBusy(false)
     }
@@ -194,6 +202,12 @@ export function MfaEnrollPanel({
       {!setup && !busy && error && (
         <Button type="button" variant="outline" onClick={() => void begin()}>
           Retry setup
+        </Button>
+      )}
+
+      {error && /already (enabled|active)/i.test(error) && onRefresh && (
+        <Button type="button" variant="outline" onClick={() => void onRefresh()}>
+          Refresh account status
         </Button>
       )}
     </div>

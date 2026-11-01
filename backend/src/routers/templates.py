@@ -104,8 +104,12 @@ async def list_templates(
     default for that class level is marked.
     """
     from ..engines.template_provenance import provenance_for_template
+    from ..auth import mfa_enrollment_required
 
-    is_platform_admin = getattr(current_user, "role", None) == "platform_admin"
+    is_platform_admin = (
+        getattr(current_user, "role", None) == "platform_admin"
+        and not mfa_enrollment_required(current_user)
+    )
 
     # Built-in templates — the FULL active catalog is always returned (PART A):
     # there is no fixed count and no extra server-side limit; the teacher sees

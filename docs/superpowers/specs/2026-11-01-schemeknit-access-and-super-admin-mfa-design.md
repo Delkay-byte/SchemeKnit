@@ -208,9 +208,10 @@ Project gates: `pytest`, frontend `tsc --noEmit`, `next lint`, `next build`.
 
 Code changes only. Owner must, separately and with approval:
 
-1. Backend: `REGISTRATION_MODE=open` (remove/blank `PILOT_INVITE_CODE` if
-   present).
-2. Frontend: `NEXT_PUBLIC_PILOT_INVITE_REQUIRED=false`, rebuild and redeploy.
+1. Backend: `REGISTRATION_MODE=invite_only` with a non-empty
+   `PILOT_INVITE_CODE` (the pilot release keeps invite-only registration).
+2. Frontend: `NEXT_PUBLIC_PILOT_INVITE_REQUIRED=true`, rebuild and redeploy.
+   The backend policy endpoint remains authoritative.
 3. Backend deploy must install the new `segno` requirement.
 4. The existing Super Admin signs in and completes enrollment on first entry to
    `/platform-admin`; no database reset.

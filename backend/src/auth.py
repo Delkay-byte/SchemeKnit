@@ -243,7 +243,7 @@ async def get_optional_user(
     return None
 
 
-def _mfa_enrollment_required(user: User) -> bool:
+def mfa_enrollment_required(user: User) -> bool:
     """True when a platform admin must enroll before privileged use.
 
     Platform admins also satisfy the school-admin dependencies (``is_admin``),
@@ -265,7 +265,7 @@ async def require_admin(
     user = _authenticate_user(credentials, db)
     if not user.is_admin and user.role != "school_admin":
         raise HTTPException(status_code=403, detail="Admin access required")
-    if _mfa_enrollment_required(user):
+    if mfa_enrollment_required(user):
         raise HTTPException(
             status_code=403,
             detail="MFA enrollment is required before privileged administration.",
@@ -323,7 +323,7 @@ def require_school_membership(school_id: str):
         user = _authenticate_user(credentials, db)
         # Platform admins bypass school membership check, but not MFA.
         if user.role == "platform_admin":
-            if _mfa_enrollment_required(user):
+            if mfa_enrollment_required(user):
                 raise HTTPException(
                     status_code=403,
                     detail="MFA enrollment is required before privileged administration.",
@@ -405,7 +405,7 @@ async def require_valid_license(
 
     # Platform admins bypass license check, but not MFA enrollment.
     if user.role == "platform_admin":
-        if _mfa_enrollment_required(user):
+        if mfa_enrollment_required(user):
             raise HTTPException(
                 status_code=403,
                 detail="MFA enrollment is required before privileged administration.",

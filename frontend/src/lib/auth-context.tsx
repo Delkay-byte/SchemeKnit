@@ -36,14 +36,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // has empty sessionStorage, so it never inherits another tab's login.
     // Legacy shared localStorage tokens are intentionally NOT migrated — a
     // fresh tab must not silently attach to another tab's identity.
-    const savedToken = sessionStorage.getItem('teachflow_token')
-    const savedUser = sessionStorage.getItem('teachflow_user')
-    if (savedToken && savedUser) {
-      setToken(savedToken)
-      setUser(JSON.parse(savedUser))
-      api.setToken(savedToken)
+    //
+    // Re-read the profile after restoring, so a cached mfa_enabled value
+    // cannot leave an already-enrolled admin stuck on the enrollment gate.
+    const boot = async () => {
+      const savedToken = sessionStorage.getItem('teachflow_token')
+      const savedUser = sessionStorage.getItem('teachflow_user')
+      if (savedToken && savedUser) {
+        setToken(savedToken)
+        setUser(JSON.parse(savedUser))
+        api.setToken(savedToken)
+        try {
+          const fresh = await api.getProfile()
+          setUser(fresh)
+          sessionStorage.setItem('teachflow_user', JSON.stringify(fresh))
+        } catch {
+          /* keep the cached identity; the request helper handles 401 */
+        }
+      }
+      setLoading(false)
     }
-    setLoading(false)
+    void boot()
   }, [])
 
   const login = async (

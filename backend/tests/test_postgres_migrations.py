@@ -111,3 +111,95 @@ def test_postgres_v021_v022_migration_harness():
         f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
     )
     assert '"ok": true' in proc.stdout.replace("'", '"')
+
+
+def _scratch_postgres():
+    url = _postgres_url()
+    if not url:
+        return None
+    # Only ever touch a scratch database; refuse anything that is not named
+    # like a test database.
+    if "test" not in url.rsplit("/", 1)[-1].split("?")[0].lower():
+        return None
+    return url
+
+
+def test_v050_migration_is_additive_and_clears_only_legacy_pending():
+    """v050 adds pending columns; enrolled secrets survive, unverified ones go."""
+    url = _scratch_postgres()
+    if not url:
+        pytest.skip("Set POSTGRES_MIGRATION_TEST_URL to a scratch test database")
+    import importlib.util
+    import sys
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.orm import Session
+
+    from src import migrations as migration_module
+
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        conn.execute(text("DROP TABLE IF EXISTS users CASCADE"))
+        conn.execute(text(
+            "CREATE TABLE users (id VARCHAR PRIMARY KEY, email VARCHAR, "
+            "mfa_enabled BOOLEAN DEFAULT FALSE, mfa_secret VARCHAR)"))
+        conn.execute(text(
+            "INSERT INTO users (id, email, mfa_enabled, mfa_secret) VALUES "
+            "('u1', 'enrolled@test.local', TRUE, 'ACTIVESECRET'), "
+            "('u2', 'legacy@test.local', FALSE, 'LEGACYSECRET')"))
+
+    spec = importlib.util.spec_from_file_location(
+        "v050_test", MIGRATIONS_DIR / "v050_user_mfa_pending.py")
+    mod = importlib.util.module_from_spec(spec)
+    mod.__package__ = "src.migrations"
+    sys.modules["src.migrations"] = migration_module
+    spec.loader.exec_module(mod)
+    mod.engine = engine
+    with Session(engine) as db:
+        mod.up(db)
+
+    with engine.connect() as conn:
+        cols = {c["name"] for c in __import__("sqlalchemy").inspect(engine).get_columns("users")}
+        assert {"mfa_pending_secret", "mfa_pending_expires_at"} <= cols
+        rows = dict(conn.execute(text(
+            "SELECT email, mfa_secret FROM users")).fetchall())
+    assert rows["enrolled@test.local"] == "ACTIVESECRET"
+    assert rows["legacy@test.local"] is None
+    with engine.begin() as conn:
+        conn.execute(text("DROP TABLE IF EXISTS users CASCADE"))
+    engine.dispose()
+
+
+def test_concurrent_setup_converges_on_one_pending_secret_on_postgres():
+    from concurrent.futures import ThreadPoolExecutor
+    import uuid
+
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    from src.database import Base, User
+    from src.routers.auth import _ensure_pending_mfa_secret
+
+    url = _scratch_postgres()
+    if not url:
+        pytest.skip("Set POSTGRES_MIGRATION_TEST_URL to a scratch test database")
+    engine = create_engine(url)
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
+    user_id = str(uuid.uuid4())
+    with Session(engine) as db:
+        db.add(User(id=user_id, email=f"race-{user_id[:8]}@test.local",
+                    full_name="Race", hashed_password="x",
+                    role="platform_admin", is_admin=True,
+                    mfa_enabled=False))
+        db.commit()
+
+    def install(_):
+        with Session(engine) as db:
+            secret, _expires = _ensure_pending_mfa_secret(db, user_id)
+            return secret
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        secrets = list(pool.map(install, range(8)))
+    assert len(set(secrets)) == 1
+    Base.metadata.drop_all(engine)
+    engine.dispose()

@@ -23,6 +23,9 @@ passlib[bcrypt]==1.7.4
 python-jose[cryptography]==3.3.0
 bcrypt==4.2.0
 
+# TOTP QR generation for privileged-account MFA (pure Python)
+segno==1.6.6
+
 # Document processing
 python-docx==1.1.2
 docxtpl==0.16.0
