@@ -79,3 +79,9 @@ def test_settings_card_never_renders_the_secret_after_enrollment():
     # renders only while MFA is not enabled.
     assert "MfaEnrollPanel" in card
     assert "status?.enabled && (" in card
+
+
+def test_auth_shell_renders_exactly_one_logo():
+    """One logo on every auth page, including Platform Administration."""
+    shell = _text("src/components/auth/auth-shell.tsx")
+    assert shell.count("<BrandCapsule") == 1

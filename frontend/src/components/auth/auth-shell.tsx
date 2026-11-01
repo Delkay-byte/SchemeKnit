@@ -714,7 +714,6 @@ export function AuthShell({
       >
         {showAside ? (
           <aside className="flex flex-col justify-between px-6 py-8 sm:px-10 lg:min-h-screen lg:px-12 lg:py-10">
-            {role !== 'school_admin' && <BrandCapsule dark showWordmark />}
             {theme.aside}
             <p
               className={`hidden text-xs lg:block ${
