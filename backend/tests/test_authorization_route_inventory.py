@@ -23,6 +23,7 @@ PUBLIC = {
     ("auth", "/register/individual", "POST"),
     ("auth", "/setup-platform-admin/status", "GET"),
     ("auth", "/setup-platform-admin", "POST"),
+    ("auth", "/registration-policy", "GET"),
     ("auth", "/reset-token/validate", "GET"),
     ("auth", "/confirm-password-reset", "POST"),
     ("templates", "/profiles", "GET"),

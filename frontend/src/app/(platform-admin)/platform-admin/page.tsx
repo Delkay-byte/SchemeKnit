@@ -27,6 +27,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatCurrency, formatActivationDate } from '@/lib/utils-display'
 import { ChangePasswordCard } from '@/components/change-password'
 import { MfaSettingsCard } from '@/components/mfa-settings-card'
+import { MfaEnrollPanel } from '@/components/mfa-enroll-panel'
 
 type Tab = 'dashboard' | 'schools' | 'licenses' | 'plans' | 'teachers' | 'payments' | 'activations' | 'audit' | 'accounts' | 'settings'
 
@@ -47,10 +48,11 @@ function filterAccounts(list: any[], query: string): any[] {
 
 export default function PlatformAdminPage() {
   const router = useRouter()
-  const { user, loading: authLoading } = useAuth()
+  const { user, loading: authLoading, refreshUser, logout } = useAuth()
   const [activeTab, setActiveTab] = useState<Tab>('dashboard')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [enrollError, setEnrollError] = useState<string | null>(null)
 
   // Dashboard data
   const [dashboard, setDashboard] = useState<any>(null)
@@ -153,7 +155,11 @@ export default function PlatformAdminPage() {
       return
     }
     if (user) {
-      loadTabData(activeTab)
+      // An unenrolled admin sees the blocking enrollment gate; the console
+      // API is closed to them on the backend as well.
+      if ((user as { mfa_enabled?: boolean }).mfa_enabled) {
+        loadTabData(activeTab)
+      }
     }
   }, [user, authLoading, activeTab])
 
@@ -446,6 +452,73 @@ export default function PlatformAdminPage() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
+  if (!user.mfa_enabled) {
+    return (
+      <div className="min-h-screen bg-[#050E18] px-4 py-10 text-white">
+        <main className="mx-auto w-full max-w-lg">
+          <div className="mb-5 flex items-center gap-2">
+            <Shield className="h-6 w-6 text-[#04A9CE]" aria-hidden="true" />
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                Platform Administration
+              </p>
+              <p className="text-lg font-semibold">Authenticator required</p>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white p-6 text-[#102A43] shadow-[0_30px_70px_rgba(0,0,0,0.45)]">
+            <h1 className="text-xl font-bold tracking-tight">
+              Secure your administrator account
+            </h1>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              Two-factor authentication is mandatory for Super Admin access.
+              Add SchemeKnit to your authenticator app, then verify a current
+              six-digit code. The console stays locked until enrollment is
+              complete.
+            </p>
+            <div className="mt-4">
+              <MfaEnrollPanel
+                onRefresh={refreshUser}
+                onComplete={async () => {
+                  setEnrollError(null)
+                  try {
+                    await refreshUser()
+                  } catch {
+                    setEnrollError(
+                      'Enrollment succeeded, but your profile could not be refreshed. Retry, or sign out and sign in again.',
+                    )
+                  }
+                }}
+              />
+            </div>
+
+            {enrollError && (
+              <p role="alert" className="mt-3 text-sm text-red-600">
+                {enrollError}
+              </p>
+            )}
+
+            <div className="mt-5 flex flex-wrap items-center gap-3 border-t pt-4 text-xs text-muted-foreground">
+              <Button variant="outline" size="sm" onClick={() => void refreshUser().catch(() => setEnrollError('Could not refresh your account status.'))}>
+                Refresh status
+              </Button>
+              <button
+                type="button"
+                onClick={() => logout()}
+                className="font-semibold text-[#04A9CE] underline underline-offset-2"
+              >
+                Sign out
+              </button>
+              <span>
+                Still locked out? Ask the server operator for the documented
+                MFA reset.
+              </span>
+            </div>
+          </div>
+        </main>
       </div>
     )
   }

@@ -99,7 +99,8 @@ async def test_platform_admin_mutation_requires_mfa_in_production(db, monkeypatc
 
 
 @pytest.mark.asyncio
-async def test_platform_admin_read_remains_available_for_enrollment(db, monkeypatch):
+async def test_platform_admin_reads_require_mfa_enrollment(db, monkeypatch):
+    """Enrollment is mandatory: reads are blocked until MFA is enabled."""
     user = make_user(db, role="platform_admin", email="admin-read@test.local")
     token = create_user_token(user)
     creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
@@ -108,5 +109,11 @@ async def test_platform_admin_read_remains_available_for_enrollment(db, monkeypa
         "headers": [], "client": ("203.0.113.5", 1234),
     })
     monkeypatch.setattr(auth_module.settings, "DEBUG", False)
+    with pytest.raises(HTTPException) as blocked:
+        await require_platform_admin(
+            credentials=creds, db=db, request=request)
+    assert blocked.value.status_code == 403
+    user.mfa_enabled = True
+    db.commit()
     assert (await require_platform_admin(
         credentials=creds, db=db, request=request)).id == user.id

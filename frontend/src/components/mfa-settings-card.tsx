@@ -6,11 +6,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/password-input'
 import { api } from '@/lib/api'
+import { MfaEnrollPanel } from '@/components/mfa-enroll-panel'
 import { Shield, Copy } from 'lucide-react'
 
 export function MfaSettingsCard() {
   const [status, setStatus] = useState<{ enabled: boolean; recovery_codes_remaining: number } | null>(null)
-  const [setup, setSetup] = useState<{ secret: string; otpauth_uri: string } | null>(null)
+  const [enrolling, setEnrolling] = useState(false)
   const [code, setCode] = useState('')
   const [password, setPassword] = useState('')
   const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null)
@@ -24,27 +25,7 @@ export function MfaSettingsCard() {
 
   const begin = async () => {
     setError(''); setSuccess(''); setRecoveryCodes(null)
-    setBusy(true)
-    try {
-      const res = await api.beginMfaSetup()
-      setSetup(res)
-      setCode('')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not start MFA setup')
-    } finally { setBusy(false) }
-  }
-
-  const verify = async () => {
-    setError(''); setBusy(true)
-    try {
-      const res = await api.verifyMfaSetup(code)
-      setRecoveryCodes(res.recovery_codes)
-      setSetup(null)
-      setSuccess('MFA enabled. Store the recovery codes securely.')
-      await load()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Invalid verification code')
-    } finally { setBusy(false) }
+    setEnrolling(true)
   }
 
   const disable = async () => {
@@ -128,35 +109,28 @@ export function MfaSettingsCard() {
           </div>
         )}
 
-        {!status?.enabled && !setup && (
+        {!status?.enabled && !enrolling && (
           <Button onClick={begin} disabled={busy}>Enable MFA</Button>
         )}
 
-        {setup && (
-          <div className="space-y-3 rounded-lg border p-4">
-            <p className="text-sm">Add this account to your authenticator app using the manual key:</p>
-            <div className="flex flex-wrap items-center gap-2">
-              <code className="rounded bg-slate-100 px-2 py-1 text-sm break-all">{setup.secret}</code>
-              <Button type="button" size="sm" variant="outline" onClick={() => copy(setup.secret)}>
-                <Copy className="h-4 w-4" /> Copy key
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground break-all">{setup.otpauth_uri}</p>
-            <Input
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder="6-digit code"
-              inputMode="numeric"
-              maxLength={6}
-              autoComplete="one-time-code"
-            />
-            <Button onClick={verify} disabled={busy || code.length !== 6}>Verify and enable</Button>
-          </div>
+        {!status?.enabled && enrolling && (
+          <MfaEnrollPanel
+            onComplete={async () => {
+              setEnrolling(false)
+              setSuccess('MFA enabled. Store the recovery codes securely.')
+              await load()
+            }}
+          />
         )}
 
         {status?.enabled && (
           <div className="space-y-3 rounded-lg border p-4">
             <p className="text-sm font-medium">Manage MFA</p>
+            <p className="text-xs text-muted-foreground">
+              To change authenticator, turn MFA off first with your password and
+              a current code, then enroll the new device. The current secret is
+              never shown again.
+            </p>
             <PasswordInput
               value={password}
               onChange={(e) => setPassword(e.target.value)}

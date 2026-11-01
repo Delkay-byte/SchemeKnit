@@ -101,11 +101,14 @@ class User(Base):
     # issued before the password changed and must be rejected.
     password_changed_at = Column(DateTime, default=datetime.utcnow)
     # Privileged-account MFA. The secret is only active when mfa_enabled is
-    # true; recovery codes are bcrypt hashes and are single-use.
+    # true; recovery codes are bcrypt hashes and are single-use. An enrollment
+    # in progress lives in mfa_pending_secret and never authenticates a login.
     mfa_enabled = Column(Boolean, default=False, nullable=False)
     mfa_secret = Column(String, nullable=True)
     mfa_recovery_codes = Column(JSON, default=list)
     mfa_last_step = Column(Integer, nullable=True)
+    mfa_pending_secret = Column(String, nullable=True)
+    mfa_pending_expires_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

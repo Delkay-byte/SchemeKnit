@@ -118,6 +118,9 @@ class Settings(BaseSettings):
     #: Shared pilot code. Never commit a real value. Only used when
     #: REGISTRATION_MODE=invite_only; compared in constant time.
     PILOT_INVITE_CODE: str = ""
+    #: Lifetime of a pending TOTP enrollment. Repeated setup calls inside the
+    #: window reuse the same secret; after it, the secret is discarded.
+    MFA_PENDING_TTL_MINUTES: int = 30
 
     # ── Cloudflare Turnstile bot protection ───────────────────────────────
     # TURNSTILE_ENABLED=False keeps local/dev builds usable. Production must
@@ -483,6 +486,14 @@ class Settings(BaseSettings):
         if steps[-1] > 60:
             raise ValueError("LOGIN_LOCKOUT_STEPS must not exceed 60 minutes")
         return ",".join(str(s) for s in steps)
+
+    @field_validator("MFA_PENDING_TTL_MINUTES")
+    @classmethod
+    def _validate_mfa_pending_ttl(cls, value: int) -> int:
+        if value is None or int(value) < 1 or int(value) > 1440:
+            raise ValueError(
+                "MFA_PENDING_TTL_MINUTES must be between 1 and 1440")
+        return int(value)
 
     @field_validator("REGISTRATION_MODE")
     @classmethod

@@ -13,6 +13,7 @@ Located in `backend/src/migrations/`:
 | v001 | Educational taxonomy | Adds educational_level, template_id, and new fields to lesson_plans |
 | v002 | Payment tables | Creates payments, audit logs, product plans, payment config tables |
 | v003 | Admin flag | Adds is_admin column to users table |
+| v050 | Pending MFA enrollment | Adds mfa_pending_secret and mfa_pending_expires_at; clears unverified legacy mfa_secret for disabled accounts |
 
 ## How Migrations Run
 
@@ -23,7 +24,9 @@ Located in `backend/src/migrations/`:
 
 ## Safety
 
-- **Non-destructive**: New columns are added with defaults, existing data is preserved
+- **Non-destructive**: New columns are added with defaults, existing data is preserved.
+  Exception: v050 clears an unverified `mfa_secret` on accounts with
+  `mfa_enabled = FALSE` (legacy pending enrollment); enrolled secrets are kept.
 - **Idempotent**: Running migrations multiple times is safe
 - **Tracked**: All applied migrations are recorded in `teachflow_migrations` table
 

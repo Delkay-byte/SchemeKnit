@@ -243,6 +243,20 @@ async def get_optional_user(
     return None
 
 
+def mfa_enrollment_required(user: User) -> bool:
+    """True when a platform admin must enroll before privileged use.
+
+    Platform admins also satisfy the school-admin dependencies (``is_admin``),
+    so every privileged dependency consults this helper, not just
+    ``require_platform_admin``. DEBUG keeps the local fixture set working.
+    """
+    return (
+        user.role == "platform_admin"
+        and not settings.DEBUG
+        and not user.mfa_enabled
+    )
+
+
 async def require_admin(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db),
@@ -251,6 +265,11 @@ async def require_admin(
     user = _authenticate_user(credentials, db)
     if not user.is_admin and user.role != "school_admin":
         raise HTTPException(status_code=403, detail="Admin access required")
+    if mfa_enrollment_required(user):
+        raise HTTPException(
+            status_code=403,
+            detail="MFA enrollment is required before privileged administration.",
+        )
     return user
 
 
@@ -273,19 +292,21 @@ async def require_platform_admin(
     db: Session = Depends(get_db),
     request: Request = None,
 ) -> User:
-    """Require platform-level admin; mutations require enrolled MFA.
+    """Require platform-level admin; every request requires enrolled MFA.
 
-    Reads remain available so the admin console and MFA enrollment card load.
+    Enrollment is not optional for a platform administrator. When DEBUG is
+    off, an unenrolled admin is refused here for reads as well as writes, so a
+    direct API call cannot bypass the console's enrollment gate. The only
+    pre-enrollment surfaces are ``require_platform_admin_unenrolled`` routes
+    under ``/api/auth/mfa``.
+
     In local DEBUG, enforcement is skipped for the existing test fixture set;
     production runs with DEBUG=false and enforces it.
     """
     user = _authenticate_user(credentials, db)
     if user.role != "platform_admin":
         raise HTTPException(status_code=403, detail="Platform administrator access required")
-    method = request.method if request is not None else "GET"
-    if (not settings.DEBUG
-            and method not in {"GET", "HEAD", "OPTIONS"}
-            and not user.mfa_enabled):
+    if not settings.DEBUG and not user.mfa_enabled:
         raise HTTPException(
             status_code=403,
             detail="MFA enrollment is required before privileged administration.",
@@ -300,8 +321,13 @@ def require_school_membership(school_id: str):
         db: Session = Depends(get_db),
     ) -> User:
         user = _authenticate_user(credentials, db)
-        # Platform admins bypass school membership check
+        # Platform admins bypass school membership check, but not MFA.
         if user.role == "platform_admin":
+            if mfa_enrollment_required(user):
+                raise HTTPException(
+                    status_code=403,
+                    detail="MFA enrollment is required before privileged administration.",
+                )
             return user
         # School admins and teachers must belong to the school
         if user.school_id != school_id:
@@ -377,8 +403,13 @@ async def require_valid_license(
     """
     user = _authenticate_user(credentials, db)
 
-    # Platform admins bypass license check
+    # Platform admins bypass license check, but not MFA enrollment.
     if user.role == "platform_admin":
+        if mfa_enrollment_required(user):
+            raise HTTPException(
+                status_code=403,
+                detail="MFA enrollment is required before privileged administration.",
+            )
         return user
 
     # Users without a school_id are on free tier (no license needed)

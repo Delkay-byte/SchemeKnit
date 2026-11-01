@@ -70,6 +70,90 @@ def _hash_token(raw: str) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
+def reset_platform_admin_mfa(
+    db: Session,
+    email: str,
+    operator: str,
+    reason: str,
+    apply: bool = False,
+) -> dict:
+    """Clear a platform admin's TOTP enrollment. MFA columns only.
+
+    The caller supplies an explicit target, an operator identity and a reason;
+    every applied run writes a ``platform_audit_logs`` row and revokes the
+    account's active sessions so the next sign-in must re-enroll. Passwords,
+    roles and the active flag are never touched. Dry-run by default.
+    """
+    from datetime import datetime
+
+    from src.database import (
+        PlatformAuditLogDB, User, UserSessionDB, generate_id,
+    )
+    from src.validation import normalize_email
+
+    normalized = normalize_email(email)
+    user = db.query(User).filter(
+        User.email == normalized,
+        User.role == "platform_admin",
+    ).first()
+    if user is None:
+        return {
+            "found": False,
+            "email": normalized,
+            "applied": False,
+            "applyable_sessions": 0,
+        }
+
+    active_sessions = db.query(UserSessionDB).filter(
+        UserSessionDB.user_id == user.id,
+        UserSessionDB.revoked_at.is_(None),
+    ).count()
+
+    result = {
+        "found": True,
+        "email": user.email,
+        "mfa_enabled": bool(user.mfa_enabled),
+        "applyable_sessions": active_sessions,
+        "applied": False,
+    }
+    if not apply:
+        return result
+
+    user.mfa_enabled = False
+    user.mfa_secret = None
+    user.mfa_recovery_codes = []
+    user.mfa_last_step = None
+    user.mfa_pending_secret = None
+    user.mfa_pending_expires_at = None
+
+    # One transaction: MFA clear, session revocation and audit either all
+    # land or none do.
+    revoked = db.query(UserSessionDB).filter(
+        UserSessionDB.user_id == user.id,
+        UserSessionDB.revoked_at.is_(None),
+    ).update({UserSessionDB.revoked_at: datetime.utcnow()},
+             synchronize_session=False)
+    db.add(PlatformAuditLogDB(
+        id=generate_id(),
+        actor_id=user.id,
+        actor_role="cli_operator",
+        action="platform_admin_mfa_reset_cli",
+        target_type="user",
+        target_id=user.id,
+        details={
+            "method": "cli_operator_mfa_reset",
+            "operator": operator,
+            "reason": reason,
+            "target_email": user.email,
+        },
+    ))
+    db.commit()
+
+    result["applied"] = True
+    result["sessions_revoked"] = int(revoked or 0)
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Break-glass recovery for a locked-out Platform Admin."
@@ -80,7 +164,29 @@ def main():
         action="store_true",
         help="Directly set a new password (prompted) instead of issuing a reset token.",
     )
+    parser.add_argument(
+        "--reset-mfa",
+        action="store_true",
+        help="Clear TOTP enrollment only (audited, revokes sessions). Dry-run unless --apply.",
+    )
+    parser.add_argument("--operator", help="Operator identity recorded in the audit log")
+    parser.add_argument("--reason", help="Why MFA is being reset (recorded in the audit log)")
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="Apply the MFA reset. Without this flag the command is a dry run.",
+    )
     args = parser.parse_args()
+
+    if args.set_password and args.reset_mfa:
+        print("ERROR: choose --set-password or --reset-mfa, not both.")
+        sys.exit(2)
+    if args.reset_mfa and (not args.operator or not args.reason):
+        print("ERROR: --reset-mfa requires --operator and --reason.")
+        sys.exit(2)
+    if args.apply and not args.reset_mfa:
+        print("ERROR: --apply is only valid with --reset-mfa.")
+        sys.exit(2)
 
     from src.validation import validate_email, validate_password, normalize_email
     from src.auth import hash_password
@@ -110,6 +216,41 @@ def main():
             cont = input("Continue anyway? [y/N] ")
             if cont.lower() != "y":
                 sys.exit(0)
+
+        if args.reset_mfa:
+            print("\nMFA reset plan (TOTP only — password, role and active flag are untouched)")
+            plan = reset_platform_admin_mfa(
+                db, args.email, args.operator, args.reason, apply=False)
+            print(f"  Target: {email}")
+            print(f"  MFA enabled: {plan.get('mfa_enabled')}")
+            print(f"  Active sessions to revoke: {plan['applyable_sessions']}")
+            print(f"  Operator: {args.operator}")
+            print(f"  Reason: {args.reason}")
+
+            if not plan.get("mfa_enabled"):
+                print("\nMFA is not enabled for this account; nothing to reset.")
+                engine.dispose()
+                sys.exit(0)
+
+            if not args.apply:
+                print("\nDRY RUN — no changes made. Re-run with --apply to reset.")
+                engine.dispose()
+                sys.exit(0)
+
+            confirmation = input(
+                f'\nType the target email to confirm MFA reset: ')
+            if normalize_email(confirmation) != normalize_email(email):
+                print("Confirmation did not match. No changes made.")
+                engine.dispose()
+                sys.exit(1)
+
+            result = reset_platform_admin_mfa(
+                db, args.email, args.operator, args.reason, apply=True)
+            print("\nMFA enrollment cleared.")
+            print(f"Sessions revoked: {result.get('sessions_revoked', 0)}")
+            print("The admin must enroll a new authenticator at /platform-admin.")
+            engine.dispose()
+            sys.exit(0)
 
         if args.set_password:
             # ── Direct password replacement ────────────────────────────────

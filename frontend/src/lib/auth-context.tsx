@@ -12,12 +12,14 @@ interface User {
   is_active: boolean
   role: string
   school_id: string | null
+  mfa_enabled?: boolean
 }
 
 interface AuthContextType {
   user: User | null
   token: string | null
   login: (email: string, password: string, entry: 'teacher' | 'school_admin' | 'platform_admin', mfaCode?: string, recoveryCode?: string, turnstileToken?: string) => Promise<void>
+  refreshUser: () => Promise<void>
   logout: () => void
   loading: boolean
 }
@@ -34,14 +36,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // has empty sessionStorage, so it never inherits another tab's login.
     // Legacy shared localStorage tokens are intentionally NOT migrated — a
     // fresh tab must not silently attach to another tab's identity.
-    const savedToken = sessionStorage.getItem('teachflow_token')
-    const savedUser = sessionStorage.getItem('teachflow_user')
-    if (savedToken && savedUser) {
-      setToken(savedToken)
-      setUser(JSON.parse(savedUser))
-      api.setToken(savedToken)
+    //
+    // Re-read the profile after restoring, so a cached mfa_enabled value
+    // cannot leave an already-enrolled admin stuck on the enrollment gate.
+    const boot = async () => {
+      const savedToken = sessionStorage.getItem('teachflow_token')
+      const savedUser = sessionStorage.getItem('teachflow_user')
+      if (savedToken && savedUser) {
+        setToken(savedToken)
+        setUser(JSON.parse(savedUser))
+        api.setToken(savedToken)
+        try {
+          const fresh = await api.getProfile()
+          setUser(fresh)
+          sessionStorage.setItem('teachflow_user', JSON.stringify(fresh))
+        } catch {
+          /* keep the cached identity; the request helper handles 401 */
+        }
+      }
+      setLoading(false)
     }
-    setLoading(false)
+    void boot()
   }, [])
 
   const login = async (
@@ -60,6 +75,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     api.setToken(response.access_token)
   }
 
+  const refreshUser = async () => {
+    // Re-read the authoritative profile (used after MFA enrollment so the
+    // console gate can open without a full reload).
+    const next = await api.getProfile()
+    setUser(next)
+    sessionStorage.setItem('teachflow_user', JSON.stringify(next))
+  }
+
   const logout = () => {
     // Revoke this token server-side first (headers are captured synchronously
     // before the token is cleared). Failures never block the local sign-out.
@@ -72,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, token, login, refreshUser, logout, loading }}>
       {children}
     </AuthContext.Provider>
   )

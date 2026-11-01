@@ -7,11 +7,46 @@
 3. Start the application.
 4. Open `/setup/platform-admin`.
 5. Enter the bootstrap secret, full name, email, and password.
-6. Confirm successful login at `/login/platform-admin`.
-7. Remove or rotate the bootstrap secret (if your deployment strategy supports it).
-8. Verify `/setup/platform-admin` is no longer usable (returns 410).
+6. The new admin lands on the blocking enrollment screen at `/platform-admin`.
+   Scan the QR code (or copy the manual setup key) into a TOTP authenticator
+   app and enter the current six-digit code. Store the recovery codes shown
+   once, offline.
+7. Confirm successful login at `/login/platform-admin`.
+8. Remove or rotate the bootstrap secret (if your deployment strategy supports it).
+9. Verify `/setup/platform-admin` is no longer usable (returns 410).
 
 **Never seed a known production password. Never ship a default admin account.**
+
+## Authenticator Enrollment (TOTP)
+
+Platform administration requires TOTP MFA. Enrollment is mandatory: with
+`DEBUG=false`, every platform-admin API request from an unenrolled account is
+refused with 403, and the console shows only the enrollment screen.
+
+- `POST /api/auth/mfa/setup` creates a fresh random secret for the signed-in
+  admin and stores it as a **pending** secret (`mfa_pending_secret`), never as
+  the active secret. It returns the secret, the `otpauth://` URI and an SVG QR
+  code generated locally (`segno`; no external QR service). The response is
+  `Cache-Control: no-store, private`.
+- Setup is idempotent. Refreshing, opening a second tab, or a concurrent
+  request inside the 30-minute pending window returns the same secret and QR,
+  so an already displayed code is not invalidated. The conditional database
+  write lets only one competing request install a secret.
+- After 30 minutes the pending secret expires. The next setup call replaces it;
+  codes from the expired secret are rejected. Override the window with
+  `MFA_PENDING_TTL_MINUTES` (1–1440).
+- The pending secret stays pending until `POST /api/auth/mfa/verify-setup`
+  accepts a current six-digit code (30-second step, ±1 step window). Only then
+  is it copied to the active `mfa_secret`, `mfa_enabled` is set, and eight
+  single-use recovery codes are issued.
+- Recovery codes are stored as bcrypt hashes and shown once. Regenerating them
+  requires the password and a current TOTP or recovery code, and invalidates
+  every previous code.
+- After enrollment the secret and QR are never returned again; re-enrolling
+  (changing authenticator) requires the password plus a current code via
+  `POST /api/auth/mfa/disable`, then a fresh enrollment.
+- Sign-in without a current TOTP or unused recovery code fails. Codes already
+  accepted in a timestep cannot be replayed.
 
 ## Bootstrap Security
 
@@ -27,6 +62,40 @@
 The system supports multiple platform admin accounts. A second platform admin can be created by an existing one via the Accounts tab in the platform admin console (or the CLI tool). Any platform admin can initiate a password reset for another platform admin.
 
 **Last-admin safeguard:** The system prevents deactivating the last active platform administrator, so the platform never loses all recovery paths.
+
+## Operator-only MFA Reset (CLI)
+
+Use only when the Super Admin cannot complete an authenticator challenge and
+has no unused recovery code. MFA reset is never exposed over HTTP.
+
+**Before running it, verify the requester's identity out of band** (known
+phone number or video call, employee record, photo ID against the account
+name). Do not accept an email-only request. Record who approved it and why.
+
+Default is a dry run:
+
+```bash
+cd backend
+python -m src.tools.reset_platform_admin --reset-mfa \
+  --email admin@example.com \
+  --operator "operator-name" \
+  --reason "Lost phone; identity verified by video call, ticket OPS-123"
+```
+
+The command prints the target, current MFA status and active session count. To
+apply, add `--apply` and type the target email when prompted:
+
+```bash
+python -m src.tools.reset_platform_admin --reset-mfa --apply \
+  --email admin@example.com --operator "operator-name" --reason "OPS-123"
+```
+
+Effects: clears `mfa_enabled`, `mfa_secret`, recovery-code hashes and the replay
+marker; revokes every active session for that account; writes a
+`platform_audit_logs` row (`platform_admin_mfa_reset_cli`) containing the target,
+operator, reason and timestamp. It never changes the password, role or active
+flag. The admin signs in with the existing password and enrolls a new
+authenticator at `/platform-admin`.
 
 ## Break-Glass Recovery (CLI)
 

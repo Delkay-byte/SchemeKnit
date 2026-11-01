@@ -148,6 +148,14 @@ class ApiService {
     })
   }
 
+  async getRegistrationPolicy(): Promise<{
+    registration_mode: string
+    self_registration: boolean
+    invite_code_required: boolean
+  }> {
+    return this.request('/api/auth/registration-policy')
+  }
+
   async registerIndividual(email: string, password: string, fullName: string, referralCode?: string, inviteCode?: string, turnstileToken?: string): Promise<any> {
     return this.request('/api/auth/register/individual', {
       method: 'POST',
@@ -289,7 +297,7 @@ class ApiService {
     return this.request('/api/auth/mfa/status')
   }
 
-  async beginMfaSetup(): Promise<{ secret: string; otpauth_uri: string; digits: number; period_seconds: number }> {
+  async beginMfaSetup(): Promise<{ secret: string; otpauth_uri: string; qr_data_uri: string; digits: number; period_seconds: number; expires_at?: string }> {
     return this.request('/api/auth/mfa/setup', { method: 'POST' })
   }
 
