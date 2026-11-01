@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 import hashlib
 import secrets
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response
 from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from typing import Optional
@@ -222,6 +222,24 @@ async def setup_status(db: Session = Depends(get_db)):
             "requires_symbol": True,
             "description": password_policy_hint(),
         },
+    }
+
+
+@router.get("/registration-policy")
+async def registration_policy(response: Response):
+    """Publish the authoritative self-registration rule.
+
+    The signup page reads this instead of trusting a build-time flag, so the
+    field can never demand a code the backend does not enforce (or hide one it
+    does). No secret or account data is returned.
+    """
+    settings = get_settings()
+    mode = (settings.REGISTRATION_MODE or "open").strip().lower()
+    response.headers["Cache-Control"] = "no-store"
+    return {
+        "registration_mode": mode,
+        "self_registration": mode != "closed",
+        "invite_code_required": mode == "invite_only",
     }
 
 

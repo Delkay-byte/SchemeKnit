@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -28,9 +28,35 @@ export default function IndividualSignupPage() {
   const [turnstileToken, setTurnstileToken] = useState('')
   const [turnstileReset, setTurnstileReset] = useState(0)
   const [nextPath, setNextPath] = useState<string | null>(null)
-  // Set only on an invite-only pilot deployment. The code is checked again
-  // server-side; this flag only controls whether the field is shown.
-  const inviteRequired = process.env.NEXT_PUBLIC_PILOT_INVITE_REQUIRED === 'true'
+  // The backend is authoritative. The env flag is only the initial value used
+  // before the policy call resolves (and while the API is unreachable).
+  const [policy, setPolicy] = useState<{
+    registration_mode: string
+    self_registration: boolean
+    invite_code_required: boolean
+  } | null>(null)
+  const [policyError, setPolicyError] = useState(false)
+  const [inviteRequired, setInviteRequired] = useState(
+    process.env.NEXT_PUBLIC_PILOT_INVITE_REQUIRED === 'true',
+  )
+
+  const loadPolicy = useCallback(async () => {
+    setPolicyError(false)
+    try {
+      const res = await api.getRegistrationPolicy()
+      setPolicy(res)
+      setInviteRequired(res.invite_code_required)
+    } catch {
+      // Never assume registration is open: block submit until the backend
+      // policy is known.
+      setPolicy(null)
+      setPolicyError(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadPolicy()
+  }, [loadPolicy])
 
   // Referral attribution: capture the code from the link and keep it for a
   // later registration in this browser. It is submitted once, at signup.
@@ -51,6 +77,14 @@ export default function IndividualSignupPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    if (!policy) {
+      setError('Registration availability could not be confirmed. Please retry.')
+      return
+    }
+    if (!policy.self_registration) {
+      setError('Self-registration is currently closed.')
+      return
+    }
     const emailCheck = validateEmail(email)
     if (!emailCheck.ok) {
       setError(emailCheck.message)
@@ -220,11 +254,46 @@ export default function IndividualSignupPage() {
           resetKey={turnstileReset}
         />
 
+        {policyError && (
+          <div
+            role="alert"
+            className="flex flex-col gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-xs text-amber-900"
+          >
+            <span>
+              We could not confirm registration availability. Self-registration
+              is not enabled until the server policy is confirmed.
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void loadPolicy()}
+              className="self-start"
+            >
+              Retry
+            </Button>
+          </div>
+        )}
+
+        {policy && !policy.self_registration && (
+          <p
+            role="status"
+            className="rounded-lg border border-border bg-[#F4F7FA] px-3 py-2.5 text-xs text-muted-foreground"
+          >
+            New teacher self-registration is currently closed. Contact your
+            school administrator or SchemeKnit support for access.
+          </p>
+        )}
+
         <AuthError message={error} />
 
         <Button
           type="submit"
-          disabled={loading || Boolean(TURNSTILE_SITE_KEY && !turnstileToken)}
+          disabled={
+            loading
+            || !policy
+            || !policy.self_registration
+            || Boolean(TURNSTILE_SITE_KEY && !turnstileToken)
+          }
           className="h-11 w-full rounded-lg bg-[#102A43] text-white font-semibold shadow-[0_4px_14px_rgba(16,42,67,0.25)] hover:bg-[#0d2740] active:scale-[0.98] transition focus-visible:ring-2 focus-visible:ring-[#04A9CE] focus-visible:ring-offset-2 disabled:opacity-60"
         >
           {loading ? (

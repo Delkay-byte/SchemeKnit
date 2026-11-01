@@ -148,6 +148,14 @@ class ApiService {
     })
   }
 
+  async getRegistrationPolicy(): Promise<{
+    registration_mode: string
+    self_registration: boolean
+    invite_code_required: boolean
+  }> {
+    return this.request('/api/auth/registration-policy')
+  }
+
   async registerIndividual(email: string, password: string, fullName: string, referralCode?: string, inviteCode?: string, turnstileToken?: string): Promise<any> {
     return this.request('/api/auth/register/individual', {
       method: 'POST',
