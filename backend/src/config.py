@@ -136,7 +136,7 @@ class Settings(BaseSettings):
         "https://challenges.cloudflare.com/turnstile/v0/siteverify")
     #: Comma-separated exact hostnames accepted from Siteverify.
     TURNSTILE_ALLOWED_HOSTNAMES: str = "schemeknit-frontend.onrender.com"
-    TURNSTILE_TIMEOUT_SECONDS: float = 5.0
+    TURNSTILE_TIMEOUT_SECONDS: float = 10.0
     #: Require a login challenge after this many recent failed attempts.
     LOGIN_TURNSTILE_AFTER_FAILURES: int = 3
 

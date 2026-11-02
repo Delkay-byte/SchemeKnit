@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import requests
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -157,6 +158,206 @@ def test_siteverify_timeout_fails_closed(db, monkeypatch):
         turnstile.verify_token(db, "timeout-token", action="register")
     assert exc.value.status_code == 503
     assert exc.value.code == "turnstile_unavailable"
+
+
+# ── Token length and type boundaries ────────────────────────────────────────
+
+def test_token_of_exactly_2048_characters_is_accepted(db, monkeypatch):
+    _enable(monkeypatch)
+    calls = _fake_siteverify(monkeypatch, _payload("register"))
+    token = "a" * 2048
+    result = turnstile.verify_token(db, token, action="register")
+    assert result["success"] is True
+    assert calls == [(token, "register", None)]
+
+
+def test_token_of_2049_characters_is_rejected_before_siteverify(db, monkeypatch):
+    _enable(monkeypatch)
+    calls = _fake_siteverify(monkeypatch, _payload("register"))
+    with pytest.raises(turnstile.TurnstileError) as exc:
+        turnstile.verify_token(db, "a" * 2049, action="register")
+    assert exc.value.status_code == 400
+    assert exc.value.code == "turnstile_invalid"
+    assert calls == []
+
+
+def test_whitespace_token_is_treated_as_missing(db, monkeypatch):
+    _enable(monkeypatch)
+    calls = _fake_siteverify(monkeypatch, _payload("register"))
+    with pytest.raises(turnstile.TurnstileError) as exc:
+        turnstile.verify_token(db, "   ", action="register")
+    assert exc.value.status_code == 428
+    assert exc.value.code == "turnstile_required"
+    assert calls == []
+
+
+@pytest.mark.parametrize("token", [None, 12345, b"bytes-token", {"t": "x"}])
+def test_non_string_token_is_rejected_before_siteverify(db, monkeypatch, token):
+    _enable(monkeypatch)
+    calls = _fake_siteverify(monkeypatch, _payload("register"))
+    with pytest.raises(turnstile.TurnstileError) as exc:
+        turnstile.verify_token(db, token, action="register")
+    assert exc.value.status_code == 400
+    assert exc.value.code == "turnstile_invalid"
+    assert calls == []
+
+
+# ── Timeout configuration ───────────────────────────────────────────────────
+
+class _FakeResponse:
+    """Minimal requests.Response stand-in for Siteverify tests."""
+
+    def __init__(self, status_code=200, payload=None, body="",
+                 raise_json=False):
+        self.status_code = status_code
+        self._payload = payload
+        self.text = body
+        self._raise_json = raise_json
+
+    def json(self):
+        if self._raise_json:
+            raise ValueError("Expecting value: line 1 column 1 (char 0)")
+        return self._payload
+
+
+def test_default_siteverify_timeout_is_ten_seconds(monkeypatch):
+    monkeypatch.delenv("TURNSTILE_TIMEOUT_SECONDS", raising=False)
+    get_settings.cache_clear()
+    assert get_settings().TURNSTILE_TIMEOUT_SECONDS == 10.0
+
+
+def test_configured_siteverify_timeout_is_used(db, monkeypatch):
+    _enable(monkeypatch)
+    monkeypatch.setenv("TURNSTILE_TIMEOUT_SECONDS", "3")
+    get_settings.cache_clear()
+    seen = {}
+
+    def fake_post(url, data=None, timeout=None):
+        seen["url"] = url
+        seen["timeout"] = timeout
+        seen["data"] = dict(data or {})
+        return _FakeResponse(payload=_payload("register"))
+
+    monkeypatch.setattr(turnstile.requests, "post", fake_post)
+    turnstile.verify_token(db, "configured-timeout", action="register")
+    assert seen["timeout"] == (2.0, 3.0)
+
+
+@pytest.mark.parametrize("value", [0, 0.5, 15.1, 60, -1])
+def test_invalid_siteverify_timeout_configuration_is_rejected(monkeypatch, value):
+    from src.config import Settings
+
+    with pytest.raises(ValueError):
+        Settings(TURNSTILE_TIMEOUT_SECONDS=value)
+
+
+# ── Siteverify failure paths ────────────────────────────────────────────────
+
+def test_missing_secret_fails_closed_without_http_request(db, monkeypatch, caplog):
+    _enable(monkeypatch)
+    token = "super-secret-token-value-never-log"
+    monkeypatch.setattr(turnstile, "_secret", lambda: "")
+    calls = []
+    monkeypatch.setattr(
+        turnstile.requests, "post",
+        lambda *a, **k: calls.append((a, k)) or _FakeResponse())
+    caplog.set_level("DEBUG")
+    with pytest.raises(turnstile.TurnstileError) as exc:
+        turnstile.verify_token(db, token, action="register")
+    assert exc.value.status_code == 503
+    assert exc.value.code == "turnstile_unavailable"
+    assert calls == []
+    assert token not in caplog.text
+
+
+def test_connection_error_fails_closed(db, monkeypatch):
+    _enable(monkeypatch)
+    calls = []
+
+    def refused(*args, **kwargs):
+        calls.append(args)
+        raise requests.ConnectionError("connection refused")
+
+    monkeypatch.setattr(turnstile.requests, "post", refused)
+    with pytest.raises(turnstile.TurnstileError) as exc:
+        turnstile.verify_token(db, "network-token", action="register")
+    assert exc.value.status_code == 503
+    assert exc.value.code == "turnstile_unavailable"
+    # One bounded retry only, never an unbounded loop.
+    assert len(calls) == 2
+
+
+def test_requests_timeout_fails_closed(db, monkeypatch):
+    _enable(monkeypatch)
+
+    def timed_out(*args, **kwargs):
+        raise requests.Timeout("read timed out")
+
+    monkeypatch.setattr(turnstile.requests, "post", timed_out)
+    with pytest.raises(turnstile.TurnstileError) as exc:
+        turnstile.verify_token(db, "requests-timeout-token", action="register")
+    assert exc.value.status_code == 503
+    assert exc.value.code == "turnstile_unavailable"
+
+
+def test_malformed_json_response_fails_closed(db, monkeypatch):
+    _enable(monkeypatch)
+
+    def bad_json(*args, **kwargs):
+        return _FakeResponse(raise_json=True)
+
+    monkeypatch.setattr(turnstile.requests, "post", bad_json)
+    with pytest.raises(turnstile.TurnstileError) as exc:
+        turnstile.verify_token(db, "malformed-json-token", action="register")
+    assert exc.value.status_code == 503
+    assert exc.value.code == "turnstile_unavailable"
+
+
+def test_http_server_error_fails_closed_without_leaking_body(db, monkeypatch, caplog):
+    _enable(monkeypatch)
+    body = "upstream-private-diagnostic-body"
+    calls = []
+
+    def server_error(*args, **kwargs):
+        calls.append(args)
+        return _FakeResponse(status_code=500, body=body)
+
+    monkeypatch.setattr(turnstile.requests, "post", server_error)
+    caplog.set_level("DEBUG")
+    with pytest.raises(turnstile.TurnstileError) as exc:
+        turnstile.verify_token(db, "server-error-token", action="register")
+    assert exc.value.status_code == 503
+    assert exc.value.code == "turnstile_unavailable"
+    assert len(calls) == 2
+    assert body not in caplog.text
+
+
+def test_http_client_error_is_not_treated_as_verification(db, monkeypatch):
+    _enable(monkeypatch)
+
+    def forbidden(*args, **kwargs):
+        return _FakeResponse(
+            status_code=403,
+            payload={"success": False, "error-codes": ["invalid-input-response"]},
+            body="denied",
+        )
+
+    monkeypatch.setattr(turnstile.requests, "post", forbidden)
+    with pytest.raises(turnstile.TurnstileError) as exc:
+        turnstile.verify_token(db, "forbidden-token", action="register")
+    assert exc.value.status_code == 400
+    assert exc.value.code == "turnstile_invalid"
+
+
+def test_non_object_json_response_fails_closed(db, monkeypatch):
+    _enable(monkeypatch)
+    monkeypatch.setattr(
+        turnstile.requests, "post",
+        lambda *a, **k: _FakeResponse(payload=["not", "an", "object"]))
+    with pytest.raises(turnstile.TurnstileError) as exc:
+        turnstile.verify_token(db, "non-object-token", action="register")
+    assert exc.value.status_code == 400
+    assert exc.value.code == "turnstile_invalid"
 
 
 # ── HTTP entry points ───────────────────────────────────────────────────────

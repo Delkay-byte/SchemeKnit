@@ -46,7 +46,8 @@ TEST_SITE_KEYS = frozenset({
 
 VALID_ACTIONS = frozenset({"register", "login", "password_reset"})
 
-_TOKEN_MAX_LENGTH = 4096
+#: Cloudflare's documented maximum Siteverify response token length.
+_TOKEN_MAX_LENGTH = 2048
 
 
 class TurnstileError(HTTPException):
@@ -216,7 +217,15 @@ def verify_token(
             500, "turnstile_misconfigured",
             "Bot verification is not configured correctly.", retryable=False)
 
-    token = (token or "").strip()
+    # A JSON body can carry a non-string value. Never coerce it: reject it
+    # before it reaches the token length check or Siteverify.
+    if not isinstance(token, str):
+        raise TurnstileError(
+            400, "turnstile_invalid",
+            "Bot verification failed. Please complete the challenge again.",
+            retryable=False,
+        )
+    token = token.strip()
     if not token:
         raise TurnstileError(
             428, "turnstile_required",
