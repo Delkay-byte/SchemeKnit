@@ -13,6 +13,7 @@ import { AuthField, AuthError } from '@/components/auth/auth-field'
 import { TurnstileWidget, TURNSTILE_SITE_KEY } from '@/components/turnstile-widget'
 import { validateEmail, validatePassword, PASSWORD_POLICY } from '@/lib/password-policy'
 import { authHref, currentNextPath } from '@/lib/purchase-return'
+import { normalizeError } from '@/lib/error-normalizer'
 
 export default function IndividualSignupPage() {
   const router = useRouter()
@@ -139,7 +140,7 @@ export default function IndividualSignupPage() {
       }
       router.push(currentNextPath() || '/dashboard')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Registration failed')
+      setError(normalizeError(err).message)
       // A token is single-use: a failed attempt must request a fresh one.
       setTurnstileToken('')
       setTurnstileReset((value) => value + 1)

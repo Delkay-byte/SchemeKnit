@@ -12,6 +12,7 @@ import { api } from '@/lib/api'
 import { TurnstileWidget, TURNSTILE_SITE_KEY } from '@/components/turnstile-widget'
 import { useSearchParams } from 'next/navigation'
 import { ArrowRight, ShieldCheck, CheckCircle2 } from 'lucide-react'
+import { normalizeError } from '@/lib/error-normalizer'
 
 /**
  * Public password-reset completion page.
@@ -54,7 +55,7 @@ export default function ResetPasswordPage() {
     } catch (err) {
       setTargetEmail('')
       setTargetName('')
-      setError(err instanceof Error ? err.message : 'Invalid reset token')
+      setError(normalizeError(err).message)
     } finally {
       setValidating(false)
     }
@@ -98,7 +99,7 @@ export default function ResetPasswordPage() {
       await api.confirmPasswordReset(token.trim(), newPassword, turnstileToken)
       setSuccess(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Password reset failed')
+      setError(normalizeError(err).message)
       setTurnstileToken('')
       setTurnstileReset((value) => value + 1)
     } finally {

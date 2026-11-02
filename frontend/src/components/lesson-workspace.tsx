@@ -10,6 +10,7 @@ import { TextArea } from '@/components/ui/field'
 import { SourceAlignment, type LessonProvenance } from '@/components/source-alignment'
 import { api } from '@/lib/api'
 import { aiFailure } from '@/lib/ai-feedback'
+import { normalizeError } from '@/lib/error-normalizer'
 
 /** Canonical Phase 2 activity (never flattened to raw JSON). */
 export interface MainActivity {
@@ -242,7 +243,7 @@ export function LessonWorkspace({
         setDraft(draftFrom(first))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'We could not load the generated lesson.')
+      setError(normalizeError(err).message)
     } finally {
       setLoading(false)
     }
@@ -322,7 +323,7 @@ export function LessonWorkspace({
       setDirty(false)
       setTimeout(() => setSaved(false), 3000)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'We could not save your changes.')
+      setError(normalizeError(err).message)
     } finally {
       setSaving(false)
     }

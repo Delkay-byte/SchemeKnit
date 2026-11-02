@@ -20,7 +20,9 @@ import { UserPlus, Pencil, Key, KeyRound, UserCheck, UserX, X, Copy, Check } fro
 import { api } from '@/lib/api'
 import { PageHeader } from '@/components/ui/page-header'
 import { PasswordInput } from '@/components/password-input'
+import { toast } from '@/components/ui/toaster'
 import { validatePassword, validateEmail, PASSWORD_POLICY } from '@/lib/password-policy'
+import { normalizeError } from '@/lib/error-normalizer'
 
 interface Teacher {
   id: string
@@ -67,7 +69,7 @@ export default function TeachersPage() {
       setTeachers((usersRes.users || []).filter((u: Teacher) => u.role === 'teacher'))
       setSeats(school.seats || null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load teachers')
+      setError(normalizeError(err).message)
     } finally {
       setLoading(false)
     }
@@ -92,21 +94,49 @@ export default function TeachersPage() {
       setForm({ email: '', password: '', full_name: '' })
       load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Create teacher failed')
+      setError(normalizeError(err).message)
     } finally {
       setActionId(null)
     }
   }
 
   const runToggle = async (t: Teacher) => {
+    if (actionId === t.id) return
     const verb = t.is_active ? 'deactivate' : 'reactivate'
+    const nextActive = !t.is_active
+    setActionId(t.id)
+    setError(null)
+    setTeachers((current) => current.map((teacher) => (
+      teacher.id === t.id ? { ...teacher, is_active: nextActive } : teacher
+    )))
+    toast({
+      title: `${verb === 'deactivate' ? 'Deactivating' : 'Reactivating'} teacher…`,
+      description: t.full_name,
+      variant: 'info',
+      duration: 3000,
+      key: `teacher-toggle:${t.id}`,
+    })
     try {
-      setActionId(t.id)
-      setError(null)
       await api.toggleUserActive(t.id)
+      toast({
+        title: nextActive ? 'Teacher reactivated.' : 'Teacher deactivated.',
+        variant: 'success',
+        key: `teacher-toggle-done:${t.id}`,
+      })
       load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : `${verb} failed`)
+      setTeachers((current) => current.map((teacher) => (
+        teacher.id === t.id ? { ...teacher, is_active: t.is_active } : teacher
+      )))
+      const normalized = normalizeError(err)
+      setError(normalized.message)
+      toast({
+        title: `Could not ${verb} this teacher`,
+        description: normalized.message,
+        variant: 'error',
+        key: `teacher-toggle-error:${t.id}`,
+        action: { label: 'Try again', onClick: () => { void runToggle(t) } },
+      })
     } finally {
       setActionId(null)
     }
@@ -126,7 +156,7 @@ export default function TeachersPage() {
       setEditing(null)
       load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Update failed')
+      setError(normalizeError(err).message)
     } finally {
       setActionId(null)
     }
@@ -146,7 +176,7 @@ export default function TeachersPage() {
       setResetId(null)
       setNewPassword('')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Password reset failed')
+      setError(normalizeError(err).message)
     } finally {
       setActionId(null)
     }
@@ -163,7 +193,7 @@ export default function TeachersPage() {
         minutes: res.expires_in_minutes,
       })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to initiate reset')
+      setError(normalizeError(err).message)
     } finally {
       setActionId(null)
     }

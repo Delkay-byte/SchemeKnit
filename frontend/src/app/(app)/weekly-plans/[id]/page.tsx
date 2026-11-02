@@ -12,8 +12,12 @@ import { Select } from '@/components/ui/select'
 import { PageHeader } from '@/components/ui/page-header'
 import { DetailPageSkeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
+import { DraftRecoveryBanner, DraftSaveStatus } from '@/components/ui/draft-recovery'
 import { toast } from '@/components/ui/toaster'
 import { api } from '@/lib/api'
+import { useAuth } from '@/lib/auth-context'
+import { useFormDraft } from '@/hooks/use-form-draft'
+import { normalizeError } from '@/lib/error-normalizer'
 import { resolveRouteId } from '@/lib/route-params'
 import type { WapefOptions, WeeklyClassPlan } from '@/types'
 
@@ -63,7 +67,7 @@ export default function WeeklyPlanDetailPage() {
         setWapefOptions(options)
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load the weekly plan')
+          setError(normalizeError(err).message)
         }
       } finally {
         if (!cancelled) setLoading(false)
@@ -73,6 +77,25 @@ export default function WeeklyPlanDetailPage() {
   }, [planId])
 
   const dirty = Object.keys(metaEdits).length > 0 || Object.keys(dayEdits).length > 0
+  const { user } = useAuth()
+
+  const planDraft = useFormDraft<{
+    metaEdits: Record<number, MetadataPatch>
+    dayEdits: Record<string, { starter?: string; reflection?: string }>
+  }>({
+    userId: user?.id || null,
+    workflow: 'weekly-plan-edit',
+    resourceId: planId,
+    value: { metaEdits, dayEdits },
+    enabled: dirty,
+  })
+
+  const continuePlanDraft = () => {
+    const recovered = planDraft.accept()
+    if (!recovered) return
+    setMetaEdits(recovered.metaEdits || {})
+    setDayEdits(recovered.dayEdits || {})
+  }
 
   const dayEditKey = (subjectIndex: number, dayIndex: number) =>
     `${subjectIndex}:${dayIndex}`
@@ -91,9 +114,15 @@ export default function WeeklyPlanDetailPage() {
   }
 
   const handleSave = async () => {
-    if (!plan) return
+    if (!plan || saving) return
     setSaving(true)
     setError(null)
+    toast({
+      title: 'Saving weekly plan changes…',
+      variant: 'info',
+      duration: 3000,
+      key: `weekly-plan-edit-saving:${planId}`,
+    })
     try {
       const subjectIndexes = new Set<number>([
         ...Object.keys(metaEdits).map(Number),
@@ -117,9 +146,18 @@ export default function WeeklyPlanDetailPage() {
       setPlan(response.plan)
       setMetaEdits({})
       setDayEdits({})
+      planDraft.clear()
       toast({ title: 'Changes saved', description: 'Only the edited subject/day changed.' })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save changes')
+      const normalized = normalizeError(err)
+      setError(normalized.message)
+      toast({
+        title: 'Weekly plan was not saved',
+        description: normalized.message,
+        variant: 'error',
+        key: `weekly-plan-edit-error:${planId}`,
+        action: { label: 'Try again', onClick: () => { void handleSave() } },
+      })
     } finally {
       setSaving(false)
     }
@@ -135,7 +173,7 @@ export default function WeeklyPlanDetailPage() {
       await api.downloadFile(payload.blob, payload.filename || `Weekly_Plan.${format}`)
       toast({ title: `Exported ${format.toUpperCase()}`, description: 'One weekly document with every subject section.' })
     } catch (err) {
-      setExportError(err instanceof Error ? err.message : `Failed to export ${format.toUpperCase()}`)
+      setExportError(normalizeError(err).message)
     } finally {
       setExporting(null)
     }
@@ -211,6 +249,15 @@ export default function WeeklyPlanDetailPage() {
           </div>
         }
       />
+
+      {planDraft.recovered && (
+        <DraftRecoveryBanner
+          updatedAt={planDraft.recovered.updatedAt}
+          label="Unsaved edits to this weekly plan"
+          onContinue={continuePlanDraft}
+          onDiscard={planDraft.discard}
+        />
+      )}
 
       {error && <Banner tone="danger" title="Could not save">{error}</Banner>}
       {exportError && (
@@ -419,6 +466,7 @@ export default function WeeklyPlanDetailPage() {
               <Save className="h-4 w-4" aria-hidden="true" />
               {saving ? 'Saving…' : 'Save changes'}
             </Button>
+            <DraftSaveStatus status={planDraft.status} savedAt={planDraft.savedAt} />
             <Button
               className="w-full"
               variant="outline"

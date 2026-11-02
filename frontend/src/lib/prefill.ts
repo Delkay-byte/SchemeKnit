@@ -23,10 +23,13 @@ function clean(value: string | null | undefined): string {
 export function prefillLessonConfig<T extends PrefillableLessonConfig>(
   config: T,
   profile: TeacherProfileDefaults | null | undefined,
+  clearedFields: ReadonlySet<string> = new Set(),
 ): T {
   return {
     ...config,
-    teacher_name: clean(config.teacher_name) || clean(profile?.full_name) || null,
-    school_name: clean(config.school_name) || clean(profile?.school_name) || null,
+    teacher_name: clean(config.teacher_name)
+      || (clearedFields.has('teacher_name') ? null : clean(profile?.full_name) || null),
+    school_name: clean(config.school_name)
+      || (clearedFields.has('school_name') ? null : clean(profile?.school_name) || null),
   }
 }

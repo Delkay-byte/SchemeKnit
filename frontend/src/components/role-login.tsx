@@ -16,6 +16,7 @@ import { TurnstileWidget, TURNSTILE_SITE_KEY } from '@/components/turnstile-widg
 import type { ApiError } from '@/lib/api'
 import { authHref, currentNextPath } from '@/lib/purchase-return'
 import { Building2, Shield, GraduationCap, KeyRound, AlertCircle, ArrowRight } from 'lucide-react'
+import { normalizeError } from '@/lib/error-normalizer'
 
 /**
  * Sign-in entry points.
@@ -159,7 +160,7 @@ export function RoleLogin({ entry }: { entry: EntryRole }) {
       )
     } catch (err) {
       const apiError = err as ApiError
-      setError(err instanceof Error ? err.message : 'Authentication failed')
+      setError(normalizeError(err).message)
       if (apiError?.code === 'turnstile_required'
           || apiError?.code?.startsWith('turnstile_')) {
         setChallengeRequired(true)
@@ -181,19 +182,20 @@ export function RoleLogin({ entry }: { entry: EntryRole }) {
         : entry === 'platform_admin'
           ? 'bg-[#050E18]'
           : 'bg-[#071826]'
-    const spin =
-      entry === 'school_admin'
-        ? 'border-[#04A9CE]'
-        : entry === 'platform_admin'
-          ? 'border-slate-400'
-          : 'border-[#04A9CE]'
     return (
-      <div className={`min-h-screen ${loadingBg} flex items-center justify-center`}>
+      <div className={`min-h-screen ${loadingBg} flex items-center justify-center px-4`}>
         <div
-          className={`animate-spin rounded-full h-12 w-12 border-b-2 ${spin}`}
           role="status"
-          aria-label="Loading"
-        />
+          aria-live="polite"
+          aria-label="Checking your session"
+          className="w-full max-w-sm space-y-3 rounded-2xl border border-white/10 bg-white/5 p-6"
+        >
+          <div className="h-6 w-2/3 animate-pulse rounded bg-white/15 motion-reduce:animate-none" />
+          <div className="h-3 w-full animate-pulse rounded bg-white/10 motion-reduce:animate-none" />
+          <div className="h-10 w-full animate-pulse rounded-lg bg-white/10 motion-reduce:animate-none" />
+          <div className="h-10 w-full animate-pulse rounded-lg bg-white/10 motion-reduce:animate-none" />
+          <div className="h-10 w-full animate-pulse rounded-lg bg-[#04A9CE]/30 motion-reduce:animate-none" />
+        </div>
       </div>
     )
   }

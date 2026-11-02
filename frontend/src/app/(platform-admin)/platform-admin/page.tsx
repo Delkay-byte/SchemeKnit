@@ -29,6 +29,7 @@ import { formatCurrency, formatActivationDate } from '@/lib/utils-display'
 import { ChangePasswordCard } from '@/components/change-password'
 import { MfaSettingsCard } from '@/components/mfa-settings-card'
 import { MfaEnrollPanel } from '@/components/mfa-enroll-panel'
+import { normalizeError } from '@/lib/error-normalizer'
 
 type Tab = 'dashboard' | 'schools' | 'licenses' | 'plans' | 'teachers' | 'payments' | 'activations' | 'audit' | 'accounts' | 'settings'
 
@@ -227,7 +228,7 @@ export default function PlatformAdminPage() {
           break
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load data')
+      setError(normalizeError(err).message)
     } finally {
       setLoading(false)
     }
@@ -244,7 +245,7 @@ export default function PlatformAdminPage() {
       setNewSchool({ name: '', school_code: '', contact_name: '', contact_phone: '', contact_email: '', address: '' })
       loadTabData('schools')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create school')
+      setError(normalizeError(err).message)
     }
   }
 
@@ -260,7 +261,7 @@ export default function PlatformAdminPage() {
         setNewLicense({ license_type: 'school', school_id: '', teacher_email: '', product_plan_id: '', seat_limit: 10 })
         loadTabData('activations')
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to create individual activation')
+        setError(normalizeError(err).message)
       }
     } else {
       if (!newLicense.school_id || !newLicense.product_plan_id) {
@@ -273,7 +274,7 @@ export default function PlatformAdminPage() {
         setNewLicense({ license_type: 'school', school_id: '', teacher_email: '', product_plan_id: '', seat_limit: 10 })
         loadTabData('licenses')
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to create license')
+        setError(normalizeError(err).message)
       }
     }
   }
@@ -289,7 +290,7 @@ export default function PlatformAdminPage() {
       setNewPlan({ name: '', description: '', product_type: 'school', price: 0, duration_days: 365, seat_limit: 10, features: [] })
       loadTabData('plans')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create plan')
+      setError(normalizeError(err).message)
     }
   }
 
@@ -299,7 +300,7 @@ export default function PlatformAdminPage() {
       const detail = await api.getSchool(schoolId)
       setSchoolDetail(detail)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load school')
+      setError(normalizeError(err).message)
     }
   }
 
@@ -317,7 +318,7 @@ export default function PlatformAdminPage() {
       const res = await api.listLicenseActivationCodes(licenseId)
       setLicenseCodes((prev) => ({ ...prev, [licenseId]: res.activation_codes || [] }))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load activation codes')
+      setError(normalizeError(err).message)
     }
   }
 
@@ -328,7 +329,7 @@ export default function PlatformAdminPage() {
       const res = await api.listLicenseActivationCodes(licenseId)
       setLicenseCodes((prev) => ({ ...prev, [licenseId]: res.activation_codes || [] }))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate activation code')
+      setError(normalizeError(err).message)
     }
   }
 
@@ -363,7 +364,7 @@ export default function PlatformAdminPage() {
         setAccounts(usr.users || [])
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to initiate reset')
+      setError(normalizeError(err).message)
     } finally {
       setResetLoadingId(null)
     }
@@ -381,7 +382,7 @@ export default function PlatformAdminPage() {
       await api.activateIndividualTeacher(teacherId, teacherPlanId, teacherDays)
       await loadTabData('teachers')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to activate PRO')
+      setError(normalizeError(err).message)
     } finally {
       setTeacherBusyId(null)
     }
@@ -394,7 +395,7 @@ export default function PlatformAdminPage() {
       await api.revokeIndividualTeacher(teacherId, 'Revoked by platform admin')
       await loadTabData('teachers')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to revoke PRO')
+      setError(normalizeError(err).message)
     } finally {
       setTeacherBusyId(null)
     }
@@ -407,7 +408,7 @@ export default function PlatformAdminPage() {
       await api.extendIndividualTeacher(teacherId, teacherDays)
       await loadTabData('teachers')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to extend PRO')
+      setError(normalizeError(err).message)
     } finally {
       setTeacherBusyId(null)
     }
@@ -443,7 +444,7 @@ export default function PlatformAdminPage() {
       setLicenseCodes({})
       loadTabData(activeTab)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to reset demo data')
+      setError(normalizeError(err).message)
     } finally {
       setResetLoading(false)
     }
@@ -761,20 +762,20 @@ export default function PlatformAdminPage() {
                             <Button size="sm" variant="outline" onClick={() => setPendingConfirm({
                               title: 'Suspend license',
                               message: `Suspend license for ${l.school_name}?`,
-                              onConfirm: () => api.suspendLicense(l.id).then(() => loadTabData('licenses')).catch((err) => setError(err.message || 'Failed to suspend')),
+                              onConfirm: () => api.suspendLicense(l.id).then(() => loadTabData('licenses')).catch((err) => setError(normalizeError(err).message)),
                             })}>Suspend</Button>
                           )}
                           {eff !== 'active' && eff !== 'cancelled' && (
                             <Button size="sm" variant="outline" onClick={() => setPendingConfirm({
                               title: 'Activate license',
                               message: `Activate license for ${l.school_name}?`,
-                              onConfirm: () => api.activateLicense(l.id).then(() => loadTabData('licenses')).catch((err) => setError(err.message || 'Failed to activate')),
+                              onConfirm: () => api.activateLicense(l.id).then(() => loadTabData('licenses')).catch((err) => setError(normalizeError(err).message)),
                             })}>Activate</Button>
                           )}
                           <Button size="sm" variant="outline" onClick={() => setPendingConfirm({
                             title: 'Renew license',
                             message: `Renew license for ${l.school_name}?`,
-                            onConfirm: () => api.renewLicense(l.id).then(() => loadTabData('licenses')).catch((err) => setError(err.message || 'Failed to renew')),
+                            onConfirm: () => api.renewLicense(l.id).then(() => loadTabData('licenses')).catch((err) => setError(normalizeError(err).message)),
                           })}>Renew</Button>
                           <Button size="sm" variant="outline" onClick={() => toggleLicenseCodes(l.id)}>
                             <Key className="h-4 w-4 mr-1.5" />
@@ -922,14 +923,14 @@ export default function PlatformAdminPage() {
                                 <Button size="sm" onClick={() => setPendingConfirm({
                                   title: 'Verify payment',
                                   message: `Verify ${p.payment_method} payment of ${formatCurrency(p.amount)} from ${p.payer_name}?`,
-                                  onConfirm: () => api.platformVerifyPayment(p.id).then(() => loadTabData('payments')).catch((err) => setError(err.message || 'Failed to verify')),
+                                  onConfirm: () => api.platformVerifyPayment(p.id).then(() => loadTabData('payments')).catch((err) => setError(normalizeError(err).message)),
                                 })}>Verify</Button>
                                 <Button size="sm" variant="destructive" onClick={() => setPendingConfirm({
                                   title: 'Reject payment',
                                   message: `Reject payment from ${p.payer_name}?`,
                                   destructive: true,
                                   confirmLabel: 'Reject',
-                                  onConfirm: () => api.platformRejectPayment(p.id, 'Rejected by admin').then(() => loadTabData('payments')).catch((err) => setError(err.message || 'Failed to reject')),
+                                  onConfirm: () => api.platformRejectPayment(p.id, 'Rejected by admin').then(() => loadTabData('payments')).catch((err) => setError(normalizeError(err).message)),
                                 })}>Reject</Button>
                               </div>
                             )}
@@ -994,7 +995,7 @@ export default function PlatformAdminPage() {
                                 message: `Revoke activation code ${a.code}?`,
                                 destructive: true,
                                 confirmLabel: 'Revoke',
-                                onConfirm: () => api.revokeActivationCode(a.id).then(() => loadTabData('activations')).catch((err) => setError(err.message || 'Failed to revoke')),
+                                onConfirm: () => api.revokeActivationCode(a.id).then(() => loadTabData('activations')).catch((err) => setError(normalizeError(err).message)),
                               })}>Revoke</Button>
                             )}
                           </TableCell>
@@ -1549,7 +1550,7 @@ function MaintenanceControl() {
       const res = await api.setMaintenanceMode(!enabled, message, estimatedRestore)
       setEnabled(res?.maintenance?.active ?? !enabled)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not update maintenance mode. Please try again.')
+      setError(normalizeError(err).message)
     }
     setSaving(false)
   }
@@ -1561,7 +1562,7 @@ function MaintenanceControl() {
       const res = await api.setMaintenanceMode(enabled, message, estimatedRestore)
       setEnabled(res?.maintenance?.active ?? enabled)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save maintenance settings. Please try again.')
+      setError(normalizeError(err).message)
     }
     setSaving(false)
   }

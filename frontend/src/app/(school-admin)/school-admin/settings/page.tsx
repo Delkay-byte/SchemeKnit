@@ -9,10 +9,16 @@ import { Banner } from '@/components/ui/banner'
 import { api } from '@/lib/api'
 import { PageHeader } from '@/components/ui/page-header'
 import { FormPageSkeleton } from '@/components/ui/skeleton'
+import { DraftRecoveryBanner, DraftSaveStatus } from '@/components/ui/draft-recovery'
+import { toast } from '@/components/ui/toaster'
 import { ChangePasswordCard } from '@/components/change-password'
+import { useAuth } from '@/lib/auth-context'
+import { useFormDraft } from '@/hooks/use-form-draft'
+import { normalizeError } from '@/lib/error-normalizer'
 
 export default function SchoolSettingsPage() {
   const [form, setForm] = useState({ name: '', contact_name: '', contact_phone: '', contact_email: '', address: '' })
+  const [baseline, setBaseline] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -28,34 +34,59 @@ export default function SchoolSettingsPage() {
       setError(null)
       const data = await api.getMySchool()
       const s = data.school || {}
-      setForm({
+      const next = {
         name: s.name || '',
         contact_name: s.contact_name || '',
         contact_phone: s.contact_phone || '',
         contact_email: s.contact_email || '',
         address: s.address || '',
-      })
+      }
+      setForm(next)
+      setBaseline(JSON.stringify(next))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load settings')
+      setError(normalizeError(err).message)
     } finally {
       setLoading(false)
     }
   }
+
+  const { user } = useAuth()
+  const dirty = baseline !== '' && JSON.stringify(form) !== baseline
+
+  const settingsDraft = useFormDraft<typeof form>({
+    userId: user?.id || null,
+    workflow: 'school-settings',
+    resourceId: user?.school_id || 'school',
+    value: form,
+    enabled: dirty,
+  })
 
   const handleSave = async () => {
     if (!form.name.trim()) {
       setError('School name is required')
       return
     }
+    if (saving) return
     try {
       setSaving(true)
       setError(null)
       setSaved(false)
+      toast({ title: 'Saving school settings…', variant: 'info', duration: 3000, key: 'school-settings-saving' })
       await api.updateMySchool(form)
+      setBaseline(JSON.stringify(form))
+      settingsDraft.clear()
       setSaved(true)
+      toast({ title: 'School settings saved.', variant: 'success', key: 'school-settings-saved' })
       setTimeout(() => setSaved(false), 3000)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Save failed')
+      const normalized = normalizeError(err)
+      setError(normalized.message)
+      toast({
+        title: 'School settings were not saved',
+        description: normalized.message,
+        variant: 'error',
+        action: { label: 'Try again', onClick: () => { void handleSave() } },
+      })
     } finally {
       setSaving(false)
     }
@@ -71,6 +102,17 @@ export default function SchoolSettingsPage() {
         title="School Settings"
         description="School profile details shown to teachers and used on records."
       />
+      {settingsDraft.recovered && (
+        <DraftRecoveryBanner
+          updatedAt={settingsDraft.recovered.updatedAt}
+          label="Unsaved school settings"
+          onContinue={() => {
+            const recovered = settingsDraft.accept()
+            if (recovered) setForm(recovered)
+          }}
+          onDiscard={settingsDraft.discard}
+        />
+      )}
       {error && <Banner tone="danger">{error}</Banner>}
       <SurfaceCard data-school-profile className="px-5 py-5 sm:px-6">
         <h2 className="text-lg font-semibold text-[#102A43]">School Profile</h2>
@@ -97,6 +139,7 @@ export default function SchoolSettingsPage() {
               {saving ? 'Saving...' : 'Save Changes'}
             </Button>
             {saved && <span className="text-sm text-green-600">Saved</span>}
+            <DraftSaveStatus status={settingsDraft.status} savedAt={settingsDraft.savedAt} />
           </div>
           <p className="text-xs text-muted-foreground">
             Plan, seat limit, and license dates are managed by SchemeKnit.

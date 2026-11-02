@@ -8,6 +8,7 @@ import { validatePassword, PASSWORD_POLICY } from '@/lib/password-policy'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import { KeyRound } from 'lucide-react'
+import { normalizeError } from '@/lib/error-normalizer'
 
 /**
  * Self-service password change for any authenticated role.
@@ -66,7 +67,7 @@ export function ChangePasswordCard() {
       setNewPassword('')
       setConfirmPassword('')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Password change failed')
+      setError(normalizeError(err).message)
     } finally {
       setLoading(false)
     }

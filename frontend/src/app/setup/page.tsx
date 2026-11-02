@@ -12,6 +12,7 @@ import { AuthField, AuthError } from '@/components/auth/auth-field'
 import {
   validatePassword, validateEmail, PASSWORD_POLICY,
 } from '@/lib/password-policy'
+import { normalizeError } from '@/lib/error-normalizer'
 
 export default function SetupPage() {
   const router = useRouter()
@@ -65,7 +66,7 @@ export default function SetupPage() {
       await api.firstRunSetup({ name, email, password, school_name: schoolName })
       window.location.href = '/dashboard'
     } catch (err: any) {
-      setError(err.message || 'Setup failed')
+      setError(normalizeError(err).message)
     } finally {
       setLoading(false)
     }
@@ -73,8 +74,26 @@ export default function SetupPage() {
 
   if (authLoading || checking) {
     return (
-      <div className="min-h-screen bg-[#0D1630] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-400" role="status" aria-label="Loading" />
+      <div className="min-h-screen bg-[#0D1630] px-4 py-10">
+        <div
+          role="status"
+          aria-busy="true"
+          aria-label="Checking setup status"
+          className="mx-auto w-full max-w-md space-y-4 rounded-2xl border border-white/10 bg-white/5 p-6"
+        >
+          <div className="mx-auto h-12 w-12 animate-pulse rounded-xl bg-white/10 motion-reduce:animate-none" />
+          <div className="mx-auto h-7 w-2/3 animate-pulse rounded-md bg-white/10 motion-reduce:animate-none" />
+          <div className="h-3 w-full animate-pulse rounded bg-white/10 motion-reduce:animate-none" />
+          <div className="space-y-3 pt-2">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div key={index} className="space-y-2">
+                <div className="h-3 w-24 animate-pulse rounded bg-white/10 motion-reduce:animate-none" />
+                <div className="h-10 w-full animate-pulse rounded-lg bg-white/10 motion-reduce:animate-none" />
+              </div>
+            ))}
+          </div>
+          <div className="h-10 w-full animate-pulse rounded-lg bg-violet-400/20 motion-reduce:animate-none" />
+        </div>
       </div>
     )
   }

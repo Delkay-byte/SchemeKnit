@@ -11,6 +11,7 @@ import { Select } from '@/components/ui/select'
 import { Banner } from '@/components/ui/banner'
 import { DetailPageSkeleton } from '@/components/ui/skeleton'
 import { DraftRecoveryBanner, DraftSaveStatus } from '@/components/ui/draft-recovery'
+import { toast } from '@/components/ui/toaster'
 import { ArrowLeft, CheckCircle, AlertCircle, Save, Loader2, Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
@@ -284,7 +285,7 @@ export default function LessonDetailPage() {
         }))
       )
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load lesson')
+      setError(normalizeError(err).message)
     } finally {
       setLoading(false)
     }
@@ -390,9 +391,17 @@ export default function LessonDetailPage() {
     .filter(({ activity }) => !isBoundaryPhase(activity.phase))
 
   const handleSave = async () => {
+    if (saving) return
     try {
       setSaving(true)
       setSaved(false)
+      toast({
+        title: 'Saving lesson changes…',
+        description: 'Your edits stay visible while the save completes.',
+        variant: 'info',
+        duration: 3000,
+        key: `lesson-saving:${lessonId}`,
+      })
       // PART L/M: only non-empty references are persisted — empty slots on
       // screen never become stored empty objects.
       const savedRefs = structuredRefs.filter(r => (r.title || '').trim())
@@ -424,9 +433,22 @@ export default function LessonDetailPage() {
       setLesson(updated)
       lessonDraft.clear()
       setSaved(true)
+      toast({
+        title: 'Lesson saved.',
+        variant: 'success',
+        key: `lesson-saved:${lessonId}`,
+      })
       setTimeout(() => setSaved(false), 3000)
     } catch (err) {
-      setError(normalizeError(err).message)
+      const normalized = normalizeError(err)
+      setError(normalized.message)
+      toast({
+        title: 'Lesson was not saved',
+        description: normalized.message,
+        variant: 'error',
+        key: `lesson-save-error:${lessonId}`,
+        action: { label: 'Try again', onClick: () => { void handleSave() } },
+      })
     } finally {
       setSaving(false)
     }

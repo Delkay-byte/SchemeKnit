@@ -108,7 +108,7 @@ export default function Dashboard() {
       setActivationCode('')
       await loadSchemes() // Refresh plan
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Activation failed')
+      setError(normalizeError(err).message)
     } finally {
       setActivating(false)
     }

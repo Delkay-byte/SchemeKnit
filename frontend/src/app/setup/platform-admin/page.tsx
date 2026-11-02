@@ -14,6 +14,7 @@ import { validateEmail, validatePassword, PASSWORD_POLICY } from '@/lib/password
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import { ArrowRight, CheckCircle2, Lock } from 'lucide-react'
+import { normalizeError } from '@/lib/error-normalizer'
 
 /**
  * One-time Platform Admin bootstrap page.
@@ -89,7 +90,7 @@ export default function SetupPlatformAdminPage() {
         setTimeout(() => router.push('/platform-admin'), 1500)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Setup failed')
+      setError(normalizeError(err).message)
     } finally {
       setLoading(false)
     }
@@ -97,8 +98,26 @@ export default function SetupPlatformAdminPage() {
 
   if (checking) {
     return (
-      <div className="min-h-screen bg-[#050E18] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-400" role="status" aria-label="Loading" />
+      <div className="min-h-screen bg-[#050E18] px-4 py-10">
+        <div
+          role="status"
+          aria-busy="true"
+          aria-label="Checking platform administrator setup"
+          className="mx-auto w-full max-w-md space-y-4 rounded-2xl border border-white/10 bg-white/5 p-6"
+        >
+          <div className="mx-auto h-12 w-12 animate-pulse rounded-xl bg-white/10 motion-reduce:animate-none" />
+          <div className="mx-auto h-7 w-2/3 animate-pulse rounded-md bg-white/10 motion-reduce:animate-none" />
+          <div className="h-3 w-full animate-pulse rounded bg-white/10 motion-reduce:animate-none" />
+          <div className="space-y-3 pt-2">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div key={index} className="space-y-2">
+                <div className="h-3 w-24 animate-pulse rounded bg-white/10 motion-reduce:animate-none" />
+                <div className="h-10 w-full animate-pulse rounded-lg bg-white/10 motion-reduce:animate-none" />
+              </div>
+            ))}
+          </div>
+          <div className="h-10 w-full animate-pulse rounded-lg bg-slate-400/20 motion-reduce:animate-none" />
+        </div>
       </div>
     )
   }

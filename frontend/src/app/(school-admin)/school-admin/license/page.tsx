@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/ui/page-header'
 import { FormPageSkeleton } from '@/components/ui/skeleton'
 import { AlertTriangle, CheckCircle } from 'lucide-react'
 import { api } from '@/lib/api'
+import { normalizeError } from '@/lib/error-normalizer'
 
 export default function SchoolLicensePage() {
   const [data, setData] = useState<any>(null)
@@ -25,7 +26,7 @@ export default function SchoolLicensePage() {
       setError(null)
       setData(await api.getMySchool())
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load license')
+      setError(normalizeError(err).message)
     } finally {
       setLoading(false)
     }

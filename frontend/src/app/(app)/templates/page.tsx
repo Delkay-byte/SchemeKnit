@@ -22,6 +22,7 @@ import { api } from '@/lib/api'
 import { PageHeader } from '@/components/ui/page-header'
 import { Template } from '@/types'
 import { formatEducationalLevel, formatTemplateFamily } from '@/lib/utils-display'
+import { normalizeError } from '@/lib/error-normalizer'
 
 const TEACHFLOW_FIELD_OPTIONS: { value: string; label: string }[] = [
   { value: 'school_name', label: 'School Name' },
@@ -107,7 +108,7 @@ export default function TemplatesPage() {
       const response = await api.listTemplates()
       setTemplates(response.templates || [])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load templates')
+      setError(normalizeError(err).message)
     } finally {
       setLoading(false)
     }
@@ -159,7 +160,7 @@ export default function TemplatesPage() {
       }
       setWizardStep('mapping')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sample analysis failed')
+      setError(normalizeError(err).message)
     } finally {
       setAnalyzing(false)
     }
@@ -203,7 +204,7 @@ export default function TemplatesPage() {
       setWizardOpen(false)
       loadTemplates()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save template')
+      setError(normalizeError(err).message)
     } finally {
       setSaving(false)
     }
@@ -219,7 +220,7 @@ export default function TemplatesPage() {
       setPreviewTpl(detail)
       setPreviewData(preview)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load preview')
+      setError(normalizeError(err).message)
     }
   }
 
@@ -228,7 +229,7 @@ export default function TemplatesPage() {
       await api.archiveCustomTemplate(id)
       loadTemplates()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to archive template')
+      setError(normalizeError(err).message)
     }
   }
 
@@ -241,7 +242,7 @@ export default function TemplatesPage() {
       setVersionDialog(null)
       loadTemplates()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update version')
+      setError(normalizeError(err).message)
     }
   }
 

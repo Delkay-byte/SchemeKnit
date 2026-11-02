@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/table'
 import { api } from '@/lib/api'
 import type { WeeklyPlanListItem } from '@/types'
+import { normalizeError } from '@/lib/error-normalizer'
 
 /**
  * Weekly class-teacher plans (Approved WAPEF Basic 1-3 Plan).
@@ -35,7 +36,7 @@ export default function WeeklyPlansPage() {
         if (!cancelled) setPlans(response.plans || [])
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load weekly plans')
+          setError(normalizeError(err).message)
         }
       } finally {
         if (!cancelled) setLoading(false)

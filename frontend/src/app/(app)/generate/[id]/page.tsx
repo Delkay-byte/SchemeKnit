@@ -447,7 +447,7 @@ export default function GeneratePage() {
           (prefs && Number(prefs.default_lessons_per_week)) || prev.lessons_per_week,
       }))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load data')
+      setError(normalizeError(err).message)
     } finally {
       setLoading(false)
     }
@@ -931,7 +931,7 @@ export default function GeneratePage() {
       await api.saveLessonReview(schemeId, drafts)
       setReviewSaved(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save lesson review')
+      setError(normalizeError(err).message)
       throw err
     } finally {
       setReviewSaving(false)
@@ -984,7 +984,7 @@ export default function GeneratePage() {
       void filename
       api.navigateToDownload(res.download_url)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Export failed')
+      setError(normalizeError(err).message)
     } finally {
       setExporting(null)
     }

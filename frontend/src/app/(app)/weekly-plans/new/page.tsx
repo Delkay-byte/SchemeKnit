@@ -16,6 +16,7 @@ import { DraftRecoveryBanner, DraftSaveStatus } from '@/components/ui/draft-reco
 import { Badge } from '@/components/ui/badge'
 import { toast } from '@/components/ui/toaster'
 import { api } from '@/lib/api'
+import { normalizeError } from '@/lib/error-normalizer'
 import { useAuth } from '@/lib/auth-context'
 import { useFormDraft } from '@/hooks/use-form-draft'
 import {
@@ -156,7 +157,7 @@ export default function NewWeeklyPlanPage() {
         setWapefOptions(options)
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load schemes')
+          setError(normalizeError(err).message)
         }
       } finally {
         if (!cancelled) setLoading(false)
@@ -259,24 +260,38 @@ export default function NewWeeklyPlanPage() {
         setError(response.validation_issues.join(' '))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to preview the week')
+      setError(normalizeError(err).message)
     } finally {
       setPreviewing(false)
     }
   }
 
   const handleSave = async () => {
-    if (!preview || preview.validation_issues.length > 0) return
+    if (!preview || preview.validation_issues.length > 0 || saving) return
     setSaving(true)
     setError(null)
+    toast({
+      title: 'Saving your weekly plan…',
+      variant: 'info',
+      duration: 4000,
+      key: 'weekly-plan-saving',
+    })
     try {
       const created = await api.createWeeklyPlan(buildRequest())
       formDraft.clear()
       toast({ title: 'Weekly plan saved', description: `${classLevel} · Week ${weekNumber}` })
       router.push(`/weekly-plans/${created.id}`)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save the weekly plan')
+      const normalized = normalizeError(err)
+      setError(normalized.message)
       setSaving(false)
+      toast({
+        title: 'Weekly plan was not saved',
+        description: normalized.message,
+        variant: 'error',
+        key: 'weekly-plan-save-error',
+        action: { label: 'Try again', onClick: () => { void handleSave() } },
+      })
     }
   }
 

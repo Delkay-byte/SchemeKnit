@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { SurfaceCard } from '@/components/ui/surface-card'
 import { PageHeader } from '@/components/ui/page-header'
 import { api } from '@/lib/api'
+import { normalizeError } from '@/lib/error-normalizer'
 
 export default function PaymentCallbackPage() {
   const [state, setState] = useState<'checking' | 'success' | 'pending' | 'failed'>('checking')
@@ -29,7 +30,7 @@ export default function PaymentCallbackPage() {
         setMessage('Payment verified. Your subscription is active.')
       })
       .catch((err) => {
-        const text = err instanceof Error ? err.message : 'Payment could not be verified.'
+        const text = normalizeError(err).message
         setState(/not been confirmed|pending/i.test(text) ? 'pending' : 'failed')
         setMessage(text)
       })

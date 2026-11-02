@@ -12,6 +12,7 @@ import { AuthField, AuthError } from '@/components/auth/auth-field'
 import {
   validatePassword, validateEmail, PASSWORD_POLICY,
 } from '@/lib/password-policy'
+import { normalizeError } from '@/lib/error-normalizer'
 
 type Step = 'code' | 'details' | 'account' | 'done'
 
@@ -43,7 +44,7 @@ export default function ActivateSchoolPage() {
       setInfo(res)
       setStep('details')
     } catch (err: any) {
-      const msg = err.message || 'Activation failed'
+      const msg = normalizeError(err).message
       if (msg.includes('Invalid')) setError('Invalid activation code. Please check and try again.')
       else if (msg.includes('revoked')) setError('This activation code has been revoked. Contact SchemeKnit support.')
       else if (msg.includes('expired') || msg.includes('Expired')) setError('This code or its license has expired. Contact SchemeKnit to renew.')
@@ -83,7 +84,7 @@ export default function ActivateSchoolPage() {
       setCreatedEmail(email)
       setStep('done')
     } catch (err: any) {
-      const msg = err.message || 'Failed to create administrator'
+      const msg = normalizeError(err).message
       if (msg.includes('already used')) setError('This activation code has already been used.')
       else if (msg.includes('registered')) setError('An account with this email already exists.')
       else setError(msg)

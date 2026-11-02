@@ -68,16 +68,23 @@ export default function SettingsPage() {
         setIsSchoolManaged(Boolean((profileData as { school_id?: string }).school_id))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load settings')
+      setError(normalizeError(err).message)
     } finally {
       setLoading(false)
     }
   }
 
   const handleSaveProfile = async () => {
+    if (savingProfile) return
     try {
       setSavingProfile(true)
       setError(null)
+      toast({
+        title: 'Saving your profile…',
+        variant: 'info',
+        duration: 3000,
+        key: 'profile-saving',
+      })
       // PART 7: an independent teacher (no school membership) states the
       // institution they teach at ONCE here; generation reuses it, so it never
       // has to be retyped per lesson. A school-attached teacher's membership is
@@ -89,9 +96,17 @@ export default function SettingsPage() {
       const updated = await api.updateProfile(payload)
       setProfile(updated)
       setSuccess('Profile updated successfully')
+      toast({ title: 'Profile updated successfully.', variant: 'success', key: 'profile-saved' })
       setTimeout(() => setSuccess(null), 3000)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update profile')
+      const normalized = normalizeError(err)
+      setError(normalized.message)
+      toast({
+        title: 'Profile was not saved',
+        description: normalized.message,
+        variant: 'error',
+        action: { label: 'Try again', onClick: () => { void handleSaveProfile() } },
+      })
     } finally {
       setSavingProfile(false)
     }
@@ -116,7 +131,7 @@ export default function SettingsPage() {
       setHolidays(holidaysData.holidays || [])
       setTimeout(() => setSuccess(null), 3000)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add holiday')
+      setError(normalizeError(err).message)
     } finally {
       setSaving(false)
     }

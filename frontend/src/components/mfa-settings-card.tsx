@@ -8,6 +8,7 @@ import { PasswordInput } from '@/components/password-input'
 import { api } from '@/lib/api'
 import { MfaEnrollPanel } from '@/components/mfa-enroll-panel'
 import { Shield, Copy } from 'lucide-react'
+import { normalizeError } from '@/lib/error-normalizer'
 
 export function MfaSettingsCard() {
   const [status, setStatus] = useState<{ enabled: boolean; recovery_codes_remaining: number } | null>(null)
@@ -36,7 +37,7 @@ export function MfaSettingsCard() {
       setSuccess('MFA disabled.')
       await load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not disable MFA')
+      setError(normalizeError(err).message)
     } finally { setBusy(false) }
   }
 
@@ -49,7 +50,7 @@ export function MfaSettingsCard() {
       setSuccess('New recovery codes generated. Previous codes are invalid.')
       await load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not regenerate recovery codes')
+      setError(normalizeError(err).message)
     } finally { setBusy(false) }
   }
 

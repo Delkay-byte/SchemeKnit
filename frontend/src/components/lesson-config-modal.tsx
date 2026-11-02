@@ -29,6 +29,10 @@ import { normalizeError } from '@/lib/error-normalizer'
 import { useAuth } from '@/lib/auth-context'
 import { useFormDraft } from '@/hooks/use-form-draft'
 import { prefillLessonConfig } from '@/lib/prefill'
+import {
+  readClearedFields,
+  setFieldCleared,
+} from '@/lib/prefill-overrides'
 import { LessonRubricConfig } from '@/types'
 
 const WEEK_DAYS = [
@@ -61,10 +65,16 @@ export function LessonConfigModal({
 
   // Authoritative defaults from the signed-in profile. They only fill fields
   // that are still blank; server-saved per-scheme values always win.
+  const [clearedFields, setClearedFields] = useState<string[]>([])
+
   const prefill = useMemo<LessonRubricConfig>(
-    () => prefillLessonConfig(config, user),
-    [config, user],
+    () => prefillLessonConfig(config, user, new Set(clearedFields)),
+    [config, user, clearedFields],
   )
+
+  const overrideIdentity = user?.id
+    ? { userId: user.id, workflow: 'lesson-config', resourceId: schemeId }
+    : null
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(baseline)
 
@@ -80,8 +90,13 @@ export function LessonConfigModal({
   // offered separately so an old local copy never silently replaces saved data.
   useEffect(() => {
     if (open) {
-      setDraft(prefill)
-      setBaseline(prefill)
+      const cleared = overrideIdentity
+        ? readClearedFields(overrideIdentity)
+        : new Set<string>()
+      setClearedFields(Array.from(cleared))
+      const next = prefillLessonConfig(config, user, cleared)
+      setDraft(next)
+      setBaseline(next)
       setError(null)
       setDiscardArmed(false)
     }
@@ -119,6 +134,25 @@ export function LessonConfigModal({
     setBaseline(prefill)
   }
 
+  const restoreProfileDefault = (field: 'teacher_name' | 'school_name') => {
+    const value = field === 'teacher_name'
+      ? (user?.full_name || '').trim()
+      : (user?.school_name || '').trim()
+    if (!value) return
+    if (overrideIdentity) setFieldCleared(overrideIdentity, field, false)
+    setClearedFields((current) => current.filter((item) => item !== field))
+    setDraft((current) => ({ ...current, [field]: value }))
+  }
+
+  const rememberExplicitBlanks = (saved: LessonRubricConfig) => {
+    if (!overrideIdentity) return
+    for (const field of ['teacher_name', 'school_name'] as const) {
+      const value = (saved[field] || '').trim()
+      setFieldCleared(overrideIdentity, field, !value)
+    }
+    setClearedFields(Array.from(readClearedFields(overrideIdentity)))
+  }
+
   const handleSave = async () => {
     setSaving(true)
     setError(null)
@@ -141,8 +175,10 @@ export function LessonConfigModal({
           ? [...(draft.teaching_days || [])].sort((a, b) => a - b)
           : null,
       })
+      const savedConfig = resp.config || draft
+      rememberExplicitBlanks(savedConfig)
       draftStore.clear()
-      onSaved(resp.config || draft, resp.missing || [])
+      onSaved(savedConfig, resp.missing || [])
       onOpenChange(false)
       toast({
         title: 'Lesson settings saved.',
@@ -193,6 +229,15 @@ export function LessonConfigModal({
               value={draft.school_name || ''}
               onChange={(e) => setDraft({ ...draft, school_name: e.target.value })}
             />
+            {!draft.school_name && clearedFields.includes('school_name') && (user?.school_name || '').trim() && (
+              <button
+                type="button"
+                onClick={() => restoreProfileDefault('school_name')}
+                className="text-xs font-semibold text-[#04769B] hover:underline"
+              >
+                Use my school from profile
+              </button>
+            )}
           </Field>
           <Field label="Teacher's name" htmlFor="lcfg-teacher" hint="Shown under the school name">
             <Input
@@ -202,6 +247,15 @@ export function LessonConfigModal({
               value={draft.teacher_name || ''}
               onChange={(e) => setDraft({ ...draft, teacher_name: e.target.value })}
             />
+            {!draft.teacher_name && clearedFields.includes('teacher_name') && (user?.full_name || '').trim() && (
+              <button
+                type="button"
+                onClick={() => restoreProfileDefault('teacher_name')}
+                className="text-xs font-semibold text-[#04769B] hover:underline"
+              >
+                Use my name from profile
+              </button>
+            )}
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Class size" htmlFor="lcfg-class-size">

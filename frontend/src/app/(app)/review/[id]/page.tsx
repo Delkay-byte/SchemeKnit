@@ -14,6 +14,7 @@ import { api } from '@/lib/api'
 import { LessonConfigModal } from '@/components/lesson-config-modal'
 import type { LessonRubricConfig } from '@/types'
 import { resolveRouteId } from '@/lib/route-params'
+import { normalizeError } from '@/lib/error-normalizer'
 
 interface WeekData {
   id: string
@@ -128,7 +129,7 @@ export default function ReviewPage() {
         setLessonConfigMissing(savedConfig.missing || [])
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load scheme data')
+      setError(normalizeError(err).message)
     } finally {
       setLoading(false)
     }
@@ -140,7 +141,7 @@ export default function ReviewPage() {
       await api.approveScheme(schemeId)
       router.push(`/generate/${schemeId}`)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to approve scheme')
+      setError(normalizeError(err).message)
     } finally {
       setApproving(false)
     }
@@ -153,7 +154,7 @@ export default function ReviewPage() {
       await api.confirmSubjectSection(schemeId, subject)
       await loadSchemeData()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not confirm that subject')
+      setError(normalizeError(err).message)
     } finally {
       setConfirmingSubject(null)
     }

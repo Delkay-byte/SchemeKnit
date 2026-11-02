@@ -11,6 +11,7 @@ import { PageHeader } from '@/components/ui/page-header'
 import { ListPageSkeleton } from '@/components/ui/skeleton'
 import { Users, Key, UserPlus } from 'lucide-react'
 import { api } from '@/lib/api'
+import { normalizeError } from '@/lib/error-normalizer'
 
 interface DashboardData {
   school: { id: string; name: string; school_code: string; status: string } | null
@@ -40,7 +41,7 @@ export default function SchoolAdminDashboard() {
       setError(null)
       setData(await api.getMySchool())
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load school data')
+      setError(normalizeError(err).message)
     } finally {
       setLoading(false)
     }

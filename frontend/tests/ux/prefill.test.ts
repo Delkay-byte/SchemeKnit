@@ -51,3 +51,22 @@ test('the original config object is not mutated', () => {
   prefillLessonConfig(original, profile)
   assert.deepEqual(original, { teacher_name: '', school_name: '' })
 })
+
+test('a deliberately cleared field stays blank', () => {
+  const config = prefillLessonConfig(
+    { teacher_name: null, school_name: null },
+    profile,
+    new Set(['teacher_name']),
+  )
+  assert.equal(config.teacher_name, null)
+  assert.equal(config.school_name, 'Aburi Presby Primary')
+})
+
+test('restoring the default after a clear fills the field again', () => {
+  const config = prefillLessonConfig(
+    { teacher_name: null, school_name: null },
+    profile,
+    new Set(),
+  )
+  assert.equal(config.teacher_name, 'Ama Mensah')
+})
