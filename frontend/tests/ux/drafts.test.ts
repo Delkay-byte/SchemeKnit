@@ -4,6 +4,7 @@ import {
   DRAFT_TTL_MS,
   draftAgeLabel,
   draftStorageKey,
+  isStaleDraftBaseline,
   readDraft,
   removeDraft,
   sanitizeDraftValue,
@@ -120,6 +121,22 @@ test('quota failures are reported without throwing', () => {
   storage.setItem = () => { throw new Error('QuotaExceededError') }
   const result = saveDraft({ userId: USER, workflow: WORKFLOW }, { value: 'x' }, { storage })
   assert.deepEqual(result, { ok: false, error: 'quota' })
+})
+
+test('draft baseline round-trips and detects a changed server version', () => {
+  const storage = new MemoryStorage()
+  const identity = { userId: USER, workflow: 'lesson-edit', resourceId: RESOURCE }
+  saveDraft(identity, { topic: 'Mine' }, { storage, baseline: 'rev-1' })
+  const restored = readDraft<{ topic: string }>(identity, { storage })
+  assert.equal(restored?.baseline, 'rev-1')
+  assert.equal(isStaleDraftBaseline(restored?.baseline, 'rev-1'), false)
+  assert.equal(isStaleDraftBaseline(restored?.baseline, 'rev-2'), true)
+})
+
+test('a draft with no baseline is treated as unverified', () => {
+  assert.equal(isStaleDraftBaseline(null, 'rev-1'), true)
+  assert.equal(isStaleDraftBaseline(undefined, 'rev-1'), true)
+  assert.equal(isStaleDraftBaseline('', 'rev-1'), true)
 })
 
 test('draft age labels stay human-readable', () => {

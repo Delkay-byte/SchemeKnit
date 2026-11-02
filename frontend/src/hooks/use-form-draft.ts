@@ -8,6 +8,8 @@ export type DraftSaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 export interface RecoveredDraft<T> {
   data: T
   updatedAt: number
+  /** Server revision recorded when the draft was written, if known. */
+  baseline?: string | null
 }
 
 export interface UseFormDraftOptions<T> {
@@ -20,6 +22,8 @@ export interface UseFormDraftOptions<T> {
   /** Set false until the form is ready to save (for example while loading). */
   enabled?: boolean
   debounceMs?: number
+  /** Canonical server revision the current form was loaded from. */
+  baseline?: string | null
 }
 
 export interface UseFormDraftResult<T> {
@@ -52,6 +56,7 @@ export function useFormDraft<T>({
   value,
   enabled = true,
   debounceMs = 700,
+  baseline = null,
 }: UseFormDraftOptions<T>): UseFormDraftResult<T> {
   const identity = useMemo(
     () => (userId ? { userId, workflow, resourceId } : null),
@@ -79,7 +84,11 @@ export function useFormDraft<T>({
     }
     const stored = readDraft<T>(identity)
     if (stored) {
-      setRecovered({ data: stored.data, updatedAt: stored.updatedAt })
+      setRecovered({
+        data: stored.data,
+        updatedAt: stored.updatedAt,
+        baseline: stored.baseline ?? null,
+      })
       setSavedAt(stored.updatedAt)
     }
     setChecked(true)
@@ -95,7 +104,7 @@ export function useFormDraft<T>({
     const timer = setTimeout(() => {
       const current = identityRef.current
       if (!current) return
-      const result = saveDraft(current, valueRef.current)
+      const result = saveDraft(current, valueRef.current, { baseline })
       if (result.ok) {
         const now = Date.now()
         setStatus('saved')
@@ -107,19 +116,19 @@ export function useFormDraft<T>({
     return () => clearTimeout(timer)
     // serialized is the change signal; value itself is recreated each render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serialized, active, debounceMs])
+  }, [serialized, active, debounceMs, baseline])
 
   const flush = useCallback(() => {
     const current = identityRef.current
     if (!current) return
-    const result = saveDraft(current, valueRef.current)
+    const result = saveDraft(current, valueRef.current, { baseline })
     if (result.ok) {
       setStatus('saved')
       setSavedAt(Date.now())
     } else {
       setStatus('error')
     }
-  }, [])
+  }, [baseline])
 
   // Best-effort flush on tab hide/unmount. beforeunload alone is unreliable.
   useEffect(() => {

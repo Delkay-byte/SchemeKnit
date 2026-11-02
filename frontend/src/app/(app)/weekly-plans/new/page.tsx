@@ -99,6 +99,7 @@ export default function NewWeeklyPlanPage() {
   const [loading, setLoading] = useState(true)
   const [previewing, setPreviewing] = useState(false)
   const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
   const [error, setError] = useState<string | null>(null)
 
   const { user } = useAuth()
@@ -267,7 +268,8 @@ export default function NewWeeklyPlanPage() {
   }
 
   const handleSave = async () => {
-    if (!preview || preview.validation_issues.length > 0 || saving) return
+    if (!preview || preview.validation_issues.length > 0 || savingRef.current) return
+    savingRef.current = true
     setSaving(true)
     setError(null)
     toast({
@@ -284,6 +286,7 @@ export default function NewWeeklyPlanPage() {
     } catch (err) {
       const normalized = normalizeError(err)
       setError(normalized.message)
+      savingRef.current = false
       setSaving(false)
       toast({
         title: 'Weekly plan was not saved',

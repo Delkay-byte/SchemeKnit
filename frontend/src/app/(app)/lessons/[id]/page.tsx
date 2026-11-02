@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -10,13 +10,14 @@ import { Field, TextArea } from '@/components/ui/field'
 import { Select } from '@/components/ui/select'
 import { Banner } from '@/components/ui/banner'
 import { DetailPageSkeleton } from '@/components/ui/skeleton'
-import { DraftRecoveryBanner, DraftSaveStatus } from '@/components/ui/draft-recovery'
+import { DraftConflictBanner, DraftRecoveryBanner, DraftSaveStatus } from '@/components/ui/draft-recovery'
 import { toast } from '@/components/ui/toaster'
 import { ArrowLeft, CheckCircle, AlertCircle, Save, Loader2, Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import { useFormDraft } from '@/hooks/use-form-draft'
 import { normalizeError } from '@/lib/error-normalizer'
+import { isStaleDraftBaseline } from '@/lib/drafts'
 import { aiFailure } from '@/lib/ai-feedback'
 import { resolveRouteId } from '@/lib/route-params'
 import { PageHeader } from '@/components/ui/page-header'
@@ -107,6 +108,8 @@ interface LessonData {
   home_assignment?: string
   status: string
   teacher_edited: boolean
+  /** Canonical server revision used for optimistic concurrency (If-Match). */
+  updated_at?: string | null
   /** "Why this lesson?" — source/alignment record from the curriculum spine. */
   provenance?: LessonProvenance
 }
@@ -116,8 +119,11 @@ export default function LessonDetailPage() {
   const lessonId = resolveRouteId(params.id, 'lessons')
 
   const [lesson, setLesson] = useState<LessonData | null>(null)
+  const [serverVersion, setServerVersion] = useState<string | null>(null)
+  const [serverConflict, setServerConflict] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -224,11 +230,18 @@ export default function LessonDetailPage() {
     resourceId: lessonId,
     value: draftValue,
     enabled: !loading && lessonDirty,
+    baseline: serverVersion,
   })
+
+  const draftBaselineChanged = Boolean(
+    lessonDraft.recovered
+      && isStaleDraftBaseline(lessonDraft.recovered.baseline, serverVersion),
+  )
 
   const continueLessonDraft = () => {
     const recovered = lessonDraft.accept()
     if (!recovered) return
+    if (draftBaselineChanged) setServerConflict(true)
     setTopic(recovered.topic)
     setIntroduction(recovered.introduction)
     setStarter(recovered.starter)
@@ -260,6 +273,8 @@ export default function LessonDetailPage() {
       setLoading(true)
       const data = await api.getLesson(lessonId)
       setLesson(data)
+      setServerVersion(data.updated_at || null)
+      setServerConflict(false)
       setTopic(data.lesson_topic || '')
       setIntroduction(data.introduction || '')
       setStarter(data.starter_activity || '')
@@ -390,8 +405,11 @@ export default function LessonDetailPage() {
     .map((activity, index) => ({ activity, index }))
     .filter(({ activity }) => !isBoundaryPhase(activity.phase))
 
-  const handleSave = async () => {
-    if (saving) return
+  const handleSave = async (forceOverwrite = false) => {
+    // A ref, not the render-time `saving` value, so a toast Retry created by
+    // the failed render can still run after the request settles.
+    if (savingRef.current) return
+    savingRef.current = true
     try {
       setSaving(true)
       setSaved(false)
@@ -414,6 +432,21 @@ export default function LessonDetailPage() {
           resources: a.resources || [],
         }))
         .filter(a => a.description)
+      // Fresh check immediately before the write: another browser may have
+      // saved after this editor opened (or after a draft was recovered).
+      const latest = await api.getLesson(lessonId)
+      const latestVersion = latest.updated_at || null
+      if (!forceOverwrite && latestVersion !== serverVersion) {
+        setServerConflict(true)
+        setError(
+          'This lesson changed on the server since you opened it. ' +
+          'Load the latest version, or confirm an overwrite of the latest version.',
+        )
+        return
+      }
+      // An overwrite is always submitted against the version just read, so a
+      // second change between this check and the write is still rejected.
+      const writeVersion = forceOverwrite ? latestVersion : serverVersion
       const updated = await api.updateLesson(lessonId, {
         lesson_topic: topic,
         introduction,
@@ -429,8 +462,10 @@ export default function LessonDetailPage() {
         core_competencies: coreCompetencies,
         structured_references: savedRefs,
         references: savedRefs.map(r => r.title || r.type).filter(Boolean),
-      })
+      }, writeVersion || undefined)
       setLesson(updated)
+      setServerVersion(updated.updated_at || null)
+      setServerConflict(false)
       lessonDraft.clear()
       setSaved(true)
       toast({
@@ -442,6 +477,12 @@ export default function LessonDetailPage() {
     } catch (err) {
       const normalized = normalizeError(err)
       setError(normalized.message)
+      if (normalized.category === 'conflict') {
+        setServerConflict(true)
+        return
+      }
+      savingRef.current = false
+      setSaving(false)
       toast({
         title: 'Lesson was not saved',
         description: normalized.message,
@@ -450,6 +491,7 @@ export default function LessonDetailPage() {
         action: { label: 'Try again', onClick: () => { void handleSave() } },
       })
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }
@@ -517,13 +559,48 @@ export default function LessonDetailPage() {
         {/* One h1: which lesson this is, at a glance. */}
         {lessonDraft.recovered && (
           <div className="mb-4">
-            <DraftRecoveryBanner
-              updatedAt={lessonDraft.recovered.updatedAt}
-              label="Unsaved edits to this lesson"
-              onContinue={continueLessonDraft}
-              onDiscard={lessonDraft.discard}
-            />
+            {draftBaselineChanged ? (
+              <DraftConflictBanner
+                updatedAt={lessonDraft.recovered.updatedAt}
+                onLoadLatest={() => {
+                  lessonDraft.discard()
+                  void load()
+                }}
+                onKeepDraft={continueLessonDraft}
+                onReview={() => setError(
+                  'Your draft was based on an older lesson version. Keeping it ' +
+                  'will replace the latest saved lesson only after you press Save.',
+                )}
+              />
+            ) : (
+              <DraftRecoveryBanner
+                updatedAt={lessonDraft.recovered.updatedAt}
+                label="Unsaved edits to this lesson"
+                onContinue={continueLessonDraft}
+                onDiscard={lessonDraft.discard}
+              />
+            )}
           </div>
+        )}
+        {serverConflict && !lessonDraft.recovered && (
+          <Banner
+            tone="danger"
+            className="mb-4"
+            title="This lesson changed on the server"
+            action={
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" onClick={() => { void load() }}>
+                  Load latest version
+                </Button>
+                <Button size="sm" onClick={() => { void handleSave(true) }}>
+                  Overwrite latest with my draft
+                </Button>
+              </div>
+            }
+          >
+            Your edits are still here. Load the latest version, or explicitly
+            overwrite it. A second server update will still be rejected.
+          </Banner>
         )}
         <PageHeader
           className="mb-6"
@@ -1121,7 +1198,7 @@ export default function LessonDetailPage() {
 
           {/* Save */}
           <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4">
-            <Button onClick={handleSave} disabled={saving}>
+            <Button onClick={() => { void handleSave() }} disabled={saving}>
               {saving ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

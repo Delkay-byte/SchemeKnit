@@ -93,6 +93,10 @@ LESSON_EDITABLE_FIELDS = frozenset(
 )
 
 
+class StaleLessonVersionError(RuntimeError):
+    """The lesson changed after the client read it (optimistic conflict)."""
+
+
 class UnsupportedLessonFieldError(ValueError):
     """A save request tried to write a protected or unknown lesson field."""
 
@@ -697,10 +701,29 @@ class DataService:
             and_(LessonPlanDB.scheme_id == scheme_id, LessonPlanDB.owner_id == owner_id)
         ).order_by(LessonPlanDB.lesson_date, LessonPlanDB.lesson_sequence).all()
 
-    def update_lesson_plan(self, db: Session, lesson_id: str, owner_id: str, updates: dict) -> Optional[LessonPlanDB]:
-        lp = self.get_lesson_plan(db, lesson_id, owner_id)
+    def update_lesson_plan(self, db: Session, lesson_id: str, owner_id: str,
+                           updates: dict,
+                           expected_version: Optional[str] = None) -> Optional[LessonPlanDB]:
+        # Re-read under a row lock when supported (PostgreSQL). The version is
+        # checked after the lock is held, so an edit that landed between the
+        # client's read and this save is rejected instead of overwritten.
+        from .database import LessonPlanDB
+        query = db.query(LessonPlanDB).filter(
+            LessonPlanDB.id == lesson_id,
+            LessonPlanDB.owner_id == owner_id,
+        )
+        try:
+            query = query.with_for_update()
+        except Exception:
+            pass
+        lp = query.first()
         if not lp:
             return None
+        if expected_version:
+            current = lp.updated_at.isoformat() if lp.updated_at else None
+            if current != expected_version:
+                raise StaleLessonVersionError(
+                    "The lesson changed since it was opened.")
 
         # Validate the complete payload BEFORE any in-memory or database
         # mutation. Unknown/protected fields raise; malformed known fields are

@@ -6,6 +6,38 @@
  * is for safe, reversible mutations only — never payments, activation, credits,
  * MFA or other operations that must wait for authoritative confirmation.
  */
+export type MutationKind =
+  | 'teacher-account-status'
+  | 'scheme-delete'
+  | 'holiday-delete'
+  | 'lesson-save'
+  | 'weekly-plan-save'
+  | 'profile-save'
+  | 'licence-activation'
+  | 'payment'
+  | 'credit-change'
+  | 'mfa'
+  | 'auth'
+  | 'turnstile'
+
+/**
+ * Only reversible, ordinary account/content mutations may be shown as done
+ * before the server confirms. Licence/payment/credit/MFA/auth operations must
+ * wait for the authoritative response.
+ */
+const SERVER_CONFIRMED_ONLY: ReadonlySet<MutationKind> = new Set([
+  'licence-activation',
+  'payment',
+  'credit-change',
+  'mfa',
+  'auth',
+  'turnstile',
+])
+
+export function canApplyOptimistically(kind: MutationKind): boolean {
+  return !SERVER_CONFIRMED_ONLY.has(kind)
+}
+
 export interface OptimisticRun<T> {
   apply: () => void
   rollback: () => void

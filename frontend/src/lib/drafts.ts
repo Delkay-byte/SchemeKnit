@@ -30,6 +30,8 @@ export interface DraftEnvelope<T> extends DraftIdentity {
   schemaVersion: number
   updatedAt: number
   expiresAt: number
+  /** Canonical server revision the draft was based on, when known. */
+  baseline?: string | null
   data: T
 }
 
@@ -90,7 +92,7 @@ export function draftStorageKey(identity: DraftIdentity): string {
 export function saveDraft<T>(
   identity: DraftIdentity,
   data: T,
-  options: { storage?: DraftStorage | null; now?: number } = {},
+  options: { storage?: DraftStorage | null; now?: number; baseline?: string | null } = {},
 ): DraftSaveResult {
   const storage = options.storage ?? defaultStorage()
   if (!storage) return { ok: false, error: 'unavailable' }
@@ -102,6 +104,7 @@ export function saveDraft<T>(
     schemaVersion: DRAFT_SCHEMA_VERSION,
     updatedAt: now,
     expiresAt: now + DRAFT_TTL_MS,
+    baseline: options.baseline ?? null,
     data: sanitizeDraftValue(data),
   }
 
@@ -213,6 +216,18 @@ export function sweepExpiredDrafts(
     }
   }
   return removed
+}
+
+/**
+ * A draft conflicts when it was based on a different server revision. A draft
+ * with no recorded baseline is treated as unverified, never as current.
+ */
+export function isStaleDraftBaseline(
+  draftBaseline: string | null | undefined,
+  serverVersion: string | null | undefined,
+): boolean {
+  if (!draftBaseline) return true
+  return draftBaseline !== serverVersion
 }
 
 /** Milliseconds since the draft was last updated, for "saved 1 minute ago". */

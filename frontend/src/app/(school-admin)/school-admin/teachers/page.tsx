@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { SurfaceCard } from '@/components/ui/surface-card'
 import { Input } from '@/components/ui/input'
@@ -23,6 +23,7 @@ import { PasswordInput } from '@/components/password-input'
 import { toast } from '@/components/ui/toaster'
 import { validatePassword, validateEmail, PASSWORD_POLICY } from '@/lib/password-policy'
 import { normalizeError } from '@/lib/error-normalizer'
+import { canApplyOptimistically } from '@/lib/optimistic'
 
 interface Teacher {
   id: string
@@ -38,6 +39,7 @@ export default function TeachersPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [actionId, setActionId] = useState<string | null>(null)
+  const togglingRef = useRef<string | null>(null)
 
   const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState({ email: '', password: '', full_name: '' })
@@ -101,14 +103,20 @@ export default function TeachersPage() {
   }
 
   const runToggle = async (t: Teacher) => {
-    if (actionId === t.id) return
+    if (togglingRef.current === t.id) return
+    togglingRef.current = t.id
     const verb = t.is_active ? 'deactivate' : 'reactivate'
     const nextActive = !t.is_active
+    // Ordinary account status is reversible and may be optimistic. Licence,
+    // payment, credit and MFA operations never use this path.
+    const optimistic = canApplyOptimistically('teacher-account-status')
     setActionId(t.id)
     setError(null)
-    setTeachers((current) => current.map((teacher) => (
-      teacher.id === t.id ? { ...teacher, is_active: nextActive } : teacher
-    )))
+    if (optimistic) {
+      setTeachers((current) => current.map((teacher) => (
+        teacher.id === t.id ? { ...teacher, is_active: nextActive } : teacher
+      )))
+    }
     toast({
       title: `${verb === 'deactivate' ? 'Deactivating' : 'Reactivating'} teacher…`,
       description: t.full_name,
@@ -138,6 +146,7 @@ export default function TeachersPage() {
         action: { label: 'Try again', onClick: () => { void runToggle(t) } },
       })
     } finally {
+      togglingRef.current = null
       setActionId(null)
     }
   }

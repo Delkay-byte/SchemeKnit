@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { SurfaceCard } from '@/components/ui/surface-card'
 import { Input } from '@/components/ui/input'
@@ -21,6 +21,7 @@ export default function SchoolSettingsPage() {
   const [baseline, setBaseline] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
 
@@ -66,7 +67,8 @@ export default function SchoolSettingsPage() {
       setError('School name is required')
       return
     }
-    if (saving) return
+    if (savingRef.current) return
+    savingRef.current = true
     try {
       setSaving(true)
       setError(null)
@@ -81,6 +83,8 @@ export default function SchoolSettingsPage() {
     } catch (err) {
       const normalized = normalizeError(err)
       setError(normalized.message)
+      savingRef.current = false
+      setSaving(false)
       toast({
         title: 'School settings were not saved',
         description: normalized.message,
@@ -88,6 +92,7 @@ export default function SchoolSettingsPage() {
         action: { label: 'Try again', onClick: () => { void handleSave() } },
       })
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }

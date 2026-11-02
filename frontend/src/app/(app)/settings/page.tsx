@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { SurfaceCard } from '@/components/ui/surface-card'
@@ -36,6 +36,7 @@ export default function SettingsPage() {
   const [profileSchool, setProfileSchool] = useState('')
   const [isSchoolManaged, setIsSchoolManaged] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
+  const savingProfileRef = useRef(false)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   // Server-authoritative plan + usage. Never derived from client storage.
   const [plan, setPlan] = useState<PlanResolution | null>(null)
@@ -75,7 +76,8 @@ export default function SettingsPage() {
   }
 
   const handleSaveProfile = async () => {
-    if (savingProfile) return
+    if (savingProfileRef.current) return
+    savingProfileRef.current = true
     try {
       setSavingProfile(true)
       setError(null)
@@ -101,6 +103,8 @@ export default function SettingsPage() {
     } catch (err) {
       const normalized = normalizeError(err)
       setError(normalized.message)
+      savingProfileRef.current = false
+      setSavingProfile(false)
       toast({
         title: 'Profile was not saved',
         description: normalized.message,
@@ -108,6 +112,7 @@ export default function SettingsPage() {
         action: { label: 'Try again', onClick: () => { void handleSaveProfile() } },
       })
     } finally {
+      savingProfileRef.current = false
       setSavingProfile(false)
     }
   }

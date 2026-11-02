@@ -43,6 +43,51 @@ export function DraftRecoveryBanner({
   )
 }
 
+export function DraftConflictBanner({
+  updatedAt,
+  onLoadLatest,
+  onKeepDraft,
+  onReview,
+}: {
+  updatedAt: number
+  onLoadLatest: () => void
+  onKeepDraft: () => void
+  onReview?: () => void
+}) {
+  const time = new Date(updatedAt).toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+  return (
+    <div
+      role="alert"
+      data-draft-conflict
+      className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-950"
+    >
+      <p className="text-sm font-semibold">
+        This item changed on the server since your draft was saved at {time}.
+      </p>
+      <p className="mt-1 text-xs">
+        Your unsaved work is still here. Choose which version to continue with;
+        nothing has been overwritten.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button type="button" size="sm" variant="outline" onClick={onLoadLatest}>
+          Load latest version
+        </Button>
+        <Button type="button" size="sm" onClick={onKeepDraft}>
+          Keep my draft
+        </Button>
+        {onReview && (
+          <Button type="button" size="sm" variant="ghost" onClick={onReview}>
+            Review conflict
+          </Button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function DraftSaveStatus({ status, savedAt }: { status: DraftSaveStatus; savedAt: number | null }) {
   const [, setTick] = useState(0)
 

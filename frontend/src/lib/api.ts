@@ -26,7 +26,8 @@ import type {
  */
 export function getApiBaseUrl(): string {
   if (typeof window !== 'undefined' && (window as any).electronAPI) {
-    return 'http://127.0.0.1:18234'
+    // The preload reports the port this desktop launch actually started.
+    return (window as any).electronAPI.backendUrl || 'http://127.0.0.1:18234'
   }
   return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 }
@@ -633,9 +634,10 @@ class ApiService {
     })
   }
 
-  async updateLesson(lessonId: string, updates: any): Promise<any> {
+  async updateLesson(lessonId: string, updates: any, expectedVersion?: string): Promise<any> {
     return this.request(`/api/generation/lessons/${lessonId}`, {
       method: 'PUT',
+      headers: expectedVersion ? { 'If-Match': expectedVersion } : undefined,
       body: JSON.stringify(updates),
     })
   }
@@ -1295,14 +1297,19 @@ class ApiService {
   }
 
   /** Fetch one weekly plan (reload after save, with full day-plan content). */
-  async getWeeklyPlan(planId: string): Promise<{ plan: WeeklyClassPlan }> {
+  async getWeeklyPlan(planId: string): Promise<{ plan: WeeklyClassPlan; version?: string }> {
     return this.request(`/api/weekly-plans/${planId}`)
   }
 
   /** Edit a saved weekly plan (subject + day granularity, isolation enforced). */
-  async updateWeeklyPlan(planId: string, updates: Record<string, unknown>): Promise<{ plan: WeeklyClassPlan }> {
+  async updateWeeklyPlan(
+    planId: string,
+    updates: Record<string, unknown>,
+    expectedVersion?: string,
+  ): Promise<{ plan: WeeklyClassPlan; version?: string }> {
     return this.request(`/api/weekly-plans/${planId}`, {
       method: 'PUT',
+      headers: expectedVersion ? { 'If-Match': expectedVersion } : undefined,
       body: JSON.stringify(updates),
     })
   }
