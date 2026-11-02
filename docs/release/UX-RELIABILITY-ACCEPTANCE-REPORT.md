@@ -33,10 +33,10 @@ transparency.
 | Starting `origin/main` | `b13aeec4a466c01573299c2b57f259a01ed83abd` |
 | Feature branch | `ux/teacher-workflow-reliability` |
 | Pre-release commits | `15b2539`, `d91d0a6` |
-| Final feature commit | pending commit of this report |
-| Production merge commit | pending merge |
-| Render backend deploy | pending |
-| Render frontend deploy | pending |
+| Final feature commit | `e5733ab` |
+| Production merge commit | `be7d5c8d54327a58da856e941d05fa41b8d5a6d1` (PR #6) |
+| Render backend deploy | `dep-dbkh6o95efls73d5l730`, live |
+| Render frontend deploy | `dep-dbkh7p8ae00c7384q9t0`, live |
 
 ## 3. Requirement status
 
@@ -217,7 +217,21 @@ Source preservation verified:
 - no new migration and no production data writes from tests;
 - curriculum extraction, allocation, generation and export logic untouched.
 
-Production smoke tests are recorded after deployment.
+Production verification (2026-11-02):
+
+- Render backend `dep-dbkh6o95efls73d5l730` live on `be7d5c8d`.
+- Render frontend `dep-dbkh7p8ae00c7384q9t0` live on `be7d5c8d`.
+- `GET /api/health` → 200 `{"status":"healthy"}`.
+- `GET /api/auth/registration-policy` → `invite_only`, invite code required.
+- Registration with no Turnstile token → 428 `turnstile_required`; no account
+  created.
+- Public routes `/`, `/signup`, `/login` → 200; unknown route → the new 404
+  page; no unexpected page-level console errors.
+- No production records were created or modified.
+
+Status: **Deployed** and smoke-tested. Teacher-authenticated production
+conflict/prefill checks were not run because they would require a production
+account and data changes; those were verified against the disposable environment.
 
 ## 10. Intentional exclusions and limitations
 
