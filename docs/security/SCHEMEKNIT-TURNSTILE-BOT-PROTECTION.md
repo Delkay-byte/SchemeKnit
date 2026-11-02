@@ -1,9 +1,19 @@
 # SchemeKnit Turnstile Bot Protection
 
-Status: **IMPLEMENTED AND LOCALLY VERIFIED; PRODUCTION ACTIVATION REQUIRED**.
-No Cloudflare widget was created and no production key is present in this
-repository. Production bot protection is not active until the owner completes
-the activation steps in section 6.
+Status: **ACTIVE IN PRODUCTION**. The Cloudflare widget `Schemeknit Production`
+is configured, Render has the matching keys, and the backend validates every
+token with Siteverify before the protected action continues.
+
+This document separates three things:
+
+- **Production configuration** — what is deployed today.
+- **Development-only settings** — the public Cloudflare test keys used by local
+  builds and automated tests.
+- **Future operational recommendations** — optional improvements, not current
+  requirements.
+
+No secret value, invite code, token or credential belongs in this document or in
+Git history.
 
 ## 1. Design
 
@@ -13,8 +23,24 @@ obtains a short-lived token; the backend is the authority and calls:
 
 `POST https://challenges.cloudflare.com/turnstile/v0/siteverify`
 
-The secret key is backend-only. The site key is public and ships in the
-frontend bundle.
+The Siteverify call is server-to-server. The secret key never reaches the
+browser. The site key is public and ships in the frontend bundle.
+
+Production values:
+
+| Item | Value |
+|---|---|
+| Cloudflare widget | `Schemeknit Production` |
+| Mode | Managed |
+| Approved hostname | `schemeknit-frontend.onrender.com` |
+| Siteverify endpoint | `https://challenges.cloudflare.com/turnstile/v0/siteverify` |
+| Backend secret variable | `TURNSTILE_SECRET_KEY` |
+| Backend public config | `TURNSTILE_SITE_KEY`, `TURNSTILE_ALLOWED_HOSTNAMES`, `TURNSTILE_ENABLED` |
+| Frontend public variable | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` |
+
+`TURNSTILE_SECRET_KEY` is backend-only and must remain a Render secret. It must
+never be placed in a `NEXT_PUBLIC_*` variable, a source file, a log line or a
+test fixture.
 
 ## 2. Protected actions
 
@@ -25,35 +51,60 @@ frontend bundle.
 | `password_reset` | `POST /api/auth/confirm-password-reset` | Always when enabled |
 
 Normal uploads, lesson generation and exports never require a CAPTCHA.
-Normal first-time logins stay frictionless. The progressive account lockout and
-all rate limits remain in place; Turnstile is an additional layer.
+First-time logins stay frictionless. Progressive account lockout and all rate
+limits remain in place; Turnstile is an additional layer, not a replacement.
 
-There is no anonymous "request a password reset" endpoint in SchemeKnit:
-reset tokens are issued by an authenticated school/platform administrator. The
-public completion form is protected instead, and the reset token itself remains
-single-use and expiring.
+There is no anonymous "request a password reset" endpoint. Reset tokens are
+issued by an authenticated school/platform administrator. The public completion
+form is protected, and the reset token itself remains single-use and expiring.
+
+Invite-only registration (`REGISTRATION_MODE=invite_only`) requires **both** a
+valid Turnstile token and the correct `PILOT_INVITE_CODE`. A valid token never
+substitutes for the invite code, and a correct invite code never substitutes for
+a valid token.
 
 ## 3. Server-side rules
 
-`backend/src/turnstile.py` enforces:
+`backend/src/turnstile.py` is the single verification service. Route handlers do
+not duplicate Siteverify logic. It enforces:
 
-- token presence, maximum length and a single configured action;
-- Siteverify `success: true`;
-- exact action match (`register` ≠ `login` ≠ `password_reset`);
-- exact hostname match against `TURNSTILE_ALLOWED_HOSTNAMES`;
-- a SHA-256 digest of every accepted token stored in `turnstile_tokens` with a
-  unique constraint, so the same token cannot authorise a second action even if
-  Siteverify were replayed;
-- a bounded Siteverify timeout (`TURNSTILE_TIMEOUT_SECONDS`, default 5 s) and
-  one retry with a stable idempotency key;
-- fail-closed 503 `turnstile_unavailable` when Siteverify cannot be reached;
-- no provider response internals, secret or raw diagnostic in the HTTP body.
+- token must be a string, non-empty after trimming, and at most **2048
+  characters** (Cloudflare's documented maximum);
+- a token longer than 2048 characters is rejected before any HTTP request is
+  made; it is never truncated or submitted;
+- Siteverify must return an explicit JSON `success: true`;
+- action must equal the expected action exactly (`register`, `login` or
+  `password_reset`);
+- hostname must equal an entry in `TURNSTILE_ALLOWED_HOSTNAMES` exactly;
+- a SHA-256 digest of every accepted production token is stored in
+  `turnstile_tokens` with a unique constraint, so a replay cannot authorise a
+  second action;
+- the request uses `application/x-www-form-urlencoded` with `secret`, `response`
+  and an `idempotency_key`; `remoteip` is included only when a trusted client
+  address is available;
+- one bounded retry reuses the same `idempotency_key` for the same verification
+  attempt;
+- the default Siteverify timeout is **10 seconds**
+  (`TURNSTILE_TIMEOUT_SECONDS`, allowed range 1–15 seconds);
+- network errors, timeouts, HTTP 5xx responses, malformed JSON and missing
+  secrets all fail closed with a safe `503 turnstile_unavailable` (or
+  `500 turnstile_misconfigured` for an invalid action);
+- a non-5xx HTTP error response is still parsed, but only an explicit
+  `success: true` can pass; otherwise the result is `400 turnstile_invalid`;
+- no provider response body, secret or raw token appears in an HTTP response or
+  a log line. Logs record only failure categories and Cloudflare error codes.
 
-Cloudflare enforces the five-minute token lifetime. SchemeKnit additionally
-rejects its own digest rows after one hour and cleans expired rows
-opportunistically.
+Cloudflare enforces the five-minute token lifetime. SchemeKnit keeps its own
+digest rows for one hour and removes expired rows opportunistically.
 
 A successful-looking browser callback is never accepted without Siteverify.
+
+### Client IP handling
+
+`remoteip` is optional. SchemeKnit uses `client_ip()` in `backend/src/security.py`,
+which reads forwarded headers only when the direct socket peer is in the explicit
+`TRUSTED_PROXY_CIDRS` allowlist. Otherwise it uses the direct peer address.
+Arbitrary client-supplied `X-Forwarded-For` values are never trusted.
 
 ## 4. Frontend
 
@@ -64,12 +115,12 @@ A successful-looking browser callback is never accepted without Siteverify.
 - renders a Managed widget with the public site key and the action name;
 - exposes loading, success, expired and error states with `aria-live`;
 - provides a keyboard-operable "Retry verification" action;
-- resets after every failed submit, because a Turnstile token is single-use;
+- removes and re-renders the widget after every failed or completed submit,
+  because a Turnstile token is single-use;
 - prevents duplicate submission while no valid token is present;
-- is responsive and uses Cloudflare's accessible widget;
 - renders nothing when no public site key is configured (local development).
 
-`NEXT_PUBLIC_TURNSTILE_SITE_KEY` is the only browser-visible value.
+`NEXT_PUBLIC_TURNSTILE_SITE_KEY` is the only browser-visible Turnstile value.
 
 CSP additions (frontend `next.config.js`), nothing broader:
 
@@ -83,43 +134,36 @@ frame-src ... https://challenges.cloudflare.com
 
 ## 5. Privacy
 
-The privacy policy now discloses that Cloudflare Turnstile processes browser
+The privacy policy discloses that Cloudflare Turnstile processes browser
 signals, IP address and challenge results to distinguish people from bots, acts
 as a service provider, and may process data outside the user's country. It does
-not claim that Cloudflare performs no processing and does not describe the data
-as advertising/profile data.
+not describe the data as advertising or profile data.
 
-## 6. Owner activation steps (Cloudflare + Render)
+## 6. Production configuration (already deployed)
 
-1. In the Cloudflare dashboard open **Turnstile → Add widget**.
-2. Name: `SchemeKnit Production`.
-3. Widget mode: **Managed**.
-4. Hostnames: add only `schemeknit-frontend.onrender.com` (the existing Render
-   frontend host). Do not add wildcards or unrelated domains. Add a future
-   custom domain explicitly, one exact hostname at a time.
-5. Copy the **site key** and **secret key**.
-6. Render backend environment:
-   - `TURNSTILE_ENABLED=true`
-   - `TURNSTILE_SECRET_KEY=<secret>` (backend only, never in Git or the bundle)
-   - `TURNSTILE_SITE_KEY=<site key>`
-   - `TURNSTILE_ALLOWED_HOSTNAMES=schemeknit-frontend.onrender.com`
-   - optional: `TURNSTILE_TIMEOUT_SECONDS=5`,
-     `LOGIN_TURNSTILE_AFTER_FAILURES=3`
-7. Render frontend environment:
-   - `NEXT_PUBLIC_TURNSTILE_SITE_KEY=<site key>`
-8. Redeploy frontend and backend. The backend refuses to start in a
-   non-debug profile when `TURNSTILE_ENABLED=true` and either key or the
-   allowed-hostname list is missing.
-9. Register a real test account, complete the visible challenge, and confirm a
-   second replay of the same token is rejected.
-10. Trigger three failed logins on a test account, then confirm the login page
-    shows the challenge and a correct password succeeds after verification.
+The following Render backend variables are set for `schemeknit-api`:
 
-The Cloudflare API token available to the project was not shown to have
-Turnstile widget-management permission, so no widget was created
-automatically. No broader account permission was requested.
+- `TURNSTILE_ENABLED=true`
+- `TURNSTILE_SECRET_KEY` — secret, backend only
+- `TURNSTILE_SITE_KEY` — public site key
+- `TURNSTILE_ALLOWED_HOSTNAMES=schemeknit-frontend.onrender.com`
+- optional: `TURNSTILE_TIMEOUT_SECONDS` (default 10),
+  `LOGIN_TURNSTILE_AFTER_FAILURES` (default 3)
 
-## 7. Testing keys
+The frontend service `schemeknit-frontend` sets:
+
+- `NEXT_PUBLIC_TURNSTILE_SITE_KEY` — public site key
+
+The backend refuses to start in a non-debug profile when
+`TURNSTILE_ENABLED=true` and the secret, site key or allowed-hostname list is
+missing. Do not rotate, replace or recreate the widget or its keys as part of a
+code change. Do not add hostnames casually: add one exact hostname at a time in
+Cloudflare and in `TURNSTILE_ALLOWED_HOSTNAMES`.
+
+## 7. Development and test settings
+
+Local and automated tests use Cloudflare's documented public test keys. They are
+not production keys and carry no authority.
 
 - Site keys (public):
   - `1x00000000000000000000AA` — visible, always passes
@@ -131,55 +175,94 @@ automatically. No broader account permission was requested.
   - `2x0000000000000000000000000000000AA` — always fails
   - `3x0000000000000000000000000000000AA` — token already spent
 
-These are Cloudflare's documented public test values and appear only in test
-configuration. Production secrets are never used in tests or committed.
-
 The public test site key returns the same dummy token for every widget and does
 not report a consistent action/hostname. SchemeKnit therefore skips replay
 storage and action/hostname matching **only** when the configured secret is one
 of the documented test secrets. A production secret always enforces all rules;
 this exception cannot be reached by a production deployment.
 
-## 8. Tests and evidence
+Local development may run with `TURNSTILE_ENABLED=false`, which keeps forms
+usable without a widget. `localhost` and `127.0.0.1` are never added to the
+production hostname allowlist.
 
-`backend/tests/test_turnstile.py` (15 tests) proves:
+## 8. Troubleshooting
 
-- a valid test token permits the intended action;
-- missing, invalid and expired tokens are rejected;
-- a replayed token is rejected;
-- a token issued for a different action is rejected;
-- a token issued for a different hostname is rejected;
-- registration cannot bypass verification by calling the API directly;
-- a verified registration succeeds;
-- a normal login needs no challenge;
-- the login challenge appears after repeated failures;
-- registration tokens cannot be reused for login;
-- Siteverify timeout fails closed with 503;
-- disabled Turnstile keeps local flows working;
-- CSP permits Turnstile without `unsafe-eval`.
+Check the backend log category first. Logs intentionally contain no token,
+secret or provider response body.
 
-Browser acceptance for the registration and challenge-triggered login flows is
-implemented in `frontend/e2e/turnstile-auth.js`. Against a local backend with
-the documented test keys and a frontend built with the test site key, the run
-passed:
+| Symptom | Meaning | Action |
+|---|---|---|
+| `turnstile_required` (428) | No token reached the backend | Confirm the frontend read `cf-turnstile-response` and included `turnstile_token` in the JSON payload |
+| `turnstile_invalid` (400) | Cloudflare rejected the token, or the token exceeded 2048 characters | Complete the widget again; do not reuse an old or truncated token |
+| `turnstile_hostname_mismatch` (400) | Widget hostname is not in `TURNSTILE_ALLOWED_HOSTNAMES` | Add the exact frontend hostname in Cloudflare and Render |
+| `turnstile_action_mismatch` (400) | Widget action differs from the endpoint's expected action | Align `action` in the widget with `register`, `login` or `password_reset` |
+| `turnstile_replay` (400) | The same token was submitted twice | Expected single-use behaviour; reset the widget |
+| `turnstile_unavailable` (503) | Secret missing, Siteverify timed out, network failed, HTTP error or malformed JSON | Check Render secrets and network; the request fails closed, never open |
+| `turnstile_misconfigured` (500) | A route requested an unknown action | Fix the route; never add an action casually |
 
-```text
-PASS  desktop: registration passed with a Turnstile token
-PASS  desktop: login challenge appeared and verified
-PASS  mobile: registration passed with a Turnstile token
-PASS  mobile: login challenge appeared and verified
-4 passed, 0 failed
-```
+Timeouts and network failures are retryable. Tell the user to retry after a
+moment. Do not add a fallback that accepts the request when Cloudflare is
+unreachable.
 
-This proves the widget, form submission and risk-triggered login UI work at
-1440 px and 390 px. It does not prove production activation: a real widget token
-must still be validated after the owner configures the production site key and
-secret.
+## 9. Analytics
 
-## 9. Residual limitations
+Turnstile Analytics in the Cloudflare dashboard reports challenges issued and
+solved, browser source, and token validation outcomes. Treat these as separate
+signals:
 
-- Production activation depends on the Cloudflare widget and Render secrets.
-- The in-repo Siteverify test mocks the Cloudflare response; a real token from
-  the production widget has not been validated yet.
+- **Challenges issued** are not Siteverify requests.
+- **Challenges solved** are not necessarily successfully validated tokens.
+- **Token validation** separately distinguishes requests, valid tokens and
+  invalid tokens.
+- Browser labels such as Electron, HeadlessChrome and Chrome Mobile are source
+  categories, not proof of malicious traffic. Do not block a browser category or
+  change challenge mode solely to improve a displayed solve rate.
+
+To review production behaviour, open Cloudflare Dashboard → Turnstile →
+`Schemeknit Production` → Analytics, then compare the challenge counts with the
+token-validation panel for the same period. Backend logs record the safe failure
+category (`turnstile_siteverify_rejected`, `turnstile_action_mismatch`,
+`turnstile_hostname_mismatch`, `turnstile_token_replay`,
+`turnstile_siteverify_unavailable`, `turnstile_secret_missing`) without token or
+secret values.
+
+## 10. Tests and evidence
+
+`backend/tests/test_turnstile.py` covers:
+
+- acceptance of a valid token;
+- missing, empty, whitespace, non-string, oversized (2049) and invalid tokens;
+- the exact 2048-character boundary;
+- expired tokens and replayed tokens;
+- hostname and action mismatch;
+- Siteverify timeout, connection error, HTTP server error, HTTP client error,
+  malformed JSON and non-object JSON;
+- a missing backend secret failing closed without any HTTP request;
+- the 10-second default and an explicitly configured timeout;
+- rejection of out-of-range timeout configuration;
+- registration, risk-triggered login and password-reset enforcement;
+- invite-only interaction (a valid token does not replace the invite code, and
+  the invite code does not replace a valid token);
+- disabled Turnstile in local builds;
+- CSP permitting Turnstile without `unsafe-eval`.
+
+All Siteverify calls in automated tests are mocked. Tests never send traffic to
+live Cloudflare.
+
+Production verification has been performed separately with a real widget token:
+a genuine token passed Siteverify and was then rejected by the invite-only gate
+(no account created), and a replay of the same token returned
+`turnstile_replay`. A dummy token returned `turnstile_invalid`, proving the
+backend called Cloudflare rather than only checking token presence.
+
+## 11. Residual limitations and future recommendations
+
+- Dashboard Siteverify counters are only visible in Cloudflare Analytics; they
+  are not exposed by the application.
 - A Cloudflare outage pauses protected forms (fail closed) rather than silently
   disabling bot protection.
+- Future: add alerting on sustained `turnstile_unavailable` rates.
+- Future: review Analytics monthly for challenge solve rate and validation
+  failures; do not tune challenge mode from a single day's sample.
+- Future: if a custom domain replaces the Render hostname, add it explicitly in
+  both Cloudflare and `TURNSTILE_ALLOWED_HOSTNAMES`.
