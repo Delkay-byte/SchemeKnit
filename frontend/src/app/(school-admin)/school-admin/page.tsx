@@ -8,6 +8,7 @@ import { StatusPill } from '@/components/ui/badge'
 import { Banner } from '@/components/ui/banner'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { PageHeader } from '@/components/ui/page-header'
+import { ListPageSkeleton } from '@/components/ui/skeleton'
 import { Users, Key, UserPlus } from 'lucide-react'
 import { api } from '@/lib/api'
 
@@ -46,11 +47,7 @@ export default function SchoolAdminDashboard() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    )
+    return <ListPageSkeleton label="Loading school overview" rows={4} columns={4} />
   }
 
   if (error) {

@@ -16,6 +16,10 @@ import { FileText, Eye, Play, BookOpen, Trash2, Crown, Zap, School, Upload } fro
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import { PageHeader } from '@/components/ui/page-header'
+import { DashboardSkeleton } from '@/components/ui/skeleton'
+import { toast } from '@/components/ui/toaster'
+import { normalizeError } from '@/lib/error-normalizer'
+import { restoreAt, runOptimistic } from '@/lib/optimistic'
 import { SchemeOfWork, PlanResolution } from '@/types'
 
 // Labels only — the server-persisted stage keys and the status fallback
@@ -67,8 +71,12 @@ export default function Dashboard() {
   }, [user, authLoading])
 
   const loadSchemes = async () => {
+    // Only the first load shows the full skeleton. A refresh keeps already
+    // loaded content visible and updates it in place.
+    const firstLoad = schemes.length === 0
     try {
-      setLoading(true)
+      if (firstLoad) setLoading(true)
+      setError(null)
       const [schemesRes, planRes, refRes] = await Promise.all([
         api.listSchemes(),
         api.getMyPlan().catch(() => null),
@@ -81,7 +89,7 @@ export default function Dashboard() {
       }
       if (refRes) setRefStats(refRes)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load schemes')
+      setError(normalizeError(err).message)
     } finally {
       setLoading(false)
     }
@@ -141,12 +149,45 @@ export default function Dashboard() {
   }
 
   const handleDelete = async (schemeId: string) => {
+    const index = schemes.findIndex((scheme) => scheme.id === schemeId)
+    const removed = schemes[index]
+    if (!removed) return
+
+    setPendingDeleteId(null)
+    setError(null)
+    toast({
+      title: 'Removing scheme…',
+      description: removed.filename,
+      variant: 'info',
+      duration: 2500,
+      key: `scheme-delete-pending:${schemeId}`,
+    })
+
     try {
-      setError(null)
-      await api.deleteScheme(schemeId)
-      setSchemes(schemes.filter(s => s.id !== schemeId))
+      await runOptimistic({
+        apply: () => setSchemes((current) => current.filter((scheme) => scheme.id !== schemeId)),
+        rollback: () => setSchemes((current) => (
+          current.some((scheme) => scheme.id === schemeId)
+            ? current
+            : restoreAt(current, removed, index)
+        )),
+        request: () => api.deleteScheme(schemeId),
+      })
+      toast({
+        title: 'Scheme removed successfully.',
+        description: removed.filename,
+        variant: 'success',
+        key: `scheme-delete-done:${schemeId}`,
+      })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Delete failed')
+      const normalized = normalizeError(err)
+      toast({
+        title: 'Scheme could not be deleted',
+        description: normalized.message,
+        variant: 'error',
+        key: `scheme-delete-error:${schemeId}`,
+        action: { label: 'Try again', onClick: () => { void handleDelete(schemeId) } },
+      })
     }
   }
 
@@ -176,8 +217,10 @@ export default function Dashboard() {
 
   if (authLoading || !user) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="min-h-screen bg-background">
+        <main className="container mx-auto px-4 py-8">
+          <DashboardSkeleton />
+        </main>
       </div>
     )
   }
@@ -197,17 +240,15 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen">
       <main className="container mx-auto px-4 py-8">
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          </div>
-        ) : error ? (
+        {loading && schemes.length === 0 ? (
+          <DashboardSkeleton />
+        ) : error && schemes.length === 0 ? (
           <Banner
             tone="danger"
-            title="Something went wrong"
+            title="We couldn't load your dashboard"
             action={
               <Button size="sm" variant="outline" onClick={loadSchemes}>
-                Try Again
+                Try again
               </Button>
             }
           >
@@ -215,6 +256,19 @@ export default function Dashboard() {
           </Banner>
         ) : (
           <div className="space-y-6">
+            {error && (
+              <Banner
+                tone="danger"
+                title="Some dashboard details could not be refreshed"
+                action={
+                  <Button size="sm" variant="outline" onClick={loadSchemes}>
+                    Try again
+                  </Button>
+                }
+              >
+                {error}
+              </Banner>
+            )}
             {/* 1. Page header — one h1, one unmistakable primary action. */}
             <PageHeader
               title={`Welcome back, ${user.full_name?.split(' ')[0] || 'Teacher'}`}

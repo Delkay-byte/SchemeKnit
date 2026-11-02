@@ -6,6 +6,7 @@ import { SurfaceCard } from '@/components/ui/surface-card'
 import { Input } from '@/components/ui/input'
 import { Banner } from '@/components/ui/banner'
 import { StatusPill } from '@/components/ui/badge'
+import { ListPageSkeleton } from '@/components/ui/skeleton'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import {
   Dialog,
@@ -187,11 +188,7 @@ export default function TeachersPage() {
   const seatsFull = seats != null && seats.used >= seats.limit
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    )
+    return <ListPageSkeleton label="Loading teachers" rows={5} columns={4} />
   }
 
   return (

@@ -9,8 +9,12 @@ import { Field } from '@/components/ui/field'
 import { Banner } from '@/components/ui/banner'
 import { ConfirmDialog } from '@/components/ui/dialog'
 import { PageHeader } from '@/components/ui/page-header'
+import { FormPageSkeleton } from '@/components/ui/skeleton'
+import { toast } from '@/components/ui/toaster'
 import { Save, Plus, Trash2, User } from 'lucide-react'
 import { api } from '@/lib/api'
+import { normalizeError } from '@/lib/error-normalizer'
+import { restoreAt, runOptimistic } from '@/lib/optimistic'
 import { ChangePasswordCard } from '@/components/change-password'
 import { SessionSecurityCard } from '@/components/session-security-card'
 import { Holiday, PlanResolution } from '@/types'
@@ -119,23 +123,42 @@ export default function SettingsPage() {
   }
 
   const handleDeleteHoliday = async (holidayId: string) => {
+    const index = holidays.findIndex((holiday) => holiday.id === holidayId)
+    const removed = holidays[index]
+    if (!removed) return
+    setError(null)
     try {
-      await api.deleteHoliday(holidayId)
-      setHolidays(holidays.filter(h => h.id !== holidayId))
+      await runOptimistic({
+        apply: () => setHolidays((current) => current.filter((holiday) => holiday.id !== holidayId)),
+        rollback: () => setHolidays((current) => (
+          current.some((holiday) => holiday.id === holidayId)
+            ? current
+            : restoreAt(current, removed, index)
+        )),
+        request: () => api.deleteHoliday(holidayId),
+      })
       setSuccess('Holiday deleted successfully')
       setTimeout(() => setSuccess(null), 3000)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete holiday')
+      const normalized = normalizeError(err)
+      setError(normalized.message)
+      toast({
+        title: 'Holiday could not be deleted',
+        description: normalized.message,
+        variant: 'error',
+        action: { label: 'Try again', onClick: () => { void handleDeleteHoliday(holidayId) } },
+      })
     }
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Loading settings...</p>
-        </div>
+      <div className="min-h-screen bg-background">
+        <main className="container mx-auto px-4 py-8">
+          <div className="mx-auto max-w-4xl">
+            <FormPageSkeleton label="Loading settings" />
+          </div>
+        </main>
       </div>
     )
   }
@@ -243,6 +266,7 @@ export default function SettingsPage() {
                     <Input
                       id="profile-full-name"
                       type="text"
+                      autoComplete="name"
                       value={profileName}
                       onChange={(e) => setProfileName(e.target.value)}
                       placeholder="e.g. Ama Mensah"
@@ -270,6 +294,7 @@ export default function SettingsPage() {
                   <Input
                     id="profile-school"
                     type="text"
+                    autoComplete="organization"
                     value={isSchoolManaged ? profile?.school_name || '—' : profileSchool}
                     disabled={isSchoolManaged}
                     onChange={(e) => setProfileSchool(e.target.value)}

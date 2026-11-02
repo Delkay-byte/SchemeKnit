@@ -14,16 +14,21 @@
  * silently dismissed — the first Cancel arms the discard, a second confirms.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Field } from '@/components/ui/field'
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
+import { DraftRecoveryBanner, DraftSaveStatus } from '@/components/ui/draft-recovery'
+import { toast } from '@/components/ui/toaster'
 import { Loader2, Save } from 'lucide-react'
 import { api } from '@/lib/api'
 import { normalizeError } from '@/lib/error-normalizer'
+import { useAuth } from '@/lib/auth-context'
+import { useFormDraft } from '@/hooks/use-form-draft'
+import { prefillLessonConfig } from '@/lib/prefill'
 import { LessonRubricConfig } from '@/types'
 
 const WEEK_DAYS = [
@@ -47,25 +52,48 @@ export interface LessonConfigModalProps {
 export function LessonConfigModal({
   schemeId, open, onOpenChange, config, onSaved,
 }: LessonConfigModalProps) {
+  const { user } = useAuth()
   const [draft, setDraft] = useState<LessonRubricConfig>(config)
+  const [baseline, setBaseline] = useState<LessonRubricConfig>(config)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [discardArmed, setDiscardArmed] = useState(false)
 
-  // Re-draft from the saved values each time the modal opens.
+  // Authoritative defaults from the signed-in profile. They only fill fields
+  // that are still blank; server-saved per-scheme values always win.
+  const prefill = useMemo<LessonRubricConfig>(
+    () => prefillLessonConfig(config, user),
+    [config, user],
+  )
+
+  const dirty = JSON.stringify(draft) !== JSON.stringify(baseline)
+
+  const draftStore = useFormDraft<LessonRubricConfig>({
+    userId: user?.id || null,
+    workflow: 'lesson-config',
+    resourceId: schemeId,
+    value: draft,
+    enabled: open && dirty,
+  })
+
+  // Re-draft from the saved values each time the modal opens. Recovery is
+  // offered separately so an old local copy never silently replaces saved data.
   useEffect(() => {
     if (open) {
-      setDraft({ ...config })
+      setDraft(prefill)
+      setBaseline(prefill)
       setError(null)
       setDiscardArmed(false)
     }
-  }, [open, config])
-
-  const dirty = JSON.stringify(draft) !== JSON.stringify(config)
+    // Only opening a modal starts a fresh draft; parent re-renders must not
+    // discard what the teacher is typing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
 
   const handleOpenChange = (next: boolean) => {
     if (!next && dirty) {
       if (discardArmed) {
+        draftStore.clear()
         setDiscardArmed(false)
         onOpenChange(false)
       } else {
@@ -77,9 +105,29 @@ export function LessonConfigModal({
     onOpenChange(next)
   }
 
+  const applyRecovered = () => {
+    const recovered = draftStore.accept()
+    if (recovered) {
+      setDraft({ ...prefill, ...recovered })
+      setBaseline(prefill)
+    }
+  }
+
+  const discardRecovered = () => {
+    draftStore.discard()
+    setDraft(prefill)
+    setBaseline(prefill)
+  }
+
   const handleSave = async () => {
     setSaving(true)
     setError(null)
+    toast({
+      title: 'Saving lesson settings…',
+      variant: 'info',
+      duration: 4000,
+      key: `lesson-config-saving:${schemeId}`,
+    })
     try {
       const resp = await api.saveLessonConfig(schemeId, {
         school_name: draft.school_name?.trim() || null,
@@ -93,10 +141,24 @@ export function LessonConfigModal({
           ? [...(draft.teaching_days || [])].sort((a, b) => a - b)
           : null,
       })
+      draftStore.clear()
       onSaved(resp.config || draft, resp.missing || [])
       onOpenChange(false)
+      toast({
+        title: 'Lesson settings saved.',
+        variant: 'success',
+        key: `lesson-config-saved:${schemeId}`,
+      })
     } catch (err) {
-      setError(normalizeError(err).message)
+      const normalized = normalizeError(err)
+      setError(normalized.message)
+      toast({
+        title: 'Lesson settings were not saved',
+        description: normalized.message,
+        variant: 'error',
+        key: `lesson-config-error:${schemeId}`,
+        action: { label: 'Try again', onClick: () => { void handleSave() } },
+      })
     } finally {
       setSaving(false)
     }
@@ -115,10 +177,19 @@ export function LessonConfigModal({
         </DialogHeader>
 
         <div className="grid gap-4 py-2">
+          {draftStore.recovered && (
+            <DraftRecoveryBanner
+              updatedAt={draftStore.recovered.updatedAt}
+              label={`Unsaved lesson settings for this scheme`}
+              onContinue={applyRecovered}
+              onDiscard={discardRecovered}
+            />
+          )}
           <Field label="School name" htmlFor="lcfg-school" hint="Shown at the top of the first week">
             <Input
               id="lcfg-school"
               type="text"
+              autoComplete="organization"
               value={draft.school_name || ''}
               onChange={(e) => setDraft({ ...draft, school_name: e.target.value })}
             />
@@ -127,6 +198,7 @@ export function LessonConfigModal({
             <Input
               id="lcfg-teacher"
               type="text"
+              autoComplete="name"
               value={draft.teacher_name || ''}
               onChange={(e) => setDraft({ ...draft, teacher_name: e.target.value })}
             />
@@ -229,14 +301,17 @@ export function LessonConfigModal({
           )}
         </div>
 
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button type="button" disabled={saving} onClick={handleSave} data-save-lesson-config>
-            {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" /> : <Save className="mr-2 h-4 w-4" aria-hidden="true" />}
-            Save &amp; apply
-          </Button>
+        <DialogFooter className="sm:items-center sm:justify-between">
+          <DraftSaveStatus status={draftStore.status} savedAt={draftStore.savedAt} />
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="button" disabled={saving} onClick={handleSave} data-save-lesson-config>
+              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" /> : <Save className="mr-2 h-4 w-4" aria-hidden="true" />}
+              Save &amp; apply
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

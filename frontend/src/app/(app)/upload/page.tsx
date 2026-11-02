@@ -11,6 +11,7 @@ import { Upload, FileText, CheckCircle, AlertTriangle, Play } from 'lucide-react
 import { Select } from '@/components/ui/select'
 import { Field } from '@/components/ui/field'
 import { api } from '@/lib/api'
+import { normalizeError } from '@/lib/error-normalizer'
 import { WhatsAppButton } from '@/components/whatsapp-button'
 import { UploadPrivacyNotice } from '@/components/upload-privacy-notice'
 import { formatFileSize } from '@/lib/utils-display'
@@ -119,7 +120,7 @@ export default function UploadPage() {
       setSuccess(true)
       api.getStorageUsage().then(setStorage).catch(() => {})
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed')
+      setError(normalizeError(err).message)
       setUploadProgress(0)
     } finally {
       setUploading(false)
@@ -229,7 +230,7 @@ export default function UploadPage() {
       window.sessionStorage.setItem('schemeknit.autopilot_intent', '1')
       router.push(`/generate/${result.scheme_id}`)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not confirm that subject')
+      setError(normalizeError(err).message)
     } finally {
       setConfirmingSubject(null)
     }

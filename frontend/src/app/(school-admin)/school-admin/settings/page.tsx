@@ -8,6 +8,7 @@ import { Field, TextArea } from '@/components/ui/field'
 import { Banner } from '@/components/ui/banner'
 import { api } from '@/lib/api'
 import { PageHeader } from '@/components/ui/page-header'
+import { FormPageSkeleton } from '@/components/ui/skeleton'
 import { ChangePasswordCard } from '@/components/change-password'
 
 export default function SchoolSettingsPage() {
@@ -61,11 +62,7 @@ export default function SchoolSettingsPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    )
+    return <FormPageSkeleton label="Loading school settings" />
   }
 
   return (

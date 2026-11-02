@@ -7,6 +7,7 @@ import { LayoutDashboard, Users, Settings, Key } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { Header } from '@/components/header'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { AppShellSkeleton } from '@/components/ui/skeleton'
 import { isDesktop } from '@/lib/build-target'
 
 const NAV = [
@@ -39,8 +40,10 @@ export default function SchoolAdminLayout({ children }: { children: ReactNode })
 
   if (loading || !user || user.role !== 'school_admin') {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="min-h-screen bg-background">
+        <main className="container mx-auto px-4 py-8">
+          <AppShellSkeleton />
+        </main>
       </div>
     )
   }

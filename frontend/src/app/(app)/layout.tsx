@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Header } from '@/components/header'
+import { AppShellSkeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/lib/auth-context'
 import { safeNextPath } from '@/lib/purchase-return'
 
@@ -43,8 +44,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (loading || !user) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="min-h-screen bg-background">
+        <main className="container mx-auto px-4 py-8">
+          <AppShellSkeleton />
+        </main>
       </div>
     )
   }

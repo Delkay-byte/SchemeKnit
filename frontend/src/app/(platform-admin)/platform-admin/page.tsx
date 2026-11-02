@@ -9,6 +9,7 @@ import { Select } from '@/components/ui/select'
 import { Field } from '@/components/ui/field'
 import { Banner } from '@/components/ui/banner'
 import { StatusPill } from '@/components/ui/badge'
+import { AppShellSkeleton, ListPageSkeleton } from '@/components/ui/skeleton'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import {
   Dialog,
@@ -450,8 +451,10 @@ export default function PlatformAdminPage() {
 
   if (authLoading || !user || user.role !== 'platform_admin') {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="min-h-screen bg-background">
+        <main className="container mx-auto px-4 py-8">
+          <AppShellSkeleton />
+        </main>
       </div>
     )
   }
@@ -565,9 +568,7 @@ export default function PlatformAdminPage() {
         {error && <Banner tone="danger" className="mb-4">{error}</Banner>}
 
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          </div>
+          <ListPageSkeleton label="Loading platform administration" rows={5} columns={5} />
         ) : (
           <>
             {/* Dashboard Tab */}

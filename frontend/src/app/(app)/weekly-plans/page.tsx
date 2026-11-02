@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { SurfaceCard } from '@/components/ui/surface-card'
 import { Banner } from '@/components/ui/banner'
 import { PageHeader } from '@/components/ui/page-header'
+import { SkeletonRegion, SkeletonTable } from '@/components/ui/skeleton'
 import {
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
 } from '@/components/ui/table'
@@ -63,9 +64,11 @@ export default function WeeklyPlansPage() {
         <Banner tone="danger" title="Could not load weekly plans">{error}</Banner>
       )}
 
-      {loading ? (
-        <div className="flex items-center justify-center py-12" data-weekly-loading>
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+      {loading && plans.length === 0 ? (
+        <div data-weekly-loading>
+          <SkeletonRegion label="Loading weekly plans">
+            <SkeletonTable rows={5} columns={4} />
+          </SkeletonRegion>
         </div>
       ) : plans.length === 0 ? (
         <SurfaceCard data-empty className="p-10 text-center">

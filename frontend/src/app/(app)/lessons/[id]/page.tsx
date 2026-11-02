@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -9,8 +9,13 @@ import { Input } from '@/components/ui/input'
 import { Field, TextArea } from '@/components/ui/field'
 import { Select } from '@/components/ui/select'
 import { Banner } from '@/components/ui/banner'
+import { DetailPageSkeleton } from '@/components/ui/skeleton'
+import { DraftRecoveryBanner, DraftSaveStatus } from '@/components/ui/draft-recovery'
 import { ArrowLeft, CheckCircle, AlertCircle, Save, Loader2, Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
 import { api } from '@/lib/api'
+import { useAuth } from '@/lib/auth-context'
+import { useFormDraft } from '@/hooks/use-form-draft'
+import { normalizeError } from '@/lib/error-normalizer'
 import { aiFailure } from '@/lib/ai-feedback'
 import { resolveRouteId } from '@/lib/route-params'
 import { PageHeader } from '@/components/ui/page-header'
@@ -167,6 +172,77 @@ export default function LessonDetailPage() {
   const [aiStatus, setAiStatus] = useState<{
     active: boolean; provider: string | null; mode: string; reason: string | null;
   } | null>(null)
+
+  const { user } = useAuth()
+
+  // Draft contains teacher-editable content only. Derived curriculum fields
+  // (indicators, strand, rubric, provenance) are never persisted as drafts.
+  const draftValue = useMemo(() => ({
+    topic,
+    introduction,
+    starter,
+    assessment,
+    conclusion,
+    homework,
+    classAssignment,
+    homeAssignment,
+    keywords,
+    otherTlrs,
+    mainActivities,
+    coreCompetencies,
+    structuredRefs,
+  }), [
+    topic, introduction, starter, assessment, conclusion, homework,
+    classAssignment, homeAssignment, keywords, otherTlrs, mainActivities,
+    coreCompetencies, structuredRefs,
+  ])
+
+  const serverSnapshot = useMemo(() => (lesson ? {
+    topic: lesson.lesson_topic || '',
+    introduction: lesson.introduction || '',
+    starter: lesson.starter_activity || '',
+    assessment: lesson.assessment || '',
+    conclusion: lesson.conclusion || '',
+    homework: lesson.homework || '',
+    classAssignment: lesson.class_assignment || '',
+    homeAssignment: lesson.home_assignment || '',
+    keywords: lesson.keywords || [],
+    otherTlrs: lesson.other_tlrs || [],
+    mainActivities: normalizeActivities(lesson.main_activities),
+    coreCompetencies: lesson.core_competencies || [],
+    structuredRefs: lesson.structured_references || [],
+  } : null), [lesson])
+
+  const lessonDirty = Boolean(
+    serverSnapshot && JSON.stringify(draftValue) !== JSON.stringify(serverSnapshot),
+  )
+
+  const lessonDraft = useFormDraft<typeof draftValue>({
+    userId: user?.id || null,
+    workflow: 'lesson-edit',
+    resourceId: lessonId,
+    value: draftValue,
+    enabled: !loading && lessonDirty,
+  })
+
+  const continueLessonDraft = () => {
+    const recovered = lessonDraft.accept()
+    if (!recovered) return
+    setTopic(recovered.topic)
+    setIntroduction(recovered.introduction)
+    setStarter(recovered.starter)
+    setAssessment(recovered.assessment)
+    setConclusion(recovered.conclusion)
+    setHomework(recovered.homework)
+    setClassAssignment(recovered.classAssignment)
+    setHomeAssignment(recovered.homeAssignment)
+    setKeywords(recovered.keywords || [])
+    setOtherTlrs(recovered.otherTlrs || [])
+    setMainActivities(recovered.mainActivities || [])
+    setCoreCompetencies(recovered.coreCompetencies || [])
+    setStructuredRefs(recovered.structuredRefs || [])
+    setSaved(false)
+  }
 
   useEffect(() => {
     load()
@@ -346,10 +422,11 @@ export default function LessonDetailPage() {
         references: savedRefs.map(r => r.title || r.type).filter(Boolean),
       })
       setLesson(updated)
+      lessonDraft.clear()
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save lesson')
+      setError(normalizeError(err).message)
     } finally {
       setSaving(false)
     }
@@ -357,11 +434,10 @@ export default function LessonDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Loading lesson...</p>
-        </div>
+      <div className="min-h-screen bg-background">
+        <main className="container mx-auto px-4 py-8">
+          <DetailPageSkeleton label="Loading lesson" />
+        </main>
       </div>
     )
   }
@@ -417,6 +493,16 @@ export default function LessonDetailPage() {
     <div className="min-h-screen">
       <main className="container mx-auto max-w-4xl px-4 py-8">
         {/* One h1: which lesson this is, at a glance. */}
+        {lessonDraft.recovered && (
+          <div className="mb-4">
+            <DraftRecoveryBanner
+              updatedAt={lessonDraft.recovered.updatedAt}
+              label="Unsaved edits to this lesson"
+              onContinue={continueLessonDraft}
+              onDiscard={lessonDraft.discard}
+            />
+          </div>
+        )}
         <PageHeader
           className="mb-6"
           eyebrow="Lesson"
@@ -1032,6 +1118,7 @@ export default function LessonDetailPage() {
                 Saved
               </span>
             )}
+            <DraftSaveStatus status={lessonDraft.status} savedAt={lessonDraft.savedAt} />
           </div>
           {error && <Banner tone="danger" className="mt-4">{error}</Banner>}
         </SurfaceCard>

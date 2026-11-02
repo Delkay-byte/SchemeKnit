@@ -244,11 +244,11 @@ export function RoleLogin({ entry }: { entry: EntryRole }) {
           <Input
             id={`${entry}-email`}
             type="email"
+            autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
             placeholder={copy.emailPlaceholder}
-            autoComplete="email"
             autoFocus
             aria-invalid={error ? true : undefined}
           />

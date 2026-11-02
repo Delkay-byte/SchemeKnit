@@ -10,6 +10,7 @@ import { Banner } from '@/components/ui/banner'
 import { Field, TextArea } from '@/components/ui/field'
 import { Select } from '@/components/ui/select'
 import { PageHeader } from '@/components/ui/page-header'
+import { DetailPageSkeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { toast } from '@/components/ui/toaster'
 import { api } from '@/lib/api'
@@ -152,8 +153,8 @@ export default function WeeklyPlanDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-16" data-weekly-loading>
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+      <div className="container mx-auto px-4 py-8" data-weekly-loading>
+        <DetailPageSkeleton label="Loading weekly plan" />
       </div>
     )
   }
