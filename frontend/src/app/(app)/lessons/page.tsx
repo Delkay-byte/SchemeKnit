@@ -12,6 +12,8 @@ import { PageHeader } from '@/components/ui/page-header'
 import { Eye, BookOpen } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
+import { ListPageSkeleton } from '@/components/ui/skeleton'
+import { normalizeError } from '@/lib/error-normalizer'
 
 interface LessonPlan {
   id: string
@@ -56,12 +58,15 @@ export default function LessonsPage() {
   }, [user, authLoading])
 
   const loadLessons = async () => {
+    // Keep loaded rows visible during a refresh; skeleton only for first load.
+    const firstLoad = lessons.length === 0
     try {
-      setLoading(true)
+      if (firstLoad) setLoading(true)
+      setError(null)
       const response = await api.listAllLessons()
       setLessons(response.lesson_plans || [])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load lesson plans')
+      setError(normalizeError(err).message)
     } finally {
       setLoading(false)
     }
@@ -77,8 +82,10 @@ export default function LessonsPage() {
 
   if (authLoading || !user) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="min-h-screen bg-background">
+        <main className="container mx-auto px-4 py-8">
+          <ListPageSkeleton label="Loading lesson plans" rows={5} columns={6} />
+        </main>
       </div>
     )
   }
@@ -107,14 +114,12 @@ export default function LessonsPage() {
           />
         </div>
 
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          </div>
-        ) : error ? (
+        {loading && lessons.length === 0 ? (
+          <ListPageSkeleton label="Loading lesson plans" rows={5} columns={6} />
+        ) : error && lessons.length === 0 ? (
           <SurfaceCard className="px-6 py-8 text-center">
             <p className="mb-4 text-destructive">{error}</p>
-            <Button onClick={loadLessons}>Try Again</Button>
+            <Button onClick={loadLessons}>Try again</Button>
           </SurfaceCard>
         ) : lessons.length === 0 ? (
           <SurfaceCard data-empty className="px-6 py-12 text-center">
@@ -134,6 +139,14 @@ export default function LessonsPage() {
           </SurfaceCard>
         ) : (
           <>
+            {error && (
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+                <span>{error}</span>
+                <Button size="sm" variant="outline" onClick={loadLessons}>
+                  Try again
+                </Button>
+              </div>
+            )}
             {/* Filter by scheme */}
             {uniqueSchemes.length > 1 && (
               <div className="mb-4">

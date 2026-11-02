@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { FileDown, FileText, Save } from 'lucide-react'
@@ -10,9 +10,15 @@ import { Banner } from '@/components/ui/banner'
 import { Field, TextArea } from '@/components/ui/field'
 import { Select } from '@/components/ui/select'
 import { PageHeader } from '@/components/ui/page-header'
+import { DetailPageSkeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
+import { DraftConflictBanner, DraftRecoveryBanner, DraftSaveStatus } from '@/components/ui/draft-recovery'
 import { toast } from '@/components/ui/toaster'
 import { api } from '@/lib/api'
+import { useAuth } from '@/lib/auth-context'
+import { useFormDraft } from '@/hooks/use-form-draft'
+import { normalizeError } from '@/lib/error-normalizer'
+import { isStaleDraftBaseline } from '@/lib/drafts'
 import { resolveRouteId } from '@/lib/route-params'
 import type { WapefOptions, WeeklyClassPlan } from '@/types'
 
@@ -39,10 +45,13 @@ export default function WeeklyPlanDetailPage() {
   const planId = resolveRouteId(params?.id as string | string[] | undefined, 'weekly-plans')
 
   const [plan, setPlan] = useState<WeeklyClassPlan | null>(null)
+  const [serverVersion, setServerVersion] = useState<string | null>(null)
+  const [serverConflict, setServerConflict] = useState(false)
   const [wapefOptions, setWapefOptions] = useState<WapefOptions | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
   const [exporting, setExporting] = useState<'docx' | 'pdf' | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
 
@@ -59,10 +68,12 @@ export default function WeeklyPlanDetailPage() {
         ])
         if (cancelled) return
         setPlan(planResponse.plan)
+        setServerVersion(planResponse.version || planResponse.plan.updated_date || null)
+        setServerConflict(false)
         setWapefOptions(options)
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load the weekly plan')
+          setError(normalizeError(err).message)
         }
       } finally {
         if (!cancelled) setLoading(false)
@@ -72,6 +83,54 @@ export default function WeeklyPlanDetailPage() {
   }, [planId])
 
   const dirty = Object.keys(metaEdits).length > 0 || Object.keys(dayEdits).length > 0
+  const { user } = useAuth()
+
+  const planDraft = useFormDraft<{
+    metaEdits: Record<number, MetadataPatch>
+    dayEdits: Record<string, { starter?: string; reflection?: string }>
+  }>({
+    userId: user?.id || null,
+    workflow: 'weekly-plan-edit',
+    resourceId: planId,
+    value: { metaEdits, dayEdits },
+    enabled: dirty,
+    baseline: serverVersion,
+  })
+
+  const draftBaselineChanged = Boolean(
+    planDraft.recovered
+      && isStaleDraftBaseline(planDraft.recovered.baseline, serverVersion),
+  )
+
+  const continuePlanDraft = () => {
+    const recovered = planDraft.accept()
+    if (!recovered) return
+    if (draftBaselineChanged) setServerConflict(true)
+    setMetaEdits(recovered.metaEdits || {})
+    setDayEdits(recovered.dayEdits || {})
+  }
+
+  const reloadLatestPlan = async () => {
+    planDraft.discard()
+    setLoading(true)
+    try {
+      const [latest, options] = await Promise.all([
+        api.getWeeklyPlan(planId),
+        api.getWapefOptions().catch(() => null),
+      ])
+      setPlan(latest.plan)
+      setServerVersion(latest.version || latest.plan.updated_date || null)
+      setServerConflict(false)
+      setMetaEdits({})
+      setDayEdits({})
+      setWapefOptions(options)
+      setError(null)
+    } catch (err) {
+      setError(normalizeError(err).message)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const dayEditKey = (subjectIndex: number, dayIndex: number) =>
     `${subjectIndex}:${dayIndex}`
@@ -89,11 +148,29 @@ export default function WeeklyPlanDetailPage() {
     setDayEdits((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } }))
   }
 
-  const handleSave = async () => {
-    if (!plan) return
+  const handleSave = async (forceOverwrite = false) => {
+    if (!plan || savingRef.current) return
+    savingRef.current = true
     setSaving(true)
     setError(null)
+    toast({
+      title: 'Saving weekly plan changes…',
+      variant: 'info',
+      duration: 3000,
+      key: `weekly-plan-edit-saving:${planId}`,
+    })
     try {
+      const latest = await api.getWeeklyPlan(planId)
+      const latestVersion = latest.version || latest.plan.updated_date || null
+      if (!forceOverwrite && latestVersion !== serverVersion) {
+        setServerConflict(true)
+        setError(
+          'This weekly plan changed on the server since you opened it. ' +
+          'Load the latest version, or confirm an overwrite of the latest version.',
+        )
+        return
+      }
+      const writeVersion = forceOverwrite ? latestVersion : serverVersion
       const subjectIndexes = new Set<number>([
         ...Object.keys(metaEdits).map(Number),
         ...Object.keys(dayEdits).map((key) => Number(key.split(':')[0])),
@@ -112,14 +189,33 @@ export default function WeeklyPlanDetailPage() {
           })),
         }
       })
-      const response = await api.updateWeeklyPlan(planId, { subjects })
+      const response = await api.updateWeeklyPlan(
+        planId, { subjects }, writeVersion || undefined)
       setPlan(response.plan)
+      setServerVersion(response.version || response.plan.updated_date || null)
+      setServerConflict(false)
       setMetaEdits({})
       setDayEdits({})
+      planDraft.clear()
       toast({ title: 'Changes saved', description: 'Only the edited subject/day changed.' })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save changes')
+      const normalized = normalizeError(err)
+      setError(normalized.message)
+      if (normalized.category === 'conflict') {
+        setServerConflict(true)
+        return
+      }
+      savingRef.current = false
+      setSaving(false)
+      toast({
+        title: 'Weekly plan was not saved',
+        description: normalized.message,
+        variant: 'error',
+        key: `weekly-plan-edit-error:${planId}`,
+        action: { label: 'Try again', onClick: () => { void handleSave() } },
+      })
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }
@@ -134,7 +230,7 @@ export default function WeeklyPlanDetailPage() {
       await api.downloadFile(payload.blob, payload.filename || `Weekly_Plan.${format}`)
       toast({ title: `Exported ${format.toUpperCase()}`, description: 'One weekly document with every subject section.' })
     } catch (err) {
-      setExportError(err instanceof Error ? err.message : `Failed to export ${format.toUpperCase()}`)
+      setExportError(normalizeError(err).message)
     } finally {
       setExporting(null)
     }
@@ -152,8 +248,8 @@ export default function WeeklyPlanDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-16" data-weekly-loading>
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+      <div className="container mx-auto px-4 py-8" data-weekly-loading>
+        <DetailPageSkeleton label="Loading weekly plan" />
       </div>
     )
   }
@@ -210,6 +306,47 @@ export default function WeeklyPlanDetailPage() {
           </div>
         }
       />
+
+      {planDraft.recovered && (
+        draftBaselineChanged ? (
+          <DraftConflictBanner
+            updatedAt={planDraft.recovered.updatedAt}
+            onLoadLatest={() => { void reloadLatestPlan() }}
+            onKeepDraft={continuePlanDraft}
+            onReview={() => setError(
+              'Your edits were based on an older weekly-plan version. Keeping ' +
+              'them will replace the latest saved version only after you press Save.',
+            )}
+          />
+        ) : (
+          <DraftRecoveryBanner
+            updatedAt={planDraft.recovered.updatedAt}
+            label="Unsaved edits to this weekly plan"
+            onContinue={continuePlanDraft}
+            onDiscard={planDraft.discard}
+          />
+        )
+      )}
+
+      {serverConflict && !planDraft.recovered && (
+        <Banner
+          tone="danger"
+          title="This weekly plan changed on the server"
+          action={
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={() => { void reloadLatestPlan() }}>
+                Load latest version
+              </Button>
+              <Button size="sm" onClick={() => { void handleSave(true) }}>
+                Overwrite latest with my draft
+              </Button>
+            </div>
+          }
+        >
+          Your edits are still here. Load the latest version, or explicitly
+          overwrite it. A second server update will still be rejected.
+        </Banner>
+      )}
 
       {error && <Banner tone="danger" title="Could not save">{error}</Banner>}
       {exportError && (
@@ -411,13 +548,14 @@ export default function WeeklyPlanDetailPage() {
             </div>
             <Button
               className="w-full"
-              onClick={handleSave}
+              onClick={() => { void handleSave() }}
               disabled={!dirty || saving}
               data-weekly-save
             >
               <Save className="h-4 w-4" aria-hidden="true" />
               {saving ? 'Saving…' : 'Save changes'}
             </Button>
+            <DraftSaveStatus status={planDraft.status} savedAt={planDraft.savedAt} />
             <Button
               className="w-full"
               variant="outline"

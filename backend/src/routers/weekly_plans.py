@@ -19,11 +19,12 @@ this router refuses a class outside the Basic 1-3 band.
 """
 
 import json
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
@@ -55,6 +56,11 @@ WEEKLY_PLANS_DIR = Path("exports/weekly-plans")
 # ── Persistence ───────────────────────────────────────────────────────────────
 
 _PLANS_FILE = Path("teachflow_data/weekly_plans.json")
+
+#: Serialize the read-modify-write of the JSON aggregate in this process, so
+#: two concurrent edits cannot both read the same revision and write over each
+#: other. Cross-process deployments still rely on the If-Match revision check.
+_STORE_LOCK = threading.Lock()
 
 
 def _load_store() -> Dict[str, Any]:
@@ -267,7 +273,7 @@ async def get_weekly_plan(
     if record is None:
         raise HTTPException(status_code=404, detail="Weekly plan not found")
     record = _get_owned_record(record, user.id)
-    return {"plan": record["plan"]}
+    return {"plan": record["plan"], "version": record.get("updated_date")}
 
 
 @router.put("/{plan_id}")
@@ -275,65 +281,79 @@ async def update_weekly_plan(
     plan_id: str,
     updates: Dict[str, Any],
     user: User = Depends(get_current_user),
+    if_match: Optional[str] = Header(default=None, alias="If-Match"),
 ):
     """Edit a saved weekly plan.
 
     Edits are applied at SUBJECT + DAY granularity and subjects are isolated:
     updating one subject's metadata or one day's starter/main/reflection never
-    touches another subject or another day.
+    touches another subject or another day. ``If-Match`` carries the
+    ``updated_date`` revision the client read; a mismatch is a 409 and nothing
+    is written.
     """
-    store = _load_store()
-    record = next((p for p in store["plans"] if p["id"] == plan_id), None)
-    if record is None:
-        raise HTTPException(status_code=404, detail="Weekly plan not found")
-    record = _get_owned_record(record, user.id)
+    with _STORE_LOCK:
+        store = _load_store()
+        record = next((p for p in store["plans"] if p["id"] == plan_id), None)
+        if record is None:
+            raise HTTPException(status_code=404, detail="Weekly plan not found")
+        record = _get_owned_record(record, user.id)
 
-    plan = WeeklyClassPlan.model_validate(record["plan"])
-    subject_updates = updates.get("subjects") or []
-    for patch in subject_updates:
-        index = patch.get("index")
-        if index is None or not (0 <= index < len(plan.subjects)):
-            continue
-        subject = plan.subjects[index]
-        metadata = patch.get("metadata")
-        if metadata:
-            new_meta = subject.metadata.model_copy(update={
-                k: v for k, v in metadata.items()
-                if k in subject.metadata.model_fields
-            })
-            subject.metadata = new_meta
-        day_updates = patch.get("day_plans") or []
-        for day_patch in day_updates:
-            day_index = day_patch.get("index")
-            if day_index is None or not (0 <= day_index < len(subject.day_plans)):
-                continue
-            current = subject.day_plans[day_index]
-            fields = {
-                k: v for k, v in day_patch.items()
-                if k in ("days", "day_label", "starter", "reflection",
-                         "main_activities", "focus_indicators", "resources",
-                         "lesson_date", "period")
-            }
-            if "main_activities" in fields and isinstance(fields["main_activities"], list):
-                fields["main_activities"] = [
-                    {"description": a} if isinstance(a, str) else a
-                    for a in fields["main_activities"]
-                ]
-            subject.day_plans[day_index] = current.model_copy(update=fields)
-        if patch.get("teaching_day_groups"):
-            from ..engines.wapef_basic13_template import normalize_day_groups
-            subject.teaching_day_groups = normalize_day_groups(
-                patch["teaching_day_groups"])
-            subject.teaching_days = sorted(
-                {d for g in subject.teaching_day_groups for d in g},
-                key=lambda d: WEEK_DAYS.index(d) if d in WEEK_DAYS else 99,
+        expected_version = if_match if isinstance(if_match, str) else None
+        if expected_version and record.get("updated_date") != expected_version:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "This weekly plan has changed since you opened it. "
+                    "Refresh the latest version before saving."
+                ),
             )
 
-    record["plan"] = plan.model_dump(mode="json")
-    record["updated_date"] = datetime.now().isoformat()
-    _save_store(store)
-    log_event("weekly_plan_updated", user_id=user.id, weekly_plan_id=plan_id)
-    return {"plan": record["plan"]}
+        plan = WeeklyClassPlan.model_validate(record["plan"])
+        subject_updates = updates.get("subjects") or []
+        for patch in subject_updates:
+            index = patch.get("index")
+            if index is None or not (0 <= index < len(plan.subjects)):
+                continue
+            subject = plan.subjects[index]
+            metadata = patch.get("metadata")
+            if metadata:
+                new_meta = subject.metadata.model_copy(update={
+                    k: v for k, v in metadata.items()
+                    if k in subject.metadata.model_fields
+                })
+                subject.metadata = new_meta
+            day_updates = patch.get("day_plans") or []
+            for day_patch in day_updates:
+                day_index = day_patch.get("index")
+                if day_index is None or not (0 <= day_index < len(subject.day_plans)):
+                    continue
+                current = subject.day_plans[day_index]
+                fields = {
+                    k: v for k, v in day_patch.items()
+                    if k in ("days", "day_label", "starter", "reflection",
+                             "main_activities", "focus_indicators", "resources",
+                             "lesson_date", "period")
+                }
+                if "main_activities" in fields and isinstance(fields["main_activities"], list):
+                    fields["main_activities"] = [
+                        {"description": a} if isinstance(a, str) else a
+                        for a in fields["main_activities"]
+                    ]
+                subject.day_plans[day_index] = current.model_copy(update=fields)
+            if patch.get("teaching_day_groups"):
+                from ..engines.wapef_basic13_template import normalize_day_groups
+                subject.teaching_day_groups = normalize_day_groups(
+                    patch["teaching_day_groups"])
+                subject.teaching_days = sorted(
+                    {d for g in subject.teaching_day_groups for d in g},
+                    key=lambda d: WEEK_DAYS.index(d) if d in WEEK_DAYS else 99,
+                )
+
+        record["plan"] = plan.model_dump(mode="json")
+        record["updated_date"] = datetime.now().isoformat()
+        _save_store(store)
+        log_event("weekly_plan_updated", user_id=user.id, weekly_plan_id=plan_id)
+        return {"plan": record["plan"], "version": record["updated_date"]}
 
 
 # ── Export ────────────────────────────────────────────────────────────────────

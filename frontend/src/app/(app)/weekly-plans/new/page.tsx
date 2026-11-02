@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { CalendarDays, ChevronRight, Sparkles } from 'lucide-react'
@@ -11,9 +11,14 @@ import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { PageHeader } from '@/components/ui/page-header'
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton'
+import { DraftRecoveryBanner, DraftSaveStatus } from '@/components/ui/draft-recovery'
 import { Badge } from '@/components/ui/badge'
 import { toast } from '@/components/ui/toaster'
 import { api } from '@/lib/api'
+import { normalizeError } from '@/lib/error-normalizer'
+import { useAuth } from '@/lib/auth-context'
+import { useFormDraft } from '@/hooks/use-form-draft'
 import {
   CLASS_LEVELS,
   type SchemeOfWork,
@@ -38,6 +43,16 @@ interface SubjectDraft {
   wapef_storyline: string
   wapef_through_lines: string[]
   wapef_gods_story: string
+}
+
+interface WeeklyPlanDraftState {
+  classLevel: string
+  weekNumber: number
+  term: string
+  academicYear: string
+  termStart: string
+  termEnd: string
+  drafts: Record<string, SubjectDraft>
 }
 
 function freshDraft(): SubjectDraft {
@@ -84,10 +99,51 @@ export default function NewWeeklyPlanPage() {
   const [loading, setLoading] = useState(true)
   const [previewing, setPreviewing] = useState(false)
   const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
   const [error, setError] = useState<string | null>(null)
 
-  const isClassTeacher = routing?.planning_model === 'class_teacher'
+  const { user } = useAuth()
   const selectedIds = Object.keys(drafts)
+  const isClassTeacher = routing?.planning_model === 'class_teacher'
+
+  const draftValue = useMemo<WeeklyPlanDraftState>(() => ({
+    classLevel,
+    weekNumber,
+    term,
+    academicYear,
+    termStart,
+    termEnd,
+    drafts,
+  }), [classLevel, weekNumber, term, academicYear, termStart, termEnd, drafts])
+
+  // Do not create a draft until the teacher actually changes something.
+  const initialDraft = useRef<string | null>(null)
+  useEffect(() => {
+    if (!loading && initialDraft.current === null) {
+      initialDraft.current = JSON.stringify(draftValue)
+    }
+  }, [loading, draftValue])
+
+  const formDraft = useFormDraft<WeeklyPlanDraftState>({
+    userId: user?.id || null,
+    workflow: 'weekly-plan-new',
+    value: draftValue,
+    enabled: !loading && initialDraft.current !== null
+      && JSON.stringify(draftValue) !== initialDraft.current,
+  })
+
+  const continueDraft = () => {
+    const recovered = formDraft.accept()
+    if (!recovered) return
+    setClassLevel(recovered.classLevel)
+    setWeekNumber(recovered.weekNumber)
+    setTerm(recovered.term)
+    setAcademicYear(recovered.academicYear)
+    setTermStart(recovered.termStart)
+    setTermEnd(recovered.termEnd)
+    setDrafts(recovered.drafts || {})
+    setPreview(null)
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -102,7 +158,7 @@ export default function NewWeeklyPlanPage() {
         setWapefOptions(options)
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load schemes')
+          setError(normalizeError(err).message)
         }
       } finally {
         if (!cancelled) setLoading(false)
@@ -205,23 +261,40 @@ export default function NewWeeklyPlanPage() {
         setError(response.validation_issues.join(' '))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to preview the week')
+      setError(normalizeError(err).message)
     } finally {
       setPreviewing(false)
     }
   }
 
   const handleSave = async () => {
-    if (!preview || preview.validation_issues.length > 0) return
+    if (!preview || preview.validation_issues.length > 0 || savingRef.current) return
+    savingRef.current = true
     setSaving(true)
     setError(null)
+    toast({
+      title: 'Saving your weekly plan…',
+      variant: 'info',
+      duration: 4000,
+      key: 'weekly-plan-saving',
+    })
     try {
       const created = await api.createWeeklyPlan(buildRequest())
+      formDraft.clear()
       toast({ title: 'Weekly plan saved', description: `${classLevel} · Week ${weekNumber}` })
       router.push(`/weekly-plans/${created.id}`)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save the weekly plan')
+      const normalized = normalizeError(err)
+      setError(normalized.message)
+      savingRef.current = false
       setSaving(false)
+      toast({
+        title: 'Weekly plan was not saved',
+        description: normalized.message,
+        variant: 'error',
+        key: 'weekly-plan-save-error',
+        action: { label: 'Try again', onClick: () => { void handleSave() } },
+      })
     }
   }
 
@@ -242,6 +315,16 @@ export default function NewWeeklyPlanPage() {
           </Button>
         }
       />
+
+      {formDraft.recovered && (
+        <DraftRecoveryBanner
+          updatedAt={formDraft.recovered.updatedAt}
+          label="Unsaved weekly plan for this week"
+          onContinue={continueDraft}
+          onDiscard={formDraft.discard}
+        />
+      )}
+      <DraftSaveStatus status={formDraft.status} savedAt={formDraft.savedAt} />
 
       {!isClassTeacher && routing && (
         <Banner tone="warning" title="Not a class-teacher plan" data-weekly-boundary>
@@ -335,8 +418,14 @@ export default function NewWeeklyPlanPage() {
             </p>
 
             {loading ? (
-              <div className="flex items-center justify-center py-10" data-weekly-loading>
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary" />
+              <div className="py-4" data-weekly-loading>
+                <SkeletonRegion label="Loading schemes for the weekly plan">
+                  <div className="space-y-3">
+                    {Array.from({ length: 4 }).map((_, index) => (
+                      <Skeleton key={index} className="h-16 w-full rounded-xl" />
+                    ))}
+                  </div>
+                </SkeletonRegion>
               </div>
             ) : schemes.length === 0 ? (
               <div className="mt-4 rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground" data-empty>

@@ -10,7 +10,7 @@ import json
 import threading
 from contextlib import contextmanager
 from datetime import date, datetime
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Header
 from fastapi.responses import FileResponse
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -25,7 +25,9 @@ from ..database import get_db, SessionLocal
 from ..auth import get_current_user, get_optional_user, require_teacher_workflow
 from ..database import GenerationJobDB, User
 from ..security import enforce_authenticated_budget
-from ..service import data_service, UnsupportedLessonFieldError
+from ..service import (
+    data_service, StaleLessonVersionError, UnsupportedLessonFieldError,
+)
 from ..entitlements import require_ai_entitlement, consume_ai_generation
 from ..models import (
     TermConfig, LessonPlan, Subject, ClassLevel, TemplateType, AIMode,
@@ -2526,9 +2528,22 @@ async def update_lesson_plan(
     updates: dict,
     user: User = Depends(require_teacher_workflow),
     db=Depends(get_db),
+    if_match: Optional[str] = Header(default=None, alias="If-Match"),
 ):
     try:
-        lp = data_service.update_lesson_plan(db, lesson_id, user.id, updates)
+        # Direct unit calls may pass FastAPI's Header default object; only a
+        # real string header token participates in concurrency control.
+        expected_version = if_match if isinstance(if_match, str) else None
+        lp = data_service.update_lesson_plan(
+            db, lesson_id, user.id, updates, expected_version=expected_version)
+    except StaleLessonVersionError:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "This lesson has changed since you opened it. Refresh the "
+                "latest version before saving."
+            ),
+        )
     except UnsupportedLessonFieldError as exc:
         raise HTTPException(
             status_code=422,
@@ -3762,6 +3777,11 @@ def _serialize_lesson(lp, scheme_db=None) -> dict:
         "generation_method": (
             getattr(lp, "generation_method", "") or "standard"),
         "teacher_edited": lp.teacher_edited,
+        # Canonical optimistic-concurrency token. Clients send this back as
+        # If-Match on save; a mismatch is a 409, never a silent overwrite.
+        "updated_at": (
+            lp.updated_at.isoformat() if getattr(lp, "updated_at", None) else None
+        ),
         "provenance": lesson_provenance(
             lp, scheme_db, ai_provider=getattr(lp, "ai_provider", "") or None),
     }

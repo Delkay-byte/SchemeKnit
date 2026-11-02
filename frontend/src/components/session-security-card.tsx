@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import { ShieldCheck } from 'lucide-react'
+import { normalizeError } from '@/lib/error-normalizer'
 
 /** Server-side revoke-all for lost or shared devices. */
 export function SessionSecurityCard() {
@@ -24,7 +25,7 @@ export function SessionSecurityCard() {
       logout()
       router.push('/login')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not revoke sessions')
+      setError(normalizeError(err).message)
     } finally {
       setLoading(false)
     }

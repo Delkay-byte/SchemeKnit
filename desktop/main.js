@@ -9,12 +9,20 @@ let mainWindow = null;
 let backendProcess = null;
 let frontendServer = null;
 let backendReady = false;
-const BACKEND_PORT = 18234;
-const FRONTEND_PORT = 18235;
+// Ports and the dev frontend URL are overridable for isolated acceptance
+// runs. Defaults preserve the existing production/desktop behaviour.
+const BACKEND_PORT = Number(process.env.SCHEMEKNIT_BACKEND_PORT) || 18234;
+const FRONTEND_PORT = Number(process.env.SCHEMEKNIT_FRONTEND_PORT) || 18235;
 const HEALTH_URL = `http://127.0.0.1:${BACKEND_PORT}/api/health`;
 const FRONTEND_URL = `http://127.0.0.1:${FRONTEND_PORT}`;
+const DEV_FRONTEND_URL =
+  process.env.SCHEMEKNIT_DEV_FRONTEND_URL || 'http://localhost:3000';
 
 const isDev = !app.isPackaged;
+// Isolated user-data directory for tests; unset in normal desktop use.
+if (process.env.SCHEMEKNIT_USER_DATA_DIR) {
+  app.setPath('userData', process.env.SCHEMEKNIT_USER_DATA_DIR);
+}
 const userDataPath = app.getPath('userData');
 const appDataPath = path.join(userDataPath, 'data');
 const uploadsPath = path.join(appDataPath, 'uploads');
@@ -91,7 +99,10 @@ function getBackendDir() {
 
 function getBackendPath() {
   if (isDev) {
-    return path.join(__dirname, '..', 'backend', 'venv', 'Scripts', 'python.exe');
+    // Acceptance runs may point at an interpreter that already has the
+    // backend dependencies; normal development keeps the project venv.
+    return process.env.SCHEMEKNIT_PYTHON
+      || path.join(__dirname, '..', 'backend', 'venv', 'Scripts', 'python.exe');
   }
   return path.join(process.resourcesPath, 'backend', 'schemeknit-backend.exe');
 }
@@ -309,9 +320,10 @@ function startBackend() {
     CORS_ORIGINS: JSON.stringify([
       'http://localhost:3000',
       'http://127.0.0.1:3000',
+      DEV_FRONTEND_URL,
       `http://127.0.0.1:${FRONTEND_PORT}`,
       `http://localhost:${FRONTEND_PORT}`,
-      'http://127.0.0.1:18234',
+      `http://127.0.0.1:${BACKEND_PORT}`,
       'file://',
     ]),
     AI_MODE: 'OFF',
@@ -469,7 +481,7 @@ function createWindow() {
   });
 
   if (isDev) {
-    mainWindow.loadURL('http://localhost:3000');
+    mainWindow.loadURL(DEV_FRONTEND_URL);
   } else {
     diagLog('Loading frontend URL: ' + FRONTEND_URL);
     mainWindow.loadURL(FRONTEND_URL);

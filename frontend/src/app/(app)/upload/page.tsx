@@ -11,6 +11,10 @@ import { Upload, FileText, CheckCircle, AlertTriangle, Play } from 'lucide-react
 import { Select } from '@/components/ui/select'
 import { Field } from '@/components/ui/field'
 import { api } from '@/lib/api'
+import { normalizeError } from '@/lib/error-normalizer'
+import { readDraft, removeDraft, saveDraft } from '@/lib/drafts'
+import { useAuth } from '@/lib/auth-context'
+import { DraftRecoveryBanner } from '@/components/ui/draft-recovery'
 import { WhatsAppButton } from '@/components/whatsapp-button'
 import { UploadPrivacyNotice } from '@/components/upload-privacy-notice'
 import { formatFileSize } from '@/lib/utils-display'
@@ -21,7 +25,9 @@ const FLOW_STEPS = ['Upload', 'Detect', 'Review']
 
 export default function UploadPage() {
   const router = useRouter()
+  const { user } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [uploadedDraft, setUploadedDraft] = useState<{ schemeId: string; filename: string; updatedAt: number } | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
@@ -53,6 +59,20 @@ export default function UploadPage() {
   } | null>(null)
 
   const validExtensions = ['.docx', '.pdf']
+
+  // Recover the id of a scheme that finished uploading but had not been
+  // reviewed yet. The original file is never persisted; the server resource is
+  // the authoritative resume point.
+  useEffect(() => {
+    if (!user?.id) return
+    const stored = readDraft<{ schemeId: string; filename: string }>({
+      userId: user.id,
+      workflow: 'upload-complete',
+    })
+    if (stored?.data?.schemeId) {
+      setUploadedDraft({ ...stored.data, updatedAt: stored.updatedAt })
+    }
+  }, [user?.id])
 
   useEffect(() => {
     let cancelled = false
@@ -117,9 +137,15 @@ export default function UploadPage() {
       setUploadProgress(100)
       setResult(response)
       setSuccess(true)
+      if (user?.id && response?.id) {
+        saveDraft(
+          { userId: user.id, workflow: 'upload-complete' },
+          { schemeId: response.id, filename: file.name },
+        )
+      }
       api.getStorageUsage().then(setStorage).catch(() => {})
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed')
+      setError(normalizeError(err).message)
       setUploadProgress(0)
     } finally {
       setUploading(false)
@@ -229,7 +255,7 @@ export default function UploadPage() {
       window.sessionStorage.setItem('schemeknit.autopilot_intent', '1')
       router.push(`/generate/${result.scheme_id}`)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not confirm that subject')
+      setError(normalizeError(err).message)
     } finally {
       setConfirmingSubject(null)
     }
@@ -253,6 +279,19 @@ export default function UploadPage() {
     <div className="min-h-screen">
       <main className="container mx-auto px-4 py-8">
         <div className="mx-auto max-w-2xl">
+          {uploadedDraft && !success && (
+            <div className="mb-4">
+              <DraftRecoveryBanner
+                updatedAt={uploadedDraft.updatedAt}
+                label={`${uploadedDraft.filename} was uploaded but not reviewed. Your file is safe on the server.`}
+                onContinue={() => router.push(`/review/${uploadedDraft.schemeId}`)}
+                onDiscard={() => {
+                  if (user?.id) removeDraft({ userId: user.id, workflow: 'upload-complete' })
+                  setUploadedDraft(null)
+                }}
+              />
+            </div>
+          )}
           <PageHeader
             className="mb-4"
             eyebrow="Upload"

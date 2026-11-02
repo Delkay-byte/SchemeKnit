@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { api } from '@/lib/api'
 import { CheckCircle2, Copy, Shield } from 'lucide-react'
+import { normalizeError } from '@/lib/error-normalizer'
 
 type MfaSetup = {
   secret: string
@@ -44,7 +45,7 @@ export function MfaEnrollPanel({
       setSetup(res)
       setCode('')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not start MFA setup')
+      setError(normalizeError(err).message)
     } finally {
       setBusy(false)
     }
@@ -63,7 +64,7 @@ export function MfaEnrollPanel({
       setSetup(null)
       setCode('')
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Invalid verification code'
+      const message = normalizeError(err).message
       // An expired pending secret cannot be verified. Drop the stale QR so
       // the retry control appears and a fresh enrollment can start.
       if (/expired/i.test(message)) {

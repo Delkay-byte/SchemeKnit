@@ -10,6 +10,7 @@ import { PasswordInput, PasswordMatchIndicator } from '@/components/password-inp
 import { AuthShell } from '@/components/auth/auth-shell'
 import { AuthField, AuthError } from '@/components/auth/auth-field'
 import { validatePassword, validateEmail, PASSWORD_POLICY } from '@/lib/password-policy'
+import { normalizeError } from '@/lib/error-normalizer'
 
 type ActivationStep = 'input' | 'success' | 'create-admin'
 
@@ -41,7 +42,7 @@ export default function ActivatePage() {
       setActivationResult(result)
       setStep('success')
     } catch (err: any) {
-      const msg = err.message || 'Activation failed'
+      const msg = normalizeError(err).message
       if (msg.includes('Invalid')) setError('Invalid activation code. Please check and try again.')
       else if (msg.includes('revoked')) setError('This activation code has been revoked. Contact SchemeKnit support.')
       else if (msg.includes('expired')) setError('This activation code has expired. Contact SchemeKnit to renew.')
@@ -81,7 +82,7 @@ export default function ActivatePage() {
       })
       router.push('/login')
     } catch (err: any) {
-      setAdminError(err.message || 'Failed to create administrator')
+      setAdminError(normalizeError(err).message)
     } finally {
       setAdminLoading(false)
     }

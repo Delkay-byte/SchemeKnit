@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { SurfaceCard } from '@/components/ui/surface-card'
 import { Input } from '@/components/ui/input'
 import { Banner } from '@/components/ui/banner'
 import { StatusPill } from '@/components/ui/badge'
+import { ListPageSkeleton } from '@/components/ui/skeleton'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import {
   Dialog,
@@ -19,7 +20,10 @@ import { UserPlus, Pencil, Key, KeyRound, UserCheck, UserX, X, Copy, Check } fro
 import { api } from '@/lib/api'
 import { PageHeader } from '@/components/ui/page-header'
 import { PasswordInput } from '@/components/password-input'
+import { toast } from '@/components/ui/toaster'
 import { validatePassword, validateEmail, PASSWORD_POLICY } from '@/lib/password-policy'
+import { normalizeError } from '@/lib/error-normalizer'
+import { canApplyOptimistically } from '@/lib/optimistic'
 
 interface Teacher {
   id: string
@@ -35,6 +39,7 @@ export default function TeachersPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [actionId, setActionId] = useState<string | null>(null)
+  const togglingRef = useRef<string | null>(null)
 
   const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState({ email: '', password: '', full_name: '' })
@@ -66,7 +71,7 @@ export default function TeachersPage() {
       setTeachers((usersRes.users || []).filter((u: Teacher) => u.role === 'teacher'))
       setSeats(school.seats || null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load teachers')
+      setError(normalizeError(err).message)
     } finally {
       setLoading(false)
     }
@@ -91,22 +96,57 @@ export default function TeachersPage() {
       setForm({ email: '', password: '', full_name: '' })
       load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Create teacher failed')
+      setError(normalizeError(err).message)
     } finally {
       setActionId(null)
     }
   }
 
   const runToggle = async (t: Teacher) => {
+    if (togglingRef.current === t.id) return
+    togglingRef.current = t.id
     const verb = t.is_active ? 'deactivate' : 'reactivate'
+    const nextActive = !t.is_active
+    // Ordinary account status is reversible and may be optimistic. Licence,
+    // payment, credit and MFA operations never use this path.
+    const optimistic = canApplyOptimistically('teacher-account-status')
+    setActionId(t.id)
+    setError(null)
+    if (optimistic) {
+      setTeachers((current) => current.map((teacher) => (
+        teacher.id === t.id ? { ...teacher, is_active: nextActive } : teacher
+      )))
+    }
+    toast({
+      title: `${verb === 'deactivate' ? 'Deactivating' : 'Reactivating'} teacher…`,
+      description: t.full_name,
+      variant: 'info',
+      duration: 3000,
+      key: `teacher-toggle:${t.id}`,
+    })
     try {
-      setActionId(t.id)
-      setError(null)
       await api.toggleUserActive(t.id)
+      toast({
+        title: nextActive ? 'Teacher reactivated.' : 'Teacher deactivated.',
+        variant: 'success',
+        key: `teacher-toggle-done:${t.id}`,
+      })
       load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : `${verb} failed`)
+      setTeachers((current) => current.map((teacher) => (
+        teacher.id === t.id ? { ...teacher, is_active: t.is_active } : teacher
+      )))
+      const normalized = normalizeError(err)
+      setError(normalized.message)
+      toast({
+        title: `Could not ${verb} this teacher`,
+        description: normalized.message,
+        variant: 'error',
+        key: `teacher-toggle-error:${t.id}`,
+        action: { label: 'Try again', onClick: () => { void runToggle(t) } },
+      })
     } finally {
+      togglingRef.current = null
       setActionId(null)
     }
   }
@@ -125,7 +165,7 @@ export default function TeachersPage() {
       setEditing(null)
       load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Update failed')
+      setError(normalizeError(err).message)
     } finally {
       setActionId(null)
     }
@@ -145,7 +185,7 @@ export default function TeachersPage() {
       setResetId(null)
       setNewPassword('')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Password reset failed')
+      setError(normalizeError(err).message)
     } finally {
       setActionId(null)
     }
@@ -162,7 +202,7 @@ export default function TeachersPage() {
         minutes: res.expires_in_minutes,
       })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to initiate reset')
+      setError(normalizeError(err).message)
     } finally {
       setActionId(null)
     }
@@ -187,11 +227,7 @@ export default function TeachersPage() {
   const seatsFull = seats != null && seats.used >= seats.limit
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    )
+    return <ListPageSkeleton label="Loading teachers" rows={5} columns={4} />
   }
 
   return (

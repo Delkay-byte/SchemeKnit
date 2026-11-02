@@ -13,6 +13,7 @@ import { AuthField, AuthError } from '@/components/auth/auth-field'
 import { TurnstileWidget, TURNSTILE_SITE_KEY } from '@/components/turnstile-widget'
 import { validateEmail, validatePassword, PASSWORD_POLICY } from '@/lib/password-policy'
 import { authHref, currentNextPath } from '@/lib/purchase-return'
+import { normalizeError } from '@/lib/error-normalizer'
 
 export default function IndividualSignupPage() {
   const router = useRouter()
@@ -39,6 +40,16 @@ export default function IndividualSignupPage() {
   const [inviteRequired, setInviteRequired] = useState(
     process.env.NEXT_PUBLIC_PILOT_INVITE_REQUIRED === 'true',
   )
+  const [isDesktopShell, setIsDesktopShell] = useState(false)
+
+  useEffect(() => {
+    // The packaged desktop app serves the UI from 127.0.0.1, which is not an
+    // approved Turnstile hostname. Tell the teacher where to finish sign-up
+    // instead of letting the challenge fail silently.
+    setIsDesktopShell(
+      typeof window !== 'undefined' && Boolean((window as unknown as { electronAPI?: unknown }).electronAPI),
+    )
+  }, [])
 
   const loadPolicy = useCallback(async () => {
     setPolicyError(false)
@@ -129,7 +140,7 @@ export default function IndividualSignupPage() {
       }
       router.push(currentNextPath() || '/dashboard')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Registration failed')
+      setError(normalizeError(err).message)
       // A token is single-use: a failed attempt must request a fresh one.
       setTurnstileToken('')
       setTurnstileReset((value) => value + 1)
@@ -173,15 +184,26 @@ export default function IndividualSignupPage() {
       ) : (
       <>
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        {isDesktopShell && (
+          <p
+            role="note"
+            data-desktop-signup-note
+            className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+          >
+            Creating an account in the desktop app? If the verification
+            challenge does not appear, finish sign-up in your browser at
+            schemeknit-frontend.onrender.com, then sign in here.
+          </p>
+        )}
         <AuthField id="signup-name" label="Full name">
           <Input
             id="signup-name"
             type="text"
+            autoComplete="name"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
             required
             placeholder="Ama Mensah"
-            autoComplete="name"
             autoFocus
             aria-invalid={error ? true : undefined}
           />
@@ -191,11 +213,11 @@ export default function IndividualSignupPage() {
           <Input
             id="signup-email"
             type="email"
+            autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
             placeholder="name@gmail.com"
-            autoComplete="email"
             aria-invalid={error ? true : undefined}
           />
         </AuthField>

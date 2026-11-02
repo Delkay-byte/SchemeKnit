@@ -6,8 +6,10 @@ import { SurfaceCard } from '@/components/ui/surface-card'
 import { StatusPill } from '@/components/ui/badge'
 import { Banner } from '@/components/ui/banner'
 import { PageHeader } from '@/components/ui/page-header'
+import { FormPageSkeleton } from '@/components/ui/skeleton'
 import { AlertTriangle, CheckCircle } from 'lucide-react'
 import { api } from '@/lib/api'
+import { normalizeError } from '@/lib/error-normalizer'
 
 export default function SchoolLicensePage() {
   const [data, setData] = useState<any>(null)
@@ -24,18 +26,14 @@ export default function SchoolLicensePage() {
       setError(null)
       setData(await api.getMySchool())
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load license')
+      setError(normalizeError(err).message)
     } finally {
       setLoading(false)
     }
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    )
+    return <FormPageSkeleton label="Loading licence details" />
   }
 
   if (error) {

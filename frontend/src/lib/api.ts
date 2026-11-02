@@ -26,7 +26,8 @@ import type {
  */
 export function getApiBaseUrl(): string {
   if (typeof window !== 'undefined' && (window as any).electronAPI) {
-    return 'http://127.0.0.1:18234'
+    // The preload reports the port this desktop launch actually started.
+    return (window as any).electronAPI.backendUrl || 'http://127.0.0.1:18234'
   }
   return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 }
@@ -94,7 +95,12 @@ class ApiService {
       const error = await response.json().catch(() => ({
         detail: 'An error occurred'
       }))
-      throw errorFromDetail(error?.detail)
+      throw errorFromDetail(error?.detail, {
+        status: response.status,
+        requestId: response.headers.get('x-request-id'),
+        retryAfter: parseRetryAfter(response.headers.get('retry-after')),
+        details: error,
+      })
     }
 
     return response.json()
@@ -382,7 +388,12 @@ class ApiService {
       const error = await response.json().catch(() => ({
         detail: 'Upload failed'
       }))
-      throw errorFromDetail(error?.detail)
+      throw errorFromDetail(error?.detail, {
+        status: response.status,
+        requestId: response.headers.get('x-request-id'),
+        retryAfter: parseRetryAfter(response.headers.get('retry-after')),
+        details: error,
+      })
     }
 
     return response.json()
@@ -623,9 +634,10 @@ class ApiService {
     })
   }
 
-  async updateLesson(lessonId: string, updates: any): Promise<any> {
+  async updateLesson(lessonId: string, updates: any, expectedVersion?: string): Promise<any> {
     return this.request(`/api/generation/lessons/${lessonId}`, {
       method: 'PUT',
+      headers: expectedVersion ? { 'If-Match': expectedVersion } : undefined,
       body: JSON.stringify(updates),
     })
   }
@@ -832,7 +844,12 @@ class ApiService {
       const error = await response.json().catch(() => ({
         detail: 'Sample analysis failed'
       }))
-      throw new Error(error.detail || 'Sample analysis failed')
+      throw errorFromDetail(error?.detail, {
+        status: response.status,
+        requestId: response.headers.get('x-request-id'),
+        retryAfter: parseRetryAfter(response.headers.get('retry-after')),
+        details: error,
+      })
     }
     return response.json()
   }
@@ -1280,14 +1297,19 @@ class ApiService {
   }
 
   /** Fetch one weekly plan (reload after save, with full day-plan content). */
-  async getWeeklyPlan(planId: string): Promise<{ plan: WeeklyClassPlan }> {
+  async getWeeklyPlan(planId: string): Promise<{ plan: WeeklyClassPlan; version?: string }> {
     return this.request(`/api/weekly-plans/${planId}`)
   }
 
   /** Edit a saved weekly plan (subject + day granularity, isolation enforced). */
-  async updateWeeklyPlan(planId: string, updates: Record<string, unknown>): Promise<{ plan: WeeklyClassPlan }> {
+  async updateWeeklyPlan(
+    planId: string,
+    updates: Record<string, unknown>,
+    expectedVersion?: string,
+  ): Promise<{ plan: WeeklyClassPlan; version?: string }> {
     return this.request(`/api/weekly-plans/${planId}`, {
       method: 'PUT',
+      headers: expectedVersion ? { 'If-Match': expectedVersion } : undefined,
       body: JSON.stringify(updates),
     })
   }
@@ -1351,6 +1373,33 @@ class ApiService {
 export interface ApiError extends Error {
   code?: string
   diagnostic?: string
+  /** HTTP status, or 0 for a transport/network failure. */
+  status?: number
+  /** Server request id, when the response exposed one. */
+  requestId?: string
+  /** Seconds to wait from a Retry-After header. */
+  retryAfter?: number
+  /** Safe, parsed response body for classification. Never rendered raw. */
+  details?: unknown
+  retryable?: boolean
+}
+
+export interface ApiErrorMetadata {
+  status?: number
+  requestId?: string | null
+  retryAfter?: number | null
+  details?: unknown
+}
+
+function parseRetryAfter(value: string | null): number | undefined {
+  if (!value) return undefined
+  const seconds = Number(value)
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds
+  const date = Date.parse(value)
+  if (Number.isFinite(date)) {
+    return Math.max(0, Math.ceil((date - Date.now()) / 1000))
+  }
+  return undefined
 }
 
 /**
@@ -1435,18 +1484,41 @@ export function sanitizeTermConfig(
  * return ``{ code, message, diagnostic }`` so the teacher sees the calm,
  * user-safe message while the raw provider error is preserved separately.
  */
-export function errorFromDetail(detail: unknown): ApiError {
+export function errorFromDetail(
+  detail: unknown,
+  metadata: ApiErrorMetadata = {},
+): ApiError {
+  const status = metadata.status ?? 0
+  const retryable =
+    status === 0 || status === 408 || status === 425 || status === 429 || status >= 500
+
+  let message = 'Request failed'
+  let code: string | undefined
+  let diagnostic: string | undefined
+
   if (detail && typeof detail === 'object') {
-    const d = detail as { code?: string; message?: string; diagnostic?: string }
-    const err = new Error(d.message || 'Request failed') as ApiError
-    err.code = d.code
-    err.diagnostic = d.diagnostic
-    return err
+    const d = detail as {
+      code?: string
+      message?: string
+      diagnostic?: string
+      detail?: string
+    }
+    message = d.message || d.detail || 'Request failed'
+    code = d.code
+    diagnostic = d.diagnostic
+  } else if (typeof detail === 'string' && detail) {
+    message = detail
   }
-  if (typeof detail === 'string' && detail) {
-    return new Error(detail)
-  }
-  return new Error('Request failed')
+
+  const err = new Error(message) as ApiError
+  err.status = status
+  err.code = code
+  err.diagnostic = diagnostic
+  err.details = metadata.details
+  err.requestId = metadata.requestId || undefined
+  err.retryAfter = metadata.retryAfter ?? undefined
+  err.retryable = retryable
+  return err
 }
 
 /**

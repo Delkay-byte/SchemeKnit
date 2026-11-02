@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
+import { ListPageSkeleton } from '@/components/ui/skeleton'
 import { SurfaceCard } from '@/components/ui/surface-card'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
@@ -21,6 +22,7 @@ import { api } from '@/lib/api'
 import { PageHeader } from '@/components/ui/page-header'
 import { Template } from '@/types'
 import { formatEducationalLevel, formatTemplateFamily } from '@/lib/utils-display'
+import { normalizeError } from '@/lib/error-normalizer'
 
 const TEACHFLOW_FIELD_OPTIONS: { value: string; label: string }[] = [
   { value: 'school_name', label: 'School Name' },
@@ -106,7 +108,7 @@ export default function TemplatesPage() {
       const response = await api.listTemplates()
       setTemplates(response.templates || [])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load templates')
+      setError(normalizeError(err).message)
     } finally {
       setLoading(false)
     }
@@ -158,7 +160,7 @@ export default function TemplatesPage() {
       }
       setWizardStep('mapping')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sample analysis failed')
+      setError(normalizeError(err).message)
     } finally {
       setAnalyzing(false)
     }
@@ -202,7 +204,7 @@ export default function TemplatesPage() {
       setWizardOpen(false)
       loadTemplates()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save template')
+      setError(normalizeError(err).message)
     } finally {
       setSaving(false)
     }
@@ -218,7 +220,7 @@ export default function TemplatesPage() {
       setPreviewTpl(detail)
       setPreviewData(preview)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load preview')
+      setError(normalizeError(err).message)
     }
   }
 
@@ -227,7 +229,7 @@ export default function TemplatesPage() {
       await api.archiveCustomTemplate(id)
       loadTemplates()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to archive template')
+      setError(normalizeError(err).message)
     }
   }
 
@@ -240,7 +242,7 @@ export default function TemplatesPage() {
       setVersionDialog(null)
       loadTemplates()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update version')
+      setError(normalizeError(err).message)
     }
   }
 
@@ -256,11 +258,10 @@ export default function TemplatesPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Loading templates...</p>
-        </div>
+      <div className="min-h-screen bg-background">
+        <main className="container mx-auto px-4 py-8">
+          <ListPageSkeleton label="Loading templates" rows={5} columns={4} />
+        </main>
       </div>
     )
   }

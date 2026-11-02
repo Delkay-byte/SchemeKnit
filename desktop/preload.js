@@ -1,6 +1,10 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+const backendPort = process.env.SCHEMEKNIT_BACKEND_PORT || '18234';
+
 contextBridge.exposeInMainWorld('electronAPI', {
+  // The renderer must reach the backend this launch actually started.
+  backendUrl: `http://127.0.0.1:${backendPort}`,
   getAppInfo: () => ipcRenderer.invoke('get-app-info'),
   getBackendStatus: () => ipcRenderer.invoke('get-backend-status'),
   restartBackend: () => ipcRenderer.invoke('restart-backend'),

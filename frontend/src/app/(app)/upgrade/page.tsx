@@ -12,6 +12,7 @@ import { PageHeader } from '@/components/ui/page-header'
 import { api } from '@/lib/api'
 import { upgradePath } from '@/lib/purchase-return'
 import type { CataloguePlan, CreditStatus } from '@/types'
+import { normalizeError } from '@/lib/error-normalizer'
 
 type Charge = {
   reference: string
@@ -131,7 +132,7 @@ export default function UpgradePage() {
         setBusy(false)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Payment could not start.')
+      setError(normalizeError(err).message)
       setBusy(false)
     }
   }

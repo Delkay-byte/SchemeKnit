@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -9,8 +9,15 @@ import { Input } from '@/components/ui/input'
 import { Field, TextArea } from '@/components/ui/field'
 import { Select } from '@/components/ui/select'
 import { Banner } from '@/components/ui/banner'
+import { DetailPageSkeleton } from '@/components/ui/skeleton'
+import { DraftConflictBanner, DraftRecoveryBanner, DraftSaveStatus } from '@/components/ui/draft-recovery'
+import { toast } from '@/components/ui/toaster'
 import { ArrowLeft, CheckCircle, AlertCircle, Save, Loader2, Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
 import { api } from '@/lib/api'
+import { useAuth } from '@/lib/auth-context'
+import { useFormDraft } from '@/hooks/use-form-draft'
+import { normalizeError } from '@/lib/error-normalizer'
+import { isStaleDraftBaseline } from '@/lib/drafts'
 import { aiFailure } from '@/lib/ai-feedback'
 import { resolveRouteId } from '@/lib/route-params'
 import { PageHeader } from '@/components/ui/page-header'
@@ -101,6 +108,8 @@ interface LessonData {
   home_assignment?: string
   status: string
   teacher_edited: boolean
+  /** Canonical server revision used for optimistic concurrency (If-Match). */
+  updated_at?: string | null
   /** "Why this lesson?" — source/alignment record from the curriculum spine. */
   provenance?: LessonProvenance
 }
@@ -110,8 +119,11 @@ export default function LessonDetailPage() {
   const lessonId = resolveRouteId(params.id, 'lessons')
 
   const [lesson, setLesson] = useState<LessonData | null>(null)
+  const [serverVersion, setServerVersion] = useState<string | null>(null)
+  const [serverConflict, setServerConflict] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -168,6 +180,84 @@ export default function LessonDetailPage() {
     active: boolean; provider: string | null; mode: string; reason: string | null;
   } | null>(null)
 
+  const { user } = useAuth()
+
+  // Draft contains teacher-editable content only. Derived curriculum fields
+  // (indicators, strand, rubric, provenance) are never persisted as drafts.
+  const draftValue = useMemo(() => ({
+    topic,
+    introduction,
+    starter,
+    assessment,
+    conclusion,
+    homework,
+    classAssignment,
+    homeAssignment,
+    keywords,
+    otherTlrs,
+    mainActivities,
+    coreCompetencies,
+    structuredRefs,
+  }), [
+    topic, introduction, starter, assessment, conclusion, homework,
+    classAssignment, homeAssignment, keywords, otherTlrs, mainActivities,
+    coreCompetencies, structuredRefs,
+  ])
+
+  const serverSnapshot = useMemo(() => (lesson ? {
+    topic: lesson.lesson_topic || '',
+    introduction: lesson.introduction || '',
+    starter: lesson.starter_activity || '',
+    assessment: lesson.assessment || '',
+    conclusion: lesson.conclusion || '',
+    homework: lesson.homework || '',
+    classAssignment: lesson.class_assignment || '',
+    homeAssignment: lesson.home_assignment || '',
+    keywords: lesson.keywords || [],
+    otherTlrs: lesson.other_tlrs || [],
+    mainActivities: normalizeActivities(lesson.main_activities),
+    coreCompetencies: lesson.core_competencies || [],
+    structuredRefs: lesson.structured_references || [],
+  } : null), [lesson])
+
+  const lessonDirty = Boolean(
+    serverSnapshot && JSON.stringify(draftValue) !== JSON.stringify(serverSnapshot),
+  )
+
+  const lessonDraft = useFormDraft<typeof draftValue>({
+    userId: user?.id || null,
+    workflow: 'lesson-edit',
+    resourceId: lessonId,
+    value: draftValue,
+    enabled: !loading && lessonDirty,
+    baseline: serverVersion,
+  })
+
+  const draftBaselineChanged = Boolean(
+    lessonDraft.recovered
+      && isStaleDraftBaseline(lessonDraft.recovered.baseline, serverVersion),
+  )
+
+  const continueLessonDraft = () => {
+    const recovered = lessonDraft.accept()
+    if (!recovered) return
+    if (draftBaselineChanged) setServerConflict(true)
+    setTopic(recovered.topic)
+    setIntroduction(recovered.introduction)
+    setStarter(recovered.starter)
+    setAssessment(recovered.assessment)
+    setConclusion(recovered.conclusion)
+    setHomework(recovered.homework)
+    setClassAssignment(recovered.classAssignment)
+    setHomeAssignment(recovered.homeAssignment)
+    setKeywords(recovered.keywords || [])
+    setOtherTlrs(recovered.otherTlrs || [])
+    setMainActivities(recovered.mainActivities || [])
+    setCoreCompetencies(recovered.coreCompetencies || [])
+    setStructuredRefs(recovered.structuredRefs || [])
+    setSaved(false)
+  }
+
   useEffect(() => {
     load()
     let mode = 'BASIC'
@@ -183,6 +273,8 @@ export default function LessonDetailPage() {
       setLoading(true)
       const data = await api.getLesson(lessonId)
       setLesson(data)
+      setServerVersion(data.updated_at || null)
+      setServerConflict(false)
       setTopic(data.lesson_topic || '')
       setIntroduction(data.introduction || '')
       setStarter(data.starter_activity || '')
@@ -208,7 +300,7 @@ export default function LessonDetailPage() {
         }))
       )
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load lesson')
+      setError(normalizeError(err).message)
     } finally {
       setLoading(false)
     }
@@ -313,10 +405,21 @@ export default function LessonDetailPage() {
     .map((activity, index) => ({ activity, index }))
     .filter(({ activity }) => !isBoundaryPhase(activity.phase))
 
-  const handleSave = async () => {
+  const handleSave = async (forceOverwrite = false) => {
+    // A ref, not the render-time `saving` value, so a toast Retry created by
+    // the failed render can still run after the request settles.
+    if (savingRef.current) return
+    savingRef.current = true
     try {
       setSaving(true)
       setSaved(false)
+      toast({
+        title: 'Saving lesson changes…',
+        description: 'Your edits stay visible while the save completes.',
+        variant: 'info',
+        duration: 3000,
+        key: `lesson-saving:${lessonId}`,
+      })
       // PART L/M: only non-empty references are persisted — empty slots on
       // screen never become stored empty objects.
       const savedRefs = structuredRefs.filter(r => (r.title || '').trim())
@@ -329,6 +432,21 @@ export default function LessonDetailPage() {
           resources: a.resources || [],
         }))
         .filter(a => a.description)
+      // Fresh check immediately before the write: another browser may have
+      // saved after this editor opened (or after a draft was recovered).
+      const latest = await api.getLesson(lessonId)
+      const latestVersion = latest.updated_at || null
+      if (!forceOverwrite && latestVersion !== serverVersion) {
+        setServerConflict(true)
+        setError(
+          'This lesson changed on the server since you opened it. ' +
+          'Load the latest version, or confirm an overwrite of the latest version.',
+        )
+        return
+      }
+      // An overwrite is always submitted against the version just read, so a
+      // second change between this check and the write is still rejected.
+      const writeVersion = forceOverwrite ? latestVersion : serverVersion
       const updated = await api.updateLesson(lessonId, {
         lesson_topic: topic,
         introduction,
@@ -344,24 +462,46 @@ export default function LessonDetailPage() {
         core_competencies: coreCompetencies,
         structured_references: savedRefs,
         references: savedRefs.map(r => r.title || r.type).filter(Boolean),
-      })
+      }, writeVersion || undefined)
       setLesson(updated)
+      setServerVersion(updated.updated_at || null)
+      setServerConflict(false)
+      lessonDraft.clear()
       setSaved(true)
+      toast({
+        title: 'Lesson saved.',
+        variant: 'success',
+        key: `lesson-saved:${lessonId}`,
+      })
       setTimeout(() => setSaved(false), 3000)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save lesson')
+      const normalized = normalizeError(err)
+      setError(normalized.message)
+      if (normalized.category === 'conflict') {
+        setServerConflict(true)
+        return
+      }
+      savingRef.current = false
+      setSaving(false)
+      toast({
+        title: 'Lesson was not saved',
+        description: normalized.message,
+        variant: 'error',
+        key: `lesson-save-error:${lessonId}`,
+        action: { label: 'Try again', onClick: () => { void handleSave() } },
+      })
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Loading lesson...</p>
-        </div>
+      <div className="min-h-screen bg-background">
+        <main className="container mx-auto px-4 py-8">
+          <DetailPageSkeleton label="Loading lesson" />
+        </main>
       </div>
     )
   }
@@ -417,6 +557,51 @@ export default function LessonDetailPage() {
     <div className="min-h-screen">
       <main className="container mx-auto max-w-4xl px-4 py-8">
         {/* One h1: which lesson this is, at a glance. */}
+        {lessonDraft.recovered && (
+          <div className="mb-4">
+            {draftBaselineChanged ? (
+              <DraftConflictBanner
+                updatedAt={lessonDraft.recovered.updatedAt}
+                onLoadLatest={() => {
+                  lessonDraft.discard()
+                  void load()
+                }}
+                onKeepDraft={continueLessonDraft}
+                onReview={() => setError(
+                  'Your draft was based on an older lesson version. Keeping it ' +
+                  'will replace the latest saved lesson only after you press Save.',
+                )}
+              />
+            ) : (
+              <DraftRecoveryBanner
+                updatedAt={lessonDraft.recovered.updatedAt}
+                label="Unsaved edits to this lesson"
+                onContinue={continueLessonDraft}
+                onDiscard={lessonDraft.discard}
+              />
+            )}
+          </div>
+        )}
+        {serverConflict && !lessonDraft.recovered && (
+          <Banner
+            tone="danger"
+            className="mb-4"
+            title="This lesson changed on the server"
+            action={
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" onClick={() => { void load() }}>
+                  Load latest version
+                </Button>
+                <Button size="sm" onClick={() => { void handleSave(true) }}>
+                  Overwrite latest with my draft
+                </Button>
+              </div>
+            }
+          >
+            Your edits are still here. Load the latest version, or explicitly
+            overwrite it. A second server update will still be rejected.
+          </Banner>
+        )}
         <PageHeader
           className="mb-6"
           eyebrow="Lesson"
@@ -1013,7 +1198,7 @@ export default function LessonDetailPage() {
 
           {/* Save */}
           <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4">
-            <Button onClick={handleSave} disabled={saving}>
+            <Button onClick={() => { void handleSave() }} disabled={saving}>
               {saving ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1032,6 +1217,7 @@ export default function LessonDetailPage() {
                 Saved
               </span>
             )}
+            <DraftSaveStatus status={lessonDraft.status} savedAt={lessonDraft.savedAt} />
           </div>
           {error && <Banner tone="danger" className="mt-4">{error}</Banner>}
         </SurfaceCard>
