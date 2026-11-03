@@ -38,7 +38,7 @@ async function uploadScheme(name) {
   })
   if (!response.ok) throw new Error(`upload failed ${response.status}: ${await response.text()}`)
   const data = await response.json()
-  return { ...data, id: data.id || data.scheme_id }
+  return { ...data, id: data.id || data.scheme_id, uploaded_name: filename }
 }
 
 async function deleteScheme(id) {
@@ -74,7 +74,7 @@ async function main() {
   await page.goto(`${WEB}/dashboard`, { waitUntil: 'domcontentloaded' })
   const skeletonVisible = await page.getByText('Loading your dashboard').waitFor({ state: 'attached', timeout: 5000 }).then(() => true).catch(() => false)
   await page.getByText(/Welcome back/i).waitFor({ timeout: 20000 })
-  const schemeVisible = await page.locator('tr', { hasText: `ux-e2e-${suffix}.pdf` }).first().isVisible().catch(() => false)
+  const schemeVisible = await page.locator('tr', { hasText: scheme.uploaded_name }).first().isVisible().catch(() => false)
   record('dashboard skeleton appears before content', skeletonVisible)
   record('dashboard replaces skeleton with real content', schemeVisible)
   await page.unroute('**/api/documents/')
@@ -86,7 +86,7 @@ async function main() {
     }
     await route.continue()
   })
-  const row = page.locator('tr', { hasText: `ux-e2e-${suffix}.pdf` })
+  const row = page.locator('tr', { hasText: scheme.uploaded_name })
   await row.getByRole('button', { name: 'Delete scheme' }).click()
   await page.getByRole('button', { name: 'Delete', exact: true }).click()
   const pendingToast = await page.getByText('Removing scheme…').isVisible().catch(() => false)
@@ -100,7 +100,7 @@ async function main() {
   // 3. Failed deletion restores the row and offers retry.
   const failing = await uploadScheme(`ux-e2e-fail-${suffix}.pdf`)
   await page.reload({ waitUntil: 'domcontentloaded' })
-  await page.locator('tr', { hasText: `ux-e2e-fail-${suffix}.pdf` }).first().waitFor({ timeout: 20000 })
+  await page.locator('tr', { hasText: failing.uploaded_name }).first().waitFor({ timeout: 20000 })
   await page.route(`**/api/documents/${failing.id}`, async (route) => {
     if (route.request().method() === 'DELETE') {
       await route.fulfill({
@@ -112,11 +112,11 @@ async function main() {
     }
     await route.continue()
   })
-  const failingRow = page.locator('tr', { hasText: `ux-e2e-fail-${suffix}.pdf` })
+  const failingRow = page.locator('tr', { hasText: failing.uploaded_name })
   await failingRow.getByRole('button', { name: 'Delete scheme' }).click()
   await page.getByRole('button', { name: 'Delete', exact: true }).click()
   await page.getByText('Scheme could not be deleted').waitFor({ timeout: 15000 })
-  const restored = await page.locator('tr', { hasText: `ux-e2e-fail-${suffix}.pdf` }).first().isVisible().catch(() => false)
+  const restored = await page.locator('tr', { hasText: failing.uploaded_name }).first().isVisible().catch(() => false)
   const retryVisible = await page.getByRole('button', { name: 'Try again' }).isVisible().catch(() => false)
   record('failed deletion restores the item', restored)
   record('failed deletion offers retry', retryVisible)
@@ -128,9 +128,21 @@ async function main() {
   await page.goto(`${WEB}/weekly-plans/new`, { waitUntil: 'domcontentloaded' })
   const weekInput = page.getByLabel('Week number')
   await weekInput.waitFor({ timeout: 20000 })
-  await page.waitForTimeout(800)
+  // Wait until the page has finished its initial load. Filling before that
+  // would make the loaded value the draft baseline and no draft would exist.
+  await page.locator('[data-weekly-loading]').waitFor(
+    { state: 'detached', timeout: 30000 }).catch(() => {})
   await weekInput.fill('7')
-  await page.waitForTimeout(1400)
+  // Wait for the debounced draft to actually persist rather than guessing:
+  // a slow staging backend must not turn a real save into a flaky failure.
+  await page.waitForFunction(
+    () => Object.keys(localStorage).some(
+      (key) => key.startsWith('schemeknit:draft')
+        && (localStorage.getItem(key) || '').includes('"weekNumber"'),
+    ),
+    null,
+    { timeout: 20000 },
+  )
   await page.reload({ waitUntil: 'domcontentloaded' })
   const recoveryVisible = await page.getByText(/We found your unsaved work/)
     .first()
