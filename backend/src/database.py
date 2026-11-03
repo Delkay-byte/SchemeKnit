@@ -13,6 +13,7 @@ from sqlalchemy import (
     create_engine, Column, String, Integer, Float, Boolean, DateTime, Date,
     Text, ForeignKey, JSON, Enum as SAEnum, Index, UniqueConstraint, BigInteger,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 
@@ -1506,3 +1507,44 @@ class RateLimitCounterDB(Base):
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+
+
+class WeeklyPlanDB(Base):
+    """Authoritative weekly class-teacher plan (PostgreSQL in hosted hosting).
+
+    The aggregate document lives in ``content``. Identity, ownership and the
+    monotonic ``revision`` are real columns so optimistic concurrency is
+    enforced by the database, never by a process-local lock.
+    """
+
+    __tablename__ = "weekly_class_plans"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    owner_id = Column(String, ForeignKey("users.id"), nullable=False)
+    school_id = Column(String, ForeignKey("schools.id"), nullable=True)
+    class_level = Column(String, default="", nullable=False)
+    week_number = Column(Integer, default=0, nullable=False)
+    term = Column(String, default="", nullable=False)
+    academic_year = Column(String, default="", nullable=False)
+    template_id = Column(String, default="", nullable=False)
+
+    #: PostgreSQL JSONB; SQLite keeps the same JSON document as TEXT/JSON.
+    content = Column(
+        JSON().with_variant(JSONB, "postgresql"),
+        nullable=False,
+        default=dict,
+    )
+    #: Monotonic revision used by If-Match. Starts at 1 and increments once per
+    #: successful conditional update.
+    revision = Column(Integer, nullable=False, default=1)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow,
+        nullable=False,
+    )
+
+    __table_args__ = (
+        Index("ix_weekly_class_plans_owner", "owner_id"),
+        Index("ix_weekly_class_plans_owner_updated", "owner_id", "updated_at"),
+        Index("ix_weekly_class_plans_school", "school_id"),
+    )
