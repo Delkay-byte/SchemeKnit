@@ -6,7 +6,6 @@ import { useEffect, ReactNode } from 'react'
 import { LayoutDashboard, Users, Settings, Key } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { Header } from '@/components/header'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AppShellSkeleton } from '@/components/ui/skeleton'
 import { isDesktop } from '@/lib/build-target'
 
@@ -58,40 +57,31 @@ export default function SchoolAdminLayout({ children }: { children: ReactNode })
     <div className="min-h-screen app-blueprint">
       <Header />
       <div className="container mx-auto px-4 py-6 max-w-6xl">
-        <Tabs value={activeSection} activationMode="manual" className="mb-6">
-          <TabsList
-            aria-label="School administration sections"
-            className="h-auto max-w-full flex-wrap justify-start gap-1 bg-transparent p-0"
-          >
+        <nav aria-label="School administration sections" className="mb-6">
+          <div className="flex h-auto max-w-full flex-wrap items-center justify-start gap-1">
             {NAV.map((item) => {
               const Icon = item.icon
+              const active = item.exact
+                ? currentPath === item.href
+                : currentPath === item.href || currentPath.startsWith(item.href)
               return (
-                <TabsTrigger
+                <Link
                   key={item.href}
-                  value={item.href}
-                  asChild
-                  className="gap-1.5 border border-border bg-background px-3 py-2 text-muted-foreground data-[state=active]:border-[#04A9CE]/40 data-[state=active]:bg-[#04A9CE]/10 data-[state=active]:text-[#04769B]"
+                  href={item.href}
+                  aria-current={active ? 'page' : undefined}
+                  className={`inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md border px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                    active
+                      ? 'border-[#04A9CE]/40 bg-[#04A9CE]/10 text-[#035f7c]'
+                      : 'border-border bg-background text-muted-foreground hover:bg-accent'
+                  }`}
                 >
-                  <Link
-                    href={item.href}
-                    aria-current={
-                      item.exact
-                        ? currentPath === item.href
-                          ? 'page'
-                          : undefined
-                        : currentPath === item.href || currentPath.startsWith(item.href)
-                          ? 'page'
-                          : undefined
-                    }
-                  >
-                    <Icon className="h-4 w-4" aria-hidden="true" />
-                    {item.label}
-                  </Link>
-                </TabsTrigger>
+                  <Icon className="h-4 w-4" aria-hidden="true" />
+                  {item.label}
+                </Link>
               )
             })}
-          </TabsList>
-        </Tabs>
+          </div>
+        </nav>
         <main>{children}</main>
       </div>
     </div>

@@ -386,7 +386,7 @@ export function LessonWorkspace({
   if (loading) {
     return (
       <SurfaceCard data-lesson-workspace className="px-5 py-10 text-center sm:px-6">
-        <Loader2 className="mx-auto mb-3 h-8 w-8 animate-spin text-[#04769B]" aria-hidden="true" />
+        <Loader2 className="mx-auto mb-3 h-8 w-8 animate-spin text-[#035f7c]" aria-hidden="true" />
         <p className="text-sm text-muted-foreground">Loading your generated lesson…</p>
       </SurfaceCard>
     )
@@ -547,7 +547,7 @@ export function LessonWorkspace({
               never mentioned as the author and no internal pattern name, score
               or corpus id is ever shown. */}
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center rounded-full bg-[#04769B]/10 px-2.5 py-0.5 text-xs font-semibold text-[#04769B]">
+            <span className="inline-flex items-center rounded-full bg-[#04769B]/10 px-2.5 py-0.5 text-xs font-semibold text-[#035f7c]">
               Generated lesson
             </span>
             {!active.provenance?.ai_provider && (
@@ -928,7 +928,7 @@ export function LessonWorkspace({
             <WorkspaceSection title="Core Competencies">
               <div className="flex flex-wrap gap-2">
                 {active.core_competencies!.map((c, i) => (
-                  <span key={i} className="rounded border border-[#04A9CE]/40 bg-[#04A9CE]/8 px-2 py-1 text-xs text-[#04769B]">
+                  <span key={i} className="rounded border border-[#04A9CE]/40 bg-[#04A9CE]/8 px-2 py-1 text-xs text-[#035f7c]">
                     {c}
                   </span>
                 ))}

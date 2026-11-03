@@ -90,7 +90,7 @@ export default function PricingPage() {
             <div className="flex items-start justify-between gap-3">
               <h2 className="text-lg font-semibold text-[#102A43]">{plan.name}</h2>
               {plan.slug === 'teacher-term-pass' && (
-                <span className="rounded-full bg-[#04A9CE]/10 px-2.5 py-1 text-xs font-semibold text-[#04769B]">
+                <span className="rounded-full bg-[#04A9CE]/10 px-2.5 py-1 text-xs font-semibold text-[#035f7c]">
                   Popular
                 </span>
               )}
@@ -192,7 +192,7 @@ export default function PricingPage() {
               className="rounded-xl border border-[#04A9CE]/30 bg-[#04A9CE]/5 p-4"
               data-selected-package={selectedPlan.slug}
             >
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#04769B]">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#035f7c]">
                 Selected package
               </p>
               <p className="mt-1 text-lg font-bold text-[#102A43]">

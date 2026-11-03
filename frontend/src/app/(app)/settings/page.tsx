@@ -208,7 +208,7 @@ export default function SettingsPage() {
                     <span className="text-sm text-muted-foreground">Plan</span>
                     <span
                       data-plan-label
-                      className="rounded-full bg-[#04A9CE]/10 px-3 py-1 text-sm font-semibold text-[#04769B]"
+                      className="rounded-full bg-[#04A9CE]/10 px-3 py-1 text-sm font-semibold text-[#035f7c]"
                     >
                       {plan.plan || (plan.edition === 'free' ? 'FREE' : 'PRO')}
                     </span>
@@ -272,7 +272,7 @@ export default function SettingsPage() {
 
             <SurfaceCard data-settings-profile accent="bg-gradient-to-r from-[#102A43] to-[#04A9CE]" className="px-5 py-5 sm:px-6">
               <div className="flex items-center">
-                <User className="mr-2 h-5 w-5 text-[#04769B]" aria-hidden="true" />
+                <User className="mr-2 h-5 w-5 text-[#035f7c]" aria-hidden="true" />
                 <div>
                   <h3 className="text-base font-semibold text-[#102A43]">Teacher Profile</h3>
                   <p className="text-sm text-muted-foreground">
@@ -392,7 +392,7 @@ export default function SettingsPage() {
                           {new Date(holiday.date).toLocaleDateString()}
                         </span>
                         {holiday.is_recurring && (
-                          <span className="ml-2 rounded bg-[#04A9CE]/10 px-2 py-1 text-xs text-[#04769B]">
+                          <span className="ml-2 rounded bg-[#04A9CE]/10 px-2 py-1 text-xs text-[#035f7c]">
                             Recurring
                           </span>
                         )}
@@ -477,7 +477,7 @@ export default function SettingsPage() {
                   Ghana Education Service standards.
                 </p>
                 <p>
-                  <Link href="/dashboard" className="font-medium text-[#04769B] hover:underline">
+                  <Link href="/dashboard" className="font-medium text-[#035f7c] hover:underline">
                     Back to Dashboard
                   </Link>
                 </p>

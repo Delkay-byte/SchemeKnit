@@ -24,7 +24,7 @@ export default function AboutPage() {
           teaching. Much of that time is repetitive: reading the same scheme
           week after week, finding the indicator, and assembling the same
           lesson structure around it. SchemeKnit does the repetitive assembly
-          while keeping the teacher's scheme and professional judgement in
+          while keeping the teacher&apos;s scheme and professional judgement in
           charge.
         </p>
       </section>
@@ -35,7 +35,7 @@ export default function AboutPage() {
           <ul className="mt-3 space-y-2 text-sm text-slate-600">
             <li>• We do not claim official GES approval or endorsement.</li>
             <li>• We do not guarantee perfect extraction or perfect lessons.</li>
-            <li>• We do not replace the teacher's review before use.</li>
+            <li>• We do not replace the teacher&apos;s review before use.</li>
             <li>• We do not promise unlimited generation.</li>
           </ul>
         </div>

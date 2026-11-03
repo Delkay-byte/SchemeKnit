@@ -316,7 +316,7 @@ export default function ReviewPage() {
               <p className="mt-1 text-sm text-muted-foreground">
                 {scheme.subject} &bull; {scheme.class_level} &bull; {scheme.term} &bull; {scheme.academic_year}
               </p>
-              <p className="mt-1 text-sm font-medium text-[#04769B]">
+              <p className="mt-1 text-sm font-medium text-[#035f7c]">
                 {weeks.length} week{weeks.length === 1 ? '' : 's'} of curriculum read from this document
               </p>
             </div>

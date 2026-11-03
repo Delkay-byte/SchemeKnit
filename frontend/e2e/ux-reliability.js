@@ -13,8 +13,8 @@ const path = require('path')
 
 const WEB = process.env.UX_WEB_URL || 'http://127.0.0.1:3000'
 const API = process.env.UX_API_URL || 'http://127.0.0.1:8000'
-const TOKEN = process.env.UX_TOKEN || ''
-const USER = process.env.UX_USER || '{"id":"ux-e2e","email":"ux-e2e@test.local","full_name":"UX E2E Teacher","school_name":"","is_admin":false,"is_active":true,"role":"teacher","school_id":null}'
+const TOKEN = process.env.UX_TOKEN || process.env.UX_TEACHER_TOKEN || ''
+const USER = process.env.UX_USER || process.env.UX_TEACHER_USER || '{"id":"ux-e2e","email":"ux-e2e@test.local","full_name":"UX E2E Teacher","school_name":"","is_admin":false,"is_active":true,"role":"teacher","school_id":null}'
 const PDF = path.resolve(__dirname, '..', '..', 'backend', 'real_documents', 'BASIC 6 TERM 1.pdf')
 const results = []
 

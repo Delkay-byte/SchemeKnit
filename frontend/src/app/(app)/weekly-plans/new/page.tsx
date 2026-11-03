@@ -588,7 +588,7 @@ export default function NewWeeklyPlanPage() {
           {preview && (
             <SurfaceCard data-weekly-preview className="p-6">
               <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-[#04769B]" aria-hidden="true" />
+                <Sparkles className="h-4 w-4 text-[#035f7c]" aria-hidden="true" />
                 <h2 className="text-base font-semibold text-[#102A43]">
                   Preview — {preview.plan.class_level}, Week {preview.plan.week_number}
                 </h2>

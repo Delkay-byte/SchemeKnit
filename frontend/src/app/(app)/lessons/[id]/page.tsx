@@ -679,7 +679,7 @@ export default function LessonDetailPage() {
         {/* The lesson document — phased hierarchy, editable in place. */}
         <SurfaceCard data-lesson-plan className="px-5 py-5 sm:px-6">
           <div className="mb-4 flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center rounded-full bg-[#04769B]/10 px-2.5 py-0.5 text-xs font-semibold text-[#04769B]">
+            <span className="inline-flex items-center rounded-full bg-[#04769B]/10 px-2.5 py-0.5 text-xs font-semibold text-[#035f7c]">
               Generated lesson
             </span>
             {!lesson.provenance?.ai_provider && (
@@ -720,7 +720,7 @@ export default function LessonDetailPage() {
                     <span>
                       {obj.description}
                       {obj.indicator_code && (
-                        <span className="ml-2 font-mono text-xs text-[#04769B]">
+                        <span className="ml-2 font-mono text-xs text-[#035f7c]">
                           {obj.indicator_code}
                         </span>
                       )}

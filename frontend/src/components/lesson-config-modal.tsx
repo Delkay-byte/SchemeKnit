@@ -233,7 +233,7 @@ export function LessonConfigModal({
               <button
                 type="button"
                 onClick={() => restoreProfileDefault('school_name')}
-                className="text-xs font-semibold text-[#04769B] hover:underline"
+                className="text-xs font-semibold text-[#035f7c] hover:underline"
               >
                 Use my school from profile
               </button>
@@ -251,7 +251,7 @@ export function LessonConfigModal({
               <button
                 type="button"
                 onClick={() => restoreProfileDefault('teacher_name')}
-                className="text-xs font-semibold text-[#04769B] hover:underline"
+                className="text-xs font-semibold text-[#035f7c] hover:underline"
               >
                 Use my name from profile
               </button>

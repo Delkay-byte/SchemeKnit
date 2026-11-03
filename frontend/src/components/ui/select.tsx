@@ -9,8 +9,8 @@ import { cn } from '@/lib/utils'
  * these controls with Playwright selectOption(), and native semantics keep
  * value/onChange behaviour identical to the markup being replaced.
  */
-export interface SelectProps
-  extends React.SelectHTMLAttributes<HTMLSelectElement> {}
+export type SelectProps =
+  React.SelectHTMLAttributes<HTMLSelectElement>
 
 export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
   function Select({ className, children, ...props }, ref) {

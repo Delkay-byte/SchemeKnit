@@ -151,7 +151,7 @@ export default function SchoolAdminDashboard() {
             <h2 className="text-lg font-semibold text-[#102A43]">Recent Teachers</h2>
             <p className="text-sm text-muted-foreground">Latest teacher accounts in this school</p>
           </div>
-          <Link href="/school-admin/teachers" className="text-sm font-medium text-[#04769B] hover:underline">
+          <Link href="/school-admin/teachers" className="text-sm font-medium text-[#035f7c] hover:underline">
             View all
           </Link>
         </div>

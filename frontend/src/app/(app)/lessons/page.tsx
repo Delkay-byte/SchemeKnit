@@ -187,7 +187,7 @@ export default function LessonsPage() {
                           {lesson.subject || lesson.scheme_subject}
                         </TableCell>
                         <TableCell className="max-w-[260px]">
-                          <span className="block font-mono text-xs text-[#04769B]">
+                          <span className="block font-mono text-xs text-[#035f7c]">
                             {lesson.indicator_codes?.[0] ||
                               (lesson.strand ? lesson.strand.slice(0, 18) : '—')}
                           </span>
