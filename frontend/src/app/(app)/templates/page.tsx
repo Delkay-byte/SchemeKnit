@@ -392,7 +392,7 @@ export default function TemplatesPage() {
                         }`}
                       >
                         <div className="flex min-w-0 items-center gap-3">
-                          <span className="rounded-lg bg-[#102A43]/8 p-2 text-[#04769B]">
+                          <span className="rounded-lg bg-[#102A43]/8 p-2 text-[#035f7c]">
                             <FileText className="h-5 w-5" aria-hidden="true" />
                           </span>
                           <div className="min-w-0">

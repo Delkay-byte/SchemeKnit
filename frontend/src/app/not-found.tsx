@@ -6,7 +6,7 @@ export default function NotFound() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md rounded-2xl border border-[#102A43]/8 bg-white p-6 text-center shadow-[0_24px_55px_rgba(16,42,67,0.12)]">
-        <p className="text-sm font-semibold uppercase tracking-wider text-[#04769B]">404</p>
+        <p className="text-sm font-semibold uppercase tracking-wider text-[#035f7c]">404</p>
         <h1 className="mt-2 text-2xl font-bold text-[#102A43]">Page not found</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           The page you are looking for does not exist, or the scheme or lesson

@@ -51,7 +51,7 @@ function iconFor(variant: ToastVariant) {
   if (variant === 'success') return <CheckCircle2 className="h-5 w-5 text-emerald-600" aria-hidden="true" />
   if (variant === 'warning') return <AlertTriangle className="h-5 w-5 text-amber-600" aria-hidden="true" />
   if (variant === 'error' || variant === 'destructive') return <XCircle className="h-5 w-5 text-red-600" aria-hidden="true" />
-  if (variant === 'info') return <Info className="h-5 w-5 text-[#04769B]" aria-hidden="true" />
+  if (variant === 'info') return <Info className="h-5 w-5 text-[#035f7c]" aria-hidden="true" />
   return <Info className="h-5 w-5 text-slate-500" aria-hidden="true" />
 }
 

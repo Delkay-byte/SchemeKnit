@@ -47,7 +47,7 @@ export function PublicPage({
       <main className="container mx-auto max-w-5xl px-4 py-12 md:py-16">
         <div className="mx-auto max-w-3xl text-center">
           {eyebrow && (
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#04769B]">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#035f7c]">
               {eyebrow}
             </p>
           )}

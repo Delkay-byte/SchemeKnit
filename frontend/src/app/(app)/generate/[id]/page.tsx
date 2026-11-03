@@ -1280,7 +1280,7 @@ export default function GeneratePage() {
                         {lesson?.id ? (
                           <Link
                             href={`/lessons/${lesson.id}`}
-                            className="text-xs font-medium text-[#04769B] hover:underline"
+                            className="text-xs font-medium text-[#035f7c] hover:underline"
                           >
                             Open lesson
                           </Link>
@@ -1392,7 +1392,7 @@ export default function GeneratePage() {
                 className="px-5 py-5 sm:px-6"
               >
                 <div className="flex items-center">
-                  <Play className="mr-2 h-5 w-5 text-[#04769B]" aria-hidden="true" />
+                  <Play className="mr-2 h-5 w-5 text-[#035f7c]" aria-hidden="true" />
                   <div>
                     <h2 className="text-lg font-semibold text-[#102A43]">Generate my lesson plans</h2>
                     <p className="text-sm text-muted-foreground">
@@ -1519,7 +1519,7 @@ export default function GeneratePage() {
             {!jobId && (
             <SurfaceCard data-generate-config className="px-5 py-5 sm:px-6">
               <div className="flex items-center">
-                <Settings className="mr-2 h-5 w-5 text-[#04769B]" aria-hidden="true" />
+                <Settings className="mr-2 h-5 w-5 text-[#035f7c]" aria-hidden="true" />
                 <div className="flex-1">
                   <h2 className="text-lg font-semibold text-[#102A43]">Configuration</h2>
                   <p className="text-sm text-muted-foreground">
@@ -2027,7 +2027,7 @@ export default function GeneratePage() {
                                         </StatusPill>
                                         <a
                                           href="#lesson-workspace"
-                                          className="rounded-md border px-1.5 py-0.5 text-[11px] text-[#04769B] hover:bg-slate-50"
+                                          className="rounded-md border px-1.5 py-0.5 text-[11px] text-[#035f7c] hover:bg-slate-50"
                                           onClick={(e) => {
                                             e.preventDefault()
                                             document

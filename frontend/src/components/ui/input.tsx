@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
  * Focus ring, hover and disabled states are defined once so every auth page
  * feels identical.
  */
-export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {}
+export type InputProps = React.InputHTMLAttributes<HTMLInputElement>
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
   function Input({ className, type, ...props }, ref) {

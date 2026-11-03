@@ -552,7 +552,7 @@ export default function PlatformAdminPage() {
               <TabsTrigger
                 key={tab}
                 value={tab}
-                className="capitalize border border-border bg-background px-3 py-1.5 text-muted-foreground data-[state=active]:border-[#04A9CE]/40 data-[state=active]:bg-[#04A9CE]/10 data-[state=active]:text-[#04769B]"
+                className="capitalize border border-border bg-background px-3 py-1.5 text-muted-foreground data-[state=active]:border-[#04A9CE]/40 data-[state=active]:bg-[#04A9CE]/10 data-[state=active]:text-[#035f7c]"
               >
                 {tab}
               </TabsTrigger>

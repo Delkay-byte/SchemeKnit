@@ -39,7 +39,7 @@ jobs:
       - name: Compile
         run: python -m compileall -q src tests
       - name: Test suite
-        run: python -m pytest -q
+        run: python -m pytest -q -m "not live_provider"
       - name: Dependency audit
         run: |
           pip install pip-audit
@@ -55,10 +55,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: UX unit tests
+        run: npm run test:ux
       - run: npx tsc --noEmit
       - run: npm run build
       - name: Dependency audit (high and critical)
@@ -91,10 +95,10 @@ jobs:
           python-version: '3.13'
           cache: pip
       - run: pip install -r requirements.txt
-      - name: Migration harness
+      - name: Migration and weekly-plan concurrency harness
         env:
           POSTGRES_MIGRATION_TEST_URL: postgresql://schemeknit:schemeknit_test@localhost:5432/schemeknit_test
-        run: python -m pytest -q tests/test_postgres_migrations.py
+        run: python -m pytest -q tests/test_postgres_migrations.py tests/test_weekly_plan_postgres.py
 
   secrets:
     name: Secret scan
@@ -106,3 +110,88 @@ jobs:
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  ux-browser:
+    name: UX browser and accessibility
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: sqlite:///./temp/ci_ux.db
+      DEBUG: "true"
+      SECRET_KEY: ux-ci-secret-not-production
+      JWT_SECRET_KEY: ux-ci-jwt-not-production
+      REGISTRATION_MODE: open
+      TURNSTILE_ENABLED: "false"
+      AI_MODE: OFF
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Install Playwright Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Start disposable backend
+        working-directory: backend
+        run: |
+          mkdir -p temp
+          python -m uvicorn src.main:app --host 127.0.0.1 --port 8100 > /tmp/ux-backend.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:8100/api/health && break
+            sleep 2
+          done
+      - name: Seed disposable UX fixtures
+        working-directory: backend
+        run: python scripts/seed_ux_e2e.py --out /tmp/ux-e2e.env
+      - name: Build frontend for the disposable API
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_API_URL: http://127.0.0.1:8100
+        run: npm run build
+      - name: Start frontend
+        working-directory: frontend
+        run: |
+          npm start -- --port 3100 > /tmp/ux-frontend.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf -o /dev/null http://127.0.0.1:3100/ && break
+            sleep 2
+          done
+      - name: Browser acceptance
+        working-directory: frontend
+        run: |
+          set -a; . /tmp/ux-e2e.env; set +a
+          export UX_WEB_URL=http://127.0.0.1:3100
+          export UX_API_URL=http://127.0.0.1:8100
+          node e2e/ux-reliability.js
+          node e2e/ux-editing-reliability.js
+          node e2e/teacher-activation-admin.js
+          node e2e/responsive-accessibility.js
+          node e2e/accessibility-keyboard.js
+
+  live-providers:
+    name: Live Gemini/Groq providers (manual)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - run: pip install -r backend/requirements.txt
+      - name: Live provider tests
+        working-directory: backend
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: python -m pytest -q -m live_provider tests/test_gemini_groq_providers.py

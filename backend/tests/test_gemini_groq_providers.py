@@ -608,6 +608,7 @@ class TestSecretHygiene:
 # ════════════════════════════════════════════════════════════════════════════
 
 @pytest.mark.live
+@pytest.mark.live_provider
 class TestLiveGemini:
     @pytest.mark.skipif(
         not os.environ.get("GEMINI_API_KEY"),
@@ -629,7 +630,7 @@ class TestLiveGemini:
         if not out and p.last_error in ("auth_failed", "auth_key_rejected",
                                         "invalid_api_key", "missing_api_key",
                                         "model_not_found", "http_404"):
-            pytest.skip(f"Gemini credentials/model rejected (last_error={p.last_error}) — update GEMINI_API_KEY")
+            pytest.fail(f"Gemini credentials/model rejected (last_error={p.last_error}) — update GEMINI_API_KEY")
         # Free-tier high-demand throttling (503/429) is transient and retried;
         # if it still blocks this run, skip with an explicit reason (documented).
         if not out and p.last_error and (
@@ -641,6 +642,7 @@ class TestLiveGemini:
 
 
 @pytest.mark.live
+@pytest.mark.live_provider
 class TestLiveGroq:
     @pytest.mark.skipif(
         not os.environ.get("GROQ_API_KEY"),
@@ -660,7 +662,7 @@ class TestLiveGroq:
         if not out and p.last_error in ("auth_failed", "invalid_api_key",
                                         "missing_api_key", "model_not_found",
                                         "http_404"):
-            pytest.skip(f"Groq blocked (last_error={p.last_error}) - verify GROQ_API_KEY/GROQ_MODEL")
+            pytest.fail(f"Groq blocked (last_error={p.last_error}) - verify GROQ_API_KEY/GROQ_MODEL")
         if not out and p.last_error and (
             p.last_error.startswith("http_5") or p.last_error == "rate_limit"
         ):

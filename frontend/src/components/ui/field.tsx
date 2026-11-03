@@ -48,8 +48,8 @@ export function Field({
   )
 }
 
-export interface TextAreaProps
-  extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {}
+export type TextAreaProps =
+  React.TextareaHTMLAttributes<HTMLTextAreaElement>
 
 export const TextArea = React.forwardRef<HTMLTextAreaElement, TextAreaProps>(
   function TextArea({ className, ...props }, ref) {

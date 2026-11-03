@@ -66,7 +66,7 @@ export default function HelpPage() {
         ))}
       </div>
       <p className="mt-8 text-center text-sm text-slate-600">
-        Still stuck? <Link href="/contact" className="font-semibold text-[#04769B] underline">Contact support</Link>.
+        Still stuck? <Link href="/contact" className="font-semibold text-[#035f7c] underline">Contact support</Link>.
       </p>
     </PublicPage>
   )

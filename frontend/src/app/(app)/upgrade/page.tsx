@@ -190,7 +190,7 @@ export default function UpgradePage() {
               >
                 <div className="flex items-baseline justify-between gap-2">
                   <h3 className="font-semibold text-[#102A43]">{p.name}</h3>
-                  <span className="font-semibold text-[#04769B]">{money(p.price_pesewas)}</span>
+                  <span className="font-semibold text-[#035f7c]">{money(p.price_pesewas)}</span>
                 </div>
                 <p className="mt-1 text-sm text-slate-600">
                   {p.credits} indicator-level lesson plans · {p.validity_label}
@@ -210,7 +210,7 @@ export default function UpgradePage() {
           <SurfaceCard className="mt-6 px-5 py-5" data-checkout>
             <div className="flex items-baseline justify-between gap-3">
               <h2 className="text-lg font-semibold text-[#102A43]">Pay for {plan.name}</h2>
-              <span className="text-lg font-bold text-[#04769B]">{money(plan.price_pesewas)}</span>
+              <span className="text-lg font-bold text-[#035f7c]">{money(plan.price_pesewas)}</span>
             </div>
             <p className="mt-1 text-sm text-slate-600">
               {plan.credits} credits · {plan.validity_label}. {plan.payment_terms}

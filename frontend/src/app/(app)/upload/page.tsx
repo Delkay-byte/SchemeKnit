@@ -319,7 +319,7 @@ export default function UploadPage() {
                       state === 'current'
                         ? 'border-[#102A43] bg-[#102A43] text-white'
                         : state === 'done'
-                          ? 'border-[#04A9CE]/40 bg-[#04A9CE]/10 text-[#04769B]'
+                          ? 'border-[#04A9CE]/40 bg-[#04A9CE]/10 text-[#035f7c]'
                           : 'border-slate-200 bg-white text-slate-400'
                     }`}
                   >
@@ -608,7 +608,7 @@ export default function UploadPage() {
                 >
                   {file ? (
                     <div className="space-y-4">
-                      <FileText className="mx-auto h-12 w-12 text-[#04769B]" aria-hidden="true" />
+                      <FileText className="mx-auto h-12 w-12 text-[#035f7c]" aria-hidden="true" />
                       <div>
                         <p className="break-all text-lg font-semibold text-[#102A43]">{file.name}</p>
                         <p className="text-sm text-muted-foreground">{formatFileSize(file.size)}</p>

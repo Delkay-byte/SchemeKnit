@@ -392,7 +392,7 @@ export default function Dashboard() {
               >
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="rounded-full bg-[#04A9CE]/10 p-3 text-[#04769B]">
+                    <div className="rounded-full bg-[#04A9CE]/10 p-3 text-[#035f7c]">
                       {plan.source === 'school' || plan.source === 'individual+school' ? (
                         <School className="h-5 w-5" />
                       ) : plan.edition === 'teacher' ? (
@@ -465,7 +465,7 @@ export default function Dashboard() {
                   <p className="mt-3 text-sm text-muted-foreground">
                     {Math.max(plan.generation_limit - plan.generations_used, 0)} of {plan.generation_limit} lesson plans remaining this month.
                     {' '}Your free lesson-plan allowance refreshes on the first day of every month.{' '}
-                    <Link href="/upgrade" className="font-medium text-[#04769B] hover:text-[#04A9CE] hover:underline">
+                    <Link href="/upgrade" className="font-medium text-[#035f7c] hover:text-[#04A9CE] hover:underline">
                       Choose a paid package
                     </Link>{' '}to continue generating more lesson plans.
                   </p>
@@ -477,7 +477,7 @@ export default function Dashboard() {
                   <p className="mt-3 text-sm text-muted-foreground">
                     You&apos;ve used all {plan.ai_credits} free AI generations for this month.
                     {' '}Your allowance renews on the 1st.{' '}
-                    <Link href="/upgrade" className="font-medium text-[#04769B] hover:text-[#04A9CE] hover:underline">
+                    <Link href="/upgrade" className="font-medium text-[#035f7c] hover:text-[#04A9CE] hover:underline">
                       Buy lesson-plan credits
                     </Link>{' '}for more lesson-plan credits.
                   </p>
@@ -524,14 +524,14 @@ export default function Dashboard() {
                         : '/lessons'
                       const enabled = state !== 'locked'
                       const body = (
-                        <div className={`flex flex-col items-center ${enabled ? 'cursor-pointer' : 'opacity-60'}`}>
+                        <div className={`flex flex-col items-center ${enabled ? 'cursor-pointer' : ''}`}>
                           <div
                             className={`flex h-9 w-9 items-center justify-center rounded-full border-2 text-sm font-bold ${
                               state === 'done'
                                 ? 'border-green-500 bg-green-50 text-green-700'
                                 : state === 'current'
                                   ? 'border-[#04A9CE] bg-[#102A43] text-white shadow-[0_0_0_4px_rgba(4,169,206,0.18)]'
-                                  : 'border-slate-200 bg-white text-slate-400'
+                                  : 'border-slate-200 bg-white text-slate-500'
                             }`}
                           >
                             {state === 'done' ? '\u2713' : i + 1}
@@ -542,7 +542,7 @@ export default function Dashboard() {
                                 ? 'font-semibold text-[#102A43]'
                                 : state === 'done'
                                   ? 'text-slate-600'
-                                  : 'text-slate-400'
+                                  : 'text-slate-500'
                             }`}
                           >
                             {step.label}
@@ -625,7 +625,7 @@ export default function Dashboard() {
                           <TableRow key={scheme.id}>
                             <TableCell className="max-w-[240px]">
                               <span className="flex items-center gap-2">
-                                <FileText className="h-4 w-4 shrink-0 text-[#04769B]" aria-hidden="true" />
+                                <FileText className="h-4 w-4 shrink-0 text-[#035f7c]" aria-hidden="true" />
                                 <span className="truncate font-medium">{scheme.filename}</span>
                               </span>
                             </TableCell>
@@ -671,16 +671,16 @@ export default function Dashboard() {
               aria-label="More destinations"
               className="flex flex-wrap gap-x-6 gap-y-2 border-t border-slate-200 pt-4 text-sm"
             >
-              <Link href="/lessons" className="font-medium text-slate-600 transition-colors hover:text-[#04769B]">
+              <Link href="/lessons" className="font-medium text-slate-600 transition-colors hover:text-[#035f7c]">
                 Lesson Plans
               </Link>
-              <Link href="/templates" className="font-medium text-slate-600 transition-colors hover:text-[#04769B]">
+              <Link href="/templates" className="font-medium text-slate-600 transition-colors hover:text-[#035f7c]">
                 Templates
               </Link>
-              <Link href="/payments" className="font-medium text-slate-600 transition-colors hover:text-[#04769B]">
+              <Link href="/payments" className="font-medium text-slate-600 transition-colors hover:text-[#035f7c]">
                 Payments
               </Link>
-              <Link href="/settings" className="font-medium text-slate-600 transition-colors hover:text-[#04769B]">
+              <Link href="/settings" className="font-medium text-slate-600 transition-colors hover:text-[#035f7c]">
                 Settings
               </Link>
             </nav>

@@ -31,7 +31,7 @@ export function UploadPrivacyNotice({ className }: { className?: string }) {
     >
       <div className="flex items-start gap-3">
         <ShieldCheck
-          className="mt-0.5 h-5 w-5 shrink-0 text-[#04769B]"
+          className="mt-0.5 h-5 w-5 shrink-0 text-[#035f7c]"
           aria-hidden="true"
         />
         <div className="min-w-0">

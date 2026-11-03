@@ -18,14 +18,13 @@ the class boundary is decided in one place (``wapef_template_for_class``) and
 this router refuses a class outside the Basic 1-3 band.
 """
 
-import json
-import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import FileResponse
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from ..auth import get_current_user
@@ -47,64 +46,21 @@ from ..models import (
     WeeklyClassPlan,
     WeeklyPlanRequest,
 )
+from ..weekly_plan_store import (
+    StaleWeeklyPlanRevision,
+    WeeklyPlanNotFound,
+    create_row,
+    get_row,
+    list_rows,
+    plan_document,
+    plan_from_row,
+    update_row,
+    version_token,
+)
 
 router = APIRouter()
 
 WEEKLY_PLANS_DIR = Path("exports/weekly-plans")
-
-
-# ── Persistence ───────────────────────────────────────────────────────────────
-
-_PLANS_FILE = Path("teachflow_data/weekly_plans.json")
-
-#: Serialize the read-modify-write of the JSON aggregate in this process, so
-#: two concurrent edits cannot both read the same revision and write over each
-#: other. Cross-process deployments still rely on the If-Match revision check.
-_STORE_LOCK = threading.Lock()
-
-
-def _load_store() -> Dict[str, Any]:
-    """The weekly-plan store (created on first use).
-
-    A lightweight, ownership-scoped JSON store: the weekly class plan is a
-    single aggregate document, so a row-per-field relational split buys nothing
-    here. Every record carries owner_id and every read/write filters on it.
-    """
-    if not _PLANS_FILE.is_file():
-        return {"plans": []}
-    try:
-        return json.loads(_PLANS_FILE.read_text(encoding="utf-8"))
-    except Exception:
-        return {"plans": []}
-
-
-def _save_store(store: Dict[str, Any]) -> None:
-    _PLANS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    _PLANS_FILE.write_text(json.dumps(store, indent=2, default=str), encoding="utf-8")
-
-
-def _plan_record(plan: WeeklyClassPlan, owner_id: str) -> Dict[str, Any]:
-    return {
-        "id": plan.id,
-        "owner_id": owner_id,
-        "class_level": plan.class_level.value if hasattr(plan.class_level, "value")
-                       else str(plan.class_level),
-        "week_number": plan.week_number,
-        "term": plan.term,
-        "academic_year": plan.academic_year,
-        "template_id": plan.template_id,
-        "school_name": plan.school_name,
-        "teacher_name": plan.teacher_name,
-        "created_date": plan.created_date.isoformat(),
-        "updated_date": plan.updated_date.isoformat(),
-        "plan": plan.model_dump(mode="json"),
-    }
-
-
-def _get_owned_record(db_plan: Dict[str, Any], user_id: str) -> Dict[str, Any]:
-    if db_plan.get("owner_id") != user_id:
-        raise HTTPException(status_code=404, detail="Weekly plan not found")
-    return db_plan
 
 
 # ── Class boundary ────────────────────────────────────────────────────────────
@@ -229,36 +185,53 @@ async def create_weekly_plan(
     if issues:
         raise HTTPException(status_code=400, detail="; ".join(issues))
 
-    store = _load_store()
-    store["plans"].append(_plan_record(plan, user.id))
-    _save_store(store)
+    try:
+        row = create_row(
+            db, owner_id=user.id, plan=plan, school_id=user.school_id)
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(
+            status_code=503,
+            detail="Weekly plans are temporarily unavailable. Please try again.",
+        )
     log_event("weekly_plan_created", user_id=user.id, weekly_plan_id=plan.id)
-    return {"plan": plan.model_dump(mode="json"), "id": plan.id}
+    return {
+        "plan": plan_document(row),
+        "id": plan.id,
+        "version": version_token(row),
+    }
 
 
 @router.get("")
 async def list_weekly_plans(
     user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """The teacher's weekly class plans (newest first)."""
-    store = _load_store()
-    plans = [
-        {
-            "id": p["id"],
-            "class_level": p["class_level"],
-            "week_number": p["week_number"],
-            "term": p["term"],
-            "academic_year": p["academic_year"],
-            "template_id": p["template_id"],
-            "school_name": p["school_name"],
-            "subjects": [s.get("subject", "") for s in (p["plan"].get("subjects") or [])],
-            "created_date": p["created_date"],
-            "updated_date": p["updated_date"],
-        }
-        for p in store["plans"]
-        if p.get("owner_id") == user.id
-    ]
-    plans.sort(key=lambda p: p["created_date"], reverse=True)
+    try:
+        rows = list_rows(db, user.id)
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(
+            status_code=503,
+            detail="Weekly plans are temporarily unavailable. Please try again.",
+        )
+    plans = [{
+        "id": row.id,
+        "class_level": row.class_level,
+        "week_number": row.week_number,
+        "term": row.term,
+        "academic_year": row.academic_year,
+        "template_id": row.template_id,
+        "school_name": (row.content or {}).get("school_name"),
+        "subjects": [
+            s.get("subject", "")
+            for s in ((row.content or {}).get("subjects") or [])
+        ],
+        "created_date": row.created_at.isoformat() if row.created_at else None,
+        "updated_date": row.updated_at.isoformat() if row.updated_at else None,
+        "version": version_token(row),
+    } for row in rows]
     return {"plans": plans}
 
 
@@ -266,14 +239,20 @@ async def list_weekly_plans(
 async def get_weekly_plan(
     plan_id: str,
     user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """Fetch one weekly plan (reload after save, with full day-plan content)."""
-    store = _load_store()
-    record = next((p for p in store["plans"] if p["id"] == plan_id), None)
-    if record is None:
+    try:
+        row = get_row(db, plan_id, user.id)
+    except WeeklyPlanNotFound:
         raise HTTPException(status_code=404, detail="Weekly plan not found")
-    record = _get_owned_record(record, user.id)
-    return {"plan": record["plan"], "version": record.get("updated_date")}
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(
+            status_code=503,
+            detail="Weekly plans are temporarily unavailable. Please try again.",
+        )
+    return {"plan": plan_document(row), "version": version_token(row)}
 
 
 @router.put("/{plan_id}")
@@ -281,6 +260,7 @@ async def update_weekly_plan(
     plan_id: str,
     updates: Dict[str, Any],
     user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
     if_match: Optional[str] = Header(default=None, alias="If-Match"),
 ):
     """Edit a saved weekly plan.
@@ -291,69 +271,89 @@ async def update_weekly_plan(
     ``updated_date`` revision the client read; a mismatch is a 409 and nothing
     is written.
     """
-    with _STORE_LOCK:
-        store = _load_store()
-        record = next((p for p in store["plans"] if p["id"] == plan_id), None)
-        if record is None:
-            raise HTTPException(status_code=404, detail="Weekly plan not found")
-        record = _get_owned_record(record, user.id)
+    expected_version = if_match if isinstance(if_match, str) else None
+    try:
+        row = get_row(db, plan_id, user.id)
+    except WeeklyPlanNotFound:
+        raise HTTPException(status_code=404, detail="Weekly plan not found")
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(
+            status_code=503,
+            detail="Weekly plans are temporarily unavailable. Please try again.",
+        )
 
-        expected_version = if_match if isinstance(if_match, str) else None
-        if expected_version and record.get("updated_date") != expected_version:
-            raise HTTPException(
-                status_code=409,
-                detail=(
-                    "This weekly plan has changed since you opened it. "
-                    "Refresh the latest version before saving."
-                ),
+    plan = plan_from_row(row)
+    subject_updates = updates.get("subjects") or []
+    for patch in subject_updates:
+        index = patch.get("index")
+        if index is None or not (0 <= index < len(plan.subjects)):
+            continue
+        subject = plan.subjects[index]
+        metadata = patch.get("metadata")
+        if metadata:
+            new_meta = subject.metadata.model_copy(update={
+                k: v for k, v in metadata.items()
+                if k in subject.metadata.model_fields
+            })
+            subject.metadata = new_meta
+        day_updates = patch.get("day_plans") or []
+        for day_patch in day_updates:
+            day_index = day_patch.get("index")
+            if day_index is None or not (0 <= day_index < len(subject.day_plans)):
+                continue
+            current = subject.day_plans[day_index]
+            fields = {
+                k: v for k, v in day_patch.items()
+                if k in ("days", "day_label", "starter", "reflection",
+                         "main_activities", "focus_indicators", "resources",
+                         "lesson_date", "period")
+            }
+            if "main_activities" in fields and isinstance(fields["main_activities"], list):
+                fields["main_activities"] = [
+                    {"description": a} if isinstance(a, str) else a
+                    for a in fields["main_activities"]
+                ]
+            subject.day_plans[day_index] = current.model_copy(update=fields)
+        if patch.get("teaching_day_groups"):
+            from ..engines.wapef_basic13_template import normalize_day_groups
+            subject.teaching_day_groups = normalize_day_groups(
+                patch["teaching_day_groups"])
+            subject.teaching_days = sorted(
+                {d for g in subject.teaching_day_groups for d in g},
+                key=lambda d: WEEK_DAYS.index(d) if d in WEEK_DAYS else 99,
             )
 
-        plan = WeeklyClassPlan.model_validate(record["plan"])
-        subject_updates = updates.get("subjects") or []
-        for patch in subject_updates:
-            index = patch.get("index")
-            if index is None or not (0 <= index < len(plan.subjects)):
-                continue
-            subject = plan.subjects[index]
-            metadata = patch.get("metadata")
-            if metadata:
-                new_meta = subject.metadata.model_copy(update={
-                    k: v for k, v in metadata.items()
-                    if k in subject.metadata.model_fields
-                })
-                subject.metadata = new_meta
-            day_updates = patch.get("day_plans") or []
-            for day_patch in day_updates:
-                day_index = day_patch.get("index")
-                if day_index is None or not (0 <= day_index < len(subject.day_plans)):
-                    continue
-                current = subject.day_plans[day_index]
-                fields = {
-                    k: v for k, v in day_patch.items()
-                    if k in ("days", "day_label", "starter", "reflection",
-                             "main_activities", "focus_indicators", "resources",
-                             "lesson_date", "period")
-                }
-                if "main_activities" in fields and isinstance(fields["main_activities"], list):
-                    fields["main_activities"] = [
-                        {"description": a} if isinstance(a, str) else a
-                        for a in fields["main_activities"]
-                    ]
-                subject.day_plans[day_index] = current.model_copy(update=fields)
-            if patch.get("teaching_day_groups"):
-                from ..engines.wapef_basic13_template import normalize_day_groups
-                subject.teaching_day_groups = normalize_day_groups(
-                    patch["teaching_day_groups"])
-                subject.teaching_days = sorted(
-                    {d for g in subject.teaching_day_groups for d in g},
-                    key=lambda d: WEEK_DAYS.index(d) if d in WEEK_DAYS else 99,
-                )
+    try:
+        updated = update_row(
+            db,
+            plan_id=plan_id,
+            owner_id=user.id,
+            content=plan.model_dump(mode="json"),
+            expected_version=expected_version,
+        )
+    except StaleWeeklyPlanRevision:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "This weekly plan has changed since you opened it. "
+                "Refresh the latest version before saving."
+            ),
+        )
+    except WeeklyPlanNotFound:
+        raise HTTPException(status_code=404, detail="Weekly plan not found")
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(
+            status_code=503,
+            detail="Weekly plans are temporarily unavailable. Please try again.",
+        )
 
-        record["plan"] = plan.model_dump(mode="json")
-        record["updated_date"] = datetime.now().isoformat()
-        _save_store(store)
-        log_event("weekly_plan_updated", user_id=user.id, weekly_plan_id=plan_id)
-        return {"plan": record["plan"], "version": record["updated_date"]}
+    log_event("weekly_plan_updated", user_id=user.id, weekly_plan_id=plan_id)
+    return {
+        "plan": plan_document(updated),
+        "version": version_token(updated),
+    }
 
 
 # ── Export ────────────────────────────────────────────────────────────────────
@@ -387,14 +387,19 @@ def _leftovers_text(leftovers: List[str]) -> str:
 async def export_weekly_docx(
     plan_id: str,
     user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """One DOCX: one weekly class plan with every subject section in it."""
-    store = _load_store()
-    record = next((p for p in store["plans"] if p["id"] == plan_id), None)
-    if record is None:
+    try:
+        plan = plan_from_row(get_row(db, plan_id, user.id))
+    except WeeklyPlanNotFound:
         raise HTTPException(status_code=404, detail="Weekly plan not found")
-    record = _get_owned_record(record, user.id)
-    plan = WeeklyClassPlan.model_validate(record["plan"])
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(
+            status_code=503,
+            detail="Weekly plans are temporarily unavailable. Please try again.",
+        )
 
     out_path = _render_weekly_docx(plan)
     log_event("weekly_plan_exported", user_id=user.id, weekly_plan_id=plan_id,
@@ -411,14 +416,19 @@ async def export_weekly_docx(
 async def export_weekly_pdf(
     plan_id: str,
     user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """PDF from the same canonical weekly document (DOCX → PDF)."""
-    store = _load_store()
-    record = next((p for p in store["plans"] if p["id"] == plan_id), None)
-    if record is None:
+    try:
+        plan = plan_from_row(get_row(db, plan_id, user.id))
+    except WeeklyPlanNotFound:
         raise HTTPException(status_code=404, detail="Weekly plan not found")
-    record = _get_owned_record(record, user.id)
-    plan = WeeklyClassPlan.model_validate(record["plan"])
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(
+            status_code=503,
+            detail="Weekly plans are temporarily unavailable. Please try again.",
+        )
 
     docx_path = _render_weekly_docx(plan)
     pdf_path = docx_path.with_suffix(".pdf")

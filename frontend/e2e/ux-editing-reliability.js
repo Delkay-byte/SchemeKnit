@@ -10,8 +10,8 @@ const path = require('path')
 
 const WEB = process.env.UX_WEB_URL || 'http://127.0.0.1:3100'
 const API = process.env.UX_API_URL || 'http://127.0.0.1:8100'
-const TOKEN = process.env.UX_TOKEN || ''
-const USER = JSON.parse(process.env.UX_USER || '{}')
+const TOKEN = process.env.UX_TOKEN || process.env.UX_TEACHER_TOKEN || ''
+const USER = JSON.parse(process.env.UX_USER || process.env.UX_TEACHER_USER || '{}')
 const LESSON_ID = process.env.UX_LESSON_ID || ''
 const PLAN_ID = process.env.UX_PLAN_ID || 'wp-ux-fixture'
 const PDF = path.resolve(__dirname, '..', '..', 'backend', 'real_documents', 'BASIC 6 TERM 1.pdf')
