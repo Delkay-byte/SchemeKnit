@@ -7,6 +7,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 import os
 import secrets
 from datetime import datetime, timedelta
@@ -21,6 +22,8 @@ from .database import (
     SubscriptionPlanDB, SubscriptionTransactionDB, User, UserLicenseDB,
     UserSubscriptionDB, generate_id,
 )
+
+logger = logging.getLogger(__name__)
 
 API_BASE = "https://api.paystack.co"
 TIMEOUT = 20
@@ -145,6 +148,10 @@ def _api(method: str, path: str, payload: Optional[dict] = None, *,
         body = {}
     if not resp.ok or not body.get("status"):
         message = str(body.get("message") or "")
+        # Status + provider message only; never headers or the secret key.
+        logger.warning(
+            "paystack_api_error path=%s status=%s message=%s",
+            path, resp.status_code, message[:200])
         if resp.status_code in (401, 403):
             raise PaystackError("Paystack rejected the server credentials.", 503)
         if resp.status_code == 429:
