@@ -524,14 +524,14 @@ export default function Dashboard() {
                         : '/lessons'
                       const enabled = state !== 'locked'
                       const body = (
-                        <div className={`flex flex-col items-center ${enabled ? 'cursor-pointer' : 'opacity-60'}`}>
+                        <div className={`flex flex-col items-center ${enabled ? 'cursor-pointer' : ''}`}>
                           <div
                             className={`flex h-9 w-9 items-center justify-center rounded-full border-2 text-sm font-bold ${
                               state === 'done'
                                 ? 'border-green-500 bg-green-50 text-green-700'
                                 : state === 'current'
                                   ? 'border-[#04A9CE] bg-[#102A43] text-white shadow-[0_0_0_4px_rgba(4,169,206,0.18)]'
-                                  : 'border-slate-200 bg-white text-slate-400'
+                                  : 'border-slate-200 bg-white text-slate-500'
                             }`}
                           >
                             {state === 'done' ? '\u2713' : i + 1}
@@ -542,7 +542,7 @@ export default function Dashboard() {
                                 ? 'font-semibold text-[#102A43]'
                                 : state === 'done'
                                   ? 'text-slate-600'
-                                  : 'text-slate-400'
+                                  : 'text-slate-500'
                             }`}
                           >
                             {step.label}

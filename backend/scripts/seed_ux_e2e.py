@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.auth import hash_password
 from src.database import (
     GenerationJobDB, LessonPlanDB, ProductPlanDB, SchoolDB, SchoolLicenseDB,
-    SchoolMembershipDB, SchemeDB, SessionLocal, User,
+    SchoolMembershipDB, SchemeDB, SessionLocal, User, WeekDB,
 )
 from src.models import DayPlan, SubjectMetadata, SubjectPlan, WeeklyClassPlan
 from src.weekly_plan_store import create_row
@@ -91,6 +91,14 @@ def main() -> int:
         )
         db.add(scheme)
         db.flush()
+        db.add(WeekDB(
+            id=uid(), scheme_id=scheme.id, week_number=1,
+            start_date=date(2026, 9, 7), end_date=date(2026, 9, 11),
+            strand="Diversity of Matter", sub_strand="Materials",
+            content_standards=["B8.1.1.1 Demonstrate materials"],
+            indicators=["B8.1.1.1.1 Identify materials"],
+            resources=["Chart"],
+        ))
         job = GenerationJobDB(
             id=uid(), owner_id=teacher.id, scheme_id=scheme.id,
             status="completed", completed_lessons=1, total_lessons=1,

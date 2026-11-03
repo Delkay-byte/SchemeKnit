@@ -38,7 +38,7 @@ async function axe(page, label) {
   })
   const serious = report.violations.filter((v) => ['critical', 'serious'].includes(v.impact))
   record(`axe ${label}`, serious.length === 0,
-    serious.map((v) => `${v.id}:${v.nodes.length}`).join(', '))
+    serious.flatMap((v) => v.nodes.map((n) => `${v.id}@${n.target.join(' ')}`)).slice(0, 5).join(' | '))
 }
 
 async function main() {
@@ -48,17 +48,29 @@ async function main() {
   const adminToken = process.env.UX_ADMIN_TOKEN
   const adminUser = JSON.parse(process.env.UX_ADMIN_USER || '{}')
 
+  // Prefer a scheme that actually has parsed weeks so the review page and
+  // lesson-config trigger render their real actions.
+  let reviewSchemeId = SCHEME_ID
+  try {
+    const response = await fetch(`${API}/api/documents/`, {
+      headers: { Authorization: `Bearer ${teacherToken}` },
+    })
+    const data = await response.json()
+    const usable = (data.schemes || []).find((scheme) => scheme.weeks_count > 0)
+    if (usable) reviewSchemeId = usable.id
+  } catch { /* fall back to fixture id */ }
+
   const screens = [
-    { label: 'dashboard', role: 'teacher', url: '/dashboard' },
-    { label: 'lesson editor', role: 'teacher', url: `/lessons/${LESSON_ID}` },
-    { label: 'weekly plan editor', role: 'teacher', url: `/weekly-plans/${PLAN_ID}` },
-    { label: 'new weekly plan', role: 'teacher', url: '/weekly-plans/new' },
-    { label: 'review/scheme', role: 'teacher', url: `/review/${SCHEME_ID}` },
-    { label: 'settings', role: 'teacher', url: '/settings' },
-    { label: 'school overview', role: 'admin', url: '/school-admin' },
-    { label: 'teacher management', role: 'admin', url: '/school-admin/teachers' },
-    { label: 'school settings', role: 'admin', url: '/school-admin/settings' },
-    { label: 'licence management', role: 'admin', url: '/school-admin/license' },
+    { label: 'dashboard', role: 'teacher', url: '/dashboard', wait: /Welcome back/i },
+    { label: 'lesson editor', role: 'teacher', url: `/lessons/${LESSON_ID}`, wait: 'Lesson Topic' },
+    { label: 'weekly plan editor', role: 'teacher', url: `/weekly-plans/${PLAN_ID}`, wait: 'Starter' },
+    { label: 'new weekly plan', role: 'teacher', url: '/weekly-plans/new', wait: 'Week number' },
+    { label: 'review/scheme', role: 'teacher', url: `/review/${reviewSchemeId}`, wait: /Configure lesson rubrics/i },
+    { label: 'settings', role: 'teacher', url: '/settings', wait: 'Settings' },
+    { label: 'school overview', role: 'admin', url: '/school-admin', wait: /Seats used|School/i },
+    { label: 'teacher management', role: 'admin', url: '/school-admin/teachers', wait: /Teachers \(/ },
+    { label: 'school settings', role: 'admin', url: '/school-admin/settings', wait: 'School Profile' },
+    { label: 'licence management', role: 'admin', url: '/school-admin/license', wait: /Licen[cs]e/i },
   ]
 
   for (const width of WIDTHS) {
@@ -70,12 +82,23 @@ async function main() {
     for (const screen of screens) {
       const page = screen.role === 'teacher' ? teacherPage : adminPage
       await page.goto(WEB + screen.url, { waitUntil: 'domcontentloaded' })
-      await page.waitForTimeout(700)
-      const noOverflow = await page.evaluate(() =>
-        document.documentElement.scrollWidth <= window.innerWidth + 1)
+      if (screen.wait) {
+        await page.getByText(screen.wait).first().waitFor({ timeout: 8000 }).catch(() => {})
+      }
+      await page.waitForTimeout(300)
+      const overflow = await page.evaluate(() => ({
+        ok: document.documentElement.scrollWidth <= window.innerWidth + 1,
+        scrollWidth: document.documentElement.scrollWidth,
+        innerWidth: window.innerWidth,
+        offenders: [...document.querySelectorAll('*')]
+          .filter((el) => el.getBoundingClientRect().right > window.innerWidth + 1)
+          .slice(0, 4)
+          .map((el) => `${el.tagName}.${String(el.className).slice(0, 50)}`),
+      }))
+      const noOverflow = overflow.ok
       const hasBody = (await page.locator('body').innerText()).trim().length > 10
       record(`${screen.label} @${width}`, noOverflow && hasBody,
-        noOverflow ? '' : 'horizontal overflow')
+        noOverflow ? '' : `scroll ${overflow.scrollWidth}/${overflow.innerWidth} ${overflow.offenders.join('; ')}`)
 
       if (width === 1280) {
         await axe(page, screen.label)
@@ -83,7 +106,7 @@ async function main() {
     }
 
     if (width === 1280) {
-      await teacherPage.goto(`${WEB}/review/${SCHEME_ID}`, { waitUntil: 'domcontentloaded' })
+      await teacherPage.goto(`${WEB}/review/${reviewSchemeId}`, { waitUntil: 'domcontentloaded' })
       const open = teacherPage.getByRole('button', { name: /Configure lesson rubrics/i }).first()
       await open.waitFor({ timeout: 20000 })
       await open.click()
@@ -109,9 +132,13 @@ async function main() {
   await page.reload({ waitUntil: 'domcontentloaded' })
   const recovered = await page.getByText(/We found your unsaved work/).first()
     .waitFor({ state: 'visible', timeout: 8000 }).then(() => true).catch(() => false)
-  const noOverflow = await page.evaluate(() =>
-    document.documentElement.scrollWidth <= window.innerWidth + 1)
-  record('draft banner @320 readable and contained', recovered && noOverflow)
+  const bannerOverflow = await page.evaluate(() => ({
+    ok: document.documentElement.scrollWidth <= window.innerWidth + 1,
+    scrollWidth: document.documentElement.scrollWidth,
+    innerWidth: window.innerWidth,
+  }))
+  record('draft banner @320 readable and contained', recovered && bannerOverflow.ok,
+    `scroll ${bannerOverflow.scrollWidth}/${bannerOverflow.innerWidth} recovered=${recovered}`)
   await ctx.close()
 
   // Reduced motion on a loading skeleton.

@@ -342,7 +342,7 @@ export default function NewWeeklyPlanPage() {
       {error && <Banner tone="danger" title="Needs attention">{error}</Banner>}
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
+        <div className="min-w-0 space-y-6 lg:col-span-2">
           {/* ── Plan details ─────────────────────────────────────────── */}
           <SurfaceCard data-weekly-config className="p-6">
             <h2 className="text-base font-semibold text-[#102A43]">Plan details</h2>
@@ -628,7 +628,7 @@ export default function NewWeeklyPlanPage() {
         </div>
 
         {/* ── Action rail ───────────────────────────────────────────── */}
-        <div className="lg:col-span-1 lg:sticky lg:top-20 lg:self-start">
+        <div className="min-w-0 lg:col-span-1 lg:sticky lg:top-20 lg:self-start">
           <SurfaceCard data-weekly-action className="p-6 space-y-4">
             <div>
               <h2 className="text-base font-semibold text-[#102A43]">Generate this week</h2>
