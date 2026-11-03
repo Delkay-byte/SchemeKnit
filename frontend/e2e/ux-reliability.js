@@ -16,6 +16,9 @@ const API = process.env.UX_API_URL || 'http://127.0.0.1:8000'
 const TOKEN = process.env.UX_TOKEN || process.env.UX_TEACHER_TOKEN || ''
 const USER = process.env.UX_USER || process.env.UX_TEACHER_USER || '{"id":"ux-e2e","email":"ux-e2e@test.local","full_name":"UX E2E Teacher","school_name":"","is_admin":false,"is_active":true,"role":"teacher","school_id":null}'
 const PDF = path.resolve(__dirname, '..', '..', 'backend', 'real_documents', 'BASIC 6 TERM 1.pdf')
+// Staging can point at a smaller fixture; CI keeps the PDF default.
+const SCHEME_FILE = process.env.UX_SCHEME_FILE || PDF
+const SCHEME_EXT = path.extname(SCHEME_FILE) || '.pdf'
 const results = []
 
 function record(name, passed, detail = '') {
@@ -24,9 +27,10 @@ function record(name, passed, detail = '') {
 }
 
 async function uploadScheme(name) {
-  const bytes = fs.readFileSync(PDF)
+  const bytes = fs.readFileSync(SCHEME_FILE)
+  const filename = name.replace(/\.pdf$/i, SCHEME_EXT)
   const form = new FormData()
-  form.append('file', new Blob([bytes], { type: 'application/pdf' }), name)
+  form.append('file', new Blob([bytes]), filename)
   const response = await fetch(`${API}/api/documents/upload`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${TOKEN}` },

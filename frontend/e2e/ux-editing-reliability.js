@@ -15,6 +15,8 @@ const USER = JSON.parse(process.env.UX_USER || process.env.UX_TEACHER_USER || '{
 const LESSON_ID = process.env.UX_LESSON_ID || ''
 const PLAN_ID = process.env.UX_PLAN_ID || 'wp-ux-fixture'
 const PDF = path.resolve(__dirname, '..', '..', 'backend', 'real_documents', 'BASIC 6 TERM 1.pdf')
+const SCHEME_FILE = process.env.UX_SCHEME_FILE || PDF
+const SCHEME_EXT = path.extname(SCHEME_FILE) || '.pdf'
 const results = []
 
 function record(name, passed, detail = '') {
@@ -46,9 +48,9 @@ async function plan() {
 }
 
 async function uploadScheme() {
-  const bytes = fs.readFileSync(PDF)
+  const bytes = fs.readFileSync(SCHEME_FILE)
   const form = new FormData()
-  form.append('file', new Blob([bytes], { type: 'application/pdf' }), `ux-config-${Date.now()}.pdf`)
+  form.append('file', new Blob([bytes]), `ux-config-${Date.now()}${SCHEME_EXT}`)
   const response = await fetch(`${API}/api/documents/upload`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${TOKEN}` },
