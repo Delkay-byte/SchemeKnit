@@ -66,3 +66,18 @@ def test_local_paths_still_work(tmp_path):
         SimpleNamespace(storage_filename=str(local)))
     assert path == local
     assert temp is None
+
+
+def test_durable_key_uses_the_configured_storage_prefix(monkeypatch):
+    from src.config import get_settings
+    monkeypatch.setenv("STORAGE_PREFIX", "staging/")
+    monkeypatch.setenv("STORAGE_BACKEND", "s3")
+    get_settings.cache_clear()
+    try:
+        key = documents._durable_upload_key("user-1", ".pdf")
+        assert key.startswith("staging/uploads/user-1/")
+        assert key.endswith(".pdf")
+        assert "production/" not in key
+    finally:
+        monkeypatch.delenv("STORAGE_PREFIX", raising=False)
+        get_settings.cache_clear()

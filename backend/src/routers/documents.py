@@ -23,6 +23,7 @@ from ..service import data_service
 from ..parsers.pdf_parser import get_document_parser
 from ..database import WeekDB
 from ..models import SchemeOfWork, Subject, ClassLevel
+from ..config import get_settings
 from ..logging_config import get_logger, log_event
 from ..security import enforce_authenticated_budget
 from ..storage import get_storage
@@ -142,8 +143,13 @@ def _durable_upload_enabled() -> bool:
 
 
 def _durable_upload_key(user_id: str, ext: str) -> str:
-    """Opaque production key; never derived from the teacher filename."""
-    return f"production/uploads/{user_id}/{uuid.uuid4().hex}{ext}"
+    """Opaque storage key; never derived from the teacher filename.
+
+    Staging and production share the bucket but not a prefix, so staging
+    uploads cannot mix with customer documents.
+    """
+    prefix = (get_settings().STORAGE_PREFIX or "production/").strip("/")
+    return f"{prefix}/uploads/{user_id}/{uuid.uuid4().hex}{ext}"
 
 
 def _materialize_upload(scheme):

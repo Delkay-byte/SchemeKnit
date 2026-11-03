@@ -138,3 +138,48 @@ def test_production_boot_accepts_explicit_live_configuration():
     assert "PAYSTACK_MODE" not in message
     assert "PAYSTACK_SECRET_KEY" not in message
     assert "PAYSTACK_CURRENCY" not in message
+
+
+def _production_settings(**overrides):
+    from src.config import Settings
+    values = dict(
+        DEBUG=False,
+        DATABASE_URL="postgresql://u:p@localhost/db",
+        SECRET_KEY="strong-secret",
+        JWT_SECRET_KEY="strong-jwt",
+        PUBLIC_WEB_URL="https://staging.example.com",
+        API_BASE_URL="https://staging-api.example.com",
+        CORS_ORIGINS=["https://staging.example.com"],
+        RESEND_API_KEY="re_test",
+        EMAIL_FROM="no-reply@example.com",
+        STORAGE_BACKEND="s3",
+        S3_BUCKET="bucket",
+        S3_ACCESS_KEY="key",
+        S3_SECRET_KEY="secret",
+        REGISTRATION_MODE="open",
+        RATE_LIMIT_BACKEND="db",
+        PAYSTACK_ENABLED=True,
+        PAYSTACK_MODE="test",
+        PAYSTACK_SECRET_KEY="sk_test_placeholder",
+        PAYSTACK_CURRENCY="GHS",
+    )
+    values.update(overrides)
+    return Settings(**values)
+
+
+def test_production_still_refuses_a_test_paystack_key():
+    with pytest.raises(RuntimeError) as exc:
+        _production_settings().validate_production()
+    assert "PAYSTACK_SECRET_KEY" in str(exc.value)
+
+
+def test_explicit_staging_opt_in_allows_a_test_paystack_key():
+    _production_settings(PAYSTACK_ALLOW_TEST_MODE=True).validate_production()
+
+
+def test_staging_opt_in_still_rejects_a_live_key_in_test_mode():
+    with pytest.raises(RuntimeError):
+        _production_settings(
+            PAYSTACK_ALLOW_TEST_MODE=True,
+            PAYSTACK_SECRET_KEY="sk_live_placeholder",
+        ).validate_production()
