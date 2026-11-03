@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,12 @@ import { api } from '@/lib/api'
 import { upgradePath } from '@/lib/purchase-return'
 import type { CataloguePlan, CreditStatus } from '@/types'
 import { normalizeError } from '@/lib/error-normalizer'
+import {
+  PENDING_CHECK_DELAY_MS, PENDING_POLL_INTERVAL_MS, canSubmitOtp,
+  chargeStage, chargeStageMessage, isAwaitingMomoAuthorisation,
+  isBankTransferPrompt, isExpired, isFinalFailure, isOtpRequired,
+  isPayOffline, isSuccess, shouldPollCharge,
+} from '@/lib/payment-flow'
 
 type Charge = {
   reference: string
@@ -45,6 +51,15 @@ export default function UpgradePage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [charge, setCharge] = useState<Charge | null>(null)
+  const [otp, setOtp] = useState('')
+  const [otpError, setOtpError] = useState('')
+  const [submittingOtp, setSubmittingOtp] = useState(false)
+  const [canCheck, setCanCheck] = useState(false)
+  const [checking, setChecking] = useState(false)
+  const [statusError, setStatusError] = useState('')
+  // Monotonic token: a slow, stale status response must never overwrite a
+  // newer state (or a successful OTP submission).
+  const checkSeq = useRef(0)
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -98,34 +113,64 @@ export default function UpgradePage() {
   }, [user, authLoading, params, router])
 
   // Poll a prepaid charge until Paystack confirms it, fails it, or it expires.
+  // Paystack asks merchants to wait at least 10 seconds before checking a
+  // pending charge, and OTP entry must be completed first.
   useEffect(() => {
-    if (!charge || charge.status !== 'pending') return
+    if (!charge || !shouldPollCharge(charge)) return
+    const reference = charge.reference
     const id = window.setInterval(async () => {
+      const seq = ++checkSeq.current
       try {
-        const s = await api.chargeStatus(charge.reference)
-        setCharge(s)
-        if (s.status === 'success') {
+        const next = await api.chargeStatus(reference)
+        if (seq !== checkSeq.current) return
+        setCharge(next)
+        setStatusError('')
+        if (isSuccess(next)) {
           window.clearInterval(id)
           router.push('/subscription?activated=1')
-        } else if (s.status === 'failed' || s.status === 'expired') {
+        } else if (isFinalFailure(next)) {
           window.clearInterval(id)
           setBusy(false)
         }
-      } catch { /* keep polling */ }
-    }, 5000)
+      } catch {
+        // A network hiccup is not proof the payment failed — keep polling and
+        // show an honest "temporarily unavailable" note.
+        if (seq === checkSeq.current) {
+          setStatusError('Payment status is temporarily unavailable. Your payment is still being checked.')
+        }
+      }
+    }, PENDING_POLL_INTERVAL_MS)
     return () => window.clearInterval(id)
-  }, [charge, router])
+  }, [charge?.reference, charge?.status, charge?.charge_status, router])
+
+  useEffect(() => {
+    if (!charge || charge.status !== 'pending') {
+      setCanCheck(false)
+      return
+    }
+    setCanCheck(false)
+    const timer = window.setTimeout(() => setCanCheck(true), PENDING_CHECK_DELAY_MS)
+    return () => window.clearTimeout(timer)
+  }, [charge?.reference, charge?.status, charge?.charge_status])
 
   const start = async () => {
     if (!selected) return
     setError('')
     setBusy(true)
     setCharge(null)
+    setOtp('')
+    setOtpError('')
+    setStatusError('')
+    setCanCheck(false)
+    checkSeq.current += 1
     try {
       const data = method === 'bank_transfer'
         ? await api.bankTransferCharge(selected)
         : await api.momoCharge(selected, phone, provider)
       setCharge(data)
+      // The charge itself now drives the UI (OTP form / pending / success),
+      // so the start button must not stay stuck in "sending" state.
+      setBusy(false)
       if (data.status === 'success') {
         router.push('/subscription?activated=1')
       } else if (data.status === 'failed') {
@@ -287,54 +332,191 @@ export default function UpgradePage() {
               </Button>
             )}
 
-            {charge && (
-              <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4" role="status" data-charge-status={charge.status}>
-                {charge.status === 'pending' && charge.payment_details?.account_number ? (
-                  <>
-                    <p className="flex items-center gap-2 font-semibold text-[#102A43]">
-                      <Clock className="h-4 w-4" /> Waiting for your transfer
-                    </p>
-                    <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-                      <div><dt className="text-xs uppercase text-slate-500">Bank</dt><dd>{charge.payment_details.bank_name}</dd></div>
-                      <div><dt className="text-xs uppercase text-slate-500">Account number</dt><dd className="font-mono text-base">{charge.payment_details.account_number}</dd></div>
-                      <div><dt className="text-xs uppercase text-slate-500">Account name</dt><dd>{charge.payment_details.account_name}</dd></div>
-                      <div><dt className="text-xs uppercase text-slate-500">Amount due</dt><dd className="font-semibold">{plan ? money(plan.price_pesewas) : '—'}</dd></div>
-                      <div><dt className="text-xs uppercase text-slate-500">Transfer reference</dt><dd className="font-mono break-all">{charge.payment_details.transaction_reference || charge.reference}</dd></div>
-                      <div><dt className="text-xs uppercase text-slate-500">Expires</dt><dd>{charge.payment_details.account_expires_at ? new Date(charge.payment_details.account_expires_at).toLocaleString() : '—'}</dd></div>
-                    </dl>
-                    <p className="mt-3 text-xs text-slate-500">
-                      Nothing is activated until Paystack confirms the transfer. This page checks automatically.
-                    </p>
-                  </>
-                ) : (
-                  <p className="text-sm text-[#102A43]">
-                    {charge.display_text || (charge.status === 'pending'
-                      ? 'Approve the payment on your phone. This page checks automatically.'
-                      : charge.status === 'success'
-                        ? 'Payment confirmed. Your package is active.'
-                        : 'Payment was not completed. No credits were issued.')}
-                  </p>
-                )}
-                {charge.status === 'pending' && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-3"
-                    onClick={async () => {
-                      const s = await api.chargeStatus(charge.reference)
-                      setCharge(s)
-                    }}
-                  >
-                    Check status now
-                  </Button>
-                )}
-                {charge.status === 'pending' && method === 'mobile_money' && (
-                  <p className="mt-2 text-xs text-slate-500">
-                    Reference {charge.reference}. If the prompt does not arrive, start a new request.
-                  </p>
-                )}
-              </div>
-            )}
+            {charge && (() => {
+              const stage = chargeStage(charge)
+              const display = (charge.display_text || '').trim()
+              return (
+                <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4"
+                  role="status" data-charge-status={charge.status} data-payment-stage={stage}>
+                  {stage === 'otp' ? (
+                    <div data-momo-otp>
+                      <p className="font-semibold text-[#102A43]">Enter your one-time password</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Paystack asked for the SMS one-time password for this payment.
+                        Enter it here to continue. This is not your Mobile Money PIN.
+                      </p>
+                      {display && <p className="mt-2 text-sm text-[#102A43]">{display}</p>}
+                      <div className="mt-3 max-w-xs">
+                        <label htmlFor="momo-otp" className="text-xs font-medium">One-time password</label>
+                        <input
+                          id="momo-otp"
+                          inputMode="numeric"
+                          autoComplete="one-time-code"
+                          aria-describedby="momo-otp-help"
+                          value={otp}
+                          onChange={(e) => { setOtp(e.target.value.replace(/\D/g, '').slice(0, 8)); setOtpError('') }}
+                          className="mt-1 w-full rounded-md border border-input bg-white px-3 py-2 text-sm tracking-widest"
+                          placeholder="e.g. 123456"
+                        />
+                        <p id="momo-otp-help" className="mt-1 text-xs text-slate-500">
+                          Synthetic test codes only in development. Never share this code.
+                        </p>
+                      </div>
+                      {otpError && <p className="mt-2 text-xs text-destructive" role="alert">{otpError}</p>}
+                      <p className="mt-2 text-xs text-slate-500">
+                        Payment reference {charge.reference}. Quote it to support if the code does not arrive.
+                      </p>
+                      <Button
+                        className="mt-3"
+                        disabled={submittingOtp || !canSubmitOtp(charge, otp)}
+                        onClick={async () => {
+                          if (submittingOtp) return
+                          setSubmittingOtp(true)
+                          setOtpError('')
+                          try {
+                            const next = await api.submitMomoOtp(charge.reference, otp)
+                            checkSeq.current += 1
+                            setCharge(next)
+                            setOtp('')
+                            if (isSuccess(next)) {
+                              router.push('/subscription?activated=1')
+                            } else if (isFinalFailure(next)) {
+                              setBusy(false)
+                            } else if (isOtpRequired(next)) {
+                              setOtpError('That code was not accepted. Check the SMS and try again.')
+                            }
+                          } catch (err) {
+                            setOtpError(normalizeError(err).message)
+                          } finally {
+                            setSubmittingOtp(false)
+                          }
+                        }}
+                      >
+                        {submittingOtp ? 'Submitting…' : 'Submit OTP'}
+                      </Button>
+                    </div>
+                  ) : isBankTransferPrompt(charge) ? (
+                    <>
+                      <p className="flex items-center gap-2 font-semibold text-[#102A43]">
+                        <Clock className="h-4 w-4" /> Waiting for your transfer
+                      </p>
+                      <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                        <div><dt className="text-xs uppercase text-slate-500">Bank</dt><dd>{charge.payment_details.bank_name}</dd></div>
+                        <div><dt className="text-xs uppercase text-slate-500">Account number</dt><dd className="font-mono text-base">{charge.payment_details.account_number}</dd></div>
+                        <div><dt className="text-xs uppercase text-slate-500">Account name</dt><dd>{charge.payment_details.account_name}</dd></div>
+                        <div><dt className="text-xs uppercase text-slate-500">Amount due</dt><dd className="font-semibold">{plan ? money(plan.price_pesewas) : '—'}</dd></div>
+                        <div><dt className="text-xs uppercase text-slate-500">Transfer reference</dt><dd className="font-mono break-all">{charge.payment_details.transaction_reference || charge.reference}</dd></div>
+                        <div><dt className="text-xs uppercase text-slate-500">Expires</dt><dd>{charge.payment_details.account_expires_at ? new Date(charge.payment_details.account_expires_at).toLocaleString() : '—'}</dd></div>
+                      </dl>
+                      <p className="mt-3 text-xs text-slate-500">
+                        Nothing is activated until Paystack confirms the transfer. This page checks automatically.
+                      </p>
+                    </>
+                  ) : stage === 'success' ? (
+                    <div data-payment-success>
+                      <p className="font-semibold text-green-800">Payment successful</p>
+                      <p className="mt-1 text-sm text-[#102A43]">
+                        Your package is now active. Your credits are available on your dashboard.
+                      </p>
+                    </div>
+                  ) : stage === 'failed' || stage === 'expired' ? (
+                    <div data-payment-failed>
+                      <p className="font-semibold text-[#102A43]">
+                        {stage === 'expired' ? 'Payment session expired' : 'Payment was not completed'}
+                      </p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {chargeStageMessage(stage)} No credits were issued.
+                      </p>
+                    </div>
+                  ) : (
+                    <div data-payment-waiting>
+                      <p className="font-semibold text-[#102A43]">
+                        {stage === 'pay_offline' || stage === 'awaiting_momo_authorisation'
+                          ? 'Check your phone'
+                          : 'Waiting for confirmation'}
+                      </p>
+                      <p className="mt-1 text-sm text-[#102A43]">
+                        {display || chargeStageMessage(stage)}
+                      </p>
+                      {isPayOffline(charge) && (
+                        <div className="mt-3 rounded-md border border-slate-200 bg-white p-3 text-sm text-[#102A43]">
+                          <p className="font-medium">Mobile Money authorisation</p>
+                          <p className="mt-1">
+                            Follow the prompt on your phone. If your provider asks for the
+                            SMS code, enter it in the Mobile Money prompt — not on SchemeKnit.
+                          </p>
+                          <p className="mt-1">
+                            Enter your Mobile Money PIN only in your provider&apos;s own interface.
+                            SchemeKnit will never ask for it.
+                          </p>
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            No prompt on your phone? Confirm the number is registered for
+                            Mobile Money, keep the phone connected, then start a new request.
+                            Nothing is charged until Paystack confirms the payment.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {charge.status === 'pending' && !isOtpRequired(charge) && (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!canCheck || checking}
+                        onClick={async () => {
+                          if (checking) return
+                          const seq = ++checkSeq.current
+                          setChecking(true)
+                          setStatusError('')
+                          try {
+                            const next = await api.chargeStatus(charge.reference)
+                            if (seq !== checkSeq.current) return
+                            setCharge(next)
+                            if (isSuccess(next)) {
+                              router.push('/subscription?activated=1')
+                            } else if (isFinalFailure(next)) {
+                              setBusy(false)
+                            }
+                          } catch {
+                            if (seq === checkSeq.current) {
+                              setStatusError('Payment status is temporarily unavailable. Your payment is still being checked; try again in a moment.')
+                            }
+                          } finally {
+                            if (seq === checkSeq.current) setChecking(false)
+                          }
+                        }}
+                      >
+                        {checking ? 'Checking…' : canCheck ? 'Check status now' : 'Checking becomes available in 10s…'}
+                      </Button>
+                      <span className="text-xs text-slate-500">Reference {charge.reference}</span>
+                    </div>
+                  )}
+
+                  {(stage === 'failed' || stage === 'expired') && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-3"
+                      onClick={() => {
+                        checkSeq.current += 1
+                        setCharge(null)
+                        setStatusError('')
+                        setOtp('')
+                        setOtpError('')
+                      }}
+                    >
+                      Start a new payment
+                    </Button>
+                  )}
+
+                  {statusError && (
+                    <p className="mt-2 text-xs text-amber-800" role="status">{statusError}</p>
+                  )}
+                </div>
+              )
+            })()}
           </SurfaceCard>
         )}
 

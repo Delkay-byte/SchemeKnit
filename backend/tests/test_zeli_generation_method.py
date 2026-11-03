@@ -679,17 +679,21 @@ def _frontend(path):
 
 
 def test_generate_page_offers_zeli_and_keeps_existing_options():
+    # The method choice now lives in the shared configuration dialog, used by
+    # both the upload success screen and the Generate page.
+    modal = _frontend("src/components/lesson-config-modal.tsx")
     page = _frontend("src/app/(app)/generate/[id]/page.tsx")
 
-    # The accessible, clearly labelled option exists exactly once as a choice.
-    assert "Generate with Zeli" in page
-    assert 'data-generation-method' in page
-    assert "generation_method" in page
+    assert "Generate with Zeli" in modal
+    assert 'data-generation-method="standard"' in modal
+    assert 'data-generation-method="zeli"' in modal
+    assert "generation_method" in modal and "generation_method" in page
     # Existing generation options are preserved.
     for option in ('"OFF"', '"BASIC"', '"ENHANCED"'):
-        assert f"value={option}" in page or f"'{option}'" in page
-    # Zeli availability drives a real disabled state, not a misleading button.
-    assert "zeliStatus" in page or "zeli_status" in page or "zeliStatus" in page
+        assert f"value={option}" in modal or f"'{option}'" in modal
+    # Zeli availability drives a real message, not a misleading button.
+    assert "zeliStatus" in modal and "zeliStatus" in page
+    assert "Zeli available" in page
 
 
 def test_api_client_sends_generation_method_and_reports_zeli_status():
@@ -699,11 +703,11 @@ def test_api_client_sends_generation_method_and_reports_zeli_status():
 
 
 def test_generate_page_disables_enrichment_mode_for_zeli():
-    page = _frontend("src/app/(app)/generate/[id]/page.tsx")
+    modal = _frontend("src/components/lesson-config-modal.tsx")
     # Exposed only as an explicit choice; the existing OFF/BASIC/ENHANCED
-    # select must be disabled (with a reason) while Zeli is selected.
-    assert "disabled={config.generation_method === 'zeli'}" in page
-    assert "cfg-ai-mode-note" in page
+    # select is disabled (with a reason) while Zeli is selected.
+    assert "disabled={activeMethod === 'zeli'}" in modal
+    assert "cfg-ai-mode-note" in modal
 
 
 # ── 10. Resume / retry / recovery ───────────────────────────────────────────

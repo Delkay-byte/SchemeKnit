@@ -1,15 +1,14 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { SurfaceCard } from '@/components/ui/surface-card'
 import { Banner } from '@/components/ui/banner'
-import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Field, TextArea } from '@/components/ui/field'
-import { Download, Settings, Play, CheckCircle, FileText, FileSpreadsheet, FileArchive, Loader2, Eye, Save, ChevronDown, ChevronRight, SlidersHorizontal } from 'lucide-react'
+import { Download, Settings, Play, CheckCircle, FileText, FileSpreadsheet, FileArchive, Loader2, Eye, ChevronDown, ChevronRight } from 'lucide-react'
 import { api, sanitizeTermConfig } from '@/lib/api'
 import { DetailPageSkeleton } from '@/components/ui/skeleton'
 import { normalizeError } from '@/lib/error-normalizer'
@@ -36,14 +35,25 @@ import { SchemeOfWork, TermConfig, CurriculumCoverage, Template, CurriculumProfi
 // four structured fields are teacher-selected from approved option lists.
 const WAPEF_TEMPLATE_ID = 'tpl-wapef-approved-plan'
 
+/** The fields this page edits on a per-lesson WAPEF row. */
+interface WapefReviewRow {
+  lesson_sequence: number
+  week_number?: number
+  indicator_code?: string
+  is_special_period?: boolean
+  wapef_deep_hope?: string
+  wapef_storyline?: string
+  wapef_through_lines?: string[]
+  wapef_gods_story?: string
+  remarks?: string
+}
+
 export default function GeneratePage() {
-  const router = useRouter()
   const params = useParams()
   const schemeId = resolveRouteId(params.id, 'generate')
 
   // PART 3: when a scheme never states its class, the teacher must choose one
   // before generating. "Unknown" is never a generation-ready value.
-  const [classLevels, setClassLevels] = useState<string[]>([])
   const [scheme, setScheme] = useState<SchemeOfWork | null>(null)
   const [templates, setTemplates] = useState<Template[]>([])
   const [profiles, setProfiles] = useState<CurriculumProfile[]>([])
@@ -96,14 +106,6 @@ export default function GeneratePage() {
   const [lessonConfigMissing, setLessonConfigMissing] = useState<string[]>([])
   const [configModalOpen, setConfigModalOpen] = useState(false)
   const [configSavedAt, setConfigSavedAt] = useState<string | null>(null)
-  const NACCA_COMPETENCIES = [
-    'Critical Thinking and Problem Solving',
-    'Creativity and Innovation',
-    'Communication and Collaboration',
-    'Cultural Identity and Global Citizenship',
-    'Personal Development and Leadership',
-    'Digital Literacy',
-  ]
   // Actual AI resolution (mode/provider/available) reported by the backend —
   // so the UI never shows a mode that disagrees with real behaviour.
   const [aiStatus, setAiStatus] = useState<{
@@ -175,21 +177,19 @@ export default function GeneratePage() {
       teacher_name: saved.teacher_name || prev.teacher_name,
       class_size: saved.class_size ?? prev.class_size,
       lesson_duration_minutes: saved.lesson_duration_minutes ?? prev.lesson_duration_minutes,
-      lessons_per_week: saved.periods_per_week ?? prev.lessons_per_week,
+      lessons_per_week: saved.lessons_per_week ?? saved.periods_per_week ?? prev.lessons_per_week,
       period: saved.period ?? prev.period,
       references: saved.reference ? [saved.reference] : prev.references,
       teaching_days: saved.teaching_days?.length ? [...saved.teaching_days] : prev.teaching_days,
+      term: saved.term || prev.term,
+      term_start_date: saved.term_start_date || prev.term_start_date,
+      term_end_date: saved.term_end_date || prev.term_end_date,
+      generation_method: (saved.generation_method || prev.generation_method) as any,
+      ai_mode: (saved.ai_mode || prev.ai_mode) as any,
+      template_id: saved.template_id || prev.template_id,
+      indicator_resources: saved.indicator_resources || {},
     }))
     try { await handlePreviewAllocation() } catch { /* preview refreshes debounced anyway */ }
-  }
-
-  const levelForClass = (classLevel: string): string | undefined => {
-    const c = (classLevel || '').toLowerCase()
-    if (/(nursery|kg|kindergarten|early)/.test(c)) return 'Early Childhood'
-    if (/(shs|senior high|basic 1[0-2])/.test(c)) return 'Senior High School'
-    if (/(basic [7-9]|jhs|junior high|form [1-3])/.test(c)) return 'Junior High School'
-    if (/(basic [1-6]|primary|class [1-6]|std [1-6])/.test(c)) return 'Primary'
-    return undefined
   }
 
   const [config, setConfig] = useState<TermConfig>({
@@ -212,7 +212,11 @@ export default function GeneratePage() {
     ai_mode: 'OFF',
     // "standard" keeps the existing deterministic/AI-enrichment options;
     // "zeli" asks Zeli to write each whole lesson. Persisted across visits.
-    generation_method: 'standard',
+    generation_method: (
+      typeof window !== 'undefined'
+      && new URLSearchParams(window.location.search).get('method') === 'zeli'
+        ? 'zeli' : 'standard'
+    ),
     template_type: 'GES-style',
     template_id: '',
     include_special_weeks: false,
@@ -226,24 +230,16 @@ export default function GeneratePage() {
     selected_indicator_codes: [],
   })
 
-  // PART 2/28: the curriculum reference option names THIS scheme's subject
-  // ("Computing Curriculum") — never a hard-coded "Subject Curriculum".
-  const REFERENCE_TYPES = [
-    config.subject && config.subject !== 'Unknown'
-      ? `${config.subject} Curriculum`
-      : 'Subject Curriculum',
-    'Teacher\'s Handbook / Teacher\'s Guide',
-    'Textbook',
-    'Other',
-  ]
-
   useEffect(() => {
     // Restore the teacher's last AI mode choice so it persists across visits.
     try {
       const saved = window.localStorage.getItem('schemeknit.ai_mode')
       if (saved) setConfig(prev => ({ ...prev, ai_mode: saved as any }))
+      // A method chosen on the upload screen arrives in the URL and is saved
+      // on the scheme; the last-used local value must not override it.
+      const queryMethod = new URLSearchParams(window.location.search).get('method')
       const savedMethod = window.localStorage.getItem('schemeknit.generation_method')
-      if (savedMethod === 'zeli' || savedMethod === 'standard') {
+      if (!queryMethod && (savedMethod === 'zeli' || savedMethod === 'standard')) {
         setConfig(prev => ({ ...prev, generation_method: savedMethod }))
       }
       const savedGenMode = window.localStorage.getItem('schemeknit.gen_mode')
@@ -313,8 +309,6 @@ export default function GeneratePage() {
       // teacher simply cannot confirm from this screen.
       api
         .listClassLevels()
-        .then((d) => setClassLevels(d.class_levels || []))
-        .catch(() => setClassLevels([]))
 
       // School and teacher identity come from the authenticated user, not from
       // typed input (PART 14-15). Seed the config so the generation payload
@@ -354,6 +348,24 @@ export default function GeneratePage() {
         if (savedConfig.config.teaching_days?.length) {
           setConfig(prev => ({ ...prev, teaching_days: [...savedConfig.config.teaching_days!] }))
         }
+        // The saved configuration is the plan's authority: method, term,
+        // dates, template and class must survive reload, not just this visit.
+        setConfig(prev => ({
+          ...prev,
+          generation_method:
+            (savedConfig.config.generation_method || prev.generation_method) as TermConfig['generation_method'],
+          ai_mode: (savedConfig.config.ai_mode || prev.ai_mode) as TermConfig['ai_mode'],
+          template_id: savedConfig.config.template_id || prev.template_id,
+          term: savedConfig.config.term || prev.term,
+          term_start_date: savedConfig.config.term_start_date || prev.term_start_date,
+          term_end_date: savedConfig.config.term_end_date || prev.term_end_date,
+          lessons_per_week:
+            savedConfig.config.lessons_per_week
+            ?? savedConfig.config.periods_per_week
+            ?? prev.lessons_per_week,
+          period: savedConfig.config.period ?? prev.period,
+          class_size: savedConfig.config.class_size ?? prev.class_size,
+        }))
       } else {
         setLessonConfigMissing([])
       }
@@ -435,10 +447,13 @@ export default function GeneratePage() {
           schemeData.class_level && schemeData.class_level !== 'Unknown'
             ? schemeData.class_level
             : '',
-        subject:
-          schemeData.subject && schemeData.subject !== 'Unknown'
-            ? schemeData.subject
-            : '',
+        subject: (() => {
+          // The API's `subject` is the source label ("Computing") for display;
+          // generation needs the canonical taxonomy value ("ICT").
+          const canonical = (schemeData as { subject_canonical?: string }).subject_canonical
+          const value = canonical || schemeData.subject
+          return value && value !== 'Unknown' ? value : ''
+        })(),
         term_start_date: weekStarts[0] || prev.term_start_date,
         term_end_date: weekEnds[weekEnds.length - 1] || prev.term_end_date,
         lesson_duration_minutes:
@@ -883,7 +898,7 @@ export default function GeneratePage() {
     if (!allocationPreview) {
       await handlePreviewAllocation()
     }
-    setTimeout(() => scrollTo('[data-lesson-review]'), 120)
+    setTimeout(() => scrollTo('[data-wapef-setup]'), 120)
   }
 
   // Canonical WAPEF draft shape for ONE review row: built from the CURRENT
@@ -948,17 +963,6 @@ export default function GeneratePage() {
       if (r.lesson_sequence !== seq) return r
       if (r.source_occurrence_id) touchedOccurrences.current.add(r.source_occurrence_id)
       return { ...r, ...patch }
-    }))
-    setReviewSaved(false)
-  }
-
-  const updateStructuredRef = (seq: number, index: number, patch: Partial<any>) => {
-    setLessonReview(rows => rows.map(r => {
-      if (r.lesson_sequence !== seq) return r
-      if (r.source_occurrence_id) touchedOccurrences.current.add(r.source_occurrence_id)
-      const refs = [...(r.structured_references || [])]
-      refs[index] = { ...(refs[index] || { type: 'Other', title: '' }), ...patch }
-      return { ...r, structured_references: refs }
     }))
     setReviewSaved(false)
   }
@@ -1306,14 +1310,29 @@ export default function GeneratePage() {
             {/* A. What exact lessons am I about to generate? Source facts first. */}
             <SurfaceCard
               data-generate-summary
+              data-generate-config
               accent="bg-gradient-to-r from-[#102A43] to-[#04A9CE]"
               className="px-5 py-5 sm:px-6"
             >
-              <h2 className="text-lg font-semibold text-[#102A43]">What you will generate</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Everything here comes from your uploaded scheme — check it matches your class
-                before generating.
-              </p>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-[#102A43]">What you will generate</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Everything here comes from your uploaded scheme — check it matches your class
+                    before generating.
+                  </p>
+                </div>
+                <Button variant="outline" onClick={() => setConfigModalOpen(true)}>
+                  <Settings className="mr-2 h-4 w-4" aria-hidden="true" />
+                  Configure lesson rubrics
+                </Button>
+              </div>
+              {lessonConfigMissing.length > 0 && (
+                <Banner tone="warning" className="mt-4" title="Teaching setup is incomplete">
+                  Complete: {lessonConfigMissing.join(', ')}. Open Configure
+                  lesson rubrics to finish the setup before generating.
+                </Banner>
+              )}
               <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
                 <div>
                   <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Subject</dt>
@@ -1337,7 +1356,7 @@ export default function GeneratePage() {
                 </div>
                 <div>
                   <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Term</dt>
-                  <dd className="text-sm font-semibold text-[#102A43]">{scheme.term || config.term}</dd>
+                  <dd className="text-sm font-semibold text-[#102A43]">{config.term || scheme.term}</dd>
                 </div>
                 <div>
                   <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Academic year</dt>
@@ -1351,7 +1370,7 @@ export default function GeneratePage() {
                 <div>
                   <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Template</dt>
                   <dd className="text-sm font-semibold text-[#102A43]" data-selected-template>
-                    {selectedTemplateName || 'Not selected'}
+                    {selectedTemplateName || 'Approved GES Plan'}
                   </dd>
                 </div>
                 {/* PART 7: the school this lesson belongs to — asked ONCE,
@@ -1378,6 +1397,18 @@ export default function GeneratePage() {
                   </dd>
                 </div>
               </dl>
+              {config.generation_method === 'zeli' && (
+                <p className={`mt-3 text-xs ${zeliStatus?.active ? 'text-green-700' : 'text-amber-800'}`} role="status">
+                  {zeliStatus?.active
+                    ? 'Zeli available for this scheme.'
+                    : 'Zeli unavailable — choose Standard generation or configure a provider in the lesson dialog.'}
+                </p>
+              )}
+              {configSavedAt && (
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Lesson settings last saved at {configSavedAt}.
+                </p>
+              )}
             </SurfaceCard>
 
             {/* Autopilot (Priority 3.1): ONE explicit action + the smallest
@@ -1445,7 +1476,7 @@ export default function GeneratePage() {
                           </Button>
                         )}
                         {b.code === 'class_confirmation' && (
-                          <Button size="sm" onClick={() => scrollTo('#cfg-class-level')} className="shrink-0">
+                          <Button size="sm" onClick={() => setConfigModalOpen(true)} className="shrink-0">
                             Confirm class level
                           </Button>
                         )}
@@ -1457,7 +1488,7 @@ export default function GeneratePage() {
                           </Button>
                         )}
                         {b.code === 'needs_review' && (
-                          <Button size="sm" onClick={() => scrollTo('[data-lesson-review]')} className="shrink-0">
+                          <Button size="sm" onClick={() => scrollTo('[data-allocation-preview]')} className="shrink-0">
                             Review flagged lessons
                           </Button>
                         )}
@@ -1502,7 +1533,7 @@ export default function GeneratePage() {
                           variant="outline"
                           className="flex-1"
                           disabled={generating}
-                          onClick={() => scrollTo('[data-generate-config]')}
+                          onClick={() => setConfigModalOpen(true)}
                         >
                           Change settings
                         </Button>
@@ -1513,341 +1544,127 @@ export default function GeneratePage() {
               </SurfaceCard>
             )}
 
-            {/* B. Configuration — grouped sections inside one surface. Hidden
-                once a job exists (§15): the workspace takes over and "Start
-                New Generation" brings setup back. */}
-            {!jobId && (
-            <SurfaceCard data-generate-config className="px-5 py-5 sm:px-6">
-              <div className="flex items-center">
-                <Settings className="mr-2 h-5 w-5 text-[#035f7c]" aria-hidden="true" />
-                <div className="flex-1">
-                  <h2 className="text-lg font-semibold text-[#102A43]">Configuration</h2>
-                  <p className="text-sm text-muted-foreground">
-                    Configure your lesson plan generation settings
-                  </p>
-                </div>
-                {/* Phase 3: ONE route back into the guided configuration —
-                    the modal owns the seven lesson-rubric fields; the review
-                    page never duplicates the form. */}
-                <Button
-                  type="button"
-                  variant="outline"
-                  data-configure-lesson-rubrics
-                  onClick={() => setConfigModalOpen(true)}
-                >
-                  <SlidersHorizontal className="mr-2 h-4 w-4" aria-hidden="true" />
-                  Configure lesson rubrics
-                </Button>
-              </div>
-              {lessonConfigMissing.length > 0 && (
-                <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="status">
-                  Lesson configuration is incomplete: {lessonConfigMissing.join(', ')}.{' '}
-                  Use Configure lesson rubrics to save the missing details before generating.
-                </p>
-              )}
-              {lessonConfigMissing.length === 0 && configSavedAt && (
-                <p className="mt-3 text-sm text-green-700" role="status">
-                  Lesson configuration saved{configSavedAt ? ` — ${configSavedAt}` : ''}.
-                </p>
-              )}
-
-              <div className="mt-5 space-y-6">
-                <section aria-label="Teaching setup" className="space-y-6">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                    Teaching setup
-                  </h3>
-                  <div className="grid gap-4 md:grid-cols-3">
-                    <Field label="Class Size" htmlFor="cfg-class-size">
-                      <Input
-                        id="cfg-class-size"
-                        type="number"
-                        value={config.class_size}
-                        onChange={(e) => { const v = parseInt(e.target.value); setConfig({ ...config, class_size: Number.isFinite(v) && v > 0 ? v : (undefined as unknown as number) }) }}
-                      />
-                    </Field>
-                    <Field label="Lesson Duration (min)" htmlFor="cfg-duration">
-                      <Input
-                        id="cfg-duration"
-                        type="number"
-                        value={config.lesson_duration_minutes}
-                        onChange={(e) => setConfig({ ...config, lesson_duration_minutes: parseInt(e.target.value) || 60 })}
-                      />
-                    </Field>
-                    <Field label="Lessons/Week" htmlFor="cfg-lessons-per-week">
-                      <Input
-                        id="cfg-lessons-per-week"
-                        type="number"
-                        value={config.lessons_per_week}
-                        onChange={(e) => setConfig({ ...config, lessons_per_week: parseInt(e.target.value) || 3 })}
-                      />
-                    </Field>
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <Field label="Term Start" htmlFor="cfg-term-start">
-                      <Input
-                        id="cfg-term-start"
-                        type="date"
-                        value={config.term_start_date}
-                        onChange={(e) => setConfig({ ...config, term_start_date: e.target.value })}
-                      />
-                    </Field>
-                    <Field label="Term End" htmlFor="cfg-term-end">
-                      <Input
-                        id="cfg-term-end"
-                        type="date"
-                        value={config.term_end_date}
-                        onChange={(e) => setConfig({ ...config, term_end_date: e.target.value })}
-                      />
-                    </Field>
-                  </div>
-
+            {/* Approved WAPEF Plan fields. These teacher selections belong to
+                that form only, so they stay when the WAPEF template is chosen —
+                without bringing back the removed standalone review table. */}
+            {!jobId && isWapefSelected && wapefOptions && lessonReview.length > 0 && (
+              <SurfaceCard data-wapef-setup className="px-5 py-5 sm:px-6">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="mb-2 text-sm font-medium">Teaching Days</p>
-                    <div className="flex flex-wrap gap-2">
-                      {[
-                        { value: 0, label: 'Monday' },
-                        { value: 1, label: 'Tuesday' },
-                        { value: 2, label: 'Wednesday' },
-                        { value: 3, label: 'Thursday' },
-                        { value: 4, label: 'Friday' },
-                      ].map((day) => (
-                        <button
-                          key={day.value}
-                          onClick={() => {
-                            const newDays = config.teaching_days.includes(day.value)
-                              ? config.teaching_days.filter(d => d !== day.value)
-                              : [...config.teaching_days, day.value]
-                            setConfig({ ...config, teaching_days: newDays.sort() })
-                          }}
-                          className={`rounded-full px-3 py-1 text-sm ${
-                            config.teaching_days.includes(day.value)
-                              ? 'bg-[#102A43] text-white'
-                              : 'bg-muted text-muted-foreground'
-                          }`}
-                        >
-                          {day.label}
-                        </button>
-                      ))}
-                    </div>
+                    <h2 className="text-base font-semibold text-[#102A43]">
+                      Approved WAPEF Plan fields
+                    </h2>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Teacher-selected for each lesson — the AI never changes
+                      these. Required before a WAPEF lesson can be generated.
+                    </p>
                   </div>
-
-                  {/* Generation method: Zeli is an ADDITIONAL, explicitly
-                      selectable method — the existing OFF/BASIC/ENHANCED
-                      options below are preserved and still work when
-                      Standard is selected. */}
-                  <Field
-                    label="Generation method"
-                    htmlFor="cfg-generation-method"
-                    hint="How your lesson plans are written"
-                  >
-                    <div
-                      id="cfg-generation-method"
-                      role="group"
-                      aria-label="Generation method"
-                      className="grid gap-2 sm:grid-cols-2"
-                    >
-                      {([
-                        { value: 'standard', label: 'Standard', hint: 'Deterministic lessons, optionally enriched' },
-                        { value: 'zeli', label: 'Generate with Zeli', hint: 'Zeli writes each whole lesson plan' },
-                      ] as const).map((option) => {
-                        const selected = (config.generation_method || 'standard') === option.value
-                        return (
-                          <button
-                            key={option.value}
-                            type="button"
-                            data-generation-method={option.value}
-                            aria-pressed={selected}
-                            onClick={() => {
-                              setConfig((prev) => ({ ...prev, generation_method: option.value }))
-                              try {
-                                window.localStorage.setItem('schemeknit.generation_method', option.value)
-                              } catch { /* storage unavailable */ }
-                            }}
-                            className={`rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
-                              selected
-                                ? 'border-[#102A43] bg-[#102A43] text-white'
-                                : 'border-input bg-background text-foreground hover:bg-muted'
-                            }`}
-                          >
-                            <span className="block font-medium">{option.label}</span>
-                            <span className={`block text-xs ${selected ? 'text-white/80' : 'text-muted-foreground'}`}>
-                              {option.hint}
-                            </span>
-                          </button>
-                        )
-                      })}
-                    </div>
-                    {config.generation_method === 'zeli' && zeliStatus && (
-                      <p
-                        className={`mt-1 text-xs ${zeliStatus.active ? 'text-green-600' : 'text-amber-700'}`}
-                        role="status"
-                      >
-                        {zeliStatus.active
-                          ? 'Zeli is ready — each lesson plan will be written by Zeli.'
-                          : (zeliStatus.reason
-                            || 'Zeli is unavailable right now. Nothing will be saved and no quota will be used — choose Standard generation or try again later.')}
-                      </p>
+                  <div className="flex items-center gap-2">
+                    {reviewSaved && (
+                      <span className="text-xs text-green-700" role="status">Saved</span>
                     )}
-                  </Field>
-
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <Field label="Template" htmlFor="cfg-template">
-                      <Select
-                        id="cfg-template"
-                        value={config.template_id || config.template_type}
-                        onChange={(e) => setConfig({ ...config, template_id: e.target.value })}
-                      >
-                        {filteredTemplates.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.name}{t.is_default ? ' (Default)' : ''}
-                          </option>
-                        ))}
-                      </Select>
-                      {currentProfile && (
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {currentProfile.name} &bull; {currentProfile.lessons_per_week} lessons/week &bull; {currentProfile.lesson_duration_minutes} min
-                        </p>
-                      )}
-                    </Field>
-                    <Field label="AI Mode" htmlFor="cfg-ai-mode">
-                      <Select
-                        id="cfg-ai-mode"
-                        value={config.ai_mode}
-                        disabled={config.generation_method === 'zeli'}
-                        aria-describedby={config.generation_method === 'zeli' ? 'cfg-ai-mode-note' : undefined}
-                        onChange={(e) => {
-                          const mode = e.target.value
-                          setConfig({ ...config, ai_mode: mode as any })
-                          try { window.localStorage.setItem('schemeknit.ai_mode', mode) } catch { /* ignore */ }
-                        }}
-                      >
-                        <option value="OFF">OFF - Deterministic only</option>
-                        <option value="BASIC">BASIC - Zeli suggestions</option>
-                        <option value="ENHANCED">ENHANCED - Zeli assistance</option>
-                      </Select>
-                      {config.generation_method === 'zeli' ? (
-                        <p id="cfg-ai-mode-note" className="mt-1 text-xs text-muted-foreground">
-                          Generate with Zeli writes the whole lesson, so this enrichment mode is not used.
-                          Switch to Standard to use OFF, BASIC or ENHANCED.
-                        </p>
-                      ) : aiStatus && (
-                        <p className={`mt-1 text-xs ${aiStatus.active ? 'text-green-600' : 'text-muted-foreground'}`}>
-                          {/* Zeli is the teacher-facing assistant name. The
-                              resolved provider stays in the backend-only
-                              ai-status payload (developer/admin diagnostics). */}
-                          {aiStatus.active
-                            ? 'Zeli available'
-                            : config.ai_mode === 'OFF'
-                              ? 'Zeli off — lessons will come from the deterministic engine.'
-                              : 'Zeli unavailable right now — lessons will be deterministic.'}
-                        </p>
-                      )}
-                    </Field>
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-2">
-                    {/* PART 3: a scheme that never states its class needs the
-                        teacher's choice. This is the only place the class can
-                        be set on this screen, and it persists into the
-                        generation payload. */}
-                    <Field
-                      label="Class"
-                      htmlFor="cfg-class-level"
-                      hint={
-                        classNeedsConfirmation
-                          ? 'Your scheme does not state the class — choose it to continue'
-                          : 'Taken from your scheme'
-                      }
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => saveLessonReviewDrafts()}
+                      disabled={reviewSaving}
                     >
-                      {classNeedsConfirmation ? (
-                        <Select
-                          id="cfg-class-level"
-                          aria-label="Class"
-                          data-class-level-select
-                          value=""
-                          onChange={(e) =>
-                            setConfig((prev) => ({ ...prev, class_level: e.target.value }))
-                          }
-                        >
-                          <option value="">Select the class…</option>
-                          {classLevels.map((c) => (
-                            <option key={c} value={c}>
-                              {c}
-                            </option>
-                          ))}
-                        </Select>
-                      ) : (
-                        <Input
-                          id="cfg-class-level"
-                          type="text"
-                          value={config.class_level}
-                          disabled
-                          className="bg-muted text-muted-foreground"
-                        />
-                      )}
-                    </Field>
-                    {/* School identity is server-derived from the teacher's
-                        profile and asked ONCE (summary strip → Settings) —
-                        never repeated as a field here (§14). */}
-                    <Field label="Teacher Name" htmlFor="cfg-teacher-name" hint="From your profile — update it in Settings">
-                      <Input
-                        id="cfg-teacher-name"
-                        type="text"
-                        value={config.teacher_name || currentUser?.full_name || '—'}
-                        disabled
-                        placeholder="Derived from your profile"
-                        className="bg-muted text-muted-foreground"
-                      />
-                    </Field>
+                      {reviewSaving ? (
+                        <><Loader2 className="mr-1 h-3 w-3 animate-spin" aria-hidden="true" />Saving…</>
+                      ) : 'Save WAPEF fields'}
+                    </Button>
                   </div>
-                </section>
-
-                {/* PART F/G/H/I/L: the GLOBAL SEED model is gone. Keywords,
-                    competencies, TLRs and references are generated PER LESSON
-                    from the lesson's own curriculum context (AI-suggested +
-                    teacher-editable in the per-lesson review below); Other TLRs
-                    and references start EMPTY per lesson. Period/timing is
-                    teacher-entered and stays blank when not supplied. */}
-                <section aria-label="Lesson plan details" className="border-t pt-6">
-                  <h3 className="text-sm font-semibold">Lesson Plan Details</h3>
-                  <p className="mb-4 text-xs text-muted-foreground">
-                    Keywords, core competencies and source resources are filled in
-                    automatically for EACH lesson from your scheme — you edit them
-                    in the per-lesson review below. Other TLRs and references stay
-                    empty unless you add them per lesson. Period/timing is
-                    teacher-entered; leave blank if not applicable.
-                  </p>
-                  <div className="space-y-4">
-                    <div className="grid gap-4 md:grid-cols-2">
-                      {/* PART K: period/timing is LESSON-SPECIFIC teacher data.
-                          When left empty it stays genuinely empty — never "0",
-                          "-", "N/A" or a generated "Period N". */}
-                      <Field label="Period / Timing" htmlFor="cfg-period">
-                        <Input
-                          id="cfg-period"
-                          type="text"
-                          value={config.period || ''}
-                          onChange={(e) => setConfig({ ...config, period: e.target.value })}
-                          placeholder="e.g. 1st & 2nd — leave blank if not applicable"
-                        />
-                      </Field>
-                      <Field label="Academic Term" htmlFor="cfg-term">
-                        <Select
-                          id="cfg-term"
-                          value={config.term}
-                          onChange={(e) => setConfig({ ...config, term: e.target.value })}
-                        >
-                          <option value="First Term">Term 1</option>
-                          <option value="Second Term">Term 2</option>
-                          <option value="Third Term">Term 3</option>
-                        </Select>
-                      </Field>
+                </div>
+                <div className="mt-4 max-h-96 space-y-3 overflow-y-auto pr-1">
+                  {lessonReview.filter((row: WapefReviewRow) => !row.is_special_period).map((row: WapefReviewRow) => (
+                    <div key={row.lesson_sequence} className="rounded-lg border border-slate-200 p-3">
+                      <p className="text-xs font-semibold text-[#102A43]">
+                        Week {row.week_number}{row.indicator_code ? ` · ${row.indicator_code}` : ''}
+                      </p>
+                      <div className="mt-2 grid gap-2.5 sm:grid-cols-2">
+                        <Field label="Deep Hope" htmlFor={`wapef-deep-hope-${row.lesson_sequence}`}>
+                          <Select
+                            id={`wapef-deep-hope-${row.lesson_sequence}`}
+                            value={row.wapef_deep_hope || ''}
+                            onChange={(e) => updateLessonReviewRow(row.lesson_sequence, { wapef_deep_hope: e.target.value })}
+                          >
+                            <option value="">— Select —</option>
+                            {wapefOptions.deep_hopes.map((option) => (
+                              <option key={option} value={option}>{option}</option>
+                            ))}
+                          </Select>
+                        </Field>
+                        <Field label="Storyline" htmlFor={`wapef-storyline-${row.lesson_sequence}`}>
+                          <Select
+                            id={`wapef-storyline-${row.lesson_sequence}`}
+                            value={row.wapef_storyline || ''}
+                            onChange={(e) => updateLessonReviewRow(row.lesson_sequence, { wapef_storyline: e.target.value })}
+                          >
+                            <option value="">— Select —</option>
+                            {wapefOptions.storylines.map((option) => (
+                              <option key={option} value={option}>{option}</option>
+                            ))}
+                          </Select>
+                        </Field>
+                      </div>
+                      <div className="mt-2.5">
+                        <p className="mb-1 text-xs font-medium text-muted-foreground">
+                          Through lines (select all that apply)
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {wapefOptions.through_lines.map((option) => {
+                            const selected = (row.wapef_through_lines || []).includes(option)
+                            return (
+                              <button
+                                key={option}
+                                type="button"
+                                aria-pressed={selected}
+                                onClick={() => {
+                                  const current = row.wapef_through_lines || []
+                                  const next = selected
+                                    ? current.filter((item: string) => item !== option)
+                                    : [...current, option]
+                                  updateLessonReviewRow(row.lesson_sequence, { wapef_through_lines: next })
+                                }}
+                                className={`rounded border px-2 py-0.5 text-xs ${
+                                  selected
+                                    ? 'border-[#102A43] bg-[#102A43] text-white'
+                                    : 'bg-background text-muted-foreground'
+                                }`}
+                              >
+                                {option}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                      <div className="mt-2.5 grid gap-2.5 sm:grid-cols-2">
+                        <Field label="God's Story" htmlFor={`wapef-gods-story-${row.lesson_sequence}`}>
+                          <Select
+                            id={`wapef-gods-story-${row.lesson_sequence}`}
+                            value={row.wapef_gods_story || ''}
+                            onChange={(e) => updateLessonReviewRow(row.lesson_sequence, { wapef_gods_story: e.target.value })}
+                          >
+                            <option value="">— Select —</option>
+                            {wapefOptions.gods_story.map((option) => (
+                              <option key={option} value={option}>{option}</option>
+                            ))}
+                          </Select>
+                        </Field>
+                        <Field label="Remarks" htmlFor={`wapef-remarks-${row.lesson_sequence}`}>
+                          <TextArea
+                            id={`wapef-remarks-${row.lesson_sequence}`}
+                            value={row.remarks || ''}
+                            onChange={(e) => updateLessonReviewRow(row.lesson_sequence, { remarks: e.target.value })}
+                            placeholder="Your reflection (printed in REMARKS)"
+                            rows={2}
+                          />
+                        </Field>
+                      </div>
                     </div>
-                  </div>
-                </section>
-              </div>
-            </SurfaceCard>
+                  ))}
+                </div>
+              </SurfaceCard>
             )}
 
             {/* C. Lesson plans by week — the primary surface (Priority 3). */}
@@ -2126,362 +1943,6 @@ export default function GeneratePage() {
               </SurfaceCard>
             )}
 
-            {/* D. Per-lesson review data (Section H): source fields are
-                read-only; keywords / Other TLRs / competencies /
-                references are editable and applied on generate. Hidden once a
-                job exists (§15) — the workspace shows the generated lessons. */}
-            {!jobId && lessonReview.length > 0 && (
-              <SurfaceCard data-lesson-review className="px-5 py-5 sm:px-6">
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <h2 className="text-base font-semibold text-[#102A43]">Lesson Review Data</h2>
-                    <p className="text-xs text-muted-foreground">
-                      Review each lesson before generating. Source TLRs and
-                      week-ending stay from your scheme document.
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => saveLessonReviewDrafts()}
-                    disabled={reviewSaving}
-                  >
-                    {reviewSaving ? (
-                      <>
-                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="mr-1 h-3 w-3" />
-                        Save review
-                      </>
-                    )}
-                  </Button>
-                </div>
-                {reviewSaved && (
-                  <p className="mt-2 text-xs text-green-600">Lesson review saved.</p>
-                )}
-                <div className="mt-4 max-h-96 space-y-4 overflow-y-auto pr-1">
-                  {lessonReview.map((row) => (
-                    <div
-                      key={`review-${row.lesson_sequence}`}
-                      className="space-y-2 rounded-md border bg-muted/30 p-3"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="text-xs font-semibold">
-                            Lesson {row.lesson_sequence} ·{' '}
-                            <span className="font-mono">{row.indicator_code}</span>
-                          </p>
-                          <p className="text-[11px] text-muted-foreground">
-                            Source Week {row.source_week}
-                            {row.week_ending
-                              ? ` · Week ending ${new Date(row.week_ending).toLocaleDateString('en-GB')}`
-                              : ''}
-                            {row.week_ending_derived ? ' (derived)' : ''}
-                            {' · '}Teaching Week {row.teaching_week}
-                          </p>
-                        </div>
-                      </div>
-                      {/* PART R: a special period is NOT a lesson. Show the
-                          period banner instead of fake curriculum fields and
-                          offer no lesson fields or AI generation for it. */}
-                      {row.is_special_period && (
-                        <Banner tone="info" className="text-xs">
-                          <p className="font-semibold">
-                            Special Period: {row.special_period_label || 'Mid-Term'}
-                          </p>
-                          <p>This period does not contain a normal lesson.</p>
-                        </Banner>
-                      )}
-                      {!row.is_special_period && (
-                        <>
-                          {/* ALLOCATION (Pattern 1): the teacher reviews the
-                              auto-assigned slot and adjusts it. Mostly reviewing,
-                              rarely typing — an intelligent default, editable. */}
-                          <div className="flex flex-wrap items-end gap-2">
-                            <div className="flex-1 min-w-[10rem]">
-                              <label
-                                htmlFor={`period-${row.lesson_sequence}`}
-                                className="mb-1 block text-[11px] font-medium text-muted-foreground"
-                              >
-                                Teaching period / day
-                              </label>
-                              <input
-                                id={`period-${row.lesson_sequence}`}
-                                type="text"
-                                value={row.period || ''}
-                                onChange={(e) => updateLessonReviewRow(row.lesson_sequence, {
-                                  period: e.target.value,
-                                })}
-                                placeholder="e.g. Monday · Period 1"
-                                className="w-full rounded-md border border-input px-2 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#04A9CE]/45 focus-visible:border-[#04A9CE]/70"
-                              />
-                            </div>
-                          </div>
-                          {/* CURRICULUM CONTEXT — read-only authoritative source
-                              data (PART X/Y). */}
-                          <p className="text-[11px] leading-snug text-muted-foreground">
-                            {row.indicator_description}
-                          </p>
-                          {(row.content_standard || row.strand) && (
-                            <p className="text-[11px] text-muted-foreground">
-                              {row.strand}{row.sub_strand ? ` › ${row.sub_strand}` : ''}
-                              {row.content_standard ? ` · ${row.content_standard}` : ''}
-                            </p>
-                          )}
-                          <div>
-                            <p className="mb-1 text-[11px] font-medium text-muted-foreground">
-                              Source TLRs (from scheme — read only)
-                            </p>
-                            {row.source_tlrs?.length ? (
-                              <ul className="list-inside list-disc text-[11px] text-muted-foreground">
-                                {row.source_tlrs.map((r: string, i: number) => (
-                                  <li key={i}>{r}</li>
-                                ))}
-                              </ul>
-                            ) : (
-                              <p className="text-[11px] italic text-muted-foreground">
-                                No source TLRs for this week
-                              </p>
-                            )}
-                          </div>
-                          {/* KEYWORDS — AI-suggested per lesson + editable
-                              (PART G/X). */}
-                          <div>
-                            <label
-                              htmlFor={`keywords-${row.lesson_sequence}`}
-                              className="mb-1 block text-[11px] font-medium text-muted-foreground"
-                            >
-                              Keywords for this lesson (AI-suggested — edit as needed)
-                            </label>
-                            <input
-                              id={`keywords-${row.lesson_sequence}`}
-                              type="text"
-                              value={(row.keywords || []).join(', ')}
-                              onChange={(e) => updateLessonReviewRow(row.lesson_sequence, {
-                                keywords: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
-                              })}
-                              placeholder="Comma-separated"
-                              className="w-full rounded-md border border-input px-2 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#04A9CE]/45 focus-visible:border-[#04A9CE]/70"
-                            />
-                          </div>
-                          {/* OTHER TLRs — teacher-added only; default empty
-                              (PART I/X). */}
-                          <div>
-                            <label
-                              htmlFor={`other-tlrs-${row.lesson_sequence}`}
-                              className="mb-1 block text-[11px] font-medium text-muted-foreground"
-                            >
-                              Other TLRs for this lesson (optional teacher additions)
-                            </label>
-                            <input
-                              id={`other-tlrs-${row.lesson_sequence}`}
-                              type="text"
-                              value={(row.other_tlrs || []).join(', ')}
-                              onChange={(e) => updateLessonReviewRow(row.lesson_sequence, {
-                                other_tlrs: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
-                              })}
-                              placeholder="Leave blank unless you want to add resources"
-                              className="w-full rounded-md border border-input px-2 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#04A9CE]/45 focus-visible:border-[#04A9CE]/70"
-                            />
-                          </div>
-                        </>
-                      )}
-                      {isWapefSelected && wapefOptions && !row.is_special_period && (
-                        <div className="rounded-md border bg-background p-2.5">
-                          <p className="mb-2 text-[11px] font-semibold text-[#102A43]">
-                            Approved WAPEF Plan fields
-                            <span className="ml-1 font-normal text-muted-foreground">
-                              (teacher-selected — the AI never changes these)
-                            </span>
-                          </p>
-                          <div className="grid gap-2.5 sm:grid-cols-2">
-                            <Field label="Deep Hope" htmlFor={`wapef-deep-hope-${row.lesson_sequence}`}>
-                              <Select
-                                id={`wapef-deep-hope-${row.lesson_sequence}`}
-                                value={row.wapef_deep_hope || ''}
-                                onChange={(e) => updateLessonReviewRow(row.lesson_sequence, {
-                                  wapef_deep_hope: e.target.value,
-                                })}
-                              >
-                                <option value="">— Select —</option>
-                                {wapefOptions.deep_hopes.map((option) => (
-                                  <option key={option} value={option}>{option}</option>
-                                ))}
-                              </Select>
-                            </Field>
-                            <Field label="Storyline" htmlFor={`wapef-storyline-${row.lesson_sequence}`}>
-                              <Select
-                                id={`wapef-storyline-${row.lesson_sequence}`}
-                                value={row.wapef_storyline || ''}
-                                onChange={(e) => updateLessonReviewRow(row.lesson_sequence, {
-                                  wapef_storyline: e.target.value,
-                                })}
-                              >
-                                <option value="">— Select —</option>
-                                {wapefOptions.storylines.map((option) => (
-                                  <option key={option} value={option}>{option}</option>
-                                ))}
-                              </Select>
-                            </Field>
-                          </div>
-                          <div className="mt-2.5">
-                            <p className="mb-1 text-[11px] font-medium text-muted-foreground">
-                              Through lines (select all that apply)
-                            </p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {wapefOptions.through_lines.map((option) => {
-                                const selected = (row.wapef_through_lines || []).includes(option)
-                                return (
-                                  <button
-                                    key={option}
-                                    type="button"
-                                    onClick={() => {
-                                      const cur = row.wapef_through_lines || []
-                                      const next = selected
-                                        ? cur.filter((t: string) => t !== option)
-                                        : [...cur, option]
-                                      updateLessonReviewRow(row.lesson_sequence, {
-                                        wapef_through_lines: next,
-                                      })
-                                    }}
-                                    className={`rounded border px-1.5 py-0.5 text-[10px] ${
-                                      selected
-                                        ? 'border-[#102A43] bg-[#102A43] text-white'
-                                        : 'bg-background text-muted-foreground'
-                                    }`}
-                                  >
-                                    {option}
-                                  </button>
-                                )
-                              })}
-                            </div>
-                          </div>
-                          <div className="mt-2.5 grid gap-2.5 sm:grid-cols-2">
-                            <Field label="God's Story" htmlFor={`wapef-gods-story-${row.lesson_sequence}`}>
-                              <Select
-                                id={`wapef-gods-story-${row.lesson_sequence}`}
-                                value={row.wapef_gods_story || ''}
-                                onChange={(e) => updateLessonReviewRow(row.lesson_sequence, {
-                                  wapef_gods_story: e.target.value,
-                                })}
-                              >
-                                <option value="">— Select —</option>
-                                {wapefOptions.gods_story.map((option) => (
-                                  <option key={option} value={option}>{option}</option>
-                                ))}
-                              </Select>
-                            </Field>
-                            <Field label="Remarks" htmlFor={`wapef-remarks-${row.lesson_sequence}`}>
-                              <TextArea
-                                id={`wapef-remarks-${row.lesson_sequence}`}
-                                value={row.remarks || ''}
-                                onChange={(e) => updateLessonReviewRow(row.lesson_sequence, {
-                                  remarks: e.target.value,
-                                })}
-                                placeholder="Your reflection (printed in REMARKS)"
-                                rows={2}
-                              />
-                            </Field>
-                          </div>
-                        </div>
-                      )}
-                      {/* CORE COMPETENCIES — AI-suggested for this lesson's
-                          activity type + teacher-editable (PART H/X). */}
-                      {!row.is_special_period && (
-                      <div>
-                        <p className="mb-1 text-[11px] font-medium text-muted-foreground">
-                          Core competencies (AI-suggested — edit as needed)
-                        </p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {NACCA_COMPETENCIES.map((label) => {
-                            const selected = (row.core_competencies || []).includes(label)
-                            return (
-                              <button
-                                key={label}
-                                type="button"
-                                onClick={() => {
-                                  const cur = row.core_competencies || []
-                                  const next = selected
-                                    ? cur.filter((c: string) => c !== label)
-                                    : [...cur, label]
-                                  updateLessonReviewRow(row.lesson_sequence, {
-                                    core_competencies: next,
-                                  })
-                                }}
-                                className={`rounded border px-1.5 py-0.5 text-[10px] ${
-                                  selected
-                                    ? 'border-[#102A43] bg-[#102A43] text-white'
-                                    : 'bg-background text-muted-foreground'
-                                }`}
-                              >
-                                {label}
-                              </button>
-                            )
-                          })}
-                        </div>
-                      </div>
-                      )}
-                      {/* REFERENCES — teacher-entered only. Exactly 3 empty
-                          slots by default; + Add creates another slot (PART
-                          L/M/X). Empty slots are never persisted. */}
-                      {!row.is_special_period && (
-                      <div>
-                        <div className="mb-1 flex items-center justify-between">
-                          <p className="text-[11px] font-medium text-muted-foreground">
-                            References (teacher-entered)
-                          </p>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-6 px-2 text-[10px]"
-                            onClick={() => updateLessonReviewRow(row.lesson_sequence, {
-                              structured_references: [
-                                ...(row.structured_references || []),
-                                { type: 'Other', title: '', page: '' },
-                              ],
-                            })}
-                          >
-                            + Add reference
-                          </Button>
-                        </div>
-                        {(row.structured_references || []).map((ref: any, idx: number) => (
-                          <div key={idx} className="mb-1 grid grid-cols-12 gap-1">
-                            <Select
-                              value={ref.type || 'Other'}
-                              onChange={(e) => updateStructuredRef(row.lesson_sequence, idx, { type: e.target.value })}
-                              className="col-span-4 h-7 px-1 text-[10px]"
-                              aria-label="Reference type"
-                            >
-                              {REFERENCE_TYPES.map(t => (
-                                <option key={t} value={t}>{t}</option>
-                              ))}
-                            </Select>
-                            <Input
-                              type="text"
-                              value={ref.title || ''}
-                              onChange={(e) => updateStructuredRef(row.lesson_sequence, idx, { title: e.target.value })}
-                              placeholder="Title"
-                              className="col-span-5 h-7 px-1 text-[10px]"
-                            />
-                            <Input
-                              type="text"
-                              value={ref.page || ''}
-                              onChange={(e) => updateStructuredRef(row.lesson_sequence, idx, { page: e.target.value })}
-                              placeholder="Page (optional)"
-                              className="col-span-3 h-7 px-1 text-[10px]"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </SurfaceCard>
-            )}
           </div>
 
           {/* ACTION RAIL — the one unmistakable place to generate. */}

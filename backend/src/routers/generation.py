@@ -838,6 +838,15 @@ class LessonConfigRequest(BaseModel):
     periods_per_week: Optional[int] = None
     period: Optional[str] = None
     teaching_days: Optional[List[int]] = None
+    term_start_date: Optional[date] = None
+    term_end_date: Optional[date] = None
+    term: Optional[str] = None
+    lessons_per_week: Optional[int] = None
+    generation_method: Optional[GenerationMethod] = None
+    ai_mode: Optional[AIMode] = None
+    template_id: Optional[str] = None
+    #: Canonical occurrence id -> {"references": [...], "tlrs": [...]}
+    indicator_resources: Optional[Dict[str, Dict[str, List[str]]]] = None
 
 
 def _normalize_lesson_config(payload: LessonConfigRequest) -> dict:
@@ -863,8 +872,72 @@ def _normalize_lesson_config(payload: LessonConfigRequest) -> dict:
 
     out["school_name"] = _clean_str("School name", payload.school_name)
     out["teacher_name"] = _clean_str("Teacher's name", payload.teacher_name)
+    # A teacher who deliberately clears the profile-prefilled name must get a
+    # blank back on reopen, not the profile default again. The flag records
+    # that intent without changing the profile.
+    if "teacher_name" in payload.model_fields_set and not out.get("teacher_name"):
+        out["teacher_name_cleared"] = True
     out["reference"] = _clean_str("Reference", payload.reference, max_len=400)
     out["period"] = _clean_str("Period", payload.period, max_len=60)
+    out["term"] = _clean_str("Academic term", payload.term, max_len=40)
+    out["template_id"] = _clean_str("Template", payload.template_id, max_len=80)
+
+    if payload.generation_method is not None:
+        out["generation_method"] = payload.generation_method.value
+    if payload.ai_mode is not None:
+        out["ai_mode"] = payload.ai_mode.value
+
+    if payload.term_start_date is not None:
+        out["term_start_date"] = payload.term_start_date.isoformat()
+    if payload.term_end_date is not None:
+        out["term_end_date"] = payload.term_end_date.isoformat()
+    if payload.term_start_date and payload.term_end_date:
+        if payload.term_end_date < payload.term_start_date:
+            errors.append("Term end date cannot be before the term start date.")
+
+    lpweek = payload.lessons_per_week
+    if lpweek is not None:
+        if not isinstance(lpweek, int) or isinstance(lpweek, bool) or not 1 <= lpweek <= 15:
+            errors.append("Lessons per week must be a whole number between 1 and 15.")
+        else:
+            out["lessons_per_week"] = lpweek
+
+    if payload.indicator_resources is not None:
+        if len(payload.indicator_resources) > 500:
+            errors.append("Too many per-lesson resource entries.")
+        else:
+            cleaned: Dict[str, Dict[str, List[str]]] = {}
+            for key, entry in payload.indicator_resources.items():
+                text = str(key or "").strip()
+                parts = text.split(":", 2)
+                if (not text.startswith("week") or len(parts) != 3
+                        or not parts[0][4:].isdigit()
+                        or not parts[1].isdigit() or len(text) > 160):
+                    errors.append(f"Invalid lesson resource key: {text[:40]}")
+                    continue
+                if not isinstance(entry, dict):
+                    errors.append(f"Invalid lesson resource entry: {text[:40]}")
+                    continue
+                refs = entry.get("references") or []
+                tlrs = entry.get("tlrs") or []
+                if not isinstance(refs, list) or not isinstance(tlrs, list):
+                    errors.append(f"Invalid lesson resources for {text[:40]}")
+                    continue
+                def _list(name, values):
+                    out_values = []
+                    for value in values[:20]:
+                        clean = str(value or "").strip()
+                        if clean:
+                            if len(clean) > 300:
+                                errors.append(f"{name} is too long (max 300 characters).")
+                                continue
+                            out_values.append(clean)
+                    return out_values
+                cleaned[text] = {
+                    "references": _list("Reference", refs),
+                    "tlrs": _list("Additional TLR", tlrs),
+                }
+            out["indicator_resources"] = cleaned
 
     cs = payload.class_size
     if cs is not None:
@@ -949,7 +1022,10 @@ async def get_lesson_config(
         merged.setdefault("school_name", resolved_school)
     if resolved_teacher:
         merged.setdefault("teacher_name", resolved_teacher)
-    merged.update(_saved_lesson_config(scheme_db))
+    saved = _saved_lesson_config(scheme_db)
+    merged.update(saved)
+    if saved.get("teacher_name_cleared"):
+        merged["teacher_name"] = None
     readiness = _lesson_config_readiness(merged)
     return {
         "config": merged,
@@ -976,6 +1052,12 @@ async def put_lesson_config(
     if not scheme_db:
         raise HTTPException(status_code=404, detail="Scheme not found")
     config = _normalize_lesson_config(payload)
+    # A client that saves teaching setup without touching per-lesson resources
+    # must not wipe the teacher's existing references/TLRs.
+    if payload.indicator_resources is None:
+        existing = _saved_lesson_config(scheme_db)
+        if isinstance(existing.get("indicator_resources"), dict):
+            config["indicator_resources"] = existing["indicator_resources"]
     scheme_db.lesson_config = config
     db.commit()
     readiness = _lesson_config_readiness(config)
@@ -1579,7 +1661,7 @@ def _generate_lesson_plans(
                 f"{'s' if available_units != 1 else ''} available "
                 f"(shortfall: {shortfall}). Select up to {available_units} "
                 "indicator(s) to generate now, or buy a package for more credits."
-                + (" Adesua — Free allowance resets on the 1st of each month."
+                + (" Free plan allowance resets on the 1st of each month."
                    if _is_free_only(quota_before) else "")
                 + (" This resume can be limited to the indicators you can afford."
                    if resume else "")
@@ -3292,8 +3374,10 @@ def _apply_saved_lesson_config(db: Session, scheme_db, config: TermConfig,
         return
     if saved.get("school_name"):
         config.school_name = saved["school_name"]
-    if saved.get("teacher_name"):
-        config.teacher_name = saved["teacher_name"]
+    # The dialog prefills the teacher's profile name, but an explicit saved
+    # value (including a deliberately cleared one) is the teacher's choice.
+    if "teacher_name" in saved:
+        config.teacher_name = saved.get("teacher_name") or None
     if saved.get("class_size") is not None:
         config.class_size = saved["class_size"]
     if saved.get("lesson_duration_minutes") is not None:
@@ -3304,6 +3388,34 @@ def _apply_saved_lesson_config(db: Session, scheme_db, config: TermConfig,
         config.lessons_per_week = saved["periods_per_week"]
     if saved.get("teaching_days"):
         config.teaching_days = list(saved["teaching_days"])
+    if saved.get("term"):
+        config.term = saved["term"]
+    if saved.get("lessons_per_week") is not None:
+        config.lessons_per_week = saved["lessons_per_week"]
+    if saved.get("term_start_date"):
+        try:
+            config.term_start_date = date.fromisoformat(saved["term_start_date"])
+        except (TypeError, ValueError):
+            pass
+    if saved.get("term_end_date"):
+        try:
+            config.term_end_date = date.fromisoformat(saved["term_end_date"])
+        except (TypeError, ValueError):
+            pass
+    if saved.get("template_id"):
+        config.template_id = saved["template_id"]
+    if saved.get("generation_method"):
+        try:
+            config.generation_method = GenerationMethod(saved["generation_method"])
+        except ValueError:
+            pass
+    if saved.get("ai_mode"):
+        try:
+            config.ai_mode = AIMode(saved["ai_mode"])
+        except ValueError:
+            pass
+    if isinstance(saved.get("indicator_resources"), dict):
+        config.indicator_resources = saved["indicator_resources"]
     if saved.get("reference"):
         config.references = [saved["reference"]]
 

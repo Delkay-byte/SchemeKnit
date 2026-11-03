@@ -23,6 +23,14 @@ SUBJECT_KEYWORDS: List[tuple] = [
     ("elective mathematics", Subject.ELECTIVE_MATHEMATICS),
     ("general knowledge in art", Subject.GENERAL_KNOWLEDGE_IN_ART),
     ("general agriculture", Subject.GENERAL_AGRICULTURE),
+    ("information and communication technology", Subject.ICT),
+    ("information communication technology", Subject.ICT),
+    ("computer science", Subject.ICT),
+    ("computing and ict", Subject.ICT),
+    ("ict and computing", Subject.ICT),
+    ("computing", Subject.ICT),
+    ("ict", Subject.ICT),
+    ("information technology", Subject.ICT),
     ("financial accounting", Subject.FINANCIAL_ACCOUNTING),
     ("cost accounting", Subject.COST_ACCOUNTING),
     ("business management", Subject.BUSINESS_MANAGEMENT),
@@ -53,8 +61,6 @@ SUBJECT_KEYWORDS: List[tuple] = [
     ("french", Subject.FRENCH),
     ("english", Subject.ENGLISH),
     ("science", Subject.SCIENCE),
-    ("computing", Subject.ICT),
-    ("ict", Subject.ICT),
 ]
 
 # Words that are noise in a heading and are stripped before matching.
