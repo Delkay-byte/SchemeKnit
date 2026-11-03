@@ -37,6 +37,11 @@ class BankTransferRequest(BaseModel):
     plan_slug: str
 
 
+class MomoOtpRequest(BaseModel):
+    reference: str
+    otp: str
+
+
 def _callback_url(request: Request) -> str:
     settings = get_settings()
     base = (getattr(settings, "PUBLIC_WEB_URL", "") or "").strip().rstrip("/")
@@ -311,6 +316,73 @@ async def momo_charge(
     return body
 
 
+@router.post("/momo/otp")
+async def momo_submit_otp(
+    req: MomoOtpRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Submit the Paystack OTP for this teacher's pending Mobile Money charge.
+
+    The OTP is forwarded to Paystack only. It is never logged or persisted.
+    """
+    reference = (req.reference or "").strip()
+    otp = "".join(ch for ch in (req.otp or "") if ch.isdigit())
+    if not reference:
+        raise HTTPException(status_code=400, detail="Payment reference is required.")
+    if not 4 <= len(otp) <= 8:
+        raise HTTPException(status_code=400, detail="Enter the one-time password sent to your phone.")
+
+    tx = (db.query(SubscriptionTransactionDB)
+          .filter(SubscriptionTransactionDB.reference == reference,
+                  SubscriptionTransactionDB.user_id == user.id).first())
+    if tx is None:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    if tx.payment_method != "mobile_money":
+        raise HTTPException(status_code=400, detail="This payment is not a Mobile Money charge.")
+    if tx.status != "pending":
+        raise HTTPException(status_code=409, detail="This payment is no longer awaiting an OTP.")
+
+    try:
+        data = paystack.submit_charge_otp(reference, otp)
+    except paystack.PaystackError as exc:
+        # Paystack answers a rejected/expired OTP with 400/422. The charge is
+        # still pending, so report the code problem and keep it retryable.
+        if exc.status_code in (400, 422):
+            raise HTTPException(
+                status_code=400,
+                detail="That one-time password was not accepted. Check the "
+                       "code sent to your phone and try again.")
+        raise HTTPException(status_code=exc.status_code, detail=exc.message)
+
+    body = _charge_payload(tx, data)
+    state = str(data.get("status") or "").lower()
+    if state in ("failed", "timeout"):
+        tx.status = "failed"
+    db.commit()
+    _settle_if_success(db, tx, data)
+    plan = db.query(SubscriptionPlanDB).filter(
+        SubscriptionPlanDB.id == tx.plan_id).first()
+    sub = db.query(UserSubscriptionDB).filter(
+        UserSubscriptionDB.user_id == user.id).first()
+    lic = db.query(UserLicenseDB).filter(
+        UserLicenseDB.user_id == user.id).first()
+    body.update({
+        "plan": _plan_payload(plan) if plan else None,
+        "status": tx.status,
+        "provider": tx.provider,
+        "email": user.email,
+        "currency": "GHS",
+        "subscription": _sub_payload(sub),
+        "licence": _licence_payload(lic) if tx.status == "success" else None,
+        "credits": credits.status(db, user.id),
+        "awaiting_authorisation": state == "pending" and tx.status == "pending",
+    })
+    log_event("paystack_momo_otp_submitted", user_id=user.id,
+              plan_id=tx.plan_id, reference=reference, charge_status=state)
+    return body
+
+
 @router.get("/charge/status/{reference}")
 async def charge_status(
     reference: str,
@@ -322,13 +394,16 @@ async def charge_status(
                   SubscriptionTransactionDB.user_id == user.id).first())
     if tx is None:
         raise HTTPException(status_code=404, detail="Payment not found")
-    if tx.status == "pending":
+    if tx.status == "pending" and tx.charge_status != "send_otp":
+        # Paystack is waiting for the customer's OTP. Checking the charge now
+        # would only repeat `send_otp`; the OTP route advances the charge.
         try:
             data = paystack.check_charge(reference)
             _charge_payload(tx, data)
             db.commit()
             _settle_if_success(db, tx, data)
         except paystack.PaystackError:
+            # A network/provider hiccup is not proof the payment failed.
             _expire_if_needed(db, tx)
         else:
             _expire_if_needed(db, tx)

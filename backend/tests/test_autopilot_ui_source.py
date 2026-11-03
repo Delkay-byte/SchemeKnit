@@ -34,17 +34,25 @@ def _api() -> str:
 
 
 class TestUploadOneAction:
-    def test_primary_button_is_the_generation_action(self):
+    def test_both_generation_methods_are_offered(self):
         src = _upload()
-        assert "data-autopilot-upload" in src
+        assert "data-generate-standard" in src
         assert "Generate my lesson plans" in src
+        assert "data-generate-zeli" in src
+        assert "Generate with Zeli" in src
 
-    def test_click_records_intent_and_hands_to_generate(self):
+    def test_click_opens_the_shared_configuration_before_generation(self):
         src = _upload()
-        assert "schemeknit.autopilot_intent" in src
-        # ONE click → straight to the Generate page (no config screen in
-        # between); the intent is consumed there, exactly once.
-        assert "router.push(`/generate/${result.scheme_id}`)" in src
+        # Both choices open the SAME dialog (the Generate page uses it too).
+        assert "LessonConfigModal" in src
+        assert "openSetup('standard')" in src
+        assert "openSetup('zeli')" in src
+        assert "api.getLessonConfig" in src
+        # Only after the configuration is saved does the teacher reach the
+        # Generate page — carrying the selected method in the URL.
+        assert "router.push(`/generate/${result.scheme_id}?method=${method}`)" in src
+        # Nothing is generated from the upload page itself.
+        assert "api.generateLessonPlans" not in src
 
     def test_confirm_path_also_hands_to_autopilot(self):
         """Backlog item 5: after the teacher resolves the one genuine
@@ -240,10 +248,14 @@ class TestManualFlowUntouched:
         for attr in (
             "data-generate-config",
             "data-allocation-preview",
-            "data-lesson-review",
+            "data-wapef-setup",
             "data-generate-summary",
         ):
             assert attr in src, f"missing {attr}"
+        # The redundant standalone review surface is gone; its WAPEF-only
+        # fields remain in the compact card.
+        assert "data-lesson-review" not in src
+        assert "Lesson Review Data" not in src
         # Priority-3 one-click-all contract keeps its exact words.
         assert "Generating your lesson plans" in src
         assert "quotaLine" in src

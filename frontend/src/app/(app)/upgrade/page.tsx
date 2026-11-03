@@ -13,6 +13,11 @@ import { api } from '@/lib/api'
 import { upgradePath } from '@/lib/purchase-return'
 import type { CataloguePlan, CreditStatus } from '@/types'
 import { normalizeError } from '@/lib/error-normalizer'
+import {
+  PENDING_CHECK_DELAY_MS, PENDING_POLL_INTERVAL_MS, canSubmitOtp,
+  isAwaitingMomoAuthorisation, isBankTransferPrompt, isFinalFailure,
+  isOtpRequired, isSuccess, shouldPollCharge,
+} from '@/lib/payment-flow'
 
 type Charge = {
   reference: string
@@ -45,6 +50,10 @@ export default function UpgradePage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [charge, setCharge] = useState<Charge | null>(null)
+  const [otp, setOtp] = useState('')
+  const [otpError, setOtpError] = useState('')
+  const [submittingOtp, setSubmittingOtp] = useState(false)
+  const [canCheck, setCanCheck] = useState(false)
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -99,22 +108,31 @@ export default function UpgradePage() {
 
   // Poll a prepaid charge until Paystack confirms it, fails it, or it expires.
   useEffect(() => {
-    if (!charge || charge.status !== 'pending') return
+    // Paystack asks merchants to wait at least 10 seconds before checking a
+    // pending charge, and OTP entry must be completed first.
+    if (!charge || !shouldPollCharge(charge)) return
     const id = window.setInterval(async () => {
       try {
         const s = await api.chargeStatus(charge.reference)
         setCharge(s)
-        if (s.status === 'success') {
+        if (isSuccess(s)) {
           window.clearInterval(id)
           router.push('/subscription?activated=1')
-        } else if (s.status === 'failed' || s.status === 'expired') {
+        } else if (isFinalFailure(s)) {
           window.clearInterval(id)
           setBusy(false)
         }
-      } catch { /* keep polling */ }
-    }, 5000)
+      } catch { /* keep polling; network hiccups are not payment failure */ }
+    }, PENDING_POLL_INTERVAL_MS)
     return () => window.clearInterval(id)
   }, [charge, router])
+
+  useEffect(() => {
+    if (!charge || charge.status !== 'pending') return
+    setCanCheck(false)
+    const timer = window.setTimeout(() => setCanCheck(true), PENDING_CHECK_DELAY_MS)
+    return () => window.clearTimeout(timer)
+  }, [charge?.reference, charge?.status])
 
   const start = async () => {
     if (!selected) return
@@ -126,6 +144,9 @@ export default function UpgradePage() {
         ? await api.bankTransferCharge(selected)
         : await api.momoCharge(selected, phone, provider)
       setCharge(data)
+      // The charge itself now drives the UI (OTP form / pending / success),
+      // so the start button must not stay stuck in "sending" state.
+      setBusy(false)
       if (data.status === 'success') {
         router.push('/subscription?activated=1')
       } else if (data.status === 'failed') {
@@ -289,7 +310,54 @@ export default function UpgradePage() {
 
             {charge && (
               <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4" role="status" data-charge-status={charge.status}>
-                {charge.status === 'pending' && charge.payment_details?.account_number ? (
+                {isOtpRequired(charge) ? (
+                  <div data-momo-otp>
+                    <p className="font-semibold text-[#102A43]">Enter your one-time password</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Paystack sent an OTP to your phone. Enter it here to continue.
+                      This is not your Mobile Money PIN.
+                    </p>
+                    <div className="mt-3 max-w-xs">
+                      <label htmlFor="momo-otp" className="text-xs font-medium">One-time password</label>
+                      <input
+                        id="momo-otp"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        value={otp}
+                        onChange={(e) => { setOtp(e.target.value.replace(/\D/g, '').slice(0, 8)); setOtpError('') }}
+                        className="mt-1 w-full rounded-md border border-input bg-white px-3 py-2 text-sm tracking-widest"
+                        placeholder="e.g. 123456"
+                      />
+                    </div>
+                    {otpError && <p className="mt-2 text-xs text-destructive" role="alert">{otpError}</p>}
+                    <p className="mt-2 text-xs text-slate-500">Reference {charge.reference}</p>
+                    <Button
+                      className="mt-3"
+                      disabled={submittingOtp || !canSubmitOtp(charge, otp)}
+                      onClick={async () => {
+                        setSubmittingOtp(true)
+                        setOtpError('')
+                        try {
+                          const next = await api.submitMomoOtp(charge.reference, otp)
+                          setCharge(next)
+                          if (isSuccess(next)) {
+                            router.push('/subscription?activated=1')
+                          } else if (isFinalFailure(next)) {
+                            setBusy(false)
+                          } else if (isOtpRequired(next)) {
+                            setOtpError('That code was not accepted. Check the SMS and try again.')
+                          }
+                        } catch (err) {
+                          setOtpError(normalizeError(err).message)
+                        } finally {
+                          setSubmittingOtp(false)
+                        }
+                      }}
+                    >
+                      {submittingOtp ? 'Submitting…' : 'Submit OTP'}
+                    </Button>
+                  </div>
+                ) : isBankTransferPrompt(charge) ? (
                   <>
                     <p className="flex items-center gap-2 font-semibold text-[#102A43]">
                       <Clock className="h-4 w-4" /> Waiting for your transfer
@@ -315,20 +383,34 @@ export default function UpgradePage() {
                         : 'Payment was not completed. No credits were issued.')}
                   </p>
                 )}
-                {charge.status === 'pending' && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-3"
-                    onClick={async () => {
-                      const s = await api.chargeStatus(charge.reference)
-                      setCharge(s)
-                    }}
-                  >
-                    Check status now
-                  </Button>
+                {charge.status === 'pending' && !isOtpRequired(charge) && (
+                  <>
+                    {isAwaitingMomoAuthorisation(charge) && (
+                      <p className="mt-3 text-sm text-[#102A43]">
+                        Your Mobile Money request is being processed. Check your phone and
+                        complete the authorization using your Mobile Money PIN — never enter
+                        your PIN on SchemeKnit.
+                      </p>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-3"
+                      disabled={!canCheck}
+                      onClick={async () => {
+                        try {
+                          const s = await api.chargeStatus(charge.reference)
+                          setCharge(s)
+                        } catch (err) {
+                          setError(normalizeError(err).message)
+                        }
+                      }}
+                    >
+                      {canCheck ? 'Check status now' : 'Checking becomes available in 10s…'}
+                    </Button>
+                  </>
                 )}
-                {charge.status === 'pending' && method === 'mobile_money' && (
+                {charge.status === 'pending' && isAwaitingMomoAuthorisation(charge) && (
                   <p className="mt-2 text-xs text-slate-500">
                     Reference {charge.reference}. If the prompt does not arrive, start a new request.
                   </p>

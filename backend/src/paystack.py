@@ -240,6 +240,18 @@ def check_charge(reference: str) -> dict:
     return _api("GET", f"/charge/{reference}")
 
 
+def submit_charge_otp(reference: str, otp: str) -> dict:
+    """Submit the Paystack OTP for a charge awaiting ``send_otp``.
+
+    The OTP is sent only to Paystack in this request body; it is never logged,
+    stored, or returned by this module.
+    """
+    return _api("POST", "/charge/submit_otp", {
+        "reference": reference,
+        "otp": otp,
+    })
+
+
 
 def _licence_key() -> str:
     raw = secrets.token_hex(16).upper()

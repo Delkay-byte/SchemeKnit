@@ -427,11 +427,11 @@ export default function Dashboard() {
                       ) : (
                         <>
                           <StatusPill tone="neutral" className="mb-1 rounded text-[11px] font-bold uppercase tracking-wider">
-                            AD ESUA — FREE
+                            FREE PLAN
                           </StatusPill>
-                          <h3 className="font-semibold">Adesua — Free</h3>
+                          <h3 className="font-semibold">Free plan</h3>
                           <p className="text-sm text-muted-foreground">
-                            Individual plan
+                            Individual free plan
                           </p>
                         </>
                       )}

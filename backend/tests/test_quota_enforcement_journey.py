@@ -163,7 +163,7 @@ class TestThirdGenerationRejectedBeforeAnySideEffect:
             before = _job_status(client, scheme)
             resp = _generate_one(client, scheme, config, rows[2])
             assert resp.status_code == 403, resp.text
-            assert "Adesua" in resp.json()["detail"]
+            assert "Free plan" in resp.json()["detail"]
             assert _job_status(client, scheme) == before, "no job created"
 
             lessons = _lessons(client, scheme)

@@ -603,6 +603,11 @@ class TermConfig(BaseModel):
     teaching_learning_resources: List[str] = []
     core_competencies: List[str] = []
     references: List[str] = []
+    #: Per-lesson teacher resources keyed by the canonical source occurrence id
+    #: (``week<week>:<position>:<code>``). Each entry holds ``references`` and
+    #: ``tlrs`` for THAT indicator only. A present empty entry is authoritative
+    #: (it must not fall back to a global seed).
+    indicator_resources: Dict[str, Dict[str, List[str]]] = {}
     created_date: datetime = Field(default_factory=datetime.now)
 
     @field_validator("term_start_date", "term_end_date", mode="before")
@@ -621,6 +626,25 @@ class TermConfig(BaseModel):
             return None
         if isinstance(value, str) and not value.strip():
             return None
+        return value
+
+    @field_validator("subject", mode="before")
+    @classmethod
+    def _source_subject_labels_map_to_canonical(cls, value):
+        """Accept the source document's own subject label.
+
+        The API displays a document titled COMPUTING as "Computing" while the
+        canonical taxonomy stores it as ``Subject.ICT``. A client that echoes
+        the displayed label back must still produce a valid canonical config —
+        the label is mapped explicitly, never coerced to a different subject.
+        """
+        if isinstance(value, str):
+            label = " ".join(value.split()).lower()
+            if label in ("computing", "computer science", "computing and ict",
+                         "ict and computing", "information technology",
+                         "information and communication technology",
+                         "information communication technology"):
+                return Subject.ICT
         return value
 
 

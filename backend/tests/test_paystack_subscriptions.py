@@ -495,3 +495,160 @@ def test_momo_does_not_auto_renew_and_cancel_is_rejected(db, env, monkeypatch):
     r = client.post("/api/paystack/cancel")
     assert r.status_code == 400
     assert "prepaid" in r.json()["detail"].lower()
+
+
+# ── Mobile Money OTP (send_otp → submit_otp → pending/success) ─────────────
+
+def _momo_tx(db, user, reference="TFM-otp-1", charge_status="send_otp",
+             status="pending", method="mobile_money", provider="mtn"):
+    plan = db.query(SubscriptionPlanDB).filter_by(slug="teacher-monthly").one()
+    tx = SubscriptionTransactionDB(
+        reference=reference, user_id=user.id, plan_id=plan.id,
+        environment="test", amount_pesewas=2200, currency="GHS",
+        status=status, payment_method=method, provider=provider,
+        charge_status=charge_status)
+    db.add(tx)
+    db.commit()
+    return tx
+
+
+def test_momo_charge_send_otp_stays_pending_and_issues_no_licence(
+        db, env, monkeypatch):
+    user = make_user(db)
+    monkeypatch.setattr("requests.request", lambda *a, **k: _Resp({
+        "reference": "r", "status": "send_otp",
+        "display_text": "Please enter the OTP sent to your phone"}))
+    body = _client(db, user).post("/api/paystack/momo/charge", json={
+        "plan_slug": "teacher-monthly", "phone": "0551234987",
+        "provider": "mtn"}).json()
+    assert body["status"] == "pending"
+    assert body["charge_status"] == "send_otp"
+    assert db.query(UserLicenseDB).count() == 0
+    assert db.query(SubscriptionTransactionDB).one().status == "pending"
+
+
+def test_charge_status_does_not_query_paystack_while_otp_is_required(
+        db, env, monkeypatch):
+    user = make_user(db)
+    _momo_tx(db, user)
+    called = {"n": 0}
+
+    def fake_check(reference):
+        called["n"] += 1
+        return {"status": "pending", "reference": reference}
+
+    monkeypatch.setattr(paystack, "check_charge", fake_check)
+    body = _client(db, user).get(
+        "/api/paystack/charge/status/TFM-otp-1").json()
+    assert called["n"] == 0
+    assert body["status"] == "pending"
+    assert body["charge_status"] == "send_otp"
+
+
+def test_submit_otp_is_forwarded_and_pending_keeps_payment_pending(
+        db, env, monkeypatch):
+    user = make_user(db)
+    _momo_tx(db, user)
+    seen = {}
+
+    def fake_submit(reference, otp):
+        seen.update({"reference": reference, "otp": otp})
+        return {"reference": reference, "status": "pending"}
+
+    monkeypatch.setattr(paystack, "submit_charge_otp", fake_submit)
+    r = _client(db, user).post("/api/paystack/momo/otp", json={
+        "reference": "TFM-otp-1", "otp": "123456"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert seen == {"reference": "TFM-otp-1", "otp": "123456"}
+    assert body["status"] == "pending"
+    assert body["charge_status"] == "pending"
+    assert db.query(UserLicenseDB).count() == 0
+    db.expire_all()
+    assert db.query(SubscriptionTransactionDB).one().status == "pending"
+
+
+def test_submit_otp_success_activates_package_exactly_once(db, env, monkeypatch):
+    user = make_user(db)
+    _momo_tx(db, user)
+    payload = {"status": "success", "amount": 2200, "currency": "GHS",
+               "reference": "TFM-otp-1", "id": 88, "channel": "mobile_money",
+               "customer": {"customer_code": "CUS_OTP"}}
+    monkeypatch.setattr(paystack, "submit_charge_otp",
+                        lambda reference, otp: dict(payload))
+    monkeypatch.setattr(paystack, "verify", lambda reference: dict(payload))
+
+    client = _client(db, user)
+    first = client.post("/api/paystack/momo/otp", json={
+        "reference": "TFM-otp-1", "otp": "123456"}).json()
+    assert first["status"] == "success"
+    assert first["licence"]["key"].startswith("TF-")
+    assert db.query(UserLicenseDB).count() == 1
+
+    again = client.post("/api/paystack/momo/otp", json={
+        "reference": "TFM-otp-1", "otp": "123456"})
+    assert again.status_code == 409
+    assert db.query(UserLicenseDB).count() == 1
+
+
+def test_submit_otp_rejection_keeps_charge_pending_and_retryable(
+        db, env, monkeypatch):
+    user = make_user(db)
+    _momo_tx(db, user)
+
+    def reject(reference, otp):
+        raise paystack.PaystackError("Paystack could not start the payment.", 400)
+
+    monkeypatch.setattr(paystack, "submit_charge_otp", reject)
+    r = _client(db, user).post("/api/paystack/momo/otp", json={
+        "reference": "TFM-otp-1", "otp": "000000"})
+    assert r.status_code == 400
+    assert "one-time password" in r.json()["detail"]
+    db.expire_all()
+    tx = db.query(SubscriptionTransactionDB).one()
+    assert tx.status == "pending" and tx.charge_status == "send_otp"
+    assert db.query(UserLicenseDB).count() == 0
+
+
+def test_submit_otp_enforces_owner_amount_method_and_status(db, env):
+    owner = make_user(db)
+    stranger = make_user(db, email="other@example.com")
+    _momo_tx(db, owner)
+    bank = _momo_tx(db, owner, reference="TFB-bank-1", charge_status="",
+                    method="bank_transfer", provider="")
+    _momo_tx(db, owner, reference="TFM-done-1", charge_status="success",
+             status="success")
+
+    stranger_client = _client(db, stranger)
+    assert stranger_client.post("/api/paystack/momo/otp", json={
+        "reference": "TFM-otp-1", "otp": "123456"}).status_code == 404
+
+    client = _client(db, owner)
+    assert client.post("/api/paystack/momo/otp", json={
+        "reference": "TFB-bank-1", "otp": "123456"}).status_code == 400
+    assert client.post("/api/paystack/momo/otp", json={
+        "reference": "TFM-done-1", "otp": "123456"}).status_code == 409
+    assert client.post("/api/paystack/momo/otp", json={
+        "reference": "TFM-otp-1", "otp": "12"}).status_code == 400
+    db.expire_all()
+    assert db.query(SubscriptionTransactionDB).filter_by(
+        reference="TFB-bank-1").one().status == "pending"
+    assert db.query(UserLicenseDB).count() == 0
+
+
+def test_charge_status_network_failure_does_not_fail_payment(db, env, monkeypatch):
+    user = make_user(db)
+    _momo_tx(db, user, charge_status="pay_offline")
+
+    def unreachable(reference):
+        raise paystack.PaystackError(
+            "Paystack could not be reached. No payment was taken; please try again.",
+            504)
+
+    monkeypatch.setattr(paystack, "check_charge", unreachable)
+    body = _client(db, user).get(
+        "/api/paystack/charge/status/TFM-otp-1").json()
+    assert body["status"] == "pending"
+    db.expire_all()
+    assert db.query(SubscriptionTransactionDB).one().status == "pending"
+    assert db.query(UserLicenseDB).count() == 0

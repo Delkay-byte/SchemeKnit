@@ -1010,6 +1010,13 @@ class ApiService {
     return this.request(`/api/paystack/momo/status/${encodeURIComponent(reference)}`)
   }
 
+  async submitMomoOtp(reference: string, otp: string): Promise<any> {
+    return this.request('/api/paystack/momo/otp', {
+      method: 'POST',
+      body: JSON.stringify({ reference, otp }),
+    })
+  }
+
   async chargeStatus(reference: string): Promise<any> {
     return this.request(`/api/paystack/charge/status/${encodeURIComponent(reference)}`)
   }

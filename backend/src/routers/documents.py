@@ -29,6 +29,30 @@ from ..storage import get_storage
 from .. import storage_quota
 
 router = APIRouter()
+
+
+def _subject_display(scheme) -> str:
+    """Preserve the source document's subject label where it is unambiguous.
+
+    The canonical generation taxonomy stores Computing under ``Subject.ICT``.
+    A document that explicitly says COMPUTING is displayed as Computing, not
+    silently relabelled ICT. The canonical value is unchanged for allocation
+    and pedagogy.
+    """
+    canonical = (
+        scheme.subject.value if hasattr(scheme.subject, "value")
+        else str(scheme.subject or ""))
+    if canonical != "ICT":
+        return canonical
+    source = " ".join([
+        str(getattr(scheme, "document_title", "") or ""),
+        str(getattr(scheme, "filename", "") or ""),
+    ]).lower()
+    if "comput" in source or "computer science" in source:
+        return "Computing"
+    if "information and communication technology" in source:
+        return "Information and Communication Technology"
+    return "ICT"
 logger = get_logger()
 
 SUPPORTED_EXTENSIONS = (".docx", ".pdf")
@@ -370,7 +394,7 @@ async def upload_scheme(
         return {
             "scheme_id": scheme.id,
             "filename": file.filename,
-            "subject": scheme.subject.value if hasattr(scheme.subject, 'value') else str(scheme.subject),
+            "subject": _subject_display(db_scheme),
             "class_level": scheme.class_level.value if hasattr(scheme.class_level, 'value') else str(scheme.class_level),
             "weeks_count": len(scheme.weeks),
             "status": db_scheme.status,
@@ -445,7 +469,7 @@ async def list_schemes(
             {
                 "id": s.id,
                 "filename": s.filename,
-                "subject": s.subject,
+                "subject": _subject_display(s),
                 "class_level": s.class_level,
                 "term": s.term,
                 "academic_year": s.academic_year,
@@ -478,7 +502,12 @@ async def get_scheme(
     return {
         "id": scheme.id,
         "filename": scheme.filename,
-        "subject": scheme.subject,
+        "subject": _subject_display(scheme),
+        #: Canonical taxonomy value for generation (e.g. ICT even when the
+        #: source document says COMPUTING). ``subject`` above is display only.
+        "subject_canonical": (
+            scheme.subject.value if hasattr(scheme.subject, "value")
+            else str(scheme.subject or "")),
         "class_level": scheme.class_level,
         "term": scheme.term,
         "academic_year": scheme.academic_year,

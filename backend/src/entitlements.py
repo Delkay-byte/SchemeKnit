@@ -41,7 +41,7 @@ FREE_TIER_AI_GENERATIONS = 5
 
 #: Visible plan label for the free individual-teacher tier (§14). The internal
 #: edition identifier stays "free"; only this user-facing wording changes.
-FREE_TIER_PLAN_NAME = "Adesua — Free"
+FREE_TIER_PLAN_NAME = "Free plan"
 
 #: Commercial plan identifiers surfaced to the client. The backend is the ONLY
 #: authority for these — a plan is PRO only when a server-side EntitlementDB row
@@ -78,11 +78,11 @@ def free_tier_lesson_quota_message(remaining: int) -> str:
         return (
             "You've used all "
             f"{FREE_TIER_LESSON_PLANS_PER_MONTH} Free Tier lesson plans for this "
-            "month (Adesua — Free). This allowance renews on the 1st of next "
+            "month (Free plan). This allowance renews on the 1st of next "
             "month. Choose a paid package to keep generating lesson plans now."
         )
     return (
-        f"You have {remaining} Adesua — Free lesson plan"
+        f"You have {remaining} Free plan lesson plan"
         f"{'s' if remaining != 1 else ''} remaining this month."
     )
 
