@@ -183,3 +183,28 @@ def test_staging_opt_in_still_rejects_a_live_key_in_test_mode():
             PAYSTACK_ALLOW_TEST_MODE=True,
             PAYSTACK_SECRET_KEY="sk_live_placeholder",
         ).validate_production()
+
+
+def test_paystack_requests_send_an_explicit_user_agent(clean_env, monkeypatch):
+    from src import paystack as module
+
+    clean_env.setenv("PAYSTACK_SECRET_KEY", "sk_test_placeholder")
+    clean_env.setenv("PAYSTACK_MODE", "test")
+    captured = {}
+
+    class Response:
+        ok = True
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {"status": True, "data": {"status": "pending"}}
+
+    def fake_request(method, url, **kwargs):
+        captured.update(kwargs.get("headers") or {})
+        return Response()
+
+    monkeypatch.setattr(module.requests, "request", fake_request)
+    module.check_charge("ref")
+    assert captured.get("User-Agent", "").startswith("SchemeKnit/")
+    assert captured.get("Accept") == "application/json"

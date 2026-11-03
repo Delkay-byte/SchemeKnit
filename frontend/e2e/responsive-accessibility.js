@@ -126,9 +126,17 @@ async function main() {
   await page.goto(`${WEB}/weekly-plans/new`, { waitUntil: 'domcontentloaded' })
   const week = page.getByLabel('Week number')
   await week.waitFor({ timeout: 20000 })
-  await page.waitForTimeout(800)
+  await page.locator('[data-weekly-loading]').waitFor(
+    { state: 'detached', timeout: 30000 }).catch(() => {})
   await week.fill('6')
-  await page.waitForTimeout(1300)
+  await page.waitForFunction(
+    () => Object.keys(localStorage).some(
+      (key) => key.startsWith('schemeknit:draft')
+        && (localStorage.getItem(key) || '').includes('"weekNumber"'),
+    ),
+    null,
+    { timeout: 20000 },
+  )
   await page.reload({ waitUntil: 'domcontentloaded' })
   const recovered = await page.getByText(/We found your unsaved work/).first()
     .waitFor({ state: 'visible', timeout: 8000 }).then(() => true).catch(() => false)

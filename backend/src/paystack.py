@@ -124,7 +124,12 @@ def _api(method: str, path: str, payload: Optional[dict] = None, *,
         resp = requests.request(
             method, f"{API_BASE}{path}", json=payload,
             headers={"Authorization": f"Bearer {secret}",
-                     "Content-Type": "application/json"},
+                     "Content-Type": "application/json",
+                     "Accept": "application/json",
+                     # Paystack's edge rejects generic urllib/python-requests
+                     # user agents with Cloudflare 1010. An explicit client
+                     # identity keeps production and staging charges working.
+                     "User-Agent": "SchemeKnit/1.0 (+https://schemeknit.com)"},
             timeout=TIMEOUT,
             verify=True,
             allow_redirects=False,
