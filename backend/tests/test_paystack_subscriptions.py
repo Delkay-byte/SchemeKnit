@@ -652,3 +652,101 @@ def test_charge_status_network_failure_does_not_fail_payment(db, env, monkeypatc
     db.expire_all()
     assert db.query(SubscriptionTransactionDB).one().status == "pending"
     assert db.query(UserLicenseDB).count() == 0
+
+
+# ── OTP edge cases against the real HTTP mapping ───────────────────────────
+
+def test_paystack_rejected_otp_preserves_a_friendly_retryable_error(db, env, monkeypatch):
+    user = make_user(db)
+    _momo_tx(db, user)
+    # Exercise the real `_api` path: Paystack answers 400 for a bad OTP.
+    monkeypatch.setattr("requests.request", lambda *a, **k: _Resp(
+        {"message": "Invalid OTP"}, ok=False, status=400))
+
+    r = _client(db, user).post("/api/paystack/momo/otp", json={
+        "reference": "TFM-otp-1", "otp": "000000"})
+    assert r.status_code == 400
+    assert "one-time password" in r.json()["detail"].lower()
+    db.expire_all()
+    tx = db.query(SubscriptionTransactionDB).one()
+    assert tx.status == "pending" and tx.charge_status == "send_otp"
+    assert db.query(UserLicenseDB).count() == 0
+
+
+def test_otp_submission_is_rate_limited_per_teacher(db, env, monkeypatch):
+    user = make_user(db)
+    _momo_tx(db, user)
+    router_module._OTP_ATTEMPTS.clear()
+    monkeypatch.setattr(paystack, "submit_charge_otp", lambda reference, otp: {
+        "reference": reference, "status": "send_otp"})
+    client = _client(db, user)
+    statuses = [
+        client.post("/api/paystack/momo/otp", json={
+            "reference": "TFM-otp-1", "otp": "123456"}).status_code
+        for _ in range(router_module._OTP_MAX_ATTEMPTS + 1)
+    ]
+    assert statuses[:router_module._OTP_MAX_ATTEMPTS] == [200] * router_module._OTP_MAX_ATTEMPTS
+    assert statuses[-1] == 429
+    router_module._OTP_ATTEMPTS.clear()
+
+
+def test_concurrent_otp_submission_is_rejected_safely(db, env):
+    user = make_user(db)
+    _momo_tx(db, user)
+    router_module._OTP_IN_FLIGHT.add("TFM-otp-1")
+    try:
+        r = _client(db, user).post("/api/paystack/momo/otp", json={
+            "reference": "TFM-otp-1", "otp": "123456"})
+    finally:
+        router_module._OTP_IN_FLIGHT.discard("TFM-otp-1")
+    assert r.status_code == 409
+    assert "already being submitted" in r.json()["detail"]
+
+
+def test_otp_network_failure_leaves_the_charge_pending(db, env, monkeypatch):
+    user = make_user(db)
+    _momo_tx(db, user)
+    router_module._OTP_ATTEMPTS.clear()
+
+    def unreachable(reference, otp):
+        raise paystack.PaystackError("Paystack could not be reached.", 504)
+
+    monkeypatch.setattr(paystack, "submit_charge_otp", unreachable)
+    r = _client(db, user).post("/api/paystack/momo/otp", json={
+        "reference": "TFM-otp-1", "otp": "123456"})
+    assert r.status_code == 504
+    db.expire_all()
+    assert db.query(SubscriptionTransactionDB).one().status == "pending"
+    assert db.query(UserLicenseDB).count() == 0
+    router_module._OTP_ATTEMPTS.clear()
+
+
+def test_repeated_buy_click_reuses_one_pending_charge(db, env, monkeypatch):
+    user = make_user(db)
+    calls = {"n": 0}
+
+    def fake_request(method, url, **kwargs):
+        calls["n"] += 1
+        return _Resp({"reference": "r", "status": "pay_offline",
+                      "display_text": "Approve on your phone"})
+
+    monkeypatch.setattr("requests.request", fake_request)
+    client = _client(db, user)
+    first = client.post("/api/paystack/momo/charge", json={
+        "plan_slug": "teacher-monthly", "phone": "0551234987",
+        "provider": "mtn"}).json()
+    second = client.post("/api/paystack/momo/charge", json={
+        "plan_slug": "teacher-monthly", "phone": "0551234987",
+        "provider": "mtn"}).json()
+    assert calls["n"] == 1
+    assert second["reference"] == first["reference"]
+    assert second.get("reused") is True
+    assert db.query(SubscriptionTransactionDB).count() == 1
+
+
+def test_pending_payment_recovery_keeps_the_otp_stage(db, env):
+    user = make_user(db)
+    _momo_tx(db, user)
+    body = _client(db, user).get("/api/paystack/me").json()
+    assert body["pending_payment"]["reference"] == "TFM-otp-1"
+    assert body["pending_payment"]["charge_status"] == "send_otp"

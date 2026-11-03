@@ -9,7 +9,9 @@ import {
   isAwaitingMomoAuthorisation,
   isBankTransferPrompt,
   isFinalFailure,
+  isExpired,
   isOtpRequired,
+  isPayOffline,
   isSuccess,
   shouldPollCharge,
 } from '../../src/lib/payment-flow.ts'
@@ -92,4 +94,27 @@ test('a pending network check leaves the stage pending', () => {
   const charge = { status: 'pending', charge_status: 'send_otp', payment_method: 'mobile_money' }
   assert.notEqual(chargeStage(charge), 'failed')
   assert.equal(chargeStageMessage('pending'), 'We are waiting for confirmation from your Mobile Money provider. Your payment has not yet been confirmed.')
+})
+
+test('pay_offline is a phone-authorisation stage with explicit guidance', () => {
+  const charge = { status: 'pending', charge_status: 'pay_offline', payment_method: 'mobile_money' }
+  assert.equal(isPayOffline(charge), true)
+  assert.equal(chargeStage(charge), 'pay_offline')
+  assert.equal(shouldPollCharge(charge), true)
+  assert.match(chargeStageMessage('pay_offline'), /check your phone/i)
+  assert.match(chargeStageMessage('pay_offline'), /never on SchemeKnit/i)
+  assert.match(chargeStageMessage('pay_offline'), /SMS code/i)
+})
+
+test('send_otp is the only stage that shows a website OTP form', () => {
+  assert.equal(chargeStage({ status: 'pending', charge_status: 'send_otp', payment_method: 'mobile_money' }), 'otp')
+  assert.equal(chargeStage({ status: 'pending', charge_status: 'pay_offline', payment_method: 'mobile_money' }), 'pay_offline')
+})
+
+test('expired has its own final copy, not a fake failure while pending', () => {
+  assert.equal(chargeStage({ status: 'expired' }), 'expired')
+  assert.equal(isExpired({ status: 'expired' }), true)
+  assert.match(chargeStageMessage('expired'), /expired/i)
+  assert.match(chargeStageMessage('expired'), /No credits were issued/i)
+  assert.equal(chargeStage({ status: 'pending', charge_status: 'pay_offline', payment_method: 'mobile_money' }), 'pay_offline')
 })

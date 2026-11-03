@@ -872,6 +872,11 @@ def _normalize_lesson_config(payload: LessonConfigRequest) -> dict:
 
     out["school_name"] = _clean_str("School name", payload.school_name)
     out["teacher_name"] = _clean_str("Teacher's name", payload.teacher_name)
+    # A teacher who deliberately clears the profile-prefilled name must get a
+    # blank back on reopen, not the profile default again. The flag records
+    # that intent without changing the profile.
+    if "teacher_name" in payload.model_fields_set and not out.get("teacher_name"):
+        out["teacher_name_cleared"] = True
     out["reference"] = _clean_str("Reference", payload.reference, max_len=400)
     out["period"] = _clean_str("Period", payload.period, max_len=60)
     out["term"] = _clean_str("Academic term", payload.term, max_len=40)
@@ -1017,7 +1022,10 @@ async def get_lesson_config(
         merged.setdefault("school_name", resolved_school)
     if resolved_teacher:
         merged.setdefault("teacher_name", resolved_teacher)
-    merged.update(_saved_lesson_config(scheme_db))
+    saved = _saved_lesson_config(scheme_db)
+    merged.update(saved)
+    if saved.get("teacher_name_cleared"):
+        merged["teacher_name"] = None
     readiness = _lesson_config_readiness(merged)
     return {
         "config": merged,
@@ -1050,10 +1058,6 @@ async def put_lesson_config(
         existing = _saved_lesson_config(scheme_db)
         if isinstance(existing.get("indicator_resources"), dict):
             config["indicator_resources"] = existing["indicator_resources"]
-    # The profile is the source of truth for the printed teacher name.
-    resolved_teacher = _resolve_teacher_name(db, user)
-    if resolved_teacher:
-        config["teacher_name"] = resolved_teacher
     scheme_db.lesson_config = config
     db.commit()
     readiness = _lesson_config_readiness(config)
@@ -3370,7 +3374,10 @@ def _apply_saved_lesson_config(db: Session, scheme_db, config: TermConfig,
         return
     if saved.get("school_name"):
         config.school_name = saved["school_name"]
-    # Teacher name is profile-authoritative; a saved copy never overrides it.
+    # The dialog prefills the teacher's profile name, but an explicit saved
+    # value (including a deliberately cleared one) is the teacher's choice.
+    if "teacher_name" in saved:
+        config.teacher_name = saved.get("teacher_name") or None
     if saved.get("class_size") is not None:
         config.class_size = saved["class_size"]
     if saved.get("lesson_duration_minutes") is not None:

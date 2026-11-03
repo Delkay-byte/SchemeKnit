@@ -149,6 +149,16 @@ export function LessonConfigModal({
     onOpenChange(next)
   }
 
+  const restoreProfileDefault = (field: 'teacher_name' | 'school_name') => {
+    const value = field === 'teacher_name'
+      ? (user?.full_name || '').trim()
+      : (user?.school_name || '').trim()
+    if (!value) return
+    if (overrideIdentity) setFieldCleared(overrideIdentity, field, false)
+    setClearedFields((current) => current.filter((item) => item !== field))
+    setDraft((current) => ({ ...current, [field]: value }))
+  }
+
   const rememberExplicitBlanks = (saved: LessonRubricConfig) => {
     if (!overrideIdentity) return
     for (const field of ['teacher_name', 'school_name'] as const) {
@@ -286,6 +296,13 @@ export function LessonConfigModal({
                 <Input id="lcfg-school" autoComplete="organization"
                   value={draft.school_name || ''}
                   onChange={(e) => setDraft({ ...draft, school_name: e.target.value })} />
+                {Boolean(user?.school_name) && (draft.school_name || '') !== user?.school_name && (
+                  <button type="button"
+                    className="text-xs font-medium text-[#035f7c] underline"
+                    onClick={() => restoreProfileDefault('school_name')}>
+                    Use my school from profile
+                  </button>
+                )}
               </Field>
               <Field label="Class" htmlFor="lcfg-class" hint="Detected from your scheme">
                 <Input id="lcfg-class" value={className} disabled className="bg-muted text-muted-foreground" />
@@ -293,6 +310,13 @@ export function LessonConfigModal({
               <Field label="Teacher's name" htmlFor="lcfg-teacher" hint="From your profile — update it in Settings">
                 <Input id="lcfg-teacher" autoComplete="name" value={draft.teacher_name || ''}
                   onChange={(e) => setDraft({ ...draft, teacher_name: e.target.value })} />
+                {Boolean(user?.full_name) && (draft.teacher_name || '') !== user?.full_name && (
+                  <button type="button"
+                    className="text-xs font-medium text-[#035f7c] underline"
+                    onClick={() => restoreProfileDefault('teacher_name')}>
+                    Use my name from profile
+                  </button>
+                )}
               </Field>
               <Field label="Class size" htmlFor="lcfg-class-size" required
                 error={showProblems ? problems.class_size : undefined}>

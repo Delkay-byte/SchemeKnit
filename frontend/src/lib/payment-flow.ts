@@ -18,15 +18,26 @@ export interface ChargeLike {
 
 export type ChargeStage =
   | 'otp'
+  | 'pay_offline'
   | 'bank_transfer'
   | 'awaiting_momo_authorisation'
   | 'pending'
   | 'success'
   | 'failed'
+  | 'expired'
 
 /** Paystack is waiting for the emailed/SMS one-time password. */
 export function isOtpRequired(charge: ChargeLike | null | undefined): boolean {
   return charge?.status === 'pending' && charge?.charge_status === 'send_otp'
+}
+
+/** Paystack's documented Ghana MoMo flow: authorise on the phone. */
+export function isPayOffline(charge: ChargeLike | null | undefined): boolean {
+  return Boolean(
+    charge && charge.status === 'pending'
+    && charge.payment_method === 'mobile_money'
+    && charge.charge_status === 'pay_offline',
+  )
 }
 
 /** A MoMo charge the customer authorises on their own phone. */
@@ -38,6 +49,11 @@ export function isAwaitingMomoAuthorisation(
     && charge.payment_method === 'mobile_money'
     && charge.charge_status !== 'send_otp',
   )
+}
+
+/** An authorisation window that ended without payment. */
+export function isExpired(charge: ChargeLike | null | undefined): boolean {
+  return charge?.status === 'expired'
 }
 
 /** A bank-transfer charge that shows the generated account details. */
@@ -80,10 +96,12 @@ export function canCheckStatus(
 
 export function chargeStage(charge: ChargeLike | null | undefined): ChargeStage {
   if (isSuccess(charge)) return 'success'
+  if (isExpired(charge)) return 'expired'
   if (isFinalFailure(charge)) return 'failed'
   if (isOtpRequired(charge)) return 'otp'
-  if (isAwaitingMomoAuthorisation(charge)) return 'awaiting_momo_authorisation'
   if (isBankTransferPrompt(charge)) return 'bank_transfer'
+  if (isPayOffline(charge)) return 'pay_offline'
+  if (isAwaitingMomoAuthorisation(charge)) return 'awaiting_momo_authorisation'
   return 'pending'
 }
 
@@ -92,6 +110,8 @@ export function chargeStageMessage(stage: ChargeStage): string {
   switch (stage) {
     case 'otp':
       return 'Enter the one-time password sent to your phone to continue.'
+    case 'pay_offline':
+      return 'Check your phone for the Mobile Money authorisation prompt. Enter the SMS code there when prompted, then your Mobile Money PIN in your provider\'s own interface — never on SchemeKnit.'
     case 'awaiting_momo_authorisation':
       return 'Your Mobile Money request is being processed. Check your phone and complete the authorization using your Mobile Money PIN.'
     case 'bank_transfer':
@@ -102,6 +122,8 @@ export function chargeStageMessage(stage: ChargeStage): string {
       return 'Payment successful. Your package is now active.'
     case 'failed':
       return 'Payment was not completed. No credits were issued.'
+    case 'expired':
+      return 'This payment session expired before it was confirmed. No credits were issued. Start a new request when you are ready.'
   }
 }
 

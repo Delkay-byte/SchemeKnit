@@ -230,12 +230,34 @@ class TestExtendedLessonConfiguration:
             "Science Textbook p.10"]
         assert body["indicator_resources"]["week1:1:B9.1.1.1.2"]["tlrs"] == ["Samples"]
 
-    def test_teacher_name_is_always_from_the_profile(self, http):
+    def test_explicit_teacher_name_and_deliberate_blank_are_persisted(self, http):
         scheme = http.scheme_factory()
-        payload = {**FULL_CONFIG, "teacher_name": "Somebody Else"}
-        resp = http.put(f"/api/generation/{scheme.id}/lesson-config", json=payload)
+        resp = http.put(
+            f"/api/generation/{scheme.id}/lesson-config",
+            json={**FULL_CONFIG, "teacher_name": "Saved Teacher"},
+        )
         assert resp.status_code == 200
-        assert resp.json()["config"]["teacher_name"] == "Guided Teacher"
+        assert resp.json()["config"]["teacher_name"] == "Saved Teacher"
+        # Reopening returns the teacher's value, not the profile default.
+        body = http.get(f"/api/generation/{scheme.id}/lesson-config").json()["config"]
+        assert body["teacher_name"] == "Saved Teacher"
+
+        # A deliberately cleared name stays blank (the UI tracks the intent).
+        assert http.put(
+            f"/api/generation/{scheme.id}/lesson-config",
+            json={**FULL_CONFIG, "teacher_name": ""},
+        ).status_code == 200
+        body = http.get(f"/api/generation/{scheme.id}/lesson-config").json()["config"]
+        assert body["teacher_name"] in ("", None)
+
+    def test_teacher_name_defaults_to_the_profile_when_not_saved(self, http):
+        scheme = http.scheme_factory()
+        payload = {k: v for k, v in FULL_CONFIG.items() if k != "teacher_name"}
+        assert http.put(
+            f"/api/generation/{scheme.id}/lesson-config", json=payload
+        ).status_code == 200
+        body = http.get(f"/api/generation/{scheme.id}/lesson-config").json()["config"]
+        assert body["teacher_name"] == "Guided Teacher"
 
     def test_invalid_date_order_and_resource_key_are_rejected(self, http):
         scheme = http.scheme_factory()

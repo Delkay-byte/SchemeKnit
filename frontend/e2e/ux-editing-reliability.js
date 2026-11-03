@@ -84,8 +84,13 @@ async function main() {
   record('profile name prefills blank lesson config', prefilledTeacher === USER.full_name, prefilledTeacher)
   record('profile school prefills blank lesson config', prefilledSchool === 'UX Test School', prefilledSchool)
 
+  // Required teaching setup is part of the same dialog; a fresh scheme has no
+  // saved class size yet, so the test completes it like a real teacher.
+  const classSize = page.getByLabel('Class size')
+  if (!(await classSize.inputValue())) await classSize.fill('30')
+
   await teacher.fill('Saved Teacher')
-  await page.getByRole('button', { name: 'Save & apply' }).click()
+  await page.getByRole('button', { name: 'Save configuration' }).click()
   await page.getByText('Lesson settings saved.').waitFor({ timeout: 20000 })
   await page.waitForTimeout(300)
   await openConfig.click()
@@ -94,7 +99,7 @@ async function main() {
   record('server-saved value wins over profile', savedTeacher === 'Saved Teacher', savedTeacher)
 
   await page.getByLabel("Teacher's name").fill('')
-  await page.getByRole('button', { name: 'Save & apply' }).click()
+  await page.getByRole('button', { name: 'Save configuration' }).click()
   await page.getByText('Lesson settings saved.').waitFor({ timeout: 20000 })
   await page.waitForTimeout(300)
   await openConfig.click()
