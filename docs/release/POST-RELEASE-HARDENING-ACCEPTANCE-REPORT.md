@@ -2,11 +2,13 @@
 
 Date: 2026-11-03
 Branch: `hardening/post-release-integrity-ux-20261102`
+Final branch commit: `6676390` (plus this report commit)
+Pull request: https://github.com/Delkay-byte/SchemeKnit/pull/8
 Starting `origin/main`: `da76859a52b9fd153d92e76267056d9e28e3a9b2`
 Production code release before this branch: `be7d5c8d54327a58da856e941d05fa41b8d5a6d1`
 
-Status: **implemented and tested locally/PostgreSQL/PostgreSQL 16 browser-E2E;
-not migrated or deployed to production.**
+Status: **implemented, browser/PostgreSQL tested, CI verified; not merged,
+migrated or deployed to production.**
 
 ## 1. Executive summary
 
@@ -200,7 +202,8 @@ rejection now fails instead of silently skipping. Documentation:
 | Backend deterministic full suite | **3,156 passed, 27 skipped, 2 deselected** (live_provider) in 37:55 |
 | Live provider focused runs | both passed (2–3 minutes) |
 | TypeScript | pass |
-| Frontend lint | 0 errors |
+| Frontend lint | 0 errors, 364 warnings |
+| CI (PR #8) | all jobs pass: backend, PostgreSQL, frontend, secret scan, UX browser/accessibility; live manual skipped |
 | Production build | pass |
 
 ## 13. Exclusions and limitations
