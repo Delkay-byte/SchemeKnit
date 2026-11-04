@@ -396,7 +396,11 @@ def fulfilment_state(db: Session, tx: SubscriptionTransactionDB) -> str:
             # Paystack already confirmed the charge but local activation did
             # not finish. This is not "pending payment" and must never invite
             # a second payment.
-            return "needs_attention"
+            details = tx.payment_details if isinstance(tx.payment_details, dict) else {}
+            fulfilment = details.get("fulfilment") if isinstance(
+                details.get("fulfilment"), dict) else {}
+            return ("needs_attention" if fulfilment.get("error")
+                    else "processing")
         return "payment_pending"
     plan = db.query(SubscriptionPlanDB).filter(
         SubscriptionPlanDB.id == tx.plan_id).first()
