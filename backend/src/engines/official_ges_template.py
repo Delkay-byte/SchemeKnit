@@ -390,6 +390,11 @@ def _resolve(field: Optional[str], lesson, ctx: Dict[str, Any]) -> str:
     """
     if not field:
         return ""
+    if field in ("phase_1_assessment", "phase_2_assessment",
+                 "phase_3_assessment"):
+        from ..curriculum.lesson_rubric import phase_assessments
+
+        return phase_assessments(lesson)[field.replace("_assessment", "")]
     if field == "week_ending":
         source = _get(lesson, "week_ending")
         if source is not None:
@@ -491,14 +496,20 @@ def _resolve(field: Optional[str], lesson, ctx: Dict[str, Any]) -> str:
     return ""
 
 
-def _grid_value(kind: str, lesson, ctx: Dict[str, Any]) -> str:
-    """Text for a delivery-grid cell that has no placeholder of its own."""
+def _grid_value(kind: str, lesson, ctx: Dict[str, Any],
+                phase_index: int = 2) -> str:
+    """Text for a delivery-grid cell that has no placeholder of its own.
+
+    The third column is ASSESSMENT ONLY. The lesson's TLR summary lives once
+    in the pedagogical-foundations table; repeating the resource inventory in
+    every delivery row was duplication, not assessment.
+    """
     if kind == FILL_LEARNER:
         return _bullet_block(_text_items(_get(lesson, "learner_activities")))
     if kind == FILL_RESOURCES_AND_ASSESSMENT:
-        parts = [_join(_text_items(_get(lesson, "teaching_learning_resources"))),
-                 _text(_get(lesson, "assessment"))]
-        return "\n".join(p for p in parts if p)
+        from ..curriculum.lesson_rubric import phase_assessments
+
+        return phase_assessments(lesson).get(f"phase_{phase_index}", "")
     return ""
 
 
@@ -695,7 +706,8 @@ def _apply_grid_fills(spec: GESLevelSpec, document, lesson, ctx: Dict[str, Any],
             cell = document.tables[table_offset + fill.table].cell(fill.row, fill.column)
         except (IndexError, KeyError):
             continue
-        _set_cell_text(cell, _grid_value(fill.kind, lesson, ctx))
+        _set_cell_text(cell, _grid_value(fill.kind, lesson, ctx,
+                                         phase_index=fill.row))
         applied += 1
     return applied
 

@@ -288,44 +288,28 @@ class TestPdfEngineContract:
 
 class TestPdfEndpointLayers:
     @pytest.mark.asyncio
-    async def test_layer1_missing_converter_renders_a_structured_pdf(self, db):
-        """No converter toolchain on the server is not a server error.
-
-        The API renders the lesson directly with ReportLab, so the teacher
-        still receives a real, template-shaped PDF instead of an environment
-        limitation they cannot act on.
-        """
-        pymupdf = pytest.importorskip("pymupdf")
+    async def test_layer1_missing_converter_is_an_explicit_503(self, db):
+        """One canonical document: without a DOCX→PDF converter the API
+        refuses with an actionable converter requirement rather than silently
+        rendering a second, differently structured document."""
         u = make_user(db, role="teacher", email="pdf-l1@t.test")
         _scheme, job = make_job_with_lessons(db, u, lessons=1)
         with patch.object(PDFExportEngine, "is_available", return_value=False):
-            res = await gen_router.export_pdf(job.id, "GES-style", None, u, db)
-
-        assert isinstance(res, FileResponse)
-        assert res.media_type == "application/pdf"
-        served = Path(res.path)
-        assert served.read_bytes().startswith(b"%PDF-")
-
-        # Structured, not a text dump: the lesson's sections are laid out as
-        # tables (the old PyMuPDF fallback re-extracted paragraphs instead).
-        doc = pymupdf.open(str(served))
-        try:
-            tables = [t for page in doc for t in page.find_tables().tables]
-            text = " ".join(page.get_text() for page in doc)
-        finally:
-            doc.close()
-        assert tables, "structured PDF rendered without any table"
-        assert "Diversity of Matter" in text
+            with pytest.raises(HTTPException) as e:
+                await gen_router.export_pdf(job.id, "GES-style", None, u, db)
+        assert e.value.status_code == 503
+        assert "LibreOffice" in e.value.detail
+        assert "Traceback" not in e.value.detail
 
     @pytest.mark.asyncio
-    async def test_layer1_structured_render_failure_is_503(self, db, monkeypatch):
-        """Only when the structured render fails too is the environment the
-        problem — and then the message must name the missing converter."""
+    async def test_layer1_structured_render_is_not_a_pdf_path(self, db, monkeypatch):
+        """The structured renderer is no longer used for PDF export, so a
+        failure there can never replace the canonical DOCX conversion."""
         u = make_user(db, role="teacher", email="pdf-l1b@t.test")
         _scheme, job = make_job_with_lessons(db, u, lessons=1)
 
-        def _boom(pipeline, lesson_plans, output_path, template_id, context):
-            raise RuntimeError("reportlab build failed")
+        def _boom(*args, **kwargs):
+            raise RuntimeError("must not be called")
 
         monkeypatch.setattr(gen_router, "_render_structured_pdf", _boom)
         with patch.object(PDFExportEngine, "is_available", return_value=False):
@@ -333,7 +317,6 @@ class TestPdfEndpointLayers:
                 await gen_router.export_pdf(job.id, "GES-style", None, u, db)
         assert e.value.status_code == 503
         assert "LibreOffice" in e.value.detail
-        assert "Traceback" not in e.value.detail
 
     @pytest.mark.asyncio
     async def test_layer2_conversion_failure_is_controlled_500(self, db, monkeypatch):
@@ -586,14 +569,11 @@ class TestDownloadHeaderContract:
         responses = [
             await gen_router.export_docx(job.id, "GES-style", TEMPLATE_ID, u, db),
             await gen_router.export_zip(job.id, "GES-style", TEMPLATE_ID, u, db),
-            await gen_router.export_xlsx(job.id, u, db),
         ]
-        # The filename-header contract is independent of which PDF renderer
-        # runs. Use the always-available structured path here so this test
-        # stays fast and does not depend on the host converter.
-        with patch.object(PDFExportEngine, "is_available", return_value=False):
-            responses.append(
-                await gen_router.export_pdf(job.id, "GES-style", None, u, db))
+        # The PDF is the same canonical DOCX converted; the filename-header
+        # contract applies to it exactly as to DOCX/ZIP.
+        responses.append(
+            await gen_router.export_pdf(job.id, "GES-style", None, u, db))
 
         for res in responses:
             assert X_FILENAME_HEADER in res.headers, res.media_type

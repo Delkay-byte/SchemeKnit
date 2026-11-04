@@ -736,7 +736,7 @@ class TestZeliFrontendCopy:
     def test_zeli_copy_is_present_in_each_surface(self):
         expectations = {
             r"src/app/(app)/lessons/[id]/page.tsx": ["Zeli available"],
-            r"src/app/(app)/generate/[id]/page.tsx": ["Zeli available"],
+            r"src/app/(app)/generate/[id]/page.tsx": ["Generate with Zeli"],
             "src/components/lesson-workspace.tsx": ["Zeli rewrote this section"],
             "src/lib/ai-feedback.ts": [
                 "Zeli is busy right now",

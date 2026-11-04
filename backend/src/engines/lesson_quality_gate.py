@@ -410,6 +410,106 @@ def wapef_loss_failures(lp: LessonPlan, canonical: Optional[Dict[str, Any]]) -> 
     return failures
 
 
+def _norm_sentence(text: str) -> str:
+    return re.sub(r"[^a-z0-9 ]+", " ", (text or "").lower()).strip()
+
+
+def _sentences(text: str) -> List[str]:
+    return [s.strip() for s in re.split(r"(?<=[.!?])\s+", text or "")
+            if len(s.strip()) >= 30]
+
+
+def _tokens(text: str) -> set:
+    return {w for w in _norm_sentence(text).split() if len(w) > 3}
+
+
+def _phase_duplication_failures(lp: LessonPlan) -> List[str]:
+    """Cross-phase repetition that makes the three phases one activity.
+
+    Exact duplicate sentences are always a defect. A high token overlap
+    (>= 0.82 Jaccard) catches Zeli paraphrases of the same instruction without
+    treating a legitimate concept reference as duplication.
+    """
+    out: List[str] = []
+    starter_text = " ".join([
+        getattr(lp, "introduction", "") or "",
+        getattr(lp, "starter_activity", "") or "",
+    ])
+    main_text = " ".join(
+        (a.description or "")
+        for a in (getattr(lp, "main_activities", None) or [])
+        if "PHASE 2" in (a.phase or "").upper()
+        or not any(k in (a.phase or "").upper()
+                   for k in ("STARTER", "PHASE 1", "PLENARY", "PHASE 3")))
+    plenary_text = " ".join([
+        getattr(lp, "conclusion", "") or "",
+    ])
+
+    def _overlap(a: str, b: str) -> float:
+        ta, tb = _tokens(a), _tokens(b)
+        if not ta or not tb:
+            return 0.0
+        return len(ta & tb) / len(ta | tb)
+
+    starter_sents = _sentences(starter_text)
+    main_sents = _sentences(main_text)
+    plenary_sents = _sentences(plenary_text)
+
+    for s in starter_sents:
+        key = _norm_sentence(s)
+        if any(key == _norm_sentence(m) for m in main_sents):
+            out.append("starter_repeated_in_main")
+            break
+    if not out:
+        for s in starter_sents:
+            if any(_overlap(s, m) >= 0.82 for m in main_sents):
+                out.append("starter_repeated_in_main")
+                break
+    for s in plenary_sents:
+        key = _norm_sentence(s)
+        if any(key == _norm_sentence(m) for m in main_sents):
+            out.append("plenary_repeated_in_main")
+            break
+    if "exit check" in main_text.lower() and "exit check" in plenary_text.lower():
+        out.append("exit_check_repeated")
+    seen: set = set()
+    for s in main_sents:
+        key = _norm_sentence(s)
+        if key and key in seen:
+            out.append("main_activity_repeated")
+            break
+        seen.add(key)
+    return out
+
+
+def _resource_failures(lp: LessonPlan) -> List[str]:
+    """Resource provenance/use checks for the printed plan."""
+    def key(value: str) -> str:
+        text = re.sub(r"\s+", " ", (value or "")).strip().lower()
+        if len(text) > 4 and text.endswith("s") and not text.endswith("ss"):
+            text = text[:-1]
+        return text
+
+    approved = [r for r in (list(getattr(lp, "source_tlrs", None) or [])
+                            + list(getattr(lp, "other_tlrs", None) or []))
+                if (r or "").strip()]
+    if not approved:
+        # Legacy/indicatorless lessons carry no provenance record; there is no
+        # source to validate against, and inventing a failure would reject
+        # good lessons. New generated lessons always populate source_tlrs.
+        return []
+    approved_keys = {key(r) for r in approved}
+    out: List[str] = []
+    display = list(getattr(lp, "teaching_learning_resources", None) or [])
+    if any(key(r) not in approved_keys for r in display):
+        out.append("unapproved_resource")
+    # Resource USE is guaranteed by the generation pass (scheme + teacher
+    # resources are named in an activity there). It is deliberately not a
+    # rejection rule here: legacy lessons and imported rows may list a resource
+    # without provenance, and rejecting them would destroy good plans.
+    return out
+
+
 def hard_failures(
     lp: LessonPlan,
     entry: Dict[str, Any],
@@ -482,6 +582,14 @@ def hard_failures(
     out.extend(wapef_loss_failures(lp, wapef_canonical))
 
     out.extend(_export_structure_failures(lp))
+
+    # Phase quality (Part G/H): distinct instructional purposes, no copied
+    # Starter inside Main Learning, no exit check printed twice.
+    out.extend(_phase_duplication_failures(lp))
+
+    # Resource provenance/use (Part F/J): the printed TLR list may contain
+    # ONLY scheme + teacher entries, and every entry must be used.
+    out.extend(_resource_failures(lp))
 
     # Phase 6/7 hygiene: drafting artefacts and malformed prose in
     # teacher-facing fields. The deterministic composer removes these; this

@@ -419,38 +419,20 @@ class TestDownloadEndpoints:
         assert r.content.startswith(b"PK\x03\x04")
 
     @pytest.mark.asyncio
-    async def test_xlsx_download_url_issues_and_delivers(self, db, tmp_path, monkeypatch):
+    async def test_xlsx_register_export_is_removed(self, db, tmp_path, monkeypatch):
+        from fastapi import HTTPException
         from tests.conftest import make_user
         from tests.test_export_download import make_job_with_lessons
         from src.routers import generation as gen_router
 
-        def _fake_xlsx(lessons, out_path):
-            out_path = Path(out_path)
-            out_path.parent.mkdir(parents=True, exist_ok=True)
-            out_path.write_bytes(b"PK\x03\x04stub xlsx body")
-            return out_path
-
-        monkeypatch.setattr(gen_router.pipeline, "export_xlsx", _fake_xlsx)
         monkeypatch.chdir(tmp_path)
         u = make_user(db, role="teacher", email="dl-xlsx-ru@t.test")
         _scheme, job = make_job_with_lessons(db, u, lessons=1)
 
-        res = await gen_router.issue_download_url(job.id, "xlsx", "GES-style", None, u, db)
-        assert res["filename"].endswith(".xlsx")
-
-        from fastapi.testclient import TestClient
-        from fastapi import FastAPI
-        from src.auth import get_optional_user
-        from src.database import get_db
-        app = FastAPI()
-        app.include_router(gen_router.router, prefix="/api/generation")
-        app.dependency_overrides[get_optional_user] = lambda: None
-        app.dependency_overrides[get_db] = lambda: db
-        with TestClient(app) as client:
-            r = client.get(res["download_url"])
-        assert r.status_code == 200
-        assert "spreadsheetml" in r.headers["content-type"]
-        assert r.content.startswith(b"PK\x03\x04")
+        assert not hasattr(gen_router, "export_xlsx")
+        with pytest.raises(HTTPException) as exc:
+            await gen_router.issue_download_url(job.id, "xlsx", "GES-style", None, u, db)
+        assert exc.value.status_code == 400
 
     @pytest.mark.asyncio
     async def test_pdf_without_libreoffice_still_delivers_a_real_pdf(
@@ -474,30 +456,10 @@ class TestDownloadEndpoints:
         u = make_user(db, role="teacher", email="dl-pdf-ru@t.test")
         _scheme, job = make_job_with_lessons(db, u, lessons=1)
 
-        res = await gen_router.issue_download_url(job.id, "pdf", "GES-style", None, u, db)
-        assert res["media_type"] == "application/pdf"
-        assert res["filename"].endswith(".pdf")
-
-        from fastapi.testclient import TestClient
-        from fastapi import FastAPI
-        from src.auth import get_optional_user
-        from src.database import get_db
-        app = FastAPI()
-        app.include_router(gen_router.router, prefix="/api/generation")
-        app.dependency_overrides[get_optional_user] = lambda: None
-        app.dependency_overrides[get_db] = lambda: db
-        with TestClient(app) as client:
-            r = client.get(res["download_url"])
-        assert r.status_code == 200
-        assert r.headers["content-type"].startswith("application/pdf")
-        assert r.content[:4] == b"%PDF"
-
-        # Both renderers down: name the missing converter instead of leaking a
-        # raw 500 at the teacher.
-        def _boom(*args, **kwargs):
-            raise RuntimeError("reportlab build failed")
-
-        monkeypatch.setattr(gen_router, "_render_structured_pdf", _boom)
+        # A PDF is the canonical DOCX converted; without a converter the API
+        # states the environment requirement instead of rendering a second
+        # differently structured document.
+        from fastapi import HTTPException
         with pytest.raises(HTTPException) as excinfo:
             await gen_router.issue_download_url(job.id, "pdf", "GES-style", None, u, db)
         assert excinfo.value.status_code == 503

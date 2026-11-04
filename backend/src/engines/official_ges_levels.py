@@ -243,16 +243,18 @@ _JHS_FIELDS = [
     GESField("PHASE_1_STARTER_ACTIVITIES", "Phase 1: Starter / Intro",
              SECTION_DELIVERY, "introduction", SOURCE_AI),
     GESField("PHASE_1_RESOURCES_OR_DIAGNOSTIC_ASSESSMENT",
-             "Phase 1: TLRs / Diagnostic Assessment", SECTION_DELIVERY,
-             "teaching_learning_resources", SOURCE_AI),
+             "Phase 1: Diagnostic Assessment", SECTION_DELIVERY,
+             "phase_1_assessment", SOURCE_AI),
     GESField("PHASE_2_MAIN_LEARNING_STEPS", "Phase 2: Main Learning",
              SECTION_DELIVERY, "main_activities", SOURCE_AI),
     GESField("PHASE_2_FORMATIVE_ASSESSMENT_STRATEGIES_AND_TOOLS",
-             "Phase 2: Formative Assessment", SECTION_DELIVERY, "assessment", SOURCE_AI),
+             "Phase 2: Formative Assessment", SECTION_DELIVERY,
+             "phase_2_assessment", SOURCE_AI),
     GESField("PHASE_3_PLENARY_AND_REFLECTION", "Phase 3: Plenary / Reflection",
              SECTION_DELIVERY, "conclusion", SOURCE_AI),
     GESField("PHASE_3_SUMMATIVE_EVALUATION_METRICS",
-             "Phase 3: Summative Evaluation", SECTION_DELIVERY, None),
+             "Phase 3: Summative Evaluation", SECTION_DELIVERY,
+             "phase_3_assessment"),
 ]
 
 JHS_SPEC = GESLevelSpec(

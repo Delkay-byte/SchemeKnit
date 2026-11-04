@@ -322,10 +322,12 @@ class TestExportVerification:
         engine = PDFExportEngine()
         assert engine is not None
 
-    def test_xlsx_export_engine_exists(self):
-        from src.engines.xlsx_export import XLSXExportEngine
-        engine = XLSXExportEngine()
-        assert engine is not None
+    def test_xlsx_export_engine_is_removed(self):
+        """The lesson-plan register XLSX export engine must not ship."""
+        import importlib
+        import pytest
+        with pytest.raises(ModuleNotFoundError):
+            importlib.import_module("src.engines.xlsx_export")
 
     def test_zip_export_engine_exists(self):
         from src.engines.zip_export import ZIPExportEngine

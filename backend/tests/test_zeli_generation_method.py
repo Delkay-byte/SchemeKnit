@@ -449,7 +449,7 @@ def test_v2_mapping_keeps_provider_starter_assessment_and_plenary_actions():
     assert "Learners: State one device" in lp.conclusion
 
 
-def test_v2_mapping_drops_placeholder_resources():
+def test_v2_mapping_drops_all_ai_invented_resources():
     from src.engines.generation_pipeline import GenerationPipeline
 
     content = _full_lesson()
@@ -460,15 +460,12 @@ def test_v2_mapping_drops_placeholder_resources():
     lp = _bare_lesson()
     GenerationPipeline()._apply_v2_content(lp, content)
 
+    # Part F: provider suggestions are NOT approved resources. Neither the
+    # activity rows nor the TLR summary may gain them.
     phase_resources = [
         r for act in lp.main_activities for r in (act.resources or [])]
-    assert "Chart" in phase_resources
-    for placeholder in ("None", "N/A", "null"):
-        assert placeholder not in phase_resources
-    assert "Real objects" in lp.teaching_learning_resources
-    assert not any(
-        str(r).strip().lower() in {"none", "n/a", "na", "null", "nil", "-"}
-        for r in lp.teaching_learning_resources)
+    assert phase_resources == []
+    assert lp.teaching_learning_resources == []
 
 
 def test_v2_mapping_fills_empty_columns_with_provider_actions():
@@ -678,18 +675,21 @@ def _frontend(path):
         return fh.read()
 
 
-def test_generate_page_offers_zeli_and_keeps_existing_options():
+def test_generate_page_offers_standard_and_zeli_without_ai_mode_controls():
     page = _frontend("src/app/(app)/generate/[id]/page.tsx")
 
-    # The accessible, clearly labelled option exists exactly once as a choice.
+    # The accessible, clearly labelled options exist as a choice.
     assert "Generate with Zeli" in page
+    assert "Standard" in page
     assert 'data-generation-method' in page
     assert "generation_method" in page
-    # Existing generation options are preserved.
+    # The internal AI-mode enum is NOT a teacher-facing control.
     for option in ('"OFF"', '"BASIC"', '"ENHANCED"'):
-        assert f"value={option}" in page or f"'{option}'" in page
-    # Zeli availability drives a real disabled state, not a misleading button.
-    assert "zeliStatus" in page or "zeli_status" in page or "zeliStatus" in page
+        assert f"value={option}" not in page
+    assert "AI Mode" not in page
+    assert "cfg-ai-mode-note" not in page
+    # Zeli availability is still reported honestly.
+    assert "zeliStatus" in page
 
 
 def test_api_client_sends_generation_method_and_reports_zeli_status():
@@ -698,12 +698,12 @@ def test_api_client_sends_generation_method_and_reports_zeli_status():
     assert "generation_method=" in api or "generationMethod" in api
 
 
-def test_generate_page_disables_enrichment_mode_for_zeli():
+def test_generate_page_has_one_primary_action():
     page = _frontend("src/app/(app)/generate/[id]/page.tsx")
-    # Exposed only as an explicit choice; the existing OFF/BASIC/ENHANCED
-    # select must be disabled (with a reason) while Zeli is selected.
-    assert "disabled={config.generation_method === 'zeli'}" in page
-    assert "cfg-ai-mode-note" in page
+    assert "Generate lesson plans" in page
+    assert "Quick Generate" not in page
+    assert "Build with me" not in page
+    assert 'data-generate-mode' not in page
 
 
 # ── 10. Resume / retry / recovery ───────────────────────────────────────────

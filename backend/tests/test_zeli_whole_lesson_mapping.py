@@ -163,16 +163,17 @@ def test_zeli_whole_lesson_replaces_generic_teacher_and_learner_columns():
     assert "Copy the names and formulas into books" in learner_text
 
 
-def test_zeli_whole_lesson_drops_irrelevant_scaffold_resources():
+def test_zeli_whole_lesson_keeps_only_source_and_teacher_resources():
     lp = _lesson()
     GenerationPipeline()._apply_v2_content(
         lp, _content(), _config(), whole_lesson=True)
     resources = " | ".join(lp.teaching_learning_resources).lower()
     assert "hand lens" not in resources
     assert "containers" not in resources
-    assert "flashcards with compound names" in resources
+    # Part F: provider-suggested materials never become TLRs.
+    assert "flashcards with compound names" not in resources
     # Source TLRs remain authoritative and are never dropped.
-    assert "Charts and Pictures" in lp.teaching_learning_resources
+    assert "charts and pictures" in resources
 
 
 def test_zeli_ai_objectives_are_provenance_marked_ai():

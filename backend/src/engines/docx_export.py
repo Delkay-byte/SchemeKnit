@@ -526,12 +526,24 @@ def _append_assessment_structure(document, lessons) -> None:
         items = [i for i in (getattr(lp, "assessment_items", None) or [])
                  if (getattr(i, "prompt", "") or "").strip()]
         rubric = getattr(lp, "assessment_rubric", None)
-        if not items and not (rubric is not None and rubric.criteria):
+        class_task = (getattr(lp, "class_assignment", "") or "").strip()
+        home_task = ((getattr(lp, "home_assignment", "") or "")
+                     or (getattr(lp, "homework", "") or "")).strip()
+        if not items and not (rubric is not None and rubric.criteria) \
+                and not class_task and not home_task:
             continue
         _heading(document,
                  f'Assessment Structure — Week {lp.week_number} '
                  f'(Lesson {lp.lesson_sequence})',
                  page_break_before=True)
+        # Assignments have no dedicated cell on the bundled form. They are
+        # printed here so the in-class and home tasks survive the export.
+        if class_task or home_task:
+            _heading(document, 'Assignments')
+            if class_task:
+                document.add_paragraph(f"Class assignment: {class_task}")
+            if home_task and home_task != class_task:
+                document.add_paragraph(f"Home assignment: {home_task}")
         if items:
             _heading(document,
                      'Assessment Questions / Checks (with marking)')

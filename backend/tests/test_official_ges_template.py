@@ -333,7 +333,10 @@ class TestDeterministicValues:
         """Nothing is invented for a form field with no stored source."""
         values = placeholder_values(JHS_SPEC, make_lesson(JHS_SPEC))
         assert values["INSERT_PERIOD"] == ""
-        assert values["PHASE_3_SUMMATIVE_EVALUATION_METRICS"] == ""
+        # The assessment column is now ASSESSMENT-only: Phase 3 carries the
+        # lesson's own success criterion instead of a blank TLR cell.
+        assert values["PHASE_3_SUMMATIVE_EVALUATION_METRICS"].startswith(
+            "Success criteria:")
         # SHS programme (Science/Business/Home Economics…) is not a lesson column.
         assert placeholder_values(SHS_SPEC, make_lesson(SHS_SPEC))["PROGRAMME"] == ""
         assert placeholder_values(PRIMARY_SPEC, make_lesson(PRIMARY_SPEC))["PERIOD"] == ""
@@ -387,8 +390,12 @@ class TestDeterministicValues:
                                          "week_ending", "lesson_date")}
         assert not (ai_tokens & category_tokens)
         # AI contributes activity-family content: delivery phases + vocabulary/TLRs.
+        # The three assessment cells are stored lesson assessment, not AI text.
+        assessment_fields = {"phase_1_assessment", "phase_2_assessment",
+                             "phase_3_assessment"}
         delivery = {f.token for f in spec.fields if f.section == "delivery_grid"
-                    and f.field is not None}
+                    and f.field is not None
+                    and f.field not in assessment_fields}
         assert delivery <= ai_tokens
 
 
@@ -402,20 +409,23 @@ class TestGridFills:
         assert JHS_SPEC.grid_fills == ()
 
     @pytest.mark.parametrize("spec", [KG_SPEC, PRIMARY_SPEC], ids=lambda s: s.key)
-    def test_resource_columns_take_resources_and_assessment(self, spec, tmp_path):
+    def test_assessment_columns_take_assessment_not_resources(self, spec, tmp_path):
         out = render_and_save(spec, [make_lesson(spec)], tmp_path / f"{spec.key}.docx")
         delivery = out.tables[1]
         for row in (1, 2, 3):
             cell = delivery.cell(row, 2).text
-            assert "Laptops" in cell
-            assert "Check that learners can print text using node." in cell
+            assert "Laptops" not in cell
+            assert cell.strip()
+        # Phase 2 carries the lesson's substantive assessment.
+        assert "Check that learners can print text using node." in delivery.cell(2, 2).text
 
-    def test_shs_fills_learner_activities_and_tlms(self, tmp_path):
+    def test_shs_fills_learner_activities_and_assessment(self, tmp_path):
         out = render_and_save(SHS_SPEC, [make_lesson(SHS_SPEC)], tmp_path / "shs.docx")
         delivery = out.tables[1]
         for row in (1, 2, 3):
             assert "Run a console log script." in delivery.cell(row, 2).text  # learner col
-            assert "Laptops" in delivery.cell(row, 3).text                    # TLMs col
+            assert "Laptops" not in delivery.cell(row, 3).text               # assessment col
+            assert delivery.cell(row, 3).text.strip()
 
     @pytest.mark.parametrize("spec", ALL_SPECS, ids=lambda s: s.key)
     def test_no_data_leaves_the_column_blank(self, spec, tmp_path):
