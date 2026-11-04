@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { SurfaceCard } from '@/components/ui/surface-card'
 import { Banner } from '@/components/ui/banner'
 import { PageHeader } from '@/components/ui/page-header'
-import { Upload, FileText, CheckCircle, AlertTriangle, Play } from 'lucide-react'
+import { Upload, FileText, CheckCircle, AlertTriangle, Play, Sparkles } from 'lucide-react'
 import { Select } from '@/components/ui/select'
 import { Field } from '@/components/ui/field'
 import { api } from '@/lib/api'
@@ -15,6 +15,8 @@ import { normalizeError } from '@/lib/error-normalizer'
 import { readDraft, removeDraft, saveDraft } from '@/lib/drafts'
 import { useAuth } from '@/lib/auth-context'
 import { DraftRecoveryBanner } from '@/components/ui/draft-recovery'
+import { LessonConfigModal } from '@/components/lesson-config-modal'
+import type { LessonRubricConfig } from '@/types'
 import { WhatsAppButton } from '@/components/whatsapp-button'
 import { UploadPrivacyNotice } from '@/components/upload-privacy-notice'
 import { formatFileSize } from '@/lib/utils-display'
@@ -28,6 +30,10 @@ export default function UploadPage() {
   const { user } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [uploadedDraft, setUploadedDraft] = useState<{ schemeId: string; filename: string; updatedAt: number } | null>(null)
+  const [configOpen, setConfigOpen] = useState(false)
+  const [config, setConfig] = useState<LessonRubricConfig>({})
+  const [chosenMethod, setChosenMethod] = useState<'standard' | 'zeli'>('standard')
+  const [openingSetup, setOpeningSetup] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
@@ -137,10 +143,10 @@ export default function UploadPage() {
       setUploadProgress(100)
       setResult(response)
       setSuccess(true)
-      if (user?.id && response?.id) {
+      if (user?.id && response?.scheme_id) {
         saveDraft(
           { userId: user.id, workflow: 'upload-complete' },
-          { schemeId: response.id, filename: file.name },
+          { schemeId: response.scheme_id, filename: file.name },
         )
       }
       api.getStorageUsage().then(setStorage).catch(() => {})
@@ -274,6 +280,22 @@ export default function UploadPage() {
   const flowCurrent = success
     ? (isExtractionFailure || needsSubjectConfirmation ? 1 : 2)
     : uploading ? 1 : 0
+
+  const openSetup = async (method: 'standard' | 'zeli') => {
+    if (!result?.scheme_id) return
+    setChosenMethod(method)
+    setOpeningSetup(true)
+    setError(null)
+    try {
+      const saved = await api.getLessonConfig(result.scheme_id)
+      setConfig(saved.config || {})
+      setConfigOpen(true)
+    } catch (err) {
+      setError(normalizeError(err).message)
+    } finally {
+      setOpeningSetup(false)
+    }
+  }
 
   return (
     <div className="min-h-screen">
@@ -529,16 +551,23 @@ export default function UploadPage() {
                   <Button
                     size="lg"
                     className="w-full bg-gradient-to-r from-[#102A43] to-[#04769B] text-white hover:from-[#0d2136] hover:to-[#04698a]"
-                    data-autopilot-upload
-                    onClick={() => {
-                      try {
-                        window.sessionStorage.setItem('schemeknit.autopilot_intent', '1')
-                      } catch { /* storage unavailable */ }
-                      router.push(`/generate/${result.scheme_id}`)
-                    }}
+                    data-generate-standard
+                    disabled={openingSetup}
+                    onClick={() => { void openSetup('standard') }}
                   >
                     <Play className="mr-2 h-4 w-4" aria-hidden="true" />
                     Generate my lesson plans
+                  </Button>
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="w-full"
+                    data-generate-zeli
+                    disabled={openingSetup}
+                    onClick={() => { void openSetup('zeli') }}
+                  >
+                    <Sparkles className="mr-2 h-4 w-4" aria-hidden="true" />
+                    Generate with Zeli
                   </Button>
                   <div className="flex flex-col gap-3 sm:flex-row">
                     <Button variant="outline" className="flex-1" onClick={() => router.push(`/review/${result.scheme_id}`)}>
@@ -721,6 +750,18 @@ export default function UploadPage() {
           )}
         </div>
       </main>
+      <LessonConfigModal
+        schemeId={result?.scheme_id || ''}
+        open={configOpen}
+        onOpenChange={setConfigOpen}
+        config={config}
+        initialMethod={chosenMethod}
+        onSaved={(saved) => {
+          if (!result?.scheme_id) return
+          const method = saved.generation_method || chosenMethod
+          router.push(`/generate/${result.scheme_id}?method=${method}`)
+        }}
+      />
       <WhatsAppButton />
     </div>
   )

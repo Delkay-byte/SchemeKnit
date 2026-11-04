@@ -1181,14 +1181,26 @@ async def get_my_plan(
             (p for p in resolved["credits"].get("purchased_packages", [])
              if p.get("reference") == latest.reference),
             None)
+        # The purchase snapshot is authoritative: a later catalogue edit must
+        # not relabel what the teacher already bought.
+        details = (latest.payment_details
+                   if isinstance(latest.payment_details, dict) else {})
+        snapshot = (details.get("package_snapshot")
+                    if isinstance(details.get("package_snapshot"), dict) else {})
+        from .. import paystack
+        fulfilment = paystack.fulfilment_state(db, latest)
         resolved["active_package"] = {
-            "slug": plan.slug if plan else "",
-            "name": plan.name if plan else "",
-            "kind": getattr(plan, "package_kind", "") if plan else "",
+            "slug": snapshot.get("slug") or (plan.slug if plan else ""),
+            "name": snapshot.get("name") or (plan.name if plan else ""),
+            "kind": (snapshot.get("package_kind")
+                     or (getattr(plan, "package_kind", "") if plan else "")),
             "credits_granted": int(balance["granted"]) if balance else 0,
             "credits_remaining": int(balance["remaining"]) if balance else 0,
             "paid_at": latest.paid_at.isoformat() if latest.paid_at else None,
             "amount_pesewas": int(latest.amount_pesewas or 0),
+            "payment_method": latest.payment_method or "",
+            "channel": latest.channel or "",
+            "fulfilment_status": fulfilment,
             "reference": latest.reference,
         }
     else:

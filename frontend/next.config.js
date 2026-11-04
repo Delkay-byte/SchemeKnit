@@ -18,15 +18,16 @@ const nextConfig = {
     NEXT_PUBLIC_BUILD_TARGET: process.env.NEXT_PUBLIC_BUILD_TARGET || 'web',
   },
   async headers() {
-    // Local development/acceptance may call a local backend. Production keeps
-    // only the deployed API origin, so a localhost API is never allow-listed
-    // in a production build.
+    // The configured API origin is always allow-listed explicitly. The
+    // production origin stays listed so a mistaken empty env cannot silently
+    // break the deployed frontend; staging adds its own origin at build time.
     const configuredApi = process.env.NEXT_PUBLIC_API_URL || ''
-    const localApiOrigin = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(
-      configuredApi,
-    )
-      ? configuredApi
-      : ''
+    let apiOrigin = ''
+    try {
+      apiOrigin = configuredApi ? new URL(configuredApi).origin : ''
+    } catch {
+      apiOrigin = ''
+    }
     const csp = [
       "default-src 'self'",
       // Next.js injects inline bootstrap scripts; dynamic code execution is not allowed.
@@ -34,7 +35,7 @@ const nextConfig = {
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
-      `connect-src 'self' https://schemeknit-api.onrender.com https://api.paystack.co https://checkout.paystack.com https://challenges.cloudflare.com${localApiOrigin ? ` ${localApiOrigin}` : ''}`,
+      `connect-src 'self' https://schemeknit-api.onrender.com https://api.paystack.co https://checkout.paystack.com https://challenges.cloudflare.com${apiOrigin ? ` ${apiOrigin}` : ''}`,
       "frame-src 'self' https://checkout.paystack.com https://challenges.cloudflare.com",
       "frame-ancestors 'self'",
       "base-uri 'self'",

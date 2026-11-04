@@ -58,12 +58,78 @@ Paystack `POST /charge` with `mobile_money: {phone, provider}`.
 
 Providers: `mtn` (MTN), `vod` (Telecel), `atl` (AirtelTigo/ATMoney). The phone
 must be a valid 10-digit Ghana number matching the selected network's prefixes.
-The response is normally `pay_offline` with `display_text`; the package stays
-pending while the customer authorises on their phone (180-second provider
-window). The frontend polls `GET /api/paystack/charge/status/{reference}`.
 
 No reusable authorisation is created, no card is charged and no automatic
-renewal is initiated.
+renewal is initiated. A repeated Buy click within 30 seconds reuses the existing
+pending charge (`reused: true`) instead of creating a second charge.
+
+### Authentication states
+
+Paystack's Ghana Mobile Money charge can require two different authentications.
+They are not interchangeable.
+
+| `data.status` | Meaning | SchemeKnit behaviour |
+|---|---|---|
+| `send_otp` | Paystack wants an OTP submitted to its API | Show the **Submit OTP** form and post to `/api/paystack/momo/otp` |
+| `pay_offline` | Normal MoMo flow: authorise in the prompt on the customer's phone | Show `display_text`, "check your phone" steps and a status check; never ask for a PIN |
+| `pending` | Provider is still processing | Keep pending; check only after at least 10 seconds |
+| `success` | Provider confirmed | Verify server-side, then activate exactly once |
+| `failed` | Final failure | Show failure; no credits |
+| `timeout` | Final timeout | Show failure; no credits |
+| `reversed` | Reversed after processing | Mark failed; existing reversal rules apply |
+
+`display_text` is always shown verbatim alongside SchemeKnit's guidance.
+
+### `send_otp` (OTP inside SchemeKnit)
+
+1. The charge stays `pending` with `charge_status=send_otp`.
+2. The browser shows an OTP field, the transaction reference and a Submit OTP
+   button. It does **not** poll while waiting for OTP entry.
+3. `POST /api/paystack/momo/otp` `{reference, otp}` checks that the reference
+   belongs to the signed-in teacher, is a Mobile Money charge, and is still
+   pending.
+4. The backend calls Paystack `POST /charge/submit_otp` `{reference, otp}`.
+5. Rejected/expired OTPs return HTTP 400 with a retryable message; the charge
+   stays pending and the customer can try again.
+6. The response advances the normal state machine (`pending`, `success`,
+   `failed`, `timeout`).
+7. At most one submission per reference is in flight. Submissions are limited
+   to 6 attempts per teacher per 5 minutes (HTTP 429 after that).
+
+### `pay_offline` (authorisation on the customer's phone)
+
+This is the normal MTN/Telecel/AirtelTigo flow. The customer sees Paystack's
+`display_text`, is told to check the phone and follow the Mobile Money prompt,
+and is told to enter the SMS code in the provider prompt — not on SchemeKnit —
+and the MoMo PIN only in the provider's own interface.
+
+If no prompt appears, the UI explains that the number must be registered for
+Mobile Money, keeps the reference visible, offers a manual status check and a
+way to start a new request. A delayed confirmation is never shown as failure.
+
+### Polling and recovery
+
+The frontend polls `GET /api/paystack/charge/status/{reference}` every 12
+seconds. Manual **Check status now** unlocks after 10 seconds, the documented
+minimum pending-check delay. Network failures show "payment status temporarily
+unavailable" and keep the charge pending. A stale in-flight response cannot
+overwrite a newer state. Refreshing `/upgrade` restores the pending charge from
+`GET /api/paystack/me` (`pending_payment`), including `charge_status`.
+
+An unconfirmed MoMo authorisation window expires after five minutes; a late
+verified `charge.success` webhook can still activate the package.
+
+### Security
+
+- OTPs and MoMo PINs are never logged, stored, placed in URLs or returned by an
+  API. Only numeric OTP input is forwarded to Paystack over TLS.
+- OTP submission requires authentication and transaction ownership. Another
+  teacher receives 404.
+- The Paystack secret key stays server-side; no client SDK or public key is
+  required for this flow.
+- `/charge/submit_otp` requests preserve Paystack's 4xx status so a bad code is
+  retryable instead of becoming a generic provider failure.
+- Phone numbers are not logged; payment logs use the reference/provider only.
 
 ## Webhook
 

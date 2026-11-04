@@ -122,14 +122,14 @@ export default function TeachersPage() {
       description: t.full_name,
       variant: 'info',
       duration: 3000,
-      key: `teacher-toggle:${t.id}`,
+      key: `teacher-toggle:${t.id}:${verb}`,
     })
     try {
       await api.toggleUserActive(t.id)
       toast({
         title: nextActive ? 'Teacher reactivated.' : 'Teacher deactivated.',
         variant: 'success',
-        key: `teacher-toggle-done:${t.id}`,
+        key: `teacher-toggle-done:${t.id}:${nextActive ? 'active' : 'inactive'}`,
       })
       load()
     } catch (err) {
@@ -142,7 +142,7 @@ export default function TeachersPage() {
         title: `Could not ${verb} this teacher`,
         description: normalized.message,
         variant: 'error',
-        key: `teacher-toggle-error:${t.id}`,
+        key: `teacher-toggle-error:${t.id}:${verb}`,
         action: { label: 'Try again', onClick: () => { void runToggle(t) } },
       })
     } finally {

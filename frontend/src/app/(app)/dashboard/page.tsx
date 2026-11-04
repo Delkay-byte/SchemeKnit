@@ -367,8 +367,16 @@ export default function Dashboard() {
                         : ''}
                     </p>
                   </div>
-                  <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-800">
-                    Active
+                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                    plan.active_package.fulfilment_status === 'activated'
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-amber-100 text-amber-800'
+                  }`}>
+                    {plan.active_package.fulfilment_status === 'activated'
+                      ? 'Active'
+                      : plan.active_package.fulfilment_status === 'needs_attention'
+                        ? 'Activation needs attention'
+                        : 'Activation pending'}
                   </span>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
@@ -388,7 +396,15 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <p className="text-xs uppercase text-slate-500">Payment</p>
-                    <p className="font-medium">Mobile Money</p>
+                    <p className="font-medium">
+                      {plan.active_package.payment_method === 'bank_transfer'
+                        ? 'Bank Transfer'
+                        : plan.active_package.payment_method === 'mobile_money'
+                          ? 'Mobile Money'
+                          : plan.active_package.payment_method === 'card'
+                            ? 'Card (historical)'
+                            : plan.active_package.channel || '—'}
+                    </p>
                   </div>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -483,11 +499,11 @@ export default function Dashboard() {
                       ) : (
                         <>
                           <StatusPill tone="neutral" className="mb-1 rounded text-[11px] font-bold uppercase tracking-wider">
-                            AD ESUA — FREE
+                            FREE PLAN
                           </StatusPill>
-                          <h3 className="font-semibold">Adesua — Free</h3>
+                          <h3 className="font-semibold">Free plan</h3>
                           <p className="text-sm text-muted-foreground">
-                            Individual plan
+                            Individual free plan
                           </p>
                         </>
                       )}

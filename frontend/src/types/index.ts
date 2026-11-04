@@ -128,6 +128,15 @@ export interface LessonRubricConfig {
   periods_per_week?: number | null
   period?: string | null
   teaching_days?: number[] | null
+  term_start_date?: string | null
+  term_end_date?: string | null
+  term?: string | null
+  lessons_per_week?: number | null
+  generation_method?: 'standard' | 'zeli' | null
+  ai_mode?: string | null
+  template_id?: string | null
+  /** Canonical source occurrence id -> per-lesson teacher resources. */
+  indicator_resources?: Record<string, { references: string[]; tlrs: string[] }>
 }
 
 export interface LessonConfigResponse {
@@ -167,6 +176,7 @@ export interface TermConfig {
   teaching_learning_resources?: string[]
   core_competencies?: string[]
   references?: string[]
+  indicator_resources?: Record<string, { references: string[]; tlrs: string[] }>
   // Free Tier: which indicators the teacher chose to spend this month's
   // lesson-plan units on. Empty = all indicators (paid/unlimited).
   selected_indicator_codes?: string[]
@@ -434,6 +444,9 @@ export interface PlanResolution {
     credits_remaining?: number
     paid_at?: string | null
     amount_pesewas?: number
+    payment_method?: string
+    channel?: string
+    fulfilment_status?: string
     reference?: string
   } | null
 }

@@ -802,6 +802,60 @@ class TestFulfilmentRecovery:
         paystack.activate_paid_transaction(db, tx, {})
         assert [kind for kind, _ in sent] == ["owner", "customer"]
 
+    def test_production_flexible_pack_replay_grants_exactly_once(self, db, monkeypatch):
+        """GH₵12 production reference: repeated activation cannot double-grant.
+
+        Mirrors the already-fulfilled transaction
+        TFM-312e7b80-475e34f2211c0682fa9a (20 credits) without touching
+        production: the same local reference is activated repeatedly and each
+        path must return the SAME single grant, licence and balance.
+        """
+        from src.routers import paystack as router_module
+
+        user = make_user(db)
+        plan = db.query(SubscriptionPlanDB).filter_by(
+            slug="flexible-credit-pack").one()
+        reference = "TFM-312e7b80-475e34f2211c0682fa9a"
+        tx = router_module._new_tx(db, user, plan, "bank_transfer")
+        tx.reference = reference
+        db.commit()
+
+        payload = {
+            "status": "success", "amount": 1200, "currency": "GHS",
+            "reference": reference, "id": 6730146887,
+            "channel": "bank_transfer",
+            "paid_at": datetime.utcnow().isoformat(),
+            "customer": {"email": user.email, "customer_code": "CUS_PROD"},
+            "metadata": {"user_id": user.id},
+        }
+        monkeypatch.setattr(paystack, "verify", lambda ref: dict(payload))
+        hook = {
+            "reference": reference, "id": 6730146887, "status": "success",
+            "amount": 1200, "currency": "GHS", "channel": "bank_transfer",
+            "customer": {"email": user.email},
+        }
+
+        paystack.handle_webhook(db, "charge.success", hook)
+        db.expire_all()
+        for _ in range(3):
+            paystack.activate_paid_transaction(db, tx, payload)
+            db.expire_all()
+
+        balances = db.query(CreditBalanceDB).filter_by(
+            grant_key=f"package:{reference}").all()
+        assert len(balances) == 1
+        assert balances[0].credits_granted == 20
+        assert balances[0].credits_remaining == 20
+        ledger = db.query(CreditLedgerDB).filter_by(
+            user_id=user.id, entry_type="grant").all()
+        assert len(ledger) == 1
+        licences = db.query(UserLicenseDB).filter_by(user_id=user.id).all()
+        assert len(licences) == 1 and licences[0].status == "active"
+        tx = db.query(SubscriptionTransactionDB).filter_by(
+            reference=reference).one()
+        assert tx.status == "success"
+        assert paystack.fulfilment_state(db, tx) == "activated"
+
     def test_notification_failure_does_not_undo_purchase(self, db, monkeypatch):
         from src import email_service
         from src.config import get_settings

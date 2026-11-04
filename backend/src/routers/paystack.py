@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import json
 import secrets
+import threading
+import time
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Dict, List, Optional, Set
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel
@@ -27,6 +29,47 @@ from ..logging_config import log_event, log_error
 
 router = APIRouter()
 
+# ── OTP abuse protection (in-process; OTPs are never stored) ───────────────
+# The rate limit counts SUBMISSION ATTEMPTS per signed-in user, not codes.
+_OTP_WINDOW_SECONDS = 300
+_OTP_MAX_ATTEMPTS = 6
+_OTP_ATTEMPTS: Dict[str, List[float]] = {}
+_OTP_IN_FLIGHT: Set[str] = set()
+_OTP_LOCK = threading.Lock()
+
+#: A repeated Buy click inside this window reuses the same pending charge.
+_DUPLICATE_CHARGE_WINDOW = timedelta(seconds=30)
+
+
+def _otp_attempt_allowed(user_id: str) -> bool:
+    """Sliding-window limit without retaining any OTP value."""
+    now = time.monotonic()
+    with _OTP_LOCK:
+        attempts = [
+            at for at in _OTP_ATTEMPTS.get(user_id, [])
+            if now - at < _OTP_WINDOW_SECONDS
+        ]
+        if len(attempts) >= _OTP_MAX_ATTEMPTS:
+            _OTP_ATTEMPTS[user_id] = attempts
+            return False
+        attempts.append(now)
+        _OTP_ATTEMPTS[user_id] = attempts
+        return True
+
+
+def _claim_otp_submission(reference: str) -> bool:
+    """Only one OTP submission per charge may be in flight at a time."""
+    with _OTP_LOCK:
+        if reference in _OTP_IN_FLIGHT:
+            return False
+        _OTP_IN_FLIGHT.add(reference)
+        return True
+
+
+def _release_otp_submission(reference: str) -> None:
+    with _OTP_LOCK:
+        _OTP_IN_FLIGHT.discard(reference)
+
 
 class MomoChargeRequest(BaseModel):
     plan_slug: str
@@ -40,6 +83,11 @@ class BankTransferRequest(BaseModel):
 
 class LicenceRedeemRequest(BaseModel):
     key: str
+
+
+class MomoOtpRequest(BaseModel):
+    reference: str
+    otp: str
 
 
 def _callback_url(request: Request) -> str:
@@ -296,6 +344,39 @@ async def momo_charge(
     except paystack.PaystackError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.message)
 
+    # A repeated Buy click (double click, slow network retry) must not create
+    # a second charge. Reuse the pending attempt instead.
+    existing = (
+        db.query(SubscriptionTransactionDB)
+        .filter(SubscriptionTransactionDB.user_id == user.id,
+                SubscriptionTransactionDB.plan_id == plan.id,
+                SubscriptionTransactionDB.payment_method == "mobile_money",
+                SubscriptionTransactionDB.status == "pending",
+                SubscriptionTransactionDB.provider == code,
+                SubscriptionTransactionDB.created_at
+                > datetime.utcnow() - _DUPLICATE_CHARGE_WINDOW)
+        .order_by(SubscriptionTransactionDB.created_at.desc())
+        .first()
+    )
+    if existing is not None:
+        log_event("paystack_momo_charge_reused", user_id=user.id,
+                  plan_id=plan.id, reference=existing.reference, provider=code)
+        return {
+            "reference": existing.reference,
+            "status": existing.status,
+            "charge_status": existing.charge_status,
+            "display_text": existing.instructions or "",
+            "payment_details": existing.payment_details or {},
+            "payment_method": existing.payment_method,
+            "billing_mode": "prepaid",
+            "plan": _plan_payload(plan),
+            "provider": code,
+            "email": user.email,
+            "currency": "GHS",
+            "awaiting_authorisation": existing.status == "pending",
+            "reused": True,
+        }
+
     tx = _new_tx(db, user, plan, "mobile_money", code)
     try:
         data = paystack.charge_mobile_money(
@@ -321,6 +402,87 @@ async def momo_charge(
     return body
 
 
+@router.post("/momo/otp")
+async def momo_submit_otp(
+    req: MomoOtpRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Submit the Paystack OTP for this teacher's pending Mobile Money charge.
+
+    The OTP is forwarded to Paystack only. It is never logged or persisted.
+    """
+    reference = (req.reference or "").strip()
+    otp = "".join(ch for ch in (req.otp or "") if ch.isdigit())
+    if not reference:
+        raise HTTPException(status_code=400, detail="Payment reference is required.")
+    if not 4 <= len(otp) <= 8:
+        raise HTTPException(status_code=400, detail="Enter the one-time password sent to your phone.")
+
+    tx = (db.query(SubscriptionTransactionDB)
+          .filter(SubscriptionTransactionDB.reference == reference,
+                  SubscriptionTransactionDB.user_id == user.id).first())
+    if tx is None:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    if tx.payment_method != "mobile_money":
+        raise HTTPException(status_code=400, detail="This payment is not a Mobile Money charge.")
+    if tx.status != "pending":
+        raise HTTPException(status_code=409, detail="This payment is no longer awaiting an OTP.")
+
+    if not _otp_attempt_allowed(user.id):
+        raise HTTPException(
+            status_code=429,
+            detail="Too many one-time password attempts. Wait a few minutes, "
+                   "then check the payment status or start a new request.",
+            headers={"Retry-After": str(_OTP_WINDOW_SECONDS)},
+        )
+    if not _claim_otp_submission(reference):
+        raise HTTPException(
+            status_code=409,
+            detail="That one-time password is already being submitted.")
+
+    try:
+        data = paystack.submit_charge_otp(reference, otp)
+    except paystack.PaystackError as exc:
+        # Paystack answers a rejected/expired OTP with 400/422. The charge is
+        # still pending, so report the code problem and keep it retryable.
+        if exc.status_code in (400, 422):
+            raise HTTPException(
+                status_code=400,
+                detail="That one-time password was not accepted. Check the "
+                       "code sent to your phone and try again.")
+        raise HTTPException(status_code=exc.status_code, detail=exc.message)
+    finally:
+        _release_otp_submission(reference)
+
+    body = _charge_payload(tx, data)
+    state = str(data.get("status") or "").lower()
+    if state in ("failed", "timeout", "reversed"):
+        tx.status = "failed"
+    db.commit()
+    _settle_if_success(db, tx, data)
+    plan = db.query(SubscriptionPlanDB).filter(
+        SubscriptionPlanDB.id == tx.plan_id).first()
+    sub = db.query(UserSubscriptionDB).filter(
+        UserSubscriptionDB.user_id == user.id).first()
+    lic = db.query(UserLicenseDB).filter(
+        UserLicenseDB.user_id == user.id).first()
+    body.update({
+        "plan": _plan_payload(plan) if plan else None,
+        "status": tx.status,
+        "provider": tx.provider,
+        "email": user.email,
+        "currency": "GHS",
+        "subscription": _sub_payload(sub),
+        "licence": _licence_payload(lic) if tx.status == "success" else None,
+        "credits": credits.status(db, user.id),
+        "awaiting_authorisation": state == "pending" and tx.status == "pending",
+    })
+    log_event("paystack_momo_otp_submitted", user_id=user.id,
+              plan_id=tx.plan_id, reference=reference, charge_status=state)
+    return body
+
+
 @router.get("/charge/status/{reference}")
 async def charge_status(
     reference: str,
@@ -332,7 +494,9 @@ async def charge_status(
                   SubscriptionTransactionDB.user_id == user.id).first())
     if tx is None:
         raise HTTPException(status_code=404, detail="Payment not found")
-    if tx.status == "pending":
+    if tx.status == "pending" and tx.charge_status != "send_otp":
+        # Paystack is waiting for the customer's OTP. Checking the charge now
+        # would only repeat `send_otp`; the OTP route advances the charge.
         try:
             data = paystack.check_charge(reference)
             _charge_payload(tx, data)
@@ -349,6 +513,7 @@ async def charge_status(
                     error_at=datetime.utcnow().isoformat())
                 db.commit()
             else:
+                # A network/provider hiccup is not proof the payment failed.
                 _expire_if_needed(db, tx)
         else:
             _expire_if_needed(db, tx)

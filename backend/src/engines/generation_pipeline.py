@@ -1453,25 +1453,31 @@ class GenerationPipeline:
         if lesson_structured_refs:
             lp.structured_references = lesson_structured_refs
 
-        # Resources are TEACHER/SCHEME OWNED (Part F). AI suggestions never
-        # enter the printed TLR list or the activity rows: the provider may
-        # only use resources we supplied in the prompt. Phase resource cells
-        # are therefore filtered to the approved set (unapproved values are
-        # dropped), and the display list is exactly source + teacher entries.
-        approved_keys = {
-            str(r).strip().lower()
-            for r in (list(lp.source_tlrs or []) + list(lp.other_tlrs or []))
-            if str(r).strip()
-        }
-        for row in (list(lp.main_activities or [])
-                    + list(lp.learner_activities or [])
-                    + list(lp.teacher_activities or [])):
-            row.resources = [
-                r for r in list(getattr(row, "resources", None) or [])
-                if str(r).strip().lower() in approved_keys
-            ]
-        lp.teaching_learning_resources = _merge_unique(
-            list(lp.source_tlrs or []), list(lp.other_tlrs or []))
+        # Resources suggested by the AI for the phases may only enrich the
+        # DISPLAY union and never mutate source_tlrs or other_tlrs.
+        ai_resources = []
+        main = content.get("main_learning", {})
+        if isinstance(main, dict):
+            for phase in main.values():
+                if isinstance(phase, dict):
+                    ai_resources.extend(
+                        _clean_resources(phase.get("resources_used", [])))
+        resources_block = content.get("resources", {})
+        if isinstance(resources_block, dict):
+            ai_resources.extend(_clean_resources(
+                resources_block.get("suggested_alternatives", [])))
+        # Do NOT pull "source_resources" from AI — source comes from the scheme.
+        if whole_lesson:
+            # Part F: a whole-lesson provider chooses its own teaching moves,
+            # but the PRINTED materials stay teacher/scheme owned. Provider
+            # suggestions may not become required TLRs.
+            lp.teaching_learning_resources = _merge_unique(
+                list(lp.source_tlrs or []), list(lp.other_tlrs or []))
+        elif ai_resources:
+            lp.teaching_learning_resources = _merge_unique(
+                list(lp.source_tlrs or []) + list(lp.other_tlrs or []),
+                _merge_unique(lp.teaching_learning_resources, ai_resources),
+            )
 
     def _lesson_to_dict(self, lp: LessonPlan) -> dict:
         """Convert a LessonPlan to a dict for the quality gate."""

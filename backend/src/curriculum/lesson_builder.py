@@ -3028,12 +3028,21 @@ def build_lesson(
         if r and r.lower() not in [x.lower() for x in source_tlrs]:
             source_tlrs.append(r)
 
-    # OTHER TLRs: teacher additions for THIS lesson only (PART I).
-    # DEFAULT: empty. The old global config seed is NOT copied here — a batch
-    # seed value must never silently become per-lesson "teacher-added" data.
-    # The teacher adds Other TLRs per lesson in review; AI suggestions never
-    # land here either (they may only enrich the display union).
+    # OTHER TLRs / references: per source occurrence when the teacher supplied
+    # them in the configuration dialog. A present (even empty) entry is
+    # authoritative and must not inherit another lesson's or a global seed.
+    occurrence_key = (
+        getattr(alloc, "source_occurrence_id", "")
+        or f"week{alloc.week_number}:0:{alloc.indicator_code or ''}")
+    configured = getattr(config, "indicator_resources", None) or {}
+    per_lesson = configured.get(occurrence_key)
+
     other_tlrs: List[str] = []
+    if per_lesson is not None:
+        for r in list(per_lesson.get("tlrs") or []):
+            r = (r or "").strip()
+            if r and r.lower() not in [x.lower() for x in other_tlrs]:
+                other_tlrs.append(r)
 
     # Display union for templates that expect one TLR list. ONLY the uploaded
     # scheme's resources are allowed here; teacher additions are merged from
@@ -3147,7 +3156,12 @@ def build_lesson(
     references: List[str] = []
     structured_refs = []
     from ..models import ReferenceEntry
-    for ref in (getattr(config, "references", []) or []):
+    reference_seed = (
+        list(per_lesson.get("references") or [])
+        if per_lesson is not None
+        else list(getattr(config, "references", []) or [])
+    )
+    for ref in reference_seed:
         ref = (ref or "").strip()
         if ref:
             structured_refs.append(ReferenceEntry(type="Other", title=ref))
@@ -3326,16 +3340,24 @@ def _attach_source_resource_use(lp) -> None:
     """Name every scheme resource in a teaching activity (never invent one)."""
     from .resource_use import resource_use_sentence
     resources = []
+    scheme_resources = []
     seen = set()
-    for value in list(getattr(lp, "source_tlrs", None) or []):
+    source_keys = {
+        str(r or "").strip().lower()
+        for r in (getattr(lp, "source_tlrs", None) or [])
+    }
+    for value in (list(getattr(lp, "source_tlrs", None) or [])
+                  + list(getattr(lp, "other_tlrs", None) or [])):
         text = (value or "").strip()
         key = text.lower()
         if not text or key in seen:
             continue
         seen.add(key)
         resources.append(text)
+        if key in source_keys:
+            scheme_resources.append(text)
     lp.teaching_learning_resources = list(resources)
-    if not resources:
+    if not scheme_resources:
         return
     corpus = " ".join([
         getattr(lp, "introduction", "") or "",
@@ -3348,7 +3370,7 @@ def _attach_source_resource_use(lp) -> None:
         + list(getattr(lp, "teacher_activities", None) or [])
     )]).lower()
     missing = [
-        r for r in resources
+        r for r in scheme_resources
         if r.lower() not in corpus and f"{r.lower()}s" not in corpus
     ]
     if not missing:

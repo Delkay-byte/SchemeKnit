@@ -65,10 +65,9 @@ class TestWeekCentricSurface:
             "data-generate-summary",
             "data-generate-config",
             "data-generate-action",
-            "data-generation-method-summary",
-            "data-lesson-review",
+            "data-generate-mode",
+            "data-wapef-setup",
             "data-coverage",
-            "data-class-level-select",
         ):
             assert attr in src, f"missing {attr}"
 
@@ -137,9 +136,9 @@ class TestStateSplit:
         cfg_card = src.find("data-generate-config")
         assert 0 < cfg_gate < cfg_card or cfg_gate != -1
 
-    def test_review_card_is_gated_and_numbered_from_lesson_sequence(self):
+    def test_wapef_card_is_gated_and_numbered_from_lesson_sequence(self):
         src = _page()
-        assert "{!jobId && lessonReview.length > 0 && (" in src
+        assert "{!jobId && isWapefSelected && wapefOptions && lessonReview.length > 0 && (" in src
         # lesson_sequence is 1-based — the display must not add another +1.
         assert "row.lesson_sequence + 1" not in src
 

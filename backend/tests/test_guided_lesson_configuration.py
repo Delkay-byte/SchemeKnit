@@ -192,3 +192,111 @@ class TestGenerationConfigGate:
         second = http.get(f"/api/generation/{scheme.id}/lesson-config").json()
         assert first["config"] == second["config"]
         assert first["ready"] is True
+
+
+class TestExtendedLessonConfiguration:
+    def test_dates_method_template_and_per_indicator_resources_round_trip(self, http):
+        scheme = http.scheme_factory()
+        payload = {
+            **FULL_CONFIG,
+            "term": "Second Term",
+            "term_start_date": "2027-01-05",
+            "term_end_date": "2027-04-01",
+            "lessons_per_week": 4,
+            "generation_method": "zeli",
+            "ai_mode": "OFF",
+            "template_id": "",
+            "indicator_resources": {
+                "week1:0:B9.1.1.1.1": {
+                    "references": ["Science Textbook p.10"],
+                    "tlrs": ["Chart"],
+                },
+                "week1:1:B9.1.1.1.2": {
+                    "references": ["Science Textbook p.14"],
+                    "tlrs": ["Samples"],
+                },
+            },
+        }
+        resp = http.put(f"/api/generation/{scheme.id}/lesson-config", json=payload)
+        assert resp.status_code == 200, resp.text
+
+        body = http.get(f"/api/generation/{scheme.id}/lesson-config").json()["config"]
+        assert body["term"] == "Second Term"
+        assert body["term_start_date"] == "2027-01-05"
+        assert body["term_end_date"] == "2027-04-01"
+        assert body["lessons_per_week"] == 4
+        assert body["generation_method"] == "zeli"
+        assert body["indicator_resources"]["week1:0:B9.1.1.1.1"]["references"] == [
+            "Science Textbook p.10"]
+        assert body["indicator_resources"]["week1:1:B9.1.1.1.2"]["tlrs"] == ["Samples"]
+
+    def test_explicit_teacher_name_and_deliberate_blank_are_persisted(self, http):
+        scheme = http.scheme_factory()
+        resp = http.put(
+            f"/api/generation/{scheme.id}/lesson-config",
+            json={**FULL_CONFIG, "teacher_name": "Saved Teacher"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["config"]["teacher_name"] == "Saved Teacher"
+        # Reopening returns the teacher's value, not the profile default.
+        body = http.get(f"/api/generation/{scheme.id}/lesson-config").json()["config"]
+        assert body["teacher_name"] == "Saved Teacher"
+
+        # A deliberately cleared name stays blank (the UI tracks the intent).
+        assert http.put(
+            f"/api/generation/{scheme.id}/lesson-config",
+            json={**FULL_CONFIG, "teacher_name": ""},
+        ).status_code == 200
+        body = http.get(f"/api/generation/{scheme.id}/lesson-config").json()["config"]
+        assert body["teacher_name"] in ("", None)
+
+    def test_teacher_name_defaults_to_the_profile_when_not_saved(self, http):
+        scheme = http.scheme_factory()
+        payload = {k: v for k, v in FULL_CONFIG.items() if k != "teacher_name"}
+        assert http.put(
+            f"/api/generation/{scheme.id}/lesson-config", json=payload
+        ).status_code == 200
+        body = http.get(f"/api/generation/{scheme.id}/lesson-config").json()["config"]
+        assert body["teacher_name"] == "Guided Teacher"
+
+    def test_invalid_date_order_and_resource_key_are_rejected(self, http):
+        scheme = http.scheme_factory()
+        bad_dates = {
+            **FULL_CONFIG,
+            "term_start_date": "2027-04-01",
+            "term_end_date": "2027-01-05",
+        }
+        assert http.put(
+            f"/api/generation/{scheme.id}/lesson-config", json=bad_dates
+        ).status_code == 422
+
+        bad_key = {
+            **FULL_CONFIG,
+            "indicator_resources": {"position-0": {"references": ["x"], "tlrs": []}},
+        }
+        assert http.put(
+            f"/api/generation/{scheme.id}/lesson-config", json=bad_key
+        ).status_code == 422
+
+    def test_saving_without_indicator_resources_keeps_existing_ones(self, http):
+        scheme = http.scheme_factory()
+        resources = {
+            "week1:0:B9.1.1.1.1": {
+                "references": ["Science Textbook p.10"],
+                "tlrs": ["Chart"],
+            },
+        }
+        assert http.put(
+            f"/api/generation/{scheme.id}/lesson-config",
+            json={**FULL_CONFIG, "indicator_resources": resources},
+        ).status_code == 200
+
+        # A later save that only edits teaching setup must not wipe them.
+        assert http.put(
+            f"/api/generation/{scheme.id}/lesson-config",
+            json={**FULL_CONFIG, "class_size": 41},
+        ).status_code == 200
+
+        body = http.get(f"/api/generation/{scheme.id}/lesson-config").json()["config"]
+        assert body["class_size"] == 41
+        assert body["indicator_resources"] == resources

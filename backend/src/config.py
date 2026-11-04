@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     # all other production checks active. Set SCHEMEKNIT_PREVIEW=true on
     # the Render backend to enable.
     PREVIEW_MODE: bool = False
+    #: Explicit staging/preview opt-in for Paystack TEST keys. Never enabled in
+    #: production; a live deployment must still use sk_live_ with mode=live.
+    PAYSTACK_ALLOW_TEST_MODE: bool = False
     SECRET_KEY: str = "CHANGE-ME-IN-PRODUCTION"
     ALLOWED_HOSTS: list[str] = ["localhost", "127.0.0.1"]
 
@@ -712,16 +715,21 @@ class Settings(BaseSettings):
             mode = (self.PAYSTACK_MODE or "").strip().lower()
             secret = (self.PAYSTACK_SECRET_KEY or "").strip()
             if secret:
-                if mode != "live":
-                    problems.append(
-                        "PAYSTACK_MODE (must be 'live' when a live Paystack "
-                        "secret is configured in production)"
-                    )
-                if not secret.startswith("sk_live_"):
-                    problems.append(
-                        "PAYSTACK_SECRET_KEY (production must use sk_live_, "
-                        "not a test key)"
-                    )
+                staging_test_mode = (
+                    self.PAYSTACK_ALLOW_TEST_MODE and mode == "test"
+                    and secret.startswith("sk_test_")
+                )
+                if not staging_test_mode:
+                    if mode != "live":
+                        problems.append(
+                            "PAYSTACK_MODE (must be 'live' when a live Paystack "
+                            "secret is configured in production)"
+                        )
+                    if not secret.startswith("sk_live_"):
+                        problems.append(
+                            "PAYSTACK_SECRET_KEY (production must use sk_live_, "
+                            "not a test key)"
+                        )
             if (self.PAYSTACK_CURRENCY or "").strip().upper() != "GHS":
                 problems.append("PAYSTACK_CURRENCY (must be GHS)")
             for key in ("PAYSTACK_PUBLIC_KEY", "NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY"):

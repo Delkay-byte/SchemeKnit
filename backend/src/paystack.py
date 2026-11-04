@@ -7,6 +7,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 import os
 import secrets
 from datetime import datetime, timedelta
@@ -21,6 +22,8 @@ from .database import (
     SubscriptionPlanDB, SubscriptionTransactionDB, User, UserLicenseDB,
     UserSubscriptionDB, generate_id,
 )
+
+logger = logging.getLogger(__name__)
 
 API_BASE = "https://api.paystack.co"
 TIMEOUT = 20
@@ -131,7 +134,8 @@ def plan_code(plan: SubscriptionPlanDB) -> str:
     return code.strip()
 
 
-def _api(method: str, path: str, payload: Optional[dict] = None) -> dict:
+def _api(method: str, path: str, payload: Optional[dict] = None, *,
+         preserve_client_errors: bool = False) -> dict:
     # Validate enabled/mode/key before any network call. This is also the
     # explicit kill switch: PAYSTACK_ENABLED=false fails here.
     environment()
@@ -140,7 +144,12 @@ def _api(method: str, path: str, payload: Optional[dict] = None) -> dict:
         resp = requests.request(
             method, f"{API_BASE}{path}", json=payload,
             headers={"Authorization": f"Bearer {secret}",
-                     "Content-Type": "application/json"},
+                     "Content-Type": "application/json",
+                     "Accept": "application/json",
+                     # Paystack's edge rejects generic urllib/python-requests
+                     # user agents with Cloudflare 1010. An explicit client
+                     # identity keeps production and staging charges working.
+                     "User-Agent": "SchemeKnit/1.0 (+https://schemeknit.com)"},
             timeout=TIMEOUT,
             verify=True,
             allow_redirects=False,
@@ -156,11 +165,21 @@ def _api(method: str, path: str, payload: Optional[dict] = None) -> dict:
         body = {}
     if not resp.ok or not body.get("status"):
         message = str(body.get("message") or "")
+        # Status + provider message only; never headers or the secret key.
+        logger.warning(
+            "paystack_api_error path=%s status=%s message=%s",
+            path, resp.status_code, message[:200])
         if resp.status_code in (401, 403):
             raise PaystackError("Paystack rejected the server credentials.", 503)
         if resp.status_code == 429:
             raise PaystackError(
                 "Paystack is busy. No payment was taken; please try again.", 429)
+        if preserve_client_errors and 400 <= resp.status_code < 500:
+            # Submit-OTP validation errors must stay retryable and readable;
+            # the caller maps them to a teacher-facing message.
+            raise PaystackError(
+                message or "Paystack rejected the request; please try again.",
+                resp.status_code)
         raise PaystackError(
             "Paystack could not start the payment. No payment was taken.", 502)
     return body.get("data") or {}
@@ -255,6 +274,18 @@ def charge_mobile_money(plan: SubscriptionPlanDB, user: User, reference: str,
 
 def check_charge(reference: str) -> dict:
     return _api("GET", f"/charge/{reference}")
+
+
+def submit_charge_otp(reference: str, otp: str) -> dict:
+    """Submit the Paystack OTP for a charge awaiting ``send_otp``.
+
+    The OTP is sent only to Paystack in this request body; it is never logged,
+    stored, or returned by this module.
+    """
+    return _api("POST", "/charge/submit_otp", {
+        "reference": reference,
+        "otp": otp,
+    }, preserve_client_errors=True)
 
 
 
