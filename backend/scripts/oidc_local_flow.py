@@ -194,6 +194,7 @@ class FlowDriver:
         if query:
             url += "?" + query
         last_component = ""
+        saw_mfa = False
         answered = False
         for _ in range(15):
             r = self.client.get(url)
@@ -250,6 +251,13 @@ class FlowDriver:
                     f"stage '{component}' rejected {r.status_code}: {r.text[:300]}")
             if component == last_component:
                 raise RuntimeError(f"stage '{component}' repeated; aborting")
+            if component == "ak-stage-identification" and saw_mfa:
+                # A bare-flow drive completes the plan (TOTP verified) and
+                # Authentik starts a fresh plan; the session is live now.
+                log("idp-flow", "plan restarted post-MFA; session is live")
+                return self.captured_secret
+            if component == "ak-stage-authenticator-validate":
+                saw_mfa = True
             last_component = component
             answered = True
         raise RuntimeError("too many flow stages")
