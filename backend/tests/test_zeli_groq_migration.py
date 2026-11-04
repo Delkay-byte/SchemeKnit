@@ -766,9 +766,16 @@ class TestZeliFrontendCopy:
 _LIVE_GROQ_READY = GroqProvider().is_available()
 
 
-@pytest.mark.live
+# `live_provider` is the marker the standard command excludes (-m "not
+# live_provider"). The class previously carried a `live` marker that nothing
+# filters on, so on any machine with a GROQ_API_KEY the default test run made
+# real network calls whose results depended on provider rate-limit state —
+# nondeterministic skips and failures that never reproduced twice the same way.
+# CI only avoided this because CI has no key; that is ambient-state gating, not
+# marker discipline.
+@pytest.mark.live_provider
 class TestLiveZeliGroq:
-    """Real Groq calls. Skipped when no key is resolvable (env or .env)."""
+    """Real Groq calls. Opt-in: run explicitly with `-m live_provider`."""
 
     @pytest.mark.skipif(
         not _LIVE_GROQ_READY,
