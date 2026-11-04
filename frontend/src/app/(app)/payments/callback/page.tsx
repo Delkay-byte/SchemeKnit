@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { SurfaceCard } from '@/components/ui/surface-card'
 import { PageHeader } from '@/components/ui/page-header'
-import { LicenceActivationCard } from '@/components/licence-activation-card'
 import { api } from '@/lib/api'
 import { normalizeError } from '@/lib/error-normalizer'
 import {
@@ -29,7 +28,6 @@ export default function PaymentCallbackPage() {
   const [purchase, setPurchase] = useState<PurchaseView | null>(null)
   const [message, setMessage] = useState('Verifying your payment with Paystack…')
   const [busy, setBusy] = useState(true)
-  const [accountEmail, setAccountEmail] = useState('')
 
   const load = useCallback(async (ref: string) => {
     setBusy(true)
@@ -60,7 +58,6 @@ export default function PaymentCallbackPage() {
     const ref = new URLSearchParams(window.location.search).get('reference') ||
       new URLSearchParams(window.location.search).get('trxref') || ''
     setReference(ref)
-    api.getProfile().then((me) => setAccountEmail(me?.email || '')).catch(() => {})
     if (!ref) {
       setMessage('No payment reference was provided.')
       setBusy(false)
@@ -143,13 +140,11 @@ export default function PaymentCallbackPage() {
             </dl>
           )}
 
-          {purchase && (phase === 'activated' || phase === 'needs_attention') && (
-            <LicenceActivationCard
-              accountEmail={accountEmail}
-              prefilledKey={licence?.key || ''}
-              alreadyActive={phase === 'activated' && licence?.status === 'active'}
-              onActivated={() => reference && void load(reference)}
-            />
+          {purchase && phase === 'activated' && (
+            <p className="mt-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+              Licence and package benefits are activated automatically on this
+              account. You do not need to copy or enter a licence key.
+            </p>
           )}
 
           {phase === 'needs_attention' && (

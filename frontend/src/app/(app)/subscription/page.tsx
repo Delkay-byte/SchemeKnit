@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { SurfaceCard } from '@/components/ui/surface-card'
 import { PageHeader } from '@/components/ui/page-header'
 import { api } from '@/lib/api'
-import { LicenceActivationCard } from '@/components/licence-activation-card'
 import { amountLabel, purchasePhase, purchaseHeadline } from '@/lib/purchase-state'
 import type { CreditStatus } from '@/types'
 
@@ -209,9 +208,12 @@ export default function SubscriptionPage() {
                 {(data.payments || []).map((p: any) => (
                   <li key={p.reference} className="flex flex-wrap justify-between gap-2 py-2">
                     <span className="font-mono text-xs">{p.reference}</span>
-                    <span>{statusLabel(p.status)} · GH₵{(p.amount_pesewas / 100).toFixed(2)}</span>
+                    <span>{p.plan_name || 'Package'} · {statusLabel(p.status)} · GH₵{(p.amount_pesewas / 100).toFixed(2)}</span>
                     <span className="text-muted-foreground">{p.payment_method === 'mobile_money' ? 'Mobile Money' : p.payment_method === 'bank_transfer' ? 'Bank Transfer' : 'Card (historical)'}</span>
                     <span className="text-muted-foreground">{fmtDate(p.created_at)}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {p.credits_granted ? `${p.credits_granted} credits granted` : ''}
+                    </span>
                     {p.fulfilment_status && p.fulfilment_status !== 'activated' && (
                       <span className="w-full text-xs font-medium text-amber-700">
                         Activation: {p.fulfilment_status.replace(/_/g, ' ')}
@@ -231,12 +233,10 @@ export default function SubscriptionPage() {
                 <p className="mt-1 text-sm">
                   Status: {data.licence.status} · Valid until {fmtDate(data.licence.expires_at)}
                 </p>
-                <LicenceActivationCard
-                  accountEmail={data.customer?.email || ''}
-                  prefilledKey={data.licence.key}
-                  alreadyActive={data.licence.status === 'active'}
-                  onActivated={load}
-                />
+                <p className="mt-2 text-sm text-green-700">
+                  Your licence is activated automatically on this account. No key
+                  entry is required.
+                </p>
               </SurfaceCard>
             )}
           </div>

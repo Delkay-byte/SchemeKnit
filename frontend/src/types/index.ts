@@ -426,6 +426,16 @@ export interface PlanResolution {
   expires_at: string | null
   is_active: boolean
   school_name: string | null
+  active_package?: {
+    slug: string
+    name: string
+    kind?: string
+    credits_granted?: number
+    credits_remaining?: number
+    paid_at?: string | null
+    amount_pesewas?: number
+    reference?: string
+  } | null
 }
 
 export interface ContentPack {

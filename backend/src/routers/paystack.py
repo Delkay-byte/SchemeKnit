@@ -20,6 +20,7 @@ from ..config import get_settings
 from ..database import (
     get_db, PaystackWebhookEventDB, SubscriptionPlanDB,
     SubscriptionTransactionDB, User, UserLicenseDB, UserSubscriptionDB,
+    CreditBalanceDB,
 )
 from .. import credits, paystack, webhook_sweeper
 from ..logging_config import log_event, log_error
@@ -119,6 +120,10 @@ def _new_tx(db: Session, user: User, plan: SubscriptionPlanDB,
         currency="GHS", status="pending", payment_method=method,
         provider=provider,
     )
+    # Package snapshot: the package selected at purchase initiation is the
+    # authority for fulfilment. Later catalogue edits must not silently change
+    # what this customer bought.
+    tx.payment_details = {"package_snapshot": paystack.package_snapshot(plan)}
     db.add(tx)
     db.commit()
     db.refresh(tx)
@@ -250,10 +255,11 @@ async def bank_transfer_charge(
     except paystack.PaystackError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.message)
     tx = _new_tx(db, user, plan, "bank_transfer")
-    tx.payment_details = {
-        "account_expires_at": (datetime.utcnow() + timedelta(hours=8))
-        .strftime("%Y-%m-%dT%H:%M:%S.000Z")
-    }
+    details = dict(tx.payment_details or {})
+    details["account_expires_at"] = (
+        datetime.utcnow() + timedelta(hours=8)
+    ).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    tx.payment_details = details
     db.commit()
     try:
         data = paystack.charge_bank_transfer(plan, user, tx.reference)
@@ -572,8 +578,16 @@ async def my_subscription(
              "currency": t.currency,
              "payment_method": t.payment_method,
              "plan_id": t.plan_id,
+             "plan_name": (
+                 (db.query(SubscriptionPlanDB).filter(
+                     SubscriptionPlanDB.id == t.plan_id).first()).name
+                 if t.plan_id else ""),
              "created_at": t.created_at.isoformat() if t.created_at else None,
              "paid_at": t.paid_at.isoformat() if t.paid_at else None,
+             "credits_granted": int(getattr(
+                 db.query(CreditBalanceDB).filter(
+                     CreditBalanceDB.grant_key == f"package:{t.reference}").first(),
+                 "credits_granted", 0) or 0),
              "fulfilment_status": paystack.fulfilment_state(db, t)}
             for t in history
         ],

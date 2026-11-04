@@ -62,6 +62,12 @@ def notify_purchase(db: Session, tx: SubscriptionTransactionDB, user: User,
     state = paystack.fulfilment_state(db, tx)
     if tx.status != "success":
         return notifications
+    details = tx.payment_details if isinstance(tx.payment_details, dict) else {}
+    snapshot = details.get("package_snapshot") if isinstance(
+        details.get("package_snapshot"), dict) else {}
+    package_name = snapshot.get("name") or plan.name
+    package_credits = int(snapshot.get("credits")
+                          or paystack._plan_credit_allowance(plan))
 
     service = get_email()
     sent_any = False
@@ -75,13 +81,13 @@ def notify_purchase(db: Session, tx: SubscriptionTransactionDB, user: User,
         if to:
             amount = f"GHS {int(tx.amount_pesewas or 0) / 100:.2f}"
             summary = (
-                f"paid purchase {tx.reference}: {plan.name}; amount {amount}; "
+                f"paid purchase {tx.reference}: {package_name}; amount {amount}; "
                 f"channel {tx.channel or tx.payment_method or 'unknown'}; "
                 f"account {user.id}; fulfilment {state}"
             )
             result = service.send_owner_purchase(
                 to=to,
-                plan_name=plan.name,
+                plan_name=package_name,
                 amount=amount,
                 reference=tx.reference,
                 channel=tx.channel or tx.payment_method or "",
@@ -108,11 +114,11 @@ def notify_purchase(db: Session, tx: SubscriptionTransactionDB, user: User,
         amount = f"GHS {int(tx.amount_pesewas or 0) / 100:.2f}"
         result = service.send_subscription_notification(
             to=user.email,
-            plan_name=plan.name,
+            plan_name=package_name,
             amount=amount,
             expiry=(sub.paid_through.strftime("%d %B %Y")
                     if sub is not None and sub.paid_through else ""),
-            credits_granted=paystack._plan_credit_allowance(plan),
+            credits_granted=package_credits,
             credit_balance=credit_status.get("total", 0),
             licence_key=(lic.licence_key if lic is not None else ""),
             reference=tx.reference,

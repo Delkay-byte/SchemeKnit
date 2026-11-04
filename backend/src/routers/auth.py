@@ -1166,8 +1166,33 @@ async def get_my_plan(
     """
     from ..entitlements import resolve_entitlement
     from .. import credits
+    from ..database import SubscriptionTransactionDB, SubscriptionPlanDB
     resolved = resolve_entitlement(db, user)
     resolved["credits"] = credits.status(db, user.id)
+    latest = (db.query(SubscriptionTransactionDB)
+              .filter(SubscriptionTransactionDB.user_id == user.id,
+                      SubscriptionTransactionDB.status == "success")
+              .order_by(SubscriptionTransactionDB.paid_at.desc())
+              .first())
+    if latest is not None:
+        plan = db.query(SubscriptionPlanDB).filter(
+            SubscriptionPlanDB.id == latest.plan_id).first()
+        balance = next(
+            (p for p in resolved["credits"].get("purchased_packages", [])
+             if p.get("reference") == latest.reference),
+            None)
+        resolved["active_package"] = {
+            "slug": plan.slug if plan else "",
+            "name": plan.name if plan else "",
+            "kind": getattr(plan, "package_kind", "") if plan else "",
+            "credits_granted": int(balance["granted"]) if balance else 0,
+            "credits_remaining": int(balance["remaining"]) if balance else 0,
+            "paid_at": latest.paid_at.isoformat() if latest.paid_at else None,
+            "amount_pesewas": int(latest.amount_pesewas or 0),
+            "reference": latest.reference,
+        }
+    else:
+        resolved["active_package"] = None
     return resolved
 
 

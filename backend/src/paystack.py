@@ -101,6 +101,23 @@ def environment() -> str:
     return env
 
 
+def package_snapshot(plan: SubscriptionPlanDB) -> dict:
+    """Immutable package details captured at purchase initiation."""
+    entitlement = dict(plan.entitlements or {})
+    return {
+        "plan_id": plan.id,
+        "slug": plan.slug,
+        "name": plan.name,
+        "package_kind": getattr(plan, "package_kind", "") or "timed",
+        "price_pesewas": int(plan.price_pesewas or 0),
+        "currency": plan.currency or "GHS",
+        "credits": int(getattr(plan, "credit_allowance", 0) or 0)
+        or int(entitlement.get("credit_allowance", 0) or 0),
+        "duration_days": int(plan.duration_days or 0),
+        "credit_validity_days": getattr(plan, "credit_validity_days", None),
+    }
+
+
 def plan_code(plan: SubscriptionPlanDB) -> str:
     env = environment()
     code = (plan.paystack_test_plan_code if env == "test"
@@ -288,6 +305,16 @@ def _plan_credit_allowance(plan: SubscriptionPlanDB) -> int:
         entitlement.get("credit_allowance", 0) or 0)
 
 
+def _tx_package(tx: SubscriptionTransactionDB,
+                plan: SubscriptionPlanDB) -> Dict[str, Any]:
+    """The immutable package snapshot, or a safe live-plan fallback."""
+    details = tx.payment_details if isinstance(tx.payment_details, dict) else {}
+    snapshot = details.get("package_snapshot")
+    if isinstance(snapshot, dict) and snapshot.get("slug"):
+        return snapshot
+    return package_snapshot(plan)
+
+
 def _with_fulfilment_state(details: Any, **values: Any) -> dict:
     out = dict(details) if isinstance(details, dict) else {}
     current = out.get("fulfilment")
@@ -320,6 +347,8 @@ def _repair_fulfilment(db: Session, tx: SubscriptionTransactionDB,
     if tx.paid_at is None:
         tx.paid_at = paid_at
         repaired = True
+    snapshot = _tx_package(tx, plan)
+    kind = snapshot.get("package_kind") or "timed"
     if sub is None:
         sub = UserSubscriptionDB(
             id=generate_id(), user_id=user.id, plan_id=plan.id,
@@ -329,19 +358,16 @@ def _repair_fulfilment(db: Session, tx: SubscriptionTransactionDB,
             current_period_start=paid_at, current_period_end=paid_at,
             paid_through=paid_at,
         )
-        if (getattr(plan, "package_kind", "") or "timed") == "timed":
+        if kind == "timed":
             sub.current_period_end = paid_at + timedelta(
-                days=int(plan.duration_days or 0))
+                days=int(snapshot.get("duration_days") or 0))
             sub.paid_through = sub.current_period_end
         db.add(sub)
         db.flush()
         repaired = True
     if lic is None:
         key = _licence_key()
-        licence_expiry = (
-            sub.paid_through
-            if (getattr(plan, "package_kind", "") or "timed") == "timed"
-            else None)
+        licence_expiry = sub.paid_through if kind == "timed" else None
         lic = UserLicenseDB(
             id=generate_id(), user_id=user.id, plan_id=plan.id,
             subscription_id=sub.id, licence_key=key,
@@ -353,14 +379,20 @@ def _repair_fulfilment(db: Session, tx: SubscriptionTransactionDB,
         db.flush()
         repaired = True
 
-    expected_credits = _plan_credit_allowance(plan)
+    expected_credits = int(snapshot.get("credits") or 0)
     balance = _credit_grant_for(db, tx)
     if expected_credits > 0 and balance is None:
         from . import credits as credit_service
 
         balance = credit_service.grant_package(
             db, user.id, plan, tx.reference, activated_at=paid_at,
-            commit=False)
+            commit=False,
+            credits_override=expected_credits,
+            kind_override=kind,
+            days_override=snapshot.get("duration_days"),
+            label_override=snapshot.get("name"),
+            slug_override=snapshot.get("slug"),
+        )
         if balance is None:
             raise PaystackError(
                 "The package credit grant could not be created.", 500)
@@ -368,7 +400,7 @@ def _repair_fulfilment(db: Session, tx: SubscriptionTransactionDB,
 
     _update_entitlement(
         db, user.id, plan, sub.paid_through or paid_at,
-        is_timed=(getattr(plan, "package_kind", "") or "timed") == "timed")
+        is_timed=kind == "timed")
     tx.payment_details = _with_fulfilment_state(
         tx.payment_details,
         state="activated",
@@ -408,7 +440,8 @@ def fulfilment_state(db: Session, tx: SubscriptionTransactionDB) -> str:
         UserLicenseDB.user_id == tx.user_id,
         UserLicenseDB.status == "active").first()
     balance = _credit_grant_for(db, tx)
-    expected = _plan_credit_allowance(plan) if plan is not None else 0
+    expected = (int((_tx_package(tx, plan) if plan is not None else {})
+                    .get("credits") or 0))
     if lic is not None and (expected <= 0 or balance is not None):
         return "activated"
     return "needs_attention"
@@ -426,6 +459,7 @@ def purchase_payload(db: Session, tx: SubscriptionTransactionDB) -> dict:
     lic = db.query(UserLicenseDB).filter(
         UserLicenseDB.user_id == tx.user_id).first()
     balance = _credit_grant_for(db, tx)
+    snapshot = _tx_package(tx, plan) if plan is not None else {}
     state = fulfilment_state(db, tx)
     credit_status = credit_service.status(db, tx.user_id) if user else None
     details = dict(tx.payment_details or {}) if isinstance(tx.payment_details, dict) else {}
@@ -442,9 +476,11 @@ def purchase_payload(db: Session, tx: SubscriptionTransactionDB) -> dict:
             else "pending"),
         "fulfilment_status": state,
         "package": {
-            "slug": plan.slug if plan else "",
-            "name": plan.name if plan else "",
-            "credits": _plan_credit_allowance(plan) if plan else 0,
+            "slug": snapshot.get("slug") or (plan.slug if plan else ""),
+            "name": snapshot.get("name") or (plan.name if plan else ""),
+            "credits": int(snapshot.get("credits") or 0)
+            if snapshot else (_plan_credit_allowance(plan) if plan else 0),
+            "kind": snapshot.get("package_kind") or "",
         },
         "amount_pesewas": int(tx.amount_pesewas or 0),
         "currency": tx.currency or "GHS",
@@ -584,15 +620,15 @@ def activate_paid_transaction(db: Session, tx: SubscriptionTransactionDB,
         db.flush()
     old_status = sub.status or ""
 
-    # A flexible credit pack is not a period-limited package: it must never
-    # shorten an existing timed package, and it has no expiry of its own.
-    kind = getattr(plan, "package_kind", "") or "timed"
+    snapshot = _tx_package(tx, plan)
+    kind = snapshot.get("package_kind") or "timed"
     is_timed = kind == "timed"
     if is_timed:
         base = sub.paid_through or paid_at
         if base < paid_at:
             base = paid_at
-        paid_through = base + timedelta(days=int(plan.duration_days or 0))
+        paid_through = base + timedelta(days=int(
+            snapshot.get("duration_days") or plan.duration_days or 0))
     else:
         paid_through = sub.paid_through
 
@@ -667,8 +703,14 @@ def activate_paid_transaction(db: Session, tx: SubscriptionTransactionDB,
     # existing bucket instead of adding again.
     from . import credits
     balance = credits.grant_package(
-        db, user.id, plan, tx.reference, activated_at=paid_at, commit=False)
-    expected_credits = _plan_credit_allowance(plan)
+        db, user.id, plan, tx.reference, activated_at=paid_at, commit=False,
+        credits_override=int(snapshot.get("credits") or 0),
+        kind_override=kind,
+        days_override=snapshot.get("duration_days"),
+        label_override=snapshot.get("name"),
+        slug_override=snapshot.get("slug"),
+    )
+    expected_credits = int(snapshot.get("credits") or 0)
     if expected_credits > 0 and balance is None:
         raise PaystackError(
             "The package credit grant could not be created.", 500)

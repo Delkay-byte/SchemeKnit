@@ -719,6 +719,33 @@ class TestFulfilmentRecovery:
         assert licences[0].status == "active"
         assert credits.status(db, user.id)["purchased"] == 20
 
+    def test_package_snapshot_is_authoritative_after_catalogue_change(self, db, monkeypatch):
+        user = make_user(db)
+        client = _client(db, user)
+        monkeypatch.setattr("requests.request",
+                            lambda *a, **k: _Resp(_bank_response()))
+        ref = client.post("/api/paystack/bank-transfer/charge",
+                          json={"plan_slug": "flexible-credit-pack"}).json()["reference"]
+        tx = db.query(SubscriptionTransactionDB).filter_by(reference=ref).one()
+        assert tx.payment_details["package_snapshot"]["credits"] == 20
+
+        plan = db.query(SubscriptionPlanDB).filter_by(
+            slug="flexible-credit-pack").one()
+        plan.credit_allowance = 999
+        db.commit()
+        payload = {
+            "status": "success", "amount": 1200, "currency": "GHS",
+            "reference": ref, "id": 9402, "channel": "bank_transfer",
+            "paid_at": datetime.utcnow().isoformat(),
+            "customer": {"email": user.email, "customer_code": "CUS_S"},
+            "metadata": {"user_id": user.id},
+        }
+        monkeypatch.setattr(paystack, "verify", lambda reference: dict(payload))
+        paystack.activate_paid_transaction(db, tx, payload)
+        db.expire_all()
+        assert credits.status(db, user.id)["purchased"] == 20
+        assert db.query(CreditBalanceDB).one().package_slug == "flexible-credit-pack"
+
     def test_unknown_reference_webhook_stays_retryable(self, db):
         user = make_user(db)
         r = _webhook(_client(db), "charge.success", {
