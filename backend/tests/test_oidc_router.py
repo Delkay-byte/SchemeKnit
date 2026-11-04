@@ -63,6 +63,22 @@ def _oidc_router_env(monkeypatch):
     for key, value in _oidc_env().items():
         monkeypatch.setenv(key, value)
     get_settings.cache_clear()
+    # Hermetic discovery: /oidc/start resolves the authorize endpoint from the
+    # discovery document. Without this stub the test performs a real HTTP call,
+    # so it passed on a workstation that happened to have an IdP on :9000 and
+    # failed in CI with "Connection refused" — a test-isolation bug, not a
+    # product bug.
+    monkeypatch.setattr(
+        oidc_client,
+        "discovery",
+        lambda: {
+            "issuer": ISSUER,
+            "authorization_endpoint": f"{ISSUER}application/o/authorize/",
+            "token_endpoint": f"{ISSUER}application/o/token/",
+            "jwks_uri": f"{ISSUER}application/o/schemeknit/jwks/",
+            "revocation_endpoint": f"{ISSUER}application/o/revoke/",
+        },
+    )
     from src.security import rate_limiter
     rate_limiter.reset()
     yield
