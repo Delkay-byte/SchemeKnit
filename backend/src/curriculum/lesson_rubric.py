@@ -202,6 +202,57 @@ def phase_rows(lp):
     return p1, p2, p3
 
 
+def _assessment_focus(lp) -> str:
+    """Short, lesson-specific focus used in phase checks (never invented)."""
+    for value in (
+        getattr(lp, "sub_strand", ""),
+        getattr(lp, "lesson_topic", ""),
+    ):
+        text = re.sub(r"\s+", " ", (value or "")).strip()
+        if text:
+            return text
+    indicators = [i for i in (getattr(lp, "indicators", None) or [])
+                  if (i or "").strip()]
+    if indicators:
+        return re.sub(r"^\s*[A-Za-z]?\d[\w./-]*\s*", "", indicators[0]).strip()
+    return "the lesson focus"
+
+
+def phase_assessments(lp) -> dict:
+    """Assessment/evidence for each delivery phase — ONE purpose per phase.
+
+    The stored lesson has a single ``assessment`` field (the substantive
+    check). The delivery table needs an Assessment column for every phase, so
+    this derives phase-appropriate actions from the lesson's own content:
+    diagnostic observation (Phase 1), the lesson's assessment (Phase 2) and
+    the objective's success criterion (Phase 3). Nothing is fabricated and no
+    sentence is copied from another phase.
+    """
+    focus = _assessment_focus(lp)
+    diagnostic = (
+        f"Diagnostic: listen for each learner naming one familiar example of "
+        f"{focus} and note who needs a prompt before the main task."
+    )
+    formative = (getattr(lp, "assessment", "") or "").strip()
+    if not formative:
+        formative = (
+            f"Check each learner's work on {focus} against the lesson's "
+            "success criteria and note who needs support."
+        )
+    objective = ""
+    objectives = list(getattr(lp, "learning_objectives", None) or [])
+    if objectives:
+        objective = (getattr(objectives[0], "description", "") or "").strip()
+    if objective:
+        summative = f"Success criteria: {objective}"
+    else:
+        summative = (
+            f"Exit evidence: each learner demonstrates {focus} and the "
+            "teacher records the result."
+        )
+    return {"phase_1": diagnostic, "phase_2": formative, "phase_3": summative}
+
+
 def lesson_body(lp):
     """The lesson text a teacher actually reads (what every renderer prints).
 

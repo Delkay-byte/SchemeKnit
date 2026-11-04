@@ -255,12 +255,12 @@ class Test16CompetencyMultiSelect:
 class Test17OfficialTaxonomy:
     def test_labels_are_official_six(self):
         assert NACCA_COMPETENCY_LABELS == [
-            "Critical Thinking and Problem Solving",
-            "Creativity and Innovation",
-            "Communication and Collaboration",
-            "Cultural Identity and Global Citizenship",
-            "Personal Development and Leadership",
-            "Digital Literacy",
+            "Critical Thinking and Problem Solving (CP)",
+            "Creativity and Innovation (CI)",
+            "Communication and Collaboration (CC)",
+            "Cultural Identity and Global Citizenship (CG)",
+            "Personal Development and Leadership (PL)",
+            "Digital Literacy (DL)",
         ]
 
     def test_builder_competencies_subset_or_teacher_official(self):

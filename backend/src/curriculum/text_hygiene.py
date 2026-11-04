@@ -81,7 +81,7 @@ _CONCAT_RE = re.compile(
     r"Summarize|Perform|Prepare|Present|Predict|Distinguish|Differentiate)\b")
 _CONCAT_LEADINS = frozenset(
     "can cannot could may might must shall should will would to and or then "
-    "help let able ableto"
+    "help let able ableto on in for with about of by at from into focuses focus"
     .split())
 
 # Incomplete-sentence endings: a sentence finishing on a dangling connector or

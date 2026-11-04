@@ -413,10 +413,16 @@ class TestAIModeWiring:
 # ── Defect 5 — TLRs / competencies / references derived from context ────────
 
 class TestContextualFields:
-    def test_resources_track_activity_type(self):
+    def test_resources_are_source_only(self):
+        """Part F: a scheme that names no TLR yields an empty list.
+
+        Activity material suggestions must never become TLRs just because they
+        would suit the activity type.
+        """
         solve, _ = _run(Subject.MATHEMATICS, [TWELVE[0]], "Number", "Whole")
         classify, _ = _run(Subject.SCIENCE, [TWELVE[4]], "Diversity", "Matter")
-        assert solve[0].teaching_learning_resources != classify[0].teaching_learning_resources
+        assert solve[0].teaching_learning_resources == []
+        assert classify[0].teaching_learning_resources == []
 
     def test_competencies_vary_by_activity(self):
         solve, _ = _run(Subject.MATHEMATICS, [TWELVE[0]], "Number", "Whole")

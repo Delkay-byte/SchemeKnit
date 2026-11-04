@@ -801,6 +801,11 @@ class TestEndpointGate:
             assert body["rejected_occurrence_ids"][0] not in body[
                 "generated_occurrence_ids"]
             assert body["blocked_for_review_occurrence_ids"] == []
+            # The partial result names the exact week/indicator that stayed
+            # pending, rather than a generic "some plans failed".
+            assert body["rejected"][0]["week_number"] == 2
+            assert body["rejected"][0]["indicator_code"] == "B7.1.1.2.1"
+            assert body["rejected"][0]["reasons"] == ["generic_objective"]
 
             rows = data_service.get_lesson_plans_for_scheme(db, scheme.id, user.id)
             assert len(rows) == 1, "only the accepted lesson persisted"
