@@ -36,6 +36,15 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
+from src.engines.pdf_export import PDFExportEngine  # noqa: E402
+
+# PDF export depends on an optional native dependency (LibreOffice or Word).
+# CI runners do not have one, so these integration tests skip there instead of
+# failing with the API's own 503. Assertions are unchanged — they run in full
+# wherever the converter exists (developer machines, desktop builds).
+_PDF_OK = PDFExportEngine.is_available()
+
+
 @pytest.fixture(autouse=True)
 def _wide_free_allowance(monkeypatch):
     """WAPEF persistence tests generate three lessons per run; the approved
@@ -328,6 +337,7 @@ class TestEWapefDocxExport:
             assert line in text
 
 
+@pytest.mark.skipif(not _PDF_OK, reason="PDF converter not installed on this machine")
 class TestFWapefPdfExport:
     """F. Stored lesson with all four fields → PDF → all four present."""
 

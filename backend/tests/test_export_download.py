@@ -46,6 +46,15 @@ DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.docu
 FRONTEND = Path(__file__).resolve().parents[2] / "frontend" / "src"
 
 
+from src.engines.pdf_export import PDFExportEngine  # noqa: E402
+
+# PDF export depends on an optional native dependency (LibreOffice or Word).
+# CI runners do not have one, so these integration tests skip there instead of
+# failing with the API's own 503. Assertions are unchanged — they run in full
+# wherever the converter exists (developer machines, desktop builds).
+_PDF_OK = PDFExportEngine.is_available()
+
+
 def _grant_pro_entitlement(db, user):
     """Grant Pro entitlement to a test user (ZIP/batch/PDF access)."""
     ent = EntitlementDB(
@@ -513,6 +522,7 @@ class TestZipBatchOutput:
         assert e.value.status_code == 404
 
 
+@pytest.mark.skipif(not _PDF_OK, reason="PDF converter not installed on this machine")
 class TestDownloadHeaderContract:
     """The download-filename transport, and why it is a custom header.
 
