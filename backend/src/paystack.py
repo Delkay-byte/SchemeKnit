@@ -282,6 +282,226 @@ def _event(db: Session, sub: UserSubscriptionDB, kind: str,
     ))
 
 
+def _plan_credit_allowance(plan: SubscriptionPlanDB) -> int:
+    entitlement = (plan.entitlements or {}) if plan is not None else {}
+    return int(getattr(plan, "credit_allowance", 0) or 0) or int(
+        entitlement.get("credit_allowance", 0) or 0)
+
+
+def _with_fulfilment_state(details: Any, **values: Any) -> dict:
+    out = dict(details) if isinstance(details, dict) else {}
+    current = out.get("fulfilment")
+    fulfilment = dict(current) if isinstance(current, dict) else {}
+    fulfilment.update(values)
+    out["fulfilment"] = fulfilment
+    return out
+
+
+def _credit_grant_for(db: Session, tx: SubscriptionTransactionDB):
+    from .database import CreditBalanceDB
+
+    return (db.query(CreditBalanceDB)
+            .filter(CreditBalanceDB.grant_key == f"package:{tx.reference}")
+            .first())
+
+
+def _repair_fulfilment(db: Session, tx: SubscriptionTransactionDB,
+                       plan: SubscriptionPlanDB, user: User,
+                       sub: Optional[UserSubscriptionDB],
+                       lic: Optional[UserLicenseDB]) -> bool:
+    """Heal a successful payment whose licence/credits are missing.
+
+    Safe to repeat: every write is keyed by the original transaction and the
+    credit grant uses the unique ``package:<reference>`` idempotency key.
+    Does not extend a timed package again and does not move the period start.
+    """
+    repaired = False
+    paid_at = tx.paid_at or datetime.utcnow()
+    if tx.paid_at is None:
+        tx.paid_at = paid_at
+        repaired = True
+    if sub is None:
+        sub = UserSubscriptionDB(
+            id=generate_id(), user_id=user.id, plan_id=plan.id,
+            status="active", billing_mode="prepaid",
+            payment_method=tx.payment_method or "mobile_money",
+            provider=tx.provider or "paystack", environment=tx.environment,
+            current_period_start=paid_at, current_period_end=paid_at,
+            paid_through=paid_at,
+        )
+        if (getattr(plan, "package_kind", "") or "timed") == "timed":
+            sub.current_period_end = paid_at + timedelta(
+                days=int(plan.duration_days or 0))
+            sub.paid_through = sub.current_period_end
+        db.add(sub)
+        db.flush()
+        repaired = True
+    if lic is None:
+        key = _licence_key()
+        licence_expiry = (
+            sub.paid_through
+            if (getattr(plan, "package_kind", "") or "timed") == "timed"
+            else None)
+        lic = UserLicenseDB(
+            id=generate_id(), user_id=user.id, plan_id=plan.id,
+            subscription_id=sub.id, licence_key=key,
+            key_hash=_hash_key(key), status="active",
+            issued_at=paid_at, starts_at=paid_at, expires_at=licence_expiry,
+            activated_at=paid_at,
+        )
+        db.add(lic)
+        db.flush()
+        repaired = True
+
+    expected_credits = _plan_credit_allowance(plan)
+    balance = _credit_grant_for(db, tx)
+    if expected_credits > 0 and balance is None:
+        from . import credits as credit_service
+
+        balance = credit_service.grant_package(
+            db, user.id, plan, tx.reference, activated_at=paid_at,
+            commit=False)
+        if balance is None:
+            raise PaystackError(
+                "The package credit grant could not be created.", 500)
+        repaired = True
+
+    _update_entitlement(
+        db, user.id, plan, sub.paid_through or paid_at,
+        is_timed=(getattr(plan, "package_kind", "") or "timed") == "timed")
+    tx.payment_details = _with_fulfilment_state(
+        tx.payment_details,
+        state="activated",
+        plan_credits=expected_credits,
+        licence_id=lic.id,
+        credit_grant_key=f"package:{tx.reference}" if balance is not None else "",
+        activated_at=(tx.paid_at or paid_at).isoformat(),
+        repaired_at=(datetime.utcnow().isoformat() if repaired else None),
+    )
+    if repaired:
+        _event(db, sub, "fulfilment_repaired", "active", "active",
+               {"reference": tx.reference, "credits": expected_credits})
+    return repaired
+
+
+def fulfilment_state(db: Session, tx: SubscriptionTransactionDB) -> str:
+    """Payment/fulfilment state for the API (never a provider claim)."""
+    status = str(tx.status or "").lower()
+    if status in ("failed", "expired"):
+        return "payment_failed"
+    if status in ("reversed", "refunded"):
+        return "payment_reversed"
+    if status != "success":
+        if status == "pending" and str(tx.charge_status or "").lower() == "success":
+            # Paystack already confirmed the charge but local activation did
+            # not finish. This is not "pending payment" and must never invite
+            # a second payment.
+            return "needs_attention"
+        return "payment_pending"
+    plan = db.query(SubscriptionPlanDB).filter(
+        SubscriptionPlanDB.id == tx.plan_id).first()
+    lic = db.query(UserLicenseDB).filter(
+        UserLicenseDB.user_id == tx.user_id,
+        UserLicenseDB.status == "active").first()
+    balance = _credit_grant_for(db, tx)
+    expected = _plan_credit_allowance(plan) if plan is not None else 0
+    if lic is not None and (expected <= 0 or balance is not None):
+        return "activated"
+    return "needs_attention"
+
+
+def purchase_payload(db: Session, tx: SubscriptionTransactionDB) -> dict:
+    """Everything the confirmation UI needs, in one redacted object."""
+    from . import credits as credit_service
+
+    plan = db.query(SubscriptionPlanDB).filter(
+        SubscriptionPlanDB.id == tx.plan_id).first()
+    user = db.query(User).filter(User.id == tx.user_id).first()
+    sub = db.query(UserSubscriptionDB).filter(
+        UserSubscriptionDB.user_id == tx.user_id).first()
+    lic = db.query(UserLicenseDB).filter(
+        UserLicenseDB.user_id == tx.user_id).first()
+    balance = _credit_grant_for(db, tx)
+    state = fulfilment_state(db, tx)
+    credit_status = credit_service.status(db, tx.user_id) if user else None
+    details = dict(tx.payment_details or {}) if isinstance(tx.payment_details, dict) else {}
+    notifications = details.get("notifications") if isinstance(
+        details.get("notifications"), dict) else {}
+    return {
+        "reference": tx.reference,
+        "payment_status": (
+            "success" if (tx.status == "success"
+                          or (tx.status == "pending"
+                              and str(tx.charge_status or "").lower() == "success"))
+            else "failed" if tx.status in ("failed", "expired")
+            else "reversed" if tx.status in ("reversed", "refunded")
+            else "pending"),
+        "fulfilment_status": state,
+        "package": {
+            "slug": plan.slug if plan else "",
+            "name": plan.name if plan else "",
+            "credits": _plan_credit_allowance(plan) if plan else 0,
+        },
+        "amount_pesewas": int(tx.amount_pesewas or 0),
+        "currency": tx.currency or "GHS",
+        "paid_at": tx.paid_at.isoformat() if tx.paid_at else None,
+        "channel": tx.channel or "",
+        "payment_method": tx.payment_method or "",
+        "provider": tx.provider or "",
+        "credits_granted": (
+            int(balance.credits_granted) if balance is not None else 0),
+        "credit_balance": credit_status,
+        "licence": _licence_public(lic),
+        "subscription": {
+            "status": sub.status if sub else None,
+            "paid_through": sub.paid_through.isoformat() if sub and sub.paid_through else None,
+        },
+        "notifications": {
+            "customer": notifications.get("customer"),
+            "owner": notifications.get("owner"),
+        },
+        "next_action": (
+            "Your package is active. No further action is needed."
+            if state == "activated" else
+            "Your payment was received. SchemeKnit is completing activation; "
+            "refresh this page shortly or contact support with the reference."
+            if state == "needs_attention" else
+            "Approve the payment on your phone, then refresh this page."
+            if state == "payment_pending" else
+            "This payment did not complete. No credits were issued."
+        ),
+    }
+
+
+def _licence_public(lic: Optional[UserLicenseDB]) -> Optional[dict]:
+    if lic is None:
+        return None
+    return {
+        "key": lic.licence_key,
+        "status": lic.status,
+        "issued_at": lic.issued_at.isoformat() if lic.issued_at else None,
+        "expires_at": lic.expires_at.isoformat() if lic.expires_at else None,
+        "plan_id": lic.plan_id,
+    }
+
+
+def notify_purchase(db: Session, tx: SubscriptionTransactionDB,
+                    user: User, plan: SubscriptionPlanDB,
+                    sub: Optional[UserSubscriptionDB],
+                    lic: Optional[UserLicenseDB]) -> None:
+    """Best-effort, idempotent customer + owner notifications."""
+    try:
+        from . import purchase_notifications
+        purchase_notifications.notify_purchase(
+            db, tx, user, plan, sub, lic)
+    except Exception:
+        # Notification delivery must never undo a paid, activated purchase.
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
+
 def activate_paid_transaction(db: Session, tx: SubscriptionTransactionDB,
                               payload: dict) -> Tuple[UserSubscriptionDB, UserLicenseDB]:
     """Idempotently credit ONE verified transaction and issue/renew the licence."""
@@ -296,10 +516,28 @@ def activate_paid_transaction(db: Session, tx: SubscriptionTransactionDB,
     else:
         db.refresh(tx)
     if tx.status == "success":
+        # Idempotent REPAIR path. A payment must never stay activated in
+        # Paystack while the local licence or credit grant is missing. The
+        # old code returned here unconditionally, so a partial/legacy state
+        # could never heal on a later webhook or verification call.
+        plan = db.query(SubscriptionPlanDB).filter(
+            SubscriptionPlanDB.id == tx.plan_id).first()
+        user = db.query(User).filter(User.id == tx.user_id).first()
         sub = (db.query(UserSubscriptionDB)
                .filter(UserSubscriptionDB.user_id == tx.user_id).first())
         lic = (db.query(UserLicenseDB)
                .filter(UserLicenseDB.user_id == tx.user_id).first())
+        if plan is None or user is None:
+            raise PaystackError("The local payment record is incomplete.", 500)
+        repaired = _repair_fulfilment(db, tx, plan, user, sub, lic)
+        if repaired:
+            db.commit()
+            db.refresh(sub)
+            lic = (db.query(UserLicenseDB)
+                   .filter(UserLicenseDB.user_id == tx.user_id).first())
+            if lic is not None:
+                db.refresh(lic)
+        notify_purchase(db, tx, user, plan, sub, lic)
         return sub, lic
     if tx.status in ("failed", "reversed", "refunded"):
         # A failed/reversed payment must never be activated by a late or
@@ -409,10 +647,25 @@ def activate_paid_transaction(db: Session, tx: SubscriptionTransactionDB,
     _event(db, sub, "payment_success", old_status, "active",
            {"reference": tx.reference, "amount": tx.amount_pesewas})
 
-    # Exactly once per verified transaction (unique grant key).
+    # Exactly once per verified transaction (unique grant key). The balance is
+    # REQUIRED: a licence without the purchased credits is a failed fulfilment,
+    # not a success. `grant_package` is idempotent, so a retry returns the
+    # existing bucket instead of adding again.
     from . import credits
-    credits.grant_package(
+    balance = credits.grant_package(
         db, user.id, plan, tx.reference, activated_at=paid_at, commit=False)
+    expected_credits = _plan_credit_allowance(plan)
+    if expected_credits > 0 and balance is None:
+        raise PaystackError(
+            "The package credit grant could not be created.", 500)
+    tx.payment_details = _with_fulfilment_state(
+        tx.payment_details,
+        state="activated",
+        plan_credits=expected_credits,
+        licence_id=lic.id,
+        credit_grant_key=(balance.grant_key if balance is not None else ""),
+        activated_at=paid_at.isoformat(),
+    )
     db.commit()
     db.refresh(sub)
     db.refresh(lic)
@@ -424,7 +677,7 @@ def activate_paid_transaction(db: Session, tx: SubscriptionTransactionDB,
         referrals.qualify(db, user, tx)
     except Exception:
         db.rollback()
-    _notify(user, plan, paid_through, tx.amount_pesewas)
+    notify_purchase(db, tx, user, plan, sub, lic)
     return sub, lic
 
 
@@ -466,20 +719,6 @@ def _validate_verified_payment(tx: SubscriptionTransactionDB, payload: dict,
     email = str(customer.get("email") or "").strip().lower()
     if email and email != (user.email or "").strip().lower():
         raise PaystackError("Payment customer does not match this account.", 400)
-
-
-def _notify(user: User, plan: SubscriptionPlanDB, paid_through: datetime,
-            amount_pesewas: int = 0) -> None:
-    """Best-effort email; never fails the verified payment."""
-    try:
-        from .email_service import get_email
-        get_email().send_subscription_notification(
-            to=user.email, plan_name=plan.name,
-            amount=f"GHS {int(amount_pesewas or plan.price_pesewas) / 100:.2f}",
-            expiry=paid_through.strftime("%d %B %Y"),
-        )
-    except Exception:
-        pass
 
 
 def event_key(event: str, data: dict) -> str:
@@ -552,7 +791,10 @@ def handle_webhook(db: Session, event: str, data: dict) -> None:
         tx = db.query(SubscriptionTransactionDB).filter(
             SubscriptionTransactionDB.reference == ref).first()
         if tx is None:
-            return
+            # Never mark an unmatched successful payment "processed": that
+            # silently loses the only delivery. The durable event row stays
+            # failed/retryable and the reference is visible to support.
+            raise PaystackError("Unknown local purchase for this reference.", 404)
         verified = verify(ref)
         _validate_verified_payment(
             tx, verified, db.query(User).filter(User.id == tx.user_id).first())

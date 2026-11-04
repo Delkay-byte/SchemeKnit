@@ -4,7 +4,8 @@ SchemeKnit Backend - Production Application
 
 import os
 import sys
-from contextlib import asynccontextmanager
+import asyncio
+from contextlib import asynccontextmanager, suppress
 from datetime import datetime, date
 from pathlib import Path
 
@@ -54,9 +55,47 @@ async def lifespan(app: FastAPI):
             db.close()
     except Exception as e:
         logger.error("stale_job_reconciliation_failed", error=str(e))
+    recovery_task = asyncio.create_task(_webhook_recovery_loop())
     logger.info("SchemeKnit started", version=settings.APP_VERSION, debug=settings.DEBUG)
     yield
+    recovery_task.cancel()
+    with suppress(asyncio.CancelledError):
+        await recovery_task
     logger.info("SchemeKnit shutting down")
+
+
+async def _webhook_recovery_loop() -> None:
+    """Retry durable Paystack webhook events that failed after the HTTP ack.
+
+    Paystack only retries when the endpoint does not return 2xx; the endpoint
+    acknowledges immediately and processes in the background. Without this
+    loop, a background failure had no automatic recovery path.
+    """
+    from .webhook_sweeper import sweep_once
+
+    interval = 60
+    while True:
+        try:
+            def _run() -> dict:
+                from .purchase_notifications import retry_pending
+                db = SessionLocal()
+                try:
+                    counts = sweep_once(db)
+                    counts["notifications_retried"] = retry_pending(db, limit=20)
+                    return counts
+                finally:
+                    db.close()
+
+            counts = await asyncio.to_thread(_run)
+            if any(counts.get(k) for k in (
+                    "processed", "failed", "exhausted", "notifications_retried")):
+                logger.info("paystack_webhook_recovery", **counts)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.error("paystack_webhook_recovery_failed",
+                         error=type(exc).__name__)
+        await asyncio.sleep(interval)
 
 
 def _seed_global_holidays():

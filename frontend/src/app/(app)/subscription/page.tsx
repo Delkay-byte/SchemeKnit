@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button'
 import { SurfaceCard } from '@/components/ui/surface-card'
 import { PageHeader } from '@/components/ui/page-header'
 import { api } from '@/lib/api'
+import { LicenceActivationCard } from '@/components/licence-activation-card'
+import { amountLabel, purchasePhase, purchaseHeadline } from '@/lib/purchase-state'
 import type { CreditStatus } from '@/types'
 
 function fmtDate(v?: string | null) {
@@ -65,6 +67,27 @@ export default function SubscriptionPage() {
           <p className="mt-6 text-sm text-muted-foreground">Loading…</p>
         ) : (
           <div className="mt-6 space-y-6">
+            {data.last_purchase && (
+              <SurfaceCard className="px-6 py-5" data-last-purchase={purchasePhase(data.last_purchase)}>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-semibold text-[#102A43]">
+                      {purchaseHeadline(purchasePhase(data.last_purchase))}
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {data.last_purchase.package?.name || 'Package'} ·{' '}
+                      {amountLabel(data.last_purchase)} ·{' '}
+                      <span className="font-mono text-xs">{data.last_purchase.reference}</span>
+                    </p>
+                  </div>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href={`/payments/callback?reference=${encodeURIComponent(data.last_purchase.reference)}`}>
+                      View confirmation
+                    </Link>
+                  </Button>
+                </div>
+              </SurfaceCard>
+            )}
             {credits && (
               <SurfaceCard className="px-6 py-6" data-credit-balances>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -189,6 +212,11 @@ export default function SubscriptionPage() {
                     <span>{statusLabel(p.status)} · GH₵{(p.amount_pesewas / 100).toFixed(2)}</span>
                     <span className="text-muted-foreground">{p.payment_method === 'mobile_money' ? 'Mobile Money' : p.payment_method === 'bank_transfer' ? 'Bank Transfer' : 'Card (historical)'}</span>
                     <span className="text-muted-foreground">{fmtDate(p.created_at)}</span>
+                    {p.fulfilment_status && p.fulfilment_status !== 'activated' && (
+                      <span className="w-full text-xs font-medium text-amber-700">
+                        Activation: {p.fulfilment_status.replace(/_/g, ' ')}
+                      </span>
+                    )}
                   </li>
                 ))}
                 {(data.payments || []).length === 0 && (
@@ -200,15 +228,15 @@ export default function SubscriptionPage() {
             {data.licence && (
               <SurfaceCard className="px-6 py-6" data-licence-status={data.licence.status}>
                 <h2 className="text-lg font-semibold text-[#102A43]">Licence</h2>
-                <div className="mt-1 flex flex-wrap items-center gap-2">
-                  <code className="rounded bg-slate-100 px-2 py-1 font-mono text-sm" data-my-licence-key>{data.licence.key}</code>
-                  <Button size="sm" variant="outline" onClick={() => copy(data.licence.key, 'licence')}>
-                    {copied === 'licence' ? 'Copied' : 'Copy'}
-                  </Button>
-                </div>
-                <p className="mt-3 text-sm">
+                <p className="mt-1 text-sm">
                   Status: {data.licence.status} · Valid until {fmtDate(data.licence.expires_at)}
                 </p>
+                <LicenceActivationCard
+                  accountEmail={data.customer?.email || ''}
+                  prefilledKey={data.licence.key}
+                  alreadyActive={data.licence.status === 'active'}
+                  onActivated={load}
+                />
               </SurfaceCard>
             )}
           </div>

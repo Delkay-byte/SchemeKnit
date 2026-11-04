@@ -1025,6 +1025,13 @@ class ApiService {
     })
   }
 
+  async redeemLicenceKey(key: string): Promise<any> {
+    return this.request('/api/paystack/licence/redeem', {
+      method: 'POST',
+      body: JSON.stringify({ key }),
+    })
+  }
+
   async getMySubscription(): Promise<any> {
     return this.request('/api/paystack/me')
   }
@@ -1250,6 +1257,21 @@ class ApiService {
       method: 'POST',
       body: JSON.stringify({ reason }),
     })
+  }
+
+  async listPlatformPaystackPurchases(status?: string, fulfilment?: string): Promise<any> {
+    const q = new URLSearchParams()
+    if (status) q.set('status', status)
+    if (fulfilment) q.set('fulfilment', fulfilment)
+    const suffix = q.toString() ? `?${q.toString()}` : ''
+    return this.request(`/api/platform-admin/paystack-purchases${suffix}`)
+  }
+
+  async reconcilePlatformPurchase(reference: string, reason: string): Promise<any> {
+    return this.request(
+      `/api/platform-admin/paystack-purchases/${encodeURIComponent(reference)}/reconcile`,
+      { method: 'POST', body: JSON.stringify({ reason }) },
+    )
   }
 
   async listPlatformAuditLogs(limit?: number): Promise<{ logs: any[] }> {

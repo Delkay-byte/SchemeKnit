@@ -37,6 +37,10 @@ class BankTransferRequest(BaseModel):
     plan_slug: str
 
 
+class LicenceRedeemRequest(BaseModel):
+    key: str
+
+
 def _callback_url(request: Request) -> str:
     settings = get_settings()
     base = (getattr(settings, "PUBLIC_WEB_URL", "") or "").strip().rstrip("/")
@@ -328,8 +332,18 @@ async def charge_status(
             _charge_payload(tx, data)
             db.commit()
             _settle_if_success(db, tx, data)
-        except paystack.PaystackError:
-            _expire_if_needed(db, tx)
+        except paystack.PaystackError as exc:
+            # A verified provider success with a local fulfilment error is
+            # not an expired payment. Preserve it for the honest state and
+            # let the next refresh/webhook retry activation.
+            if str(tx.charge_status or "").lower() == "success":
+                tx.payment_details = paystack._with_fulfilment_state(
+                    tx.payment_details, state="needs_attention",
+                    error=type(exc).__name__,
+                    error_at=datetime.utcnow().isoformat())
+                db.commit()
+            else:
+                _expire_if_needed(db, tx)
         else:
             _expire_if_needed(db, tx)
     sub = db.query(UserSubscriptionDB).filter(
@@ -349,6 +363,7 @@ async def charge_status(
         "subscription": _sub_payload(sub),
         "licence": _licence_payload(lic) if tx.status == "success" else None,
         "credits": credits.status(db, user.id),
+        "purchase": paystack.purchase_payload(db, tx),
     }
 
 
@@ -386,9 +401,17 @@ async def verify_payment(
             UserSubscriptionDB.user_id == user.id).first()
         lic = db.query(UserLicenseDB).filter(
             UserLicenseDB.user_id == user.id).first()
+        # Idempotent repair: a success row with missing credits/licence is
+        # healed before the response is built.
+        try:
+            sub, licence = paystack.activate_paid_transaction(db, tx, {})
+        except paystack.PaystackError:
+            licence = lic
         return {"status": "success", "reference": reference,
-                "subscription": _sub_payload(sub), "licence": _licence_payload(lic),
-                "credits": credits.status(db, user.id)}
+                "subscription": _sub_payload(sub),
+                "licence": _licence_payload(licence or lic),
+                "credits": credits.status(db, user.id),
+                "purchase": paystack.purchase_payload(db, tx)}
     if tx.status in ("reversed", "refunded"):
         raise HTTPException(
             status_code=409,
@@ -420,7 +443,50 @@ async def verify_payment(
     return {"status": "success", "reference": reference,
             "subscription": _sub_payload(sub),
             "licence": _licence_payload(licence),
-            "credits": credits.status(db, user.id)}
+            "credits": credits.status(db, user.id),
+            "purchase": paystack.purchase_payload(db, tx)}
+
+
+@router.post("/licence/redeem")
+def redeem_licence(
+    req: LicenceRedeemRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Redeem a licence key on THIS account.
+
+    A key already issued to this teacher is idempotent. A key belonging to
+    another account is refused; no transfer is possible through this route.
+    """
+    key = (req.key or "").strip().upper()
+    if not key:
+        raise HTTPException(status_code=422, detail="Enter a licence key.")
+    lic = (db.query(UserLicenseDB)
+           .filter(UserLicenseDB.key_hash == paystack._hash_key(key)).first())
+    if lic is None:
+        raise HTTPException(status_code=404, detail="That licence key was not found.")
+    if lic.user_id != user.id:
+        raise HTTPException(
+            status_code=409,
+            detail="That licence key belongs to another account and cannot be "
+                   "redeemed here.",
+        )
+    if lic.status == "expired":
+        raise HTTPException(status_code=409, detail="That licence key has expired.")
+    if lic.status == "revoked":
+        raise HTTPException(status_code=409, detail="That licence key was revoked.")
+    if lic.status != "active":
+        raise HTTPException(
+            status_code=409,
+            detail="That licence key is not available for activation.",
+        )
+    log_event("licence_key_redeemed", user_id=user.id, licence_id=lic.id)
+    return {
+        "status": "active",
+        "already_active": True,
+        "message": "This licence is already active on your account.",
+        "licence": _licence_payload(lic),
+    }
 
 
 def _sub_payload(sub: Optional[UserSubscriptionDB]) -> Optional[dict]:
@@ -479,11 +545,17 @@ async def my_subscription(
     if pending is not None:
         pending_plan = db.query(SubscriptionPlanDB).filter(
             SubscriptionPlanDB.id == pending.plan_id).first()
+    last_success = next(
+        (t for t in history if t.status == "success"), None)
     return {
         "subscription": _sub_payload(sub),
         "plan": _plan_payload(plan) if plan else None,
         "licence": _licence_payload(lic),
         "credits": credits.status(db, user.id),
+        "customer": {"email": user.email, "name": user.full_name},
+        "last_purchase": (
+            paystack.purchase_payload(db, last_success)
+            if last_success is not None else None),
         "pending_payment": ({
             "reference": pending.reference,
             "status": pending.status,
@@ -501,7 +573,8 @@ async def my_subscription(
              "payment_method": t.payment_method,
              "plan_id": t.plan_id,
              "created_at": t.created_at.isoformat() if t.created_at else None,
-             "paid_at": t.paid_at.isoformat() if t.paid_at else None}
+             "paid_at": t.paid_at.isoformat() if t.paid_at else None,
+             "fulfilment_status": paystack.fulfilment_state(db, t)}
             for t in history
         ],
     }

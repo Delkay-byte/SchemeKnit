@@ -20,8 +20,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from src import catalogue, credits, paystack  # noqa: E402
 from src.auth import get_current_user  # noqa: E402
 from src.database import (  # noqa: E402
-    Base, CreditBalanceDB, EntitlementDB, ReferralDB, SubscriptionPlanDB,
-    SubscriptionTransactionDB, UserLicenseDB, get_db,
+    Base, CreditBalanceDB, CreditLedgerDB, EntitlementDB, ReferralDB,
+    SubscriptionPlanDB, SubscriptionTransactionDB, UserLicenseDB,
+    PaystackWebhookEventDB, get_db,
 )
 from src.routers import paystack as router_module  # noqa: E402
 from tests.conftest import make_user  # noqa: E402
@@ -653,3 +654,237 @@ class TestRefundLifecycle:
         processed = paystack.event_key("refund.processed", {
             "transaction_reference": "REF-1", "status": "processed"})
         assert len({pending, processing, processed}) == 3
+
+
+class TestFulfilmentRecovery:
+    """A successful payment must never stay half-activated."""
+
+    def _successful_flexible(self, db, monkeypatch):
+        user = make_user(db)
+        # Flexible GHS12 pack is already seeded in the db fixture.
+        client = _client(db, user)
+        monkeypatch.setattr("requests.request",
+                            lambda *a, **k: _Resp(_bank_response()))
+        ref = client.post("/api/paystack/bank-transfer/charge",
+                          json={"plan_slug": "flexible-credit-pack"}).json()["reference"]
+        payload = {
+            "status": "success", "amount": 1200, "currency": "GHS",
+            "reference": ref, "id": 9301, "channel": "bank_transfer",
+            "paid_at": datetime.utcnow().isoformat(),
+            "customer": {"email": user.email, "customer_code": "CUS_F"},
+            "metadata": {"user_id": user.id},
+        }
+        monkeypatch.setattr(paystack, "verify", lambda reference: dict(payload))
+        hook = {
+            "reference": ref, "id": 9301, "status": "success", "amount": 1200,
+            "currency": "GHS", "channel": "bank_transfer",
+            "customer": {"email": user.email},
+        }
+        assert _webhook(_client(db), "charge.success", hook).status_code == 200
+        db.expire_all()
+        return user, ref
+
+    def test_success_with_missing_credit_is_repaired_once(self, db, monkeypatch):
+        user, ref = self._successful_flexible(db, monkeypatch)
+        db.query(CreditBalanceDB).delete()
+        db.query(CreditLedgerDB).delete()
+        db.commit()
+        tx = db.query(SubscriptionTransactionDB).filter_by(reference=ref).one()
+        assert paystack.fulfilment_state(db, tx) == "needs_attention"
+
+        paystack.activate_paid_transaction(db, tx, {})
+        db.expire_all()
+        assert credits.status(db, user.id)["purchased"] == 20
+        assert db.query(CreditBalanceDB).count() == 1
+
+        # Repeat: still exactly one grant.
+        tx = db.query(SubscriptionTransactionDB).filter_by(reference=ref).one()
+        paystack.activate_paid_transaction(db, tx, {})
+        db.expire_all()
+        assert db.query(CreditBalanceDB).count() == 1
+        assert credits.status(db, user.id)["purchased"] == 20
+
+    def test_success_with_missing_licence_is_repaired_once(self, db, monkeypatch):
+        user, ref = self._successful_flexible(db, monkeypatch)
+        old = db.query(UserLicenseDB).filter_by(user_id=user.id).one()
+        db.delete(old)
+        db.commit()
+        tx = db.query(SubscriptionTransactionDB).filter_by(reference=ref).one()
+        assert paystack.fulfilment_state(db, tx) == "needs_attention"
+
+        _sub, lic = paystack.activate_paid_transaction(db, tx, {})
+        db.expire_all()
+        licences = db.query(UserLicenseDB).filter_by(user_id=user.id).all()
+        assert len(licences) == 1
+        assert licences[0].status == "active"
+        assert credits.status(db, user.id)["purchased"] == 20
+
+    def test_unknown_reference_webhook_stays_retryable(self, db):
+        user = make_user(db)
+        r = _webhook(_client(db), "charge.success", {
+            "reference": "TFM-UNKNOWN-1", "id": 9401, "status": "success",
+            "amount": 1200, "currency": "GHS",
+            "customer": {"email": user.email}})
+        assert r.status_code == 200
+        db.expire_all()
+        row = db.query(PaystackWebhookEventDB).filter_by(
+            reference="TFM-UNKNOWN-1").one()
+        assert row.status in ("failed", "processing", "received")
+        assert row.status != "processed"
+        assert db.query(UserLicenseDB).count() == 0
+        assert db.query(CreditBalanceDB).count() == 0
+
+    def test_purchase_payload_reports_payment_and_activation_separately(self, db, monkeypatch):
+        user, ref = self._successful_flexible(db, monkeypatch)
+        tx = db.query(SubscriptionTransactionDB).filter_by(reference=ref).one()
+        payload = paystack.purchase_payload(db, tx)
+        assert payload["payment_status"] == "success"
+        assert payload["fulfilment_status"] == "activated"
+        assert payload["package"]["name"] == "Flexible Credit Pack"
+        assert payload["package"]["credits"] == 20
+        assert payload["credits_granted"] == 20
+        assert payload["credit_balance"]["total"] >= 20
+        assert payload["licence"]["status"] == "active"
+
+    def test_notifications_are_idempotent_and_recorded(self, db, monkeypatch):
+        from src import email_service
+        from src.config import get_settings
+        monkeypatch.setenv("OWNER_ALERT_EMAIL", "owner@t.test")
+        get_settings.cache_clear()
+
+        sent = []
+
+        class FakeEmail:
+            def send_subscription_notification(self, **kwargs):
+                sent.append(("customer", kwargs))
+                return email_service.EmailResult(success=True, provider_id="cus-1")
+
+            def send_owner_purchase(self, **kwargs):
+                sent.append(("owner", kwargs))
+                return email_service.EmailResult(success=True, provider_id="own-1")
+
+        monkeypatch.setattr(email_service, "get_email", lambda: FakeEmail())
+        user, ref = self._successful_flexible(db, monkeypatch)
+        tx = db.query(SubscriptionTransactionDB).filter_by(reference=ref).one()
+        notes = tx.payment_details["notifications"]
+        assert notes["customer"]["status"] == "sent"
+        assert notes["owner"]["status"] == "sent"
+        assert [kind for kind, _ in sent] == ["owner", "customer"]
+
+        # Re-running activation must not send again.
+        paystack.activate_paid_transaction(db, tx, {})
+        assert [kind for kind, _ in sent] == ["owner", "customer"]
+
+    def test_notification_failure_does_not_undo_purchase(self, db, monkeypatch):
+        from src import email_service
+        from src.config import get_settings
+        monkeypatch.setenv("OWNER_ALERT_EMAIL", "owner@t.test")
+        get_settings.cache_clear()
+
+        class FailingEmail:
+            def send_subscription_notification(self, **kwargs):
+                return email_service.EmailResult(success=False, message="provider down")
+
+            def send_owner_purchase(self, **kwargs):
+                return email_service.EmailResult(success=False, message="provider down")
+
+        monkeypatch.setattr(email_service, "get_email", lambda: FailingEmail())
+        user, ref = self._successful_flexible(db, monkeypatch)
+        tx = db.query(SubscriptionTransactionDB).filter_by(reference=ref).one()
+        assert tx.status == "success"
+        assert credits.status(db, user.id)["purchased"] == 20
+        notes = tx.payment_details["notifications"]
+        assert notes["customer"]["status"] == "failed"
+        assert notes["owner"]["status"] == "failed"
+
+
+class TestAdminPurchaseVisibility:
+    def test_admin_list_shows_fulfilment_and_notifications(self, db, monkeypatch):
+        import asyncio
+        from src.routers import platform_admin as admin_router
+
+        user, ref = TestFulfilmentRecovery()._successful_flexible(db, monkeypatch)
+        admin = make_user(db, role="platform_admin")
+        result = asyncio.run(admin_router.list_paystack_purchases(
+            status=None, fulfilment=None, user=admin, db=db))
+        row = next(p for p in result["purchases"] if p["reference"] == ref)
+        assert row["payment_status"] == "success"
+        assert row["fulfilment_status"] == "activated"
+        assert row["licence_issued"] is True
+        assert row["credits_granted"] == 20
+        assert "customer" in row["notifications"]
+
+    def test_admin_reconcile_repairs_once_and_is_auditable(self, db, monkeypatch):
+        import asyncio
+        from src.routers import platform_admin as admin_router
+        from src.database import PlatformAuditLogDB
+
+        user, ref = TestFulfilmentRecovery()._successful_flexible(db, monkeypatch)
+        db.query(CreditBalanceDB).delete()
+        db.query(CreditLedgerDB).delete()
+        db.commit()
+        admin = make_user(db, role="platform_admin")
+        result = asyncio.run(admin_router.reconcile_paystack_purchase(
+            ref, admin_router.ReconcilePurchaseRequest(
+                reason="Verified live Paystack success; credits missing"),
+            user=admin, db=db))
+        assert result["before"]["fulfilment_status"] == "needs_attention"
+        assert result["purchase"]["fulfilment_status"] == "activated"
+        assert credits.status(db, user.id)["purchased"] == 20
+        db.expire_all()
+        logs = db.query(PlatformAuditLogDB).filter_by(
+            action="paystack_purchase_reconciled").all()
+        assert logs
+        # Repeat is safe: no second credit bucket.
+        asyncio.run(admin_router.reconcile_paystack_purchase(
+            ref, admin_router.ReconcilePurchaseRequest(
+                reason="Repeat reconciliation should be idempotent"),
+            user=admin, db=db))
+        db.expire_all()
+        assert db.query(CreditBalanceDB).count() == 1
+        assert credits.status(db, user.id)["purchased"] == 20
+
+
+class TestLicenceRedemption:
+    def _licence(self, db, user):
+        return db.query(UserLicenseDB).filter_by(user_id=user.id).one()
+
+    def test_same_account_key_is_idempotent(self, db, monkeypatch):
+        user, ref = TestFulfilmentRecovery()._successful_flexible(db, monkeypatch)
+        lic = self._licence(db, user)
+        r = _client(db, user).post("/api/paystack/licence/redeem",
+                                   json={"key": lic.licence_key})
+        assert r.status_code == 200
+        assert r.json()["already_active"] is True
+        assert r.json()["licence"]["key"] == lic.licence_key
+
+    def test_another_account_key_is_refused(self, db, monkeypatch):
+        user, ref = TestFulfilmentRecovery()._successful_flexible(db, monkeypatch)
+        other = make_user(db, email="licence-other@t.test")
+        lic = self._licence(db, user)
+        r = _client(db, other).post("/api/paystack/licence/redeem",
+                                    json={"key": lic.licence_key})
+        assert r.status_code == 409
+        assert "another account" in r.json()["detail"]
+        db.expire_all()
+        assert self._licence(db, user).user_id == user.id
+
+    def test_invalid_and_expired_keys_are_clear(self, db):
+        user = make_user(db)
+        client = _client(db, user)
+        assert client.post("/api/paystack/licence/redeem",
+                           json={"key": "TF-NOT-A-KEY"}).status_code == 404
+
+        plan = db.query(SubscriptionPlanDB).filter_by(
+            slug="flexible-credit-pack").one()
+        lic = UserLicenseDB(
+            id="lic-expired", user_id=user.id, plan_id=plan.id,
+            licence_key="TF-EXPIRED-KEY", key_hash=paystack._hash_key("TF-EXPIRED-KEY"),
+            status="expired")
+        db.add(lic)
+        db.commit()
+        r = client.post("/api/paystack/licence/redeem",
+                        json={"key": "TF-EXPIRED-KEY"})
+        assert r.status_code == 409
+        assert "expired" in r.json()["detail"]
+

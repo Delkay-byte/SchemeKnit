@@ -17,7 +17,9 @@ from sqlalchemy import func
 from ..database import (
     get_db, User, SchoolDB, SchoolMembershipDB, SchoolLicenseDB,
     ActivationCodeDB, IndividualActivationCodeDB, ProductPlanDB, PaymentDB, PlatformAuditLogDB,
-    LicenseCacheDB, generate_id,
+    LicenseCacheDB, generate_id, SubscriptionTransactionDB,
+    SubscriptionPlanDB, UserLicenseDB, CreditBalanceDB,
+    PaystackWebhookEventDB, SubscriptionEventDB,
 )
 from ..auth import get_current_user, require_platform_admin
 from ..config import get_settings
@@ -738,6 +740,171 @@ async def reject_payment(
         return {"message": "Payment rejected"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+class ReconcilePurchaseRequest(BaseModel):
+    reason: str = ""
+
+
+# ── Paystack purchases (verified, self-serve) ────────────────────────────────
+
+@router.get("/paystack-purchases")
+async def list_paystack_purchases(
+    status: Optional[str] = None,
+    fulfilment: Optional[str] = None,
+    user: User = Depends(require_platform_admin),
+    db=Depends(get_db),
+):
+    """Every successful/failed Paystack purchase with fulfilment evidence."""
+    from .. import paystack
+
+    query = db.query(SubscriptionTransactionDB)
+    if status:
+        query = query.filter(SubscriptionTransactionDB.status == status)
+    rows = query.order_by(
+        SubscriptionTransactionDB.created_at.desc()).limit(200).all()
+    purchases = []
+    summary = {"total": 0, "activated": 0, "needs_attention": 0,
+               "payment_failed": 0, "payment_reversed": 0,
+               "notification_failed": 0}
+    for tx in rows:
+        payload = paystack.purchase_payload(db, tx)
+        state = payload["fulfilment_status"]
+        notes = payload.get("notifications") or {}
+        notification_failed = any(
+            (notes.get(ch) or {}).get("status") == "failed"
+            for ch in ("customer", "owner"))
+        if notification_failed:
+            state = "notification_failed"
+        if fulfilment and state != fulfilment:
+            continue
+        plan = db.query(SubscriptionPlanDB).filter(
+            SubscriptionPlanDB.id == tx.plan_id).first()
+        account = db.query(User).filter(User.id == tx.user_id).first()
+        lic = db.query(UserLicenseDB).filter(
+            UserLicenseDB.user_id == tx.user_id).first()
+        balance = db.query(CreditBalanceDB).filter(
+            CreditBalanceDB.grant_key == f"package:{tx.reference}").first()
+        hooks = (db.query(PaystackWebhookEventDB)
+                 .filter(PaystackWebhookEventDB.reference == tx.reference)
+                 .order_by(PaystackWebhookEventDB.received_at.desc())
+                 .limit(3).all())
+        summary["total"] += 1
+        summary[state] = summary.get(state, 0) + 1
+        purchases.append({
+            **payload,
+            "id": tx.id,
+            "customer": {
+                "id": tx.user_id,
+                "email": account.email if account else "",
+                "name": account.full_name if account else "",
+                "school": account.school_name if account else "",
+            },
+            "plan": plan.name if plan else "",
+            "licence_issued": lic is not None,
+            "licence_status": lic.status if lic else "",
+            "credits_granted": int(balance.credits_granted) if balance else 0,
+            "credits_remaining": int(balance.credits_remaining) if balance else 0,
+            "notifications": notes,
+            "webhooks": [{
+                "status": h.status, "attempts": h.attempts,
+                "last_error": h.last_error,
+                "received_at": h.received_at.isoformat() if h.received_at else None,
+                "processed_at": h.processed_at.isoformat() if h.processed_at else None,
+            } for h in hooks],
+            "reconciliation": (
+                (tx.payment_details or {}).get("reconciliation")
+                if isinstance(tx.payment_details, dict) else None),
+        })
+    return {"purchases": purchases, "summary": summary}
+
+
+@router.post("/paystack-purchases/{reference}/reconcile")
+async def reconcile_paystack_purchase(
+    reference: str,
+    req: ReconcilePurchaseRequest,
+    user: User = Depends(require_platform_admin),
+    db=Depends(get_db),
+):
+    """Verify with Paystack and complete a missing entitlement exactly once.
+
+    This is the supported reconciliation path. It never accepts a
+    client-supplied status, never creates a charge, and is idempotent. It is
+    auditable and refuses reversed/refunded payments.
+    """
+    from .. import paystack, purchase_notifications
+
+    reason = (req.reason or "").strip()
+    if len(reason) < 5:
+        raise HTTPException(
+            status_code=422,
+            detail="A reconciliation reason is required.",
+        )
+    tx = (db.query(SubscriptionTransactionDB)
+          .filter(SubscriptionTransactionDB.reference == reference).first())
+    if tx is None:
+        raise HTTPException(status_code=404, detail="Purchase not found")
+    if tx.status in ("reversed", "refunded"):
+        raise HTTPException(
+            status_code=409,
+            detail="A reversed/refunded payment cannot be activated.",
+        )
+    before = paystack.purchase_payload(db, tx)
+    verified = paystack.verify(reference)
+    account = db.query(User).filter(User.id == tx.user_id).first()
+    try:
+        paystack._validate_verified_payment(tx, verified, account)
+    except paystack.PaystackError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.message)
+
+    if tx.status in ("failed", "expired"):
+        # Paystack is authoritative: a local failure label from a missed
+        # webhook can be corrected after a fresh server-side verification.
+        tx.status = "pending"
+        tx.charge_status = "success"
+        db.commit()
+    try:
+        sub, lic = paystack.activate_paid_transaction(db, tx, verified)
+    except paystack.PaystackError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.message)
+
+    plan = db.query(SubscriptionPlanDB).filter(
+        SubscriptionPlanDB.id == tx.plan_id).first()
+    purchase_notifications.notify_purchase(db, tx, account, plan, sub, lic)
+    after = paystack.purchase_payload(db, tx)
+    history = []
+    if isinstance(tx.payment_details, dict):
+        history = list(tx.payment_details.get("reconciliation") or [])
+    history.append({
+        "actor_id": user.id,
+        "reason": reason,
+        "at": datetime.utcnow().isoformat(),
+        "before": before["fulfilment_status"],
+        "after": after["fulfilment_status"],
+    })
+    details = dict(tx.payment_details or {})
+    details["reconciliation"] = history
+    tx.payment_details = details
+    if sub is not None:
+        db.add(SubscriptionEventDB(
+            id=generate_id(), subscription_id=sub.id,
+            event_type="reconciled",
+            from_status="", to_status="active",
+            metadata_json={"reference": reference, "reason": reason,
+                           "before": before["fulfilment_status"],
+                           "after": after["fulfilment_status"]},
+        ))
+    db.add(PlatformAuditLogDB(
+        id=generate_id(), actor_id=user.id, actor_role=user.role,
+        action="paystack_purchase_reconciled", target_type="payment",
+        target_id=tx.id,
+        details={"reference": reference, "reason": reason,
+                 "before": before["fulfilment_status"],
+                 "after": after["fulfilment_status"]},
+    ))
+    db.commit()
+    return {"message": "Purchase reconciled", "before": before,
+            "purchase": after}
 
 
 # ── Audit Log ─────────────────────────────────────────────────────────────────

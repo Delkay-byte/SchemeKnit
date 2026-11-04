@@ -104,9 +104,9 @@ export default function UpgradePage() {
       try {
         const s = await api.chargeStatus(charge.reference)
         setCharge(s)
-        if (s.status === 'success') {
+        if (s.status === 'success' || s.purchase?.payment_status === 'success') {
           window.clearInterval(id)
-          router.push('/subscription?activated=1')
+          router.push(`/payments/callback?reference=${encodeURIComponent(s.reference || charge.reference)}`)
         } else if (s.status === 'failed' || s.status === 'expired') {
           window.clearInterval(id)
           setBusy(false)
@@ -127,7 +127,7 @@ export default function UpgradePage() {
         : await api.momoCharge(selected, phone, provider)
       setCharge(data)
       if (data.status === 'success') {
-        router.push('/subscription?activated=1')
+        router.push(`/payments/callback?reference=${encodeURIComponent(data.reference)}`)
       } else if (data.status === 'failed') {
         setBusy(false)
       }
@@ -329,9 +329,16 @@ export default function UpgradePage() {
                   </Button>
                 )}
                 {charge.status === 'pending' && method === 'mobile_money' && (
-                  <p className="mt-2 text-xs text-slate-500">
-                    Reference {charge.reference}. If the prompt does not arrive, start a new request.
-                  </p>
+                  <>
+                    <p className="mt-2 text-xs text-slate-500">
+                      Submitting the OTP does not complete the purchase. Approve the
+                      final Mobile Money prompt on your phone, then wait here.
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Reference {charge.reference}. Do not start a second payment while
+                      this one is processing.
+                    </p>
+                  </>
                 )}
               </div>
             )}
