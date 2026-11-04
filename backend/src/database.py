@@ -1403,11 +1403,32 @@ class UserSessionDB(Base):
     last_seen_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     expires_at = Column(DateTime, nullable=False, index=True)
     revoked_at = Column(DateTime, nullable=True)
+    # Provenance (Phase 1.1). NULL on rows created before v053, which are
+    # treated as local sessions: central revocation never touches them.
+    auth_source = Column(String, nullable=True)  # 'local' | 'sso'
+    idp_sub = Column(String, nullable=True)  # immutable Authentik uid
+    idp_sid = Column(String, nullable=True)  # OIDC session id
 
     __table_args__ = (
         Index("ix_user_sessions_user", "user_id", "revoked_at"),
         Index("ix_user_sessions_expiry", "expires_at"),
+        Index("ix_user_sessions_idp_sub", "idp_sub"),
+        Index("ix_user_sessions_idp_sid", "idp_sid"),
     )
+
+
+class OidcRevocationEventDB(Base):
+    """Processed revocation message ids — replay and duplicate protection.
+
+    A revocation or IdP logout token is applied at most once. Repeated delivery
+    is acknowledged (idempotent) instead of revoking again or erroring.
+    """
+
+    __tablename__ = "oidc_revocation_events"
+
+    event_id = Column(String, primary_key=True)
+    source = Column(String, nullable=False, default="control_center")
+    received_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 
 class LoginFailureDB(Base):

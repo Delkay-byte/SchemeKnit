@@ -158,6 +158,8 @@ class Settings(BaseSettings):
     #: server-to-server linking resolve/confirm calls. This is the schemeknit
     #: entry of the Control Center's CC_PRODUCT_API_KEYS map.
     PLATFORM_OIDC_LINKING_API_KEY: str = ""
+    # Control Center product slug used as the revocation audience (ADR-0004).
+    PLATFORM_REVOCATION_AUDIENCE: str = "schemeknit"
     #: Base URL of the Control Center backend (linking endpoints live under
     #: /api/v1/products/schemeknit/linking/...).
     PLATFORM_OIDC_LINKING_BASE_URL: str = "http://localhost:8400"

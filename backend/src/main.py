@@ -271,6 +271,7 @@ from .routers import platform_admin as platform_admin_router
 from .routers import weekly_plans as weekly_plans_router
 from .routers import referrals as referrals_router
 from .routers import auth_oidc as auth_oidc_router
+from .routers import session_revocation as session_revocation_router
 
 app.include_router(auth_router.router, prefix="/api/auth", tags=["authentication"])
 app.include_router(documents.router, prefix="/api/documents", tags=["documents"])
@@ -289,6 +290,7 @@ app.include_router(referrals_router.router, prefix="/api/referrals", tags=["refe
 # PLATFORM_OIDC_ENABLED feature flag is off (default), keeping the local
 # login paths unchanged.
 app.include_router(auth_oidc_router.router, prefix="/api/auth/oidc", tags=["sso"])
+app.include_router(session_revocation_router.router, tags=["sso-session-revocation"])
 
 
 @app.get("/api/health")

@@ -225,6 +225,56 @@ def validate_id_token(id_token: str, expected_nonce: str,
     return claims
 
 
+LOGOUT_EVENT = "http://schemas.openid.net/event/backchannel-logout"
+LOGOUT_TOKEN_MAX_AGE_SECONDS = 120
+
+
+def validate_logout_token(logout_token: str) -> dict:
+    """Validate an OIDC Back-Channel Logout token (OpenID Connect BCL 1.0).
+
+    Enforced, fail closed:
+    - RS256 signature against the IdP JWKS
+    - exact issuer, audience == client_id, exp/iat
+    - the ``events`` claim contains the back-channel-logout event
+    - ``iat`` is recent (replay window), a ``jti`` is present
+    - at least one of ``sub`` / ``sid`` is present
+    - a logout token MUST NOT carry a ``nonce`` (spec §2.6)
+
+    Raises :class:`OidcError` on any failure.
+    """
+    settings = get_settings()
+    try:
+        signing_key = _jwk_client(jwks_uri()).get_signing_key_from_jwt(logout_token)
+        claims = jwt.decode(
+            logout_token,
+            signing_key.key,
+            algorithms=["RS256"],
+            audience=settings.PLATFORM_OIDC_CLIENT_ID,
+            issuer=settings.PLATFORM_OIDC_ISSUER,
+            leeway=TOKEN_LEEWAY_SECONDS,
+            options={"require": ["exp", "iat", "iss", "aud", "jti"]},
+        )
+    except InvalidTokenError as exc:
+        raise OidcError(f"invalid logout token: {exc}") from exc
+    except Exception as exc:
+        raise OidcError(f"logout token validation unavailable: {exc}") from exc
+
+    events = claims.get("events") or {}
+    if not isinstance(events, dict) or LOGOUT_EVENT not in events:
+        raise OidcError("logout token missing back-channel-logout event")
+    if claims.get("nonce") is not None:
+        raise OidcError("logout token must not contain a nonce")
+
+    age = abs(int(time.time()) - int(claims.get("iat", 0)))
+    if age > LOGOUT_TOKEN_MAX_AGE_SECONDS:
+        raise OidcError("logout token is stale")
+    if not claims.get("jti"):
+        raise OidcError("logout token missing jti")
+    if not claims.get("sub") and not claims.get("sid"):
+        raise OidcError("logout token carries neither sub nor sid")
+    return claims
+
+
 def amr_from_claims(claims: dict) -> list[str]:
     """The IdP-attested authentication methods (empty list when absent)."""
     amr = claims.get("amr") or []

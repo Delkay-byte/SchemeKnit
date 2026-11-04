@@ -193,8 +193,16 @@ def create_user_token(user: User, expires_delta: Optional[timedelta] = None,
     return create_access_token(payload, expires_delta=expires_delta)
 
 
-def create_session_record(db: Session, user_id: str, jti: str) -> UserSessionDB:
-    """Create the server-side row for a newly issued login token."""
+def create_session_record(db: Session, user_id: str, jti: str,
+                          auth_source: str = "local",
+                          idp_sub: Optional[str] = None,
+                          idp_sid: Optional[str] = None) -> UserSessionDB:
+    """Create the server-side row for a newly issued login token.
+
+    ``auth_source``/``idp_sub``/``idp_sid`` record provenance so central logout
+    and IdP back-channel logout can revoke exactly the SSO-derived sessions of
+    one immutable identity, leaving that administrator's local sessions alone.
+    """
     now = datetime.utcnow()
     row = UserSessionDB(
         jti=jti,
@@ -204,6 +212,9 @@ def create_session_record(db: Session, user_id: str, jti: str) -> UserSessionDB:
         expires_at=now + timedelta(
             hours=max(1, int(getattr(settings, "SESSION_ABSOLUTE_HOURS", 12)))
         ),
+        auth_source=auth_source,
+        idp_sub=idp_sub,
+        idp_sid=idp_sid,
     )
     db.add(row)
     db.commit()

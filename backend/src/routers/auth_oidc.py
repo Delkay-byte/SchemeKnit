@@ -147,15 +147,35 @@ def _enforce_lockout(db: Session, request: Optional[Request]) -> None:
         )
 
 
-def _mint_session(db: Session, user: User, amr: list[str]) -> str:
+def _str_or_none(value) -> str | None:
+    """Coerce a JWT claim to a non-empty string, else None."""
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _mint_session(db: Session, user: User, amr: list[str],
+                  idp_sub: str | None = None,
+                  idp_sid: str | None = None) -> str:
     """Issue a NATIVE SchemeKnit session via the existing primitives.
 
     The IdP-attested ``amr`` rides on the token so the platform-admin MFA gate
     can reconcile central MFA/passkey evidence with the local TOTP gate.
+
+    Provenance (Phase 1.1): an SSO-minted session records the immutable
+    Authentik subject and the OIDC ``sid`` so central logout and IdP
+    back-channel logout can revoke exactly these sessions — and never the same
+    administrator's local password sessions.
     """
     jti = secrets.token_hex(16)
     token = create_user_token(user, jti=jti, amr=amr)
-    create_session_record(db, user.id, jti)
+    create_session_record(
+        db, user.id, jti,
+        auth_source="sso" if idp_sub else "local",
+        idp_sub=idp_sub,
+        idp_sid=idp_sid,
+    )
     return token
 
 
@@ -285,7 +305,8 @@ def _handle_callback(db: Session, request: Request, code: str, state: str,
         user, deny = _user_for_verified_link(db, idp_sub, idp_email, amr)
         if deny is not None:
             return deny
-        token = _mint_session(db, user, amr)
+        token = _mint_session(db, user, amr, idp_sub=idp_sub,
+                              idp_sid=_str_or_none(claims.get("sid")))
         _audit(db, user.id, user.role, "platform_admin_oidc_login", "user",
                user.id, {"amr": amr, "issuer": get_settings().PLATFORM_OIDC_ISSUER})
         db.commit()
@@ -542,7 +563,11 @@ async def oidc_confirm(
     _audit(db, user.id, user.role, "platform_admin_oidc_link_created",
            "user", user.id, {"via": "local_credential_proof", "issuer": settings.PLATFORM_OIDC_ISSUER})
     amr = attempt.get("amr") or []
-    token = _mint_session(db, user, amr if isinstance(amr, list) else [])
+    token = _mint_session(
+        db, user, amr if isinstance(amr, list) else [],
+        idp_sub=_str_or_none(attempt.get("sub")),
+        idp_sid=_str_or_none(attempt.get("sid")),
+    )
     _audit(db, user.id, user.role, "platform_admin_oidc_login", "user",
            user.id, {"amr": amr, "via": "link_confirm"})
     db.commit()
