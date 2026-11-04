@@ -287,21 +287,29 @@ export function normalizeError(error: unknown): NormalizedError {
     }
   }
 
-  if (status === 503 || status >= 500) {
-    // A controlled server message (quality gate refused the batch, PDF
-    // converter missing, licence problem) is safe and actionable. Only fall
-    // back to the generic line when the server sent nothing usable or the
-    // text looks like an internal stack trace.
-    const detail = safeDetail(api) || safeDetail(body?.detail)
-    const message = detail && !INTERNAL_MARKERS.test(detail)
-      ? detail
-      : FRIENDLY_MESSAGES.server
+  if (status >= 500) {
+    // Two distinct cases (the ux-reliability E2E pins both):
+    //   * 503 — a CONTROLLED refusal the teacher can act on (quality gate
+    //     refused the batch, PDF converter missing, licence problem). Its
+    //     detail is safe and actionable, so surface it unless it looks like an
+    //     internal stack trace.
+    //   * anything else (500, 502, 504) — an uncontrolled server fault. The
+    //     operator needs the detail; the teacher must never see it, so always
+    //     the generic line. Surfacing "Internal database failure" here is the
+    //     regression the friendly-error contract exists to prevent.
+    if (status === 503) {
+      const detail = safeDetail(api) || safeDetail(body?.detail)
+      const message = detail && !INTERNAL_MARKERS.test(detail)
+        ? detail
+        : FRIENDLY_MESSAGES.server
+      return { ...base, category: 'server', message, canRetry: true, showBanner: true }
+    }
     return {
       ...base,
       category: 'server',
-      message,
+      message: FRIENDLY_MESSAGES.server,
       canRetry: true,
-      showBanner: status === 503,
+      showBanner: false,
     }
   }
 
