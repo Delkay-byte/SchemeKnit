@@ -207,6 +207,17 @@ async def platform_dashboard(
     verified_revenue = db.query(func.sum(PaymentDB.amount)).filter(
         PaymentDB.status == "verified"
     ).scalar() or 0
+    paystack_success = db.query(SubscriptionTransactionDB).filter(
+        SubscriptionTransactionDB.status == "success")
+    paystack_sales_today = paystack_success.filter(
+        SubscriptionTransactionDB.paid_at >= datetime.combine(today, datetime.min.time())
+    ).count()
+    recent_paid = paystack_success.order_by(
+        SubscriptionTransactionDB.created_at.desc()).limit(200).all()
+    from ..paystack import fulfilment_state
+    paystack_attention = sum(
+        1 for tx in recent_paid
+        if fulfilment_state(db, tx) != "activated")
 
     return {
         "active_schools": active_schools,
@@ -219,6 +230,8 @@ async def platform_dashboard(
         "seats_available": int(seat_limit_sum) - total_teachers,
         "pending_payments": pending_payments,
         "verified_revenue": float(verified_revenue),
+        "paystack_sales_today": paystack_sales_today,
+        "paystack_attention": paystack_attention,
         "currency": "GHS",
     }
 
@@ -772,7 +785,7 @@ async def list_paystack_purchases(
         state = payload["fulfilment_status"]
         notes = payload.get("notifications") or {}
         notification_failed = any(
-            (notes.get(ch) or {}).get("status") == "failed"
+            (notes.get(ch) or {}).get("status") in ("failed", "not_configured")
             for ch in ("customer", "owner"))
         if notification_failed:
             state = "notification_failed"

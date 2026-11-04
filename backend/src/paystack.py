@@ -529,6 +529,10 @@ def activate_paid_transaction(db: Session, tx: SubscriptionTransactionDB,
                .filter(UserLicenseDB.user_id == tx.user_id).first())
         if plan is None or user is None:
             raise PaystackError("The local payment record is incomplete.", 500)
+        already_fulfilled = fulfilment_state(db, tx) == "activated"
+        if already_fulfilled:
+            notify_purchase(db, tx, user, plan, sub, lic)
+            return sub, lic
         try:
             repaired = _repair_fulfilment(db, tx, plan, user, sub, lic)
         except Exception:

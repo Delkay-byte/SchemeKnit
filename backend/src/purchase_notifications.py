@@ -146,7 +146,7 @@ def retry_pending(db: Session, limit: int = 20) -> int:
     for tx in rows:
         details = tx.payment_details or {}
         notes = _notifications(details)
-        if all((notes.get(ch) or {}).get("status") == "sent"
+        if all((notes.get(ch) or {}).get("status") in ("sent", "not_configured")
                for ch in ("customer", "owner")):
             continue
         user = db.query(User).filter(User.id == tx.user_id).first()

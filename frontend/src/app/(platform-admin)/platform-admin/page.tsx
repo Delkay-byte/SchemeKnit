@@ -626,6 +626,14 @@ export default function PlatformAdminPage() {
                     <p className="mt-1.5 text-2xl font-bold text-[#102A43]">{dashboard.pending_payments}</p>
                   </SurfaceCard>
                   <SurfaceCard className="px-5 py-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Paystack Sales Today</p>
+                    <p className="mt-1.5 text-2xl font-bold text-[#102A43]">{dashboard.paystack_sales_today ?? 0}</p>
+                  </SurfaceCard>
+                  <SurfaceCard className="px-5 py-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Purchases Needing Activation</p>
+                    <p className="mt-1.5 text-2xl font-bold text-amber-700">{dashboard.paystack_attention ?? 0}</p>
+                  </SurfaceCard>
+                  <SurfaceCard className="px-5 py-4">
                     <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Verified Revenue</p>
                     <p className="mt-1.5 text-2xl font-bold text-[#102A43]">{formatCurrency(dashboard.verified_revenue)}</p>
                   </SurfaceCard>
