@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 import hashlib
 import secrets
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Request, Response
 from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from typing import Optional
@@ -914,12 +914,18 @@ async def logout(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    background_tasks: BackgroundTasks = None,
 ):
     """Sign out this session server-side.
 
     The access token is stateless, so logout records its unique ``jti`` until
     the token's natural expiry. Other devices keep their independent sessions;
     the password-version check is unchanged. Only the token id is stored.
+
+    SSO-created sessions (``amr`` claim present) additionally trigger a
+    best-effort, non-blocking revocation at the identity provider. Phase 1
+    never stores IdP refresh tokens, so the hook is a safeguarded no-op until
+    refresh-token storage is added; it must never delay or fail the logout.
     """
     payload = decode_token(credentials.credentials)
     jti = payload.get("jti")
@@ -945,6 +951,14 @@ async def logout(
         if session is not None and session.revoked_at is None:
             session.revoked_at = datetime.utcnow()
             db.commit()
+    # Best-effort IdP revocation for SSO sessions (never blocks/fails logout).
+    if isinstance(payload.get("amr"), list):
+        try:
+            from .. import oidc_client
+            if get_settings().PLATFORM_OIDC_ENABLED:
+                background_tasks.add_task(oidc_client.revoke_idp_token, None)
+        except Exception:
+            pass
     # Bounded cleanup: expired rows can never match a live token.
     try:
         db.query(RevokedTokenDB).filter(

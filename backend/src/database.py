@@ -1430,6 +1430,31 @@ class LoginFailureDB(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class PlatformAdminOidcLinkDB(Base):
+    """Platform-admin account link to the central BloomCore Identity (OIDC).
+
+    One row binds a local ``platform_admin`` user to a single IdP subject
+    (``idp_sub``) at a specific ``issuer``. A row is written only after the
+    Control Center linking flow succeeds: either the association is already
+    ``verified`` centrally, or the admin proved the local password
+    (``linked_via='local_credential_proof'``) for a pending declaration.
+    No credential material is stored here.
+    """
+    __tablename__ = "platform_admin_oidc_links"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    issuer = Column(String, nullable=False)
+    idp_sub = Column(String, nullable=False, unique=True, index=True)
+    linked_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    linked_via = Column(String, default="local_credential_proof", nullable=False)
+    created_by = Column(String, default="", nullable=False)
+
+    __table_args__ = (
+        Index("ix_oidc_links_issuer_sub", "issuer", "idp_sub"),
+    )
+
+
 class StorageLedgerDB(Base):
     """One reserved, committed or deleted original-document object.
 
