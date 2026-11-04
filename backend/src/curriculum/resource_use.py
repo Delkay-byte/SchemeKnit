@@ -32,17 +32,20 @@ def resource_use_sentence(resource: str, focus: str, index: int = 0) -> str:
     topic = (focus or "the lesson focus").strip().rstrip(" .;:,")
     if not name:
         return ""
+    plural = name.split()[-1].lower().endswith("s") or "&" in name
+    them = "them" if plural else "it"
+
     if _DEVICE.search(name):
         options = (
-            f"The teacher demonstrates {topic} with the {name} and each "
-            f"learner practises the same step on it.",
+            f"The teacher demonstrates the {topic} task on the {name}, and "
+            f"each learner practises the same step.",
             f"Learners use the {name} to carry out the {topic} task while the "
             f"teacher checks each learner's technique.",
         )
     elif _VISUAL.search(name):
         options = (
-            f"The teacher displays the {name} and learners use it to name and "
-            f"compare examples of {topic}.",
+            f"The teacher displays the {name} and learners use {them} to name "
+            f"and compare examples of {topic}.",
             f"Learners study the {name}, point out the key features of {topic} "
             f"and explain what each one shows.",
         )
@@ -56,15 +59,15 @@ def resource_use_sentence(resource: str, focus: str, index: int = 0) -> str:
     elif _CONSUMABLE.search(name):
         options = (
             f"Learners use the {name} to build or demonstrate {topic}, and the "
-            f"teacher checks that each group uses it correctly.",
-            f"The teacher models {topic} with the {name}; learners then repeat "
-            f"the task in their groups.",
+            f"teacher checks that each group uses {them} correctly.",
+            f"The teacher models the {topic} task with the {name}; learners "
+            f"then repeat the task in their groups.",
         )
     else:
         options = (
-            f"The teacher uses the {name} to model {topic}, and learners then "
-            f"apply it to their own task.",
+            f"The teacher uses the {name} to model the {topic} task, and "
+            f"learners then apply {them} to their own work.",
             f"Learners use the {name} while working on {topic}; the teacher "
-            f"checks how each group applies it.",
+            f"checks how each group applies {them}.",
         )
     return options[index % len(options)]
