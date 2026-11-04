@@ -31,6 +31,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..database import OidcRevocationEventDB, UserSessionDB, get_db
@@ -42,6 +43,18 @@ router = APIRouter(tags=["session-revocation"])
 
 REVOCATION_ISSUER = "bloomcore-control-center"
 REVOCATION_MAX_AGE_SECONDS = 300
+
+
+def _sso_enabled() -> bool:
+    """The SSO feature flag gates every SSO surface, including revocation.
+
+    With SSO disabled this deployment has no SSO sessions to revoke, so the
+    receivers must not exist at all — an unreachable endpoint is a smaller
+    surface than a validating one (same rule the login/start endpoint follows).
+    """
+    from ..config import get_settings
+
+    return bool(getattr(get_settings(), "PLATFORM_OIDC_ENABLED", False))
 
 
 def _log_security(event: str, **fields) -> None:
@@ -118,6 +131,9 @@ async def revoke_from_control_center(
     x_bloomcore_event: Optional[str] = Header(default=None),
     x_bloomcore_signature: Optional[str] = Header(default=None),
 ) -> dict:
+    if not _sso_enabled():
+        raise HTTPException(status_code=404, detail="Not Found")
+
     raw = await request.body()
     if not raw or not x_bloomcore_signature or not x_bloomcore_event:
         raise HTTPException(status_code=400, detail="missing revocation message")
@@ -169,12 +185,25 @@ async def revoke_from_control_center(
         _log_security("revocation_duplicate", event_id=body["event_id"])
         return {"status": "already_applied", "revoked": 0}
 
-    revoked = _revoke_sso_sessions(
-        db,
-        idp_sub=identity_sub,
-        idp_sid=body.get("idp_sid"),
-        scope=str(body.get("scope") or "identity_sessions"),
-    )
+    try:
+        # The event row and the revocation commit together: a failure here rolls
+        # back both, so the Control Center's retry can still apply it. Recording
+        # the id first would turn a failed revocation into a silent no-op.
+        revoked = _revoke_sso_sessions(
+            db,
+            idp_sub=identity_sub,
+            idp_sid=body.get("idp_sid"),
+            scope=str(body.get("scope") or "identity_sessions"),
+        )
+    except IntegrityError:
+        # Concurrent duplicate delivery won the unique constraint.
+        db.rollback()
+        _log_security("revocation_duplicate", event_id=body["event_id"])
+        return {"status": "already_applied", "revoked": 0}
+    except Exception:
+        db.rollback()
+        _log_security("revocation_apply_failed", event_id=body["event_id"])
+        raise HTTPException(status_code=500, detail="revocation failed")
     _log_security("revocation_applied", source="control_center",
                   revoked=revoked, reason=body.get("reason"))
     _audit_revocation(db, subject=identity_sub, reason=str(body.get("reason")),
@@ -188,6 +217,9 @@ async def backchannel_logout(
     request: Request,
     db: Session = Depends(get_db),
 ) -> dict:
+    if not _sso_enabled():
+        raise HTTPException(status_code=404, detail="Not Found")
+
     form = await request.form()
     logout_token = str(form.get("logout_token") or "")
     if not logout_token:
@@ -204,11 +236,19 @@ async def backchannel_logout(
         db.commit()
         return {"status": "already_applied"}
 
-    revoked = _revoke_sso_sessions(
-        db,
-        idp_sub=str(claims["sub"]) if claims.get("sub") else None,
-        idp_sid=str(claims["sid"]) if claims.get("sid") else None,
-    )
+    try:
+        revoked = _revoke_sso_sessions(
+            db,
+            idp_sub=str(claims["sub"]) if claims.get("sub") else None,
+            idp_sid=str(claims["sid"]) if claims.get("sid") else None,
+        )
+    except IntegrityError:
+        db.rollback()
+        return {"status": "already_applied"}
+    except Exception:
+        db.rollback()
+        _log_security("backchannel_logout_apply_failed", jti=jti)
+        raise HTTPException(status_code=500, detail="revocation failed")
     _log_security("backchannel_logout_applied", revoked=revoked,
                   has_sid=bool(claims.get("sid")))
     _audit_revocation(db, subject=str(claims.get("sub") or ""), reason="idp_logout",

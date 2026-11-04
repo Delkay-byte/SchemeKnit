@@ -33,6 +33,7 @@ API_KEY = "sk-test-linking-key"
 
 @pytest.fixture(autouse=True)
 def _env(monkeypatch):
+    monkeypatch.setenv("PLATFORM_OIDC_ENABLED", "true")
     monkeypatch.setenv("PLATFORM_OIDC_LINKING_API_KEY", API_KEY)
     monkeypatch.setenv("PLATFORM_OIDC_CLIENT_ID", "schemeknit-sso")
     monkeypatch.setenv("PLATFORM_OIDC_ISSUER", "http://localhost:9000/application/o/schemeknit/")
@@ -260,3 +261,20 @@ def test_logout_token_requires_backchannel_event():
     assert LOGOUT_EVENT.startswith("http://schemas.openid.net/event/")
     # Guard against the constant silently changing shape.
     assert validate_logout_token.__doc__ and "back-channel" in validate_logout_token.__doc__
+
+
+def test_endpoints_404_when_sso_disabled(client, db_factory, monkeypatch):
+    """With SSO off there are no SSO sessions, so the receivers must not exist."""
+    from src.config import get_settings
+
+    monkeypatch.setenv("PLATFORM_OIDC_ENABLED", "false")
+    get_settings.cache_clear()
+    try:
+        body, payload, sig = _message()
+        assert _post(client, body, payload, sig).status_code == 404
+        assert client.post(
+            "/api/auth/oidc/backchannel-logout", data={"logout_token": "x"}
+        ).status_code == 404
+    finally:
+        monkeypatch.setenv("PLATFORM_OIDC_ENABLED", "true")
+        get_settings.cache_clear()
