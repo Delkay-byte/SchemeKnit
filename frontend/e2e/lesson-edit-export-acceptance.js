@@ -126,10 +126,8 @@ async function download(page, label, name, action) {
     log(pdf.bytes.slice(0, 5).toString() === '%PDF-' && pdf.bytes.length > 3000,
       'PDF has the PDF signature', `${pdf.bytes.length} bytes`)
 
-    const xlsx = await download(page, 'XLSX', `lesson-${stamp}.xlsx`, () =>
-      page.getByRole('button', { name: /download register/i }).first().click())
-    log(xlsx.bytes.slice(0, 2).toString() === 'PK' && xlsx.bytes.length > 3000,
-      'XLSX is a real package', `${xlsx.bytes.length} bytes`)
+    log((await page.getByRole('button', { name: /download register/i }).count()) === 0,
+      'Download Register (XLSX) is absent')
 
     let zip = null
     if (process.env.TF_EXPECT_ZIP === '1') {
@@ -145,7 +143,7 @@ async function download(page, label, name, action) {
     log(pageErrors.length === 0, 'no uncaught page errors', pageErrors.slice(0, 2).join(' | '))
     log(httpErrors.length === 0, 'no HTTP 4xx/5xx during the journey', httpErrors.slice(0, 3).join(' | '))
     fs.writeFileSync(path.join(OUT, 'export-paths.json'), JSON.stringify({
-      docx: docx.target, pdf: pdf.target, xlsx: xlsx.target,
+      docx: docx.target, pdf: pdf.target,
       zip: zip ? zip.target : null,
       lessonId, schemeId, topic, intro,
     }, null, 2))

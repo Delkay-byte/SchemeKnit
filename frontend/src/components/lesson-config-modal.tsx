@@ -17,7 +17,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Field } from '@/components/ui/field'
+import { Field, TextArea } from '@/components/ui/field'
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
@@ -285,12 +285,13 @@ export function LessonConfigModal({
               />
             </Field>
           </div>
-          <Field label="Reference" htmlFor="lcfg-reference" hint="Textbook, curriculum document or teacher's guide (optional)">
-            <Input
+          <Field label="Reference" htmlFor="lcfg-reference" hint="Textbook, curriculum document or teacher's guide (optional). Press Enter for a new reference.">
+            <TextArea
               id="lcfg-reference"
-              type="text"
+              rows={3}
               value={draft.reference || ''}
               onChange={(e) => setDraft({ ...draft, reference: e.target.value })}
+              placeholder="e.g. Computing curriculum page 16"
             />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">

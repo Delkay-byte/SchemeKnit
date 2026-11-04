@@ -120,16 +120,9 @@ function fail(name, detail = '') { results.push(`FAIL ${name} ${detail}`); conso
     await page.goto(`${BASE}/generate/${schemeId}`);
     await page.waitForTimeout(3500);
     const aiSelect = page.locator('#cfg-ai-mode');
-    if (await aiSelect.count()) {
-      await aiSelect.selectOption('ENHANCED');
-      await page.waitForTimeout(2500);
-    }
-    const gen = await page.content();
-    const aiActive = /AI active · provider:\s*Gemini/i.test(gen)
-      || /AI active · provider:/i.test(gen);
-    aiActive ? pass('generate: AI provider status shown (resolved)')
-             : fail('generate: AI provider status shown (resolved)',
-                    (gen.match(/AI[^<]{0,80}/) || ['label not found'])[0]);
+    (await aiSelect.count()) === 0
+      ? pass('generate: internal AI Mode control is absent')
+      : fail('generate: internal AI Mode control is absent', 'selector still present');
     await page.screenshot({ path: path.join(OUT, 'generate-1440.png') });
 
     // Small batch: select up to 2 indicators via the API path, then drive the

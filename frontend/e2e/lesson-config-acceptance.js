@@ -24,7 +24,7 @@ const OUT = path.join(__dirname, 'lesson-config-acceptance');
 fs.mkdirSync(OUT, { recursive: true });
 
 const STAMP = Date.now();
-const PASS_W = 'Auto#2026';
+const PASS_W = 'SchemeKnit#2026';
 const EMAIL = `lesson.config.${STAMP}@schemeknit.test`;
 const NAME = 'Config Acceptance';
 const SCHOOL = 'Kpogede Community School';

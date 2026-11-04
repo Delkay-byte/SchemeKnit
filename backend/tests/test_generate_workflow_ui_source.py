@@ -65,7 +65,7 @@ class TestWeekCentricSurface:
             "data-generate-summary",
             "data-generate-config",
             "data-generate-action",
-            "data-generate-mode",
+            "data-generation-method-summary",
             "data-lesson-review",
             "data-coverage",
             "data-class-level-select",

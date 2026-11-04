@@ -9,7 +9,7 @@ import { Banner } from '@/components/ui/banner'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Field, TextArea } from '@/components/ui/field'
-import { Download, Settings, Play, CheckCircle, FileText, FileSpreadsheet, FileArchive, Loader2, Eye, Save, ChevronDown, ChevronRight, SlidersHorizontal } from 'lucide-react'
+import { Download, Settings, Play, CheckCircle, FileText, FileArchive, Loader2, Eye, Save, ChevronDown, ChevronRight, SlidersHorizontal } from 'lucide-react'
 import { api, sanitizeTermConfig } from '@/lib/api'
 import { DetailPageSkeleton } from '@/components/ui/skeleton'
 import { normalizeError } from '@/lib/error-normalizer'
@@ -30,6 +30,7 @@ import { PageHeader } from '@/components/ui/page-header'
 import { StatusPill } from '@/components/ui/badge'
 import { LessonWorkspace } from '@/components/lesson-workspace'
 import { LessonConfigModal } from '@/components/lesson-config-modal'
+import { MultilineListField } from '@/components/ui/multiline-list-field'
 import { SchemeOfWork, TermConfig, CurriculumCoverage, Template, CurriculumProfile, WapefOptions, LessonRubricConfig } from '@/types'
 
 // The Approved WAPEF Plan is one shared form for Nursery/KG/Basic/JHS; its
@@ -75,10 +76,9 @@ export default function GeneratePage() {
   // Weeks collapse individually; every week starts expanded so the curriculum
   // is visible without hunting (a long scheme can be collapsed week by week).
   const [collapsedWeeks, setCollapsedWeeks] = useState<number[]>([])
-  // Generation experience (Pattern 7): Quick Generate is the default; Build
-  // with me reveals the generated lesson one section at a time. Persisted so
-  // the teacher's choice survives a reload.
-  const [genMode, setGenMode] = useState<'quick' | 'guided'>('quick')
+  // Generation workspace always shows the complete lesson. Section-by-section
+  // review is not a generation mode and is never a competing action.
+
   const [reviewedLessons, setReviewedLessons] = useState<number | null>(null)
   // Per-lesson review drafts (keywords / Other TLRs / competencies / refs)
   // edited BEFORE generation and applied when lessons are built.
@@ -97,19 +97,13 @@ export default function GeneratePage() {
   const [configModalOpen, setConfigModalOpen] = useState(false)
   const [configSavedAt, setConfigSavedAt] = useState<string | null>(null)
   const NACCA_COMPETENCIES = [
-    'Critical Thinking and Problem Solving',
-    'Creativity and Innovation',
-    'Communication and Collaboration',
-    'Cultural Identity and Global Citizenship',
-    'Personal Development and Leadership',
-    'Digital Literacy',
+    'Critical Thinking and Problem Solving (CP)',
+    'Creativity and Innovation (CI)',
+    'Communication and Collaboration (CC)',
+    'Cultural Identity and Global Citizenship (CG)',
+    'Personal Development and Leadership (PL)',
+    'Digital Literacy (DL)',
   ]
-  // Actual AI resolution (mode/provider/available) reported by the backend —
-  // so the UI never shows a mode that disagrees with real behaviour.
-  const [aiStatus, setAiStatus] = useState<{
-    mode: string; active: boolean; provider: string | null; state: string;
-    reason: string | null; provider_label?: string | null;
-  } | null>(null)
   // "Generate with Zeli" availability, reported by the backend for the Zeli
   // method specifically. It drives an honest disabled state and an explicit
   // message — never a silent disable or a fake success.
@@ -228,26 +222,16 @@ export default function GeneratePage() {
 
   // PART 2/28: the curriculum reference option names THIS scheme's subject
   // ("Computing Curriculum") — never a hard-coded "Subject Curriculum".
-  const REFERENCE_TYPES = [
-    config.subject && config.subject !== 'Unknown'
-      ? `${config.subject} Curriculum`
-      : 'Subject Curriculum',
-    'Teacher\'s Handbook / Teacher\'s Guide',
-    'Textbook',
-    'Other',
-  ]
 
   useEffect(() => {
-    // Restore the teacher's last AI mode choice so it persists across visits.
+    // Restore the teacher's last generation-method choice so it persists.
     try {
-      const saved = window.localStorage.getItem('schemeknit.ai_mode')
-      if (saved) setConfig(prev => ({ ...prev, ai_mode: saved as any }))
       const savedMethod = window.localStorage.getItem('schemeknit.generation_method')
       if (savedMethod === 'zeli' || savedMethod === 'standard') {
         setConfig(prev => ({ ...prev, generation_method: savedMethod }))
       }
       const savedGenMode = window.localStorage.getItem('schemeknit.gen_mode')
-      if (savedGenMode === 'guided' || savedGenMode === 'quick') setGenMode(savedGenMode)
+      if (savedGenMode) window.localStorage.removeItem('schemeknit.gen_mode')
       // Autopilot intent (§17): the upload page's ONE explicit action records
       // it here; a plain visit never auto-generates, so quota is never spent
       // without a teacher click.
@@ -264,14 +248,13 @@ export default function GeneratePage() {
       .catch(() => setWapefOptions(null))
   }, [schemeId])
 
-  // The displayed AI status must always reflect what the backend will actually
-  // do for the currently selected mode AND generation method.
+  // The displayed Zeli status must always reflect what the backend will
+  // actually do for the currently selected generation method.
   useEffect(() => {
     let cancelled = false
-    api.getAiStatus(config.ai_mode || 'OFF', config.generation_method || 'standard')
+    api.getAiStatus('OFF', config.generation_method || 'standard')
       .then((s) => {
         if (cancelled) return
-        setAiStatus(s)
         setZeliStatus(
           config.generation_method === 'zeli'
             ? { active: s.active, state: s.state, reason: s.reason }
@@ -280,11 +263,10 @@ export default function GeneratePage() {
       })
       .catch(() => {
         if (cancelled) return
-        setAiStatus(null)
         setZeliStatus(null)
       })
     return () => { cancelled = true }
-  }, [config.ai_mode, config.generation_method])
+  }, [config.generation_method])
 
   const loadData = async () => {
     try {
@@ -659,10 +641,15 @@ export default function GeneratePage() {
         ? progress.filter((r) => r.source_occurrence_id && generatedIds.has(r.source_occurrence_id))
         : progress
       if (rejectedIds.length > 0) {
+        const rejectedItems: Array<{ week_number?: number; indicator_code?: string; reasons?: string[] }> =
+          Array.isArray(response.rejected) ? response.rejected : []
+        const named = rejectedItems
+          .map((item) => `Week ${item.week_number ?? '—'}${item.indicator_code ? ` (${item.indicator_code})` : ''}`)
+          .join(', ')
         setBatchNotice(
           `${rejectedIds.length} lesson plan${rejectedIds.length === 1 ? '' : 's'} ` +
-          'could not be generated and remain pending. They were not saved and ' +
-          'no quota was charged for them — try those again, or review the source scheme.',
+          `could not be generated and remain pending${named ? `: ${named}` : ''}. ` +
+          'They were not saved and no quota was charged for them — try those again, or review the source scheme.',
         )
         setGenProgress(`${readyRows.length} lesson plan${readyRows.length === 1 ? '' : 's'} generated; ${rejectedIds.length} remain pending.`)
       } else {
@@ -948,17 +935,6 @@ export default function GeneratePage() {
       if (r.lesson_sequence !== seq) return r
       if (r.source_occurrence_id) touchedOccurrences.current.add(r.source_occurrence_id)
       return { ...r, ...patch }
-    }))
-    setReviewSaved(false)
-  }
-
-  const updateStructuredRef = (seq: number, index: number, patch: Partial<any>) => {
-    setLessonReview(rows => rows.map(r => {
-      if (r.lesson_sequence !== seq) return r
-      if (r.source_occurrence_id) touchedOccurrences.current.add(r.source_occurrence_id)
-      const refs = [...(r.structured_references || [])]
-      refs[index] = { ...(refs[index] || { type: 'Other', title: '' }), ...patch }
-      return { ...r, structured_references: refs }
     }))
     setReviewSaved(false)
   }
@@ -1297,7 +1273,7 @@ export default function GeneratePage() {
           {jobId && (
             <LessonWorkspace
               jobId={jobId}
-              guided={genMode === 'guided'}
+              guided={false}
               onExport={handleExport}
               exporting={exporting}
               onLessonsLoaded={setReviewedLessons}
@@ -1632,10 +1608,11 @@ export default function GeneratePage() {
                     </div>
                   </div>
 
-                  {/* Generation method: Zeli is an ADDITIONAL, explicitly
-                      selectable method — the existing OFF/BASIC/ENHANCED
-                      options below are preserved and still work when
-                      Standard is selected. */}
+                  {/* Generation method (Part C): two clear methods. Standard
+                      is the deterministic engine; Zeli writes the whole
+                      lesson. There is no teacher-facing AI-mode selector —
+                      the internal OFF/BASIC/ENHANCED enum is not a control
+                      the teacher should have to interpret. */}
                   <Field
                     label="Generation method"
                     htmlFor="cfg-generation-method"
@@ -1710,47 +1687,6 @@ export default function GeneratePage() {
                         </p>
                       )}
                     </Field>
-                    <Field label="AI Mode" htmlFor="cfg-ai-mode">
-                      <Select
-                        id="cfg-ai-mode"
-                        value={config.ai_mode}
-                        disabled={config.generation_method === 'zeli'}
-                        aria-describedby={config.generation_method === 'zeli' ? 'cfg-ai-mode-note' : undefined}
-                        onChange={(e) => {
-                          const mode = e.target.value
-                          setConfig({ ...config, ai_mode: mode as any })
-                          try { window.localStorage.setItem('schemeknit.ai_mode', mode) } catch { /* ignore */ }
-                        }}
-                      >
-                        <option value="OFF">OFF - Deterministic only</option>
-                        <option value="BASIC">BASIC - Zeli suggestions</option>
-                        <option value="ENHANCED">ENHANCED - Zeli assistance</option>
-                      </Select>
-                      {config.generation_method === 'zeli' ? (
-                        <p id="cfg-ai-mode-note" className="mt-1 text-xs text-muted-foreground">
-                          Generate with Zeli writes the whole lesson, so this enrichment mode is not used.
-                          Switch to Standard to use OFF, BASIC or ENHANCED.
-                        </p>
-                      ) : aiStatus && (
-                        <p className={`mt-1 text-xs ${aiStatus.active ? 'text-green-600' : 'text-muted-foreground'}`}>
-                          {/* Zeli is the teacher-facing assistant name. The
-                              resolved provider stays in the backend-only
-                              ai-status payload (developer/admin diagnostics). */}
-                          {aiStatus.active
-                            ? 'Zeli available'
-                            : config.ai_mode === 'OFF'
-                              ? 'Zeli off — lessons will come from the deterministic engine.'
-                              : 'Zeli unavailable right now — lessons will be deterministic.'}
-                        </p>
-                      )}
-                    </Field>
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-2">
-                    {/* PART 3: a scheme that never states its class needs the
-                        teacher's choice. This is the only place the class can
-                        be set on this screen, and it persists into the
-                        generation payload. */}
                     <Field
                       label="Class"
                       htmlFor="cfg-class-level"
@@ -1787,6 +1723,9 @@ export default function GeneratePage() {
                         />
                       )}
                     </Field>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
                     {/* School identity is server-derived from the teacher's
                         profile and asked ONCE (summary strip → Settings) —
                         never repeated as a field here (§14). */}
@@ -2276,15 +2215,14 @@ export default function GeneratePage() {
                             >
                               Other TLRs for this lesson (optional teacher additions)
                             </label>
-                            <input
+                            <MultilineListField
                               id={`other-tlrs-${row.lesson_sequence}`}
-                              type="text"
-                              value={(row.other_tlrs || []).join(', ')}
-                              onChange={(e) => updateLessonReviewRow(row.lesson_sequence, {
-                                other_tlrs: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
+                              ariaLabel="Other TLRs for this lesson"
+                              value={row.other_tlrs || []}
+                              onChange={(entries) => updateLessonReviewRow(row.lesson_sequence, {
+                                other_tlrs: entries,
                               })}
-                              placeholder="Leave blank unless you want to add resources"
-                              className="w-full rounded-md border border-input px-2 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#04A9CE]/45 focus-visible:border-[#04A9CE]/70"
+                              placeholder="One resource per line — leave blank unless you want to add resources"
                             />
                           </div>
                         </>
@@ -2397,16 +2335,20 @@ export default function GeneratePage() {
                         </p>
                         <div className="flex flex-wrap gap-1.5">
                           {NACCA_COMPETENCIES.map((label) => {
-                            const selected = (row.core_competencies || []).includes(label)
+                            const base = label.replace(/\s*\([A-Z]{2}\)$/, '')
+                            const selected = (row.core_competencies || []).some(
+                              (value: string) => value === label || value === base,
+                            )
                             return (
                               <button
                                 key={label}
                                 type="button"
+                                aria-pressed={selected}
                                 onClick={() => {
                                   const cur = row.core_competencies || []
                                   const next = selected
-                                    ? cur.filter((c: string) => c !== label)
-                                    : [...cur, label]
+                                    ? cur.filter((c: string) => c !== label && c !== base)
+                                    : [...cur.filter((c: string) => c !== base), label]
                                   updateLessonReviewRow(row.lesson_sequence, {
                                     core_competencies: next,
                                   })
@@ -2424,57 +2366,27 @@ export default function GeneratePage() {
                         </div>
                       </div>
                       )}
-                      {/* REFERENCES — teacher-entered only. Exactly 3 empty
-                          slots by default; + Add creates another slot (PART
-                          L/M/X). Empty slots are never persisted. */}
+                      {/* REFERENCES — teacher-entered, one per line. The
+                          multiline editor keeps spaces and Enter while the
+                          teacher types; parsing happens on blur/save. */}
                       {!row.is_special_period && (
                       <div>
-                        <div className="mb-1 flex items-center justify-between">
-                          <p className="text-[11px] font-medium text-muted-foreground">
-                            References (teacher-entered)
-                          </p>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-6 px-2 text-[10px]"
-                            onClick={() => updateLessonReviewRow(row.lesson_sequence, {
-                              structured_references: [
-                                ...(row.structured_references || []),
-                                { type: 'Other', title: '', page: '' },
-                              ],
-                            })}
-                          >
-                            + Add reference
-                          </Button>
-                        </div>
-                        {(row.structured_references || []).map((ref: any, idx: number) => (
-                          <div key={idx} className="mb-1 grid grid-cols-12 gap-1">
-                            <Select
-                              value={ref.type || 'Other'}
-                              onChange={(e) => updateStructuredRef(row.lesson_sequence, idx, { type: e.target.value })}
-                              className="col-span-4 h-7 px-1 text-[10px]"
-                              aria-label="Reference type"
-                            >
-                              {REFERENCE_TYPES.map(t => (
-                                <option key={t} value={t}>{t}</option>
-                              ))}
-                            </Select>
-                            <Input
-                              type="text"
-                              value={ref.title || ''}
-                              onChange={(e) => updateStructuredRef(row.lesson_sequence, idx, { title: e.target.value })}
-                              placeholder="Title"
-                              className="col-span-5 h-7 px-1 text-[10px]"
-                            />
-                            <Input
-                              type="text"
-                              value={ref.page || ''}
-                              onChange={(e) => updateStructuredRef(row.lesson_sequence, idx, { page: e.target.value })}
-                              placeholder="Page (optional)"
-                              className="col-span-3 h-7 px-1 text-[10px]"
-                            />
-                          </div>
-                        ))}
+                        <p className="mb-1 text-[11px] font-medium text-muted-foreground">
+                          References (teacher-entered, one per line)
+                        </p>
+                        <MultilineListField
+                          id={`references-${row.lesson_sequence}`}
+                          ariaLabel="References for this lesson"
+                          value={(row.structured_references || [])
+                            .map((ref: any) => ref.title || '')
+                            .filter(Boolean)}
+                          onChange={(entries) => updateLessonReviewRow(row.lesson_sequence, {
+                            structured_references: entries.map((entry) => ({
+                              type: 'Other', title: entry, page: '',
+                            })),
+                          })}
+                          placeholder="e.g. Computing curriculum page 16"
+                        />
                       </div>
                       )}
                     </div>
@@ -2505,40 +2417,14 @@ export default function GeneratePage() {
 
               {!jobId ? (
                 <>
-                  {/* Generation experience (Pattern 7). Quick Generate remains
-                      the default; Build with me is opt-in and never asks the
-                      teacher ten questions before delivering a lesson. */}
-                  <div data-generate-mode className="mt-3 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Generation mode">
-                    {([
-                      { key: 'quick', label: 'Quick Generate' },
-                      { key: 'guided', label: 'Build with me' },
-                    ] as const).map((m) => {
-                      const active = genMode === m.key
-                      return (
-                        <button
-                          key={m.key}
-                          type="button"
-                          role="radio"
-                          aria-checked={active}
-                          onClick={() => {
-                            setGenMode(m.key)
-                            try { window.localStorage.setItem('schemeknit.gen_mode', m.key) } catch { /* ignore */ }
-                          }}
-                          className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                            active
-                              ? 'border-[#102A43] bg-[#102A43] text-white'
-                              : 'border-slate-200 bg-white text-[#102A43] hover:bg-slate-50'
-                          }`}
-                        >
-                          {m.label}
-                        </button>
-                      )
-                    })}
-                  </div>
-                  <p className="mt-1 text-center text-xs text-muted-foreground">
-                    {genMode === 'guided'
-                      ? 'Build with me — review one section at a time after generating.'
-                      : 'Quick Generate — one complete draft from your scheme.'}
+                  {/* ONE primary generation action (Part D): no competing
+                      generation choices. The selected method and quota are
+                      stated here; the button below is the single way to
+                      generate. */}
+                  <p className="mt-3 text-sm text-muted-foreground" data-generation-method-summary>
+                    {config.generation_method === 'zeli'
+                      ? 'Generate with Zeli — Zeli writes each complete lesson plan.'
+                      : 'Standard — deterministic lesson plans from your scheme.'}
                   </p>
 
                   {/* Free Tier allowance (PART C) — the exact line phase17
@@ -2661,10 +2547,6 @@ export default function GeneratePage() {
                   <Button onClick={() => handleExport('pdf')} disabled={exporting === 'pdf'} className="w-full" variant="outline">
                     <Download className="mr-2 h-4 w-4" />
                     {exporting === 'pdf' ? 'Exporting...' : 'Download PDF'}
-                  </Button>
-                  <Button onClick={() => handleExport('xlsx')} disabled={exporting === 'xlsx'} className="w-full" variant="outline">
-                    <FileSpreadsheet className="mr-2 h-4 w-4" />
-                    {exporting === 'xlsx' ? 'Exporting...' : 'Download Register (XLSX)'}
                   </Button>
                   <Button onClick={() => handleExport('zip')} disabled={exporting === 'zip'} className="w-full" variant="outline">
                     <FileArchive className="mr-2 h-4 w-4" />

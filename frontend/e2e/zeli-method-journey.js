@@ -156,7 +156,7 @@ async function configure(page, onGenerate) {
   }
   await page.waitForLoadState('networkidle').catch(() => {})
   await page.waitForLoadState('networkidle').catch(() => {})
-  await page.locator('#cfg-ai-mode').waitFor({ timeout: 30000 })
+  await page.locator('[data-generation-method="standard"]').waitFor({ timeout: 30000 })
   await page.locator('#cfg-term-start').fill('2026-09-14')
   await page.locator('#cfg-term-end').fill('2026-09-25')
   await page.locator('#cfg-lessons-per-week').fill('1')
@@ -210,8 +210,8 @@ async function configure(page, onGenerate) {
     }
     log((await zeliButton.getAttribute('aria-pressed')) === 'true',
       'the Zeli method is the selected choice')
-    log(await page.locator('#cfg-ai-mode').isDisabled(),
-      'AI Mode (OFF/BASIC/ENHANCED) is disabled while Zeli is selected')
+    log((await page.locator('#cfg-ai-mode').count()) === 0,
+      'no AI Mode selector is shown for the Zeli method')
 
     const setupBody = await page.locator('body').innerText()
     log(/Zeli is ready/i.test(setupBody),
@@ -278,13 +278,8 @@ async function configure(page, onGenerate) {
       'the Zeli choice persists across a reload')
     await page.locator('[data-generation-method="standard"]').click()
     await page.waitForTimeout(500)
-    log(!(await page.locator('#cfg-ai-mode').isDisabled()),
-      'choosing Standard re-enables OFF/BASIC/ENHANCED')
-    const options = await page.locator('#cfg-ai-mode option').allInnerTexts()
-    log(options.some((o) => /^OFF/.test(o.trim()))
-      && options.some((o) => /^BASIC/.test(o.trim()))
-      && options.some((o) => /^ENHANCED/.test(o.trim())),
-      'existing OFF / BASIC / ENHANCED options are intact', options.join(' | '))
+    log((await page.locator('#cfg-ai-mode').count()) === 0,
+      'Standard has no teacher-facing AI Mode selector either')
     await shot(page, '03-standard-restored.png')
   } catch (err) {
     log(false, 'journey threw', err && err.message ? err.message : String(err))

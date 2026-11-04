@@ -285,11 +285,24 @@ export function normalizeError(error: unknown): NormalizedError {
         showBanner: true,
       }
     }
-    return { ...base, category: 'server', message: FRIENDLY_MESSAGES.server, canRetry: true, showBanner: true }
   }
 
-  if (status >= 500) {
-    return { ...base, category: 'server', message: FRIENDLY_MESSAGES.server, canRetry: true, showBanner: false }
+  if (status === 503 || status >= 500) {
+    // A controlled server message (quality gate refused the batch, PDF
+    // converter missing, licence problem) is safe and actionable. Only fall
+    // back to the generic line when the server sent nothing usable or the
+    // text looks like an internal stack trace.
+    const detail = safeDetail(api) || safeDetail(body?.detail)
+    const message = detail && !INTERNAL_MARKERS.test(detail)
+      ? detail
+      : FRIENDLY_MESSAGES.server
+    return {
+      ...base,
+      category: 'server',
+      message,
+      canRetry: true,
+      showBanner: status === 503,
+    }
   }
 
   const detail = safeDetail(error)

@@ -797,10 +797,6 @@ class ApiService {
     document.body.removeChild(a)
   }
 
-  async exportXlsx(jobId: string) {
-    return this.exportBlob(`${this.baseUrl}/api/generation/${jobId}/export/xlsx`)
-  }
-
   async exportZip(jobId: string, templateType: string = 'GES-style', templateId?: string) {
     const params = new URLSearchParams({ template_type: templateType })
     // Without this the ZIP silently fell back to the built-in template while the
