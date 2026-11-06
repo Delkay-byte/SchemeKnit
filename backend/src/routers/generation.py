@@ -1892,7 +1892,7 @@ def _generate_lesson_plans(
             # review state — never a stale in-memory copy.
             drafts = data_service.get_lesson_review_drafts(db, scheme_id, user.id) or {}
             for lp in job._lesson_plans:
-                _apply_lesson_review_draft(lp, drafts)
+                _apply_lesson_review_draft(lp, drafts, config)
                 _ensure_resources_used(lp)
 
             # ── Priority 4: the deterministic quality gate ────────────────
@@ -3709,7 +3709,7 @@ def _validate_resources(lp) -> list:
     return problems
 
 
-def _apply_lesson_review_draft(lp, drafts: dict) -> None:
+def _apply_lesson_review_draft(lp, drafts: dict, config=None) -> None:
     """Apply teacher-saved pre-generation review fields onto a built lesson.
 
     The four editable review fields plus the four WAPEF teacher-selected
@@ -3795,6 +3795,20 @@ def _apply_lesson_review_draft(lp, drafts: dict) -> None:
                 labels.append(label)
         if labels:
             lp.references = labels
+    # The CURRENT per-lesson configuration selection is the authority. A legacy
+    # review draft may still carry an older competency list; it must never
+    # override what the teacher selected in the configuration dialog.
+    if config is not None:
+        occurrence_key = (
+            getattr(lp, "source_occurrence_id", "")
+            or f"week{getattr(lp, 'week_number', 0)}:0:"
+               f"{(lp.indicator_codes[0] if lp.indicator_codes else '')}"
+        )
+        active = (getattr(config, "competency_selections", None) or {}).get(
+            occurrence_key)
+        if active:
+            from ..curriculum.competencies import normalize_competencies
+            lp.core_competencies = normalize_competencies(active)
 
 
 #: Lesson fields the allocation loop (not the builder) assigns, which a rebuilt
@@ -3929,7 +3943,7 @@ def _run_quality_gate(job, config, scheme_id, drafts, allow_rebuild: bool = True
                 # re-applies the teacher's saved review/WAPEF selections.
                 for field_name in _REBUILD_METADATA_FIELDS:
                     setattr(rebuilt, field_name, getattr(lp, field_name))
-                _apply_lesson_review_draft(rebuilt, drafts)
+                _apply_lesson_review_draft(rebuilt, drafts, config)
                 _ensure_resources_used(rebuilt)
                 rebuilt_outcome = evaluate(
                     rebuilt, build_entry(ctx.alloc, rebuilt),
