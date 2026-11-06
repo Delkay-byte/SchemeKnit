@@ -1166,6 +1166,44 @@ class UserLicenseDB(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class PurchaseEntitlementDB(Base):
+    """One purchased entitlement, with its own lifecycle.
+
+    A flexible credit pack and a time-limited package are separate commercial
+    products and must never share an expiry. Each verified transaction owns one
+    row keyed by its payment reference:
+
+    * ``kind='flexible'`` — ``expires_at`` is NULL; the pack stays valid while
+      its credit bucket remains.
+    * ``kind='timed'`` — ``expires_at`` is the package period end. Expiring it
+      never changes a flexible pack or an unrelated credit bucket.
+
+    ``UserLicenseDB`` remains the internal, single-per-account licence mirror
+    for compatibility/admin. Fulfilment and access decisions are keyed by
+    ``reference`` here, so one expired product cannot make another purchase
+    look unfulfilled.
+    """
+    __tablename__ = "purchase_entitlements"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    reference = Column(String, unique=True, nullable=False, index=True)
+    plan_id = Column(String, ForeignKey("subscription_plans.id"), nullable=True)
+    package_slug = Column(String, default="")
+    package_name = Column(String, default="")
+    kind = Column(String, default="timed", nullable=False)  # flexible|timed
+    status = Column(String, default="active", nullable=False)  # active|expired|revoked
+    starts_at = Column(DateTime, nullable=True)
+    expires_at = Column(DateTime, nullable=True)  # NULL for flexible packs
+    licence_id = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_purchase_entitlement_user_status", "user_id", "status"),
+    )
+
+
 class CreditBalanceDB(Base):
     """One auditable credit bucket for a user.
 

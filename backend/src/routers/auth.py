@@ -1166,7 +1166,9 @@ async def get_my_plan(
     """
     from ..entitlements import resolve_entitlement
     from .. import credits
-    from ..database import SubscriptionTransactionDB, SubscriptionPlanDB
+    from ..database import (
+        CreditBalanceDB, SubscriptionPlanDB, SubscriptionTransactionDB,
+    )
     resolved = resolve_entitlement(db, user)
     resolved["credits"] = credits.status(db, user.id)
     latest = (db.query(SubscriptionTransactionDB)
@@ -1174,33 +1176,62 @@ async def get_my_plan(
                       SubscriptionTransactionDB.status == "success")
               .order_by(SubscriptionTransactionDB.paid_at.desc())
               .first())
+    # Prefer an entitlement that is actually still live. A timed package that
+    # expired must not hide a flexible credit pack the teacher still owns.
+    from .. import paystack
+    live = paystack.active_purchase_entitlements(db, user.id)
+    if live:
+        live_reference = live[0].reference
+        live_tx = (db.query(SubscriptionTransactionDB)
+                   .filter(SubscriptionTransactionDB.user_id == user.id,
+                           SubscriptionTransactionDB.reference == live_reference)
+                   .first())
+        if live_tx is not None:
+            latest = live_tx
     if latest is not None:
         plan = db.query(SubscriptionPlanDB).filter(
             SubscriptionPlanDB.id == latest.plan_id).first()
-        balance = next(
-            (p for p in resolved["credits"].get("purchased_packages", [])
-             if p.get("reference") == latest.reference),
-            None)
         # The purchase snapshot is authoritative: a later catalogue edit must
         # not relabel what the teacher already bought.
         details = (latest.payment_details
                    if isinstance(latest.payment_details, dict) else {})
         snapshot = (details.get("package_snapshot")
                     if isinstance(details.get("package_snapshot"), dict) else {})
-        from .. import paystack
         fulfilment = paystack.fulfilment_state(db, latest)
+        purchase_ent = paystack.purchase_entitlement(db, latest.reference)
+        kind = (purchase_ent.kind if purchase_ent is not None else
+                snapshot.get("package_kind")
+                or (getattr(plan, "package_kind", "") if plan else ""))
+        expires_at = (purchase_ent.expires_at
+                      if purchase_ent is not None else None)
+        if kind == "flexible":
+            expires_at = None
+        granted = 0
+        remaining = 0
+        used = 0
+        if purchase_ent is not None:
+            grant = db.query(CreditBalanceDB).filter(
+                CreditBalanceDB.grant_key == f"package:{latest.reference}").first()
+            if grant is not None:
+                granted = int(grant.credits_granted or 0)
+                remaining = int(grant.credits_remaining or 0)
+                used = max(granted - remaining, 0)
         resolved["active_package"] = {
             "slug": snapshot.get("slug") or (plan.slug if plan else ""),
             "name": snapshot.get("name") or (plan.name if plan else ""),
-            "kind": (snapshot.get("package_kind")
-                     or (getattr(plan, "package_kind", "") if plan else "")),
-            "credits_granted": int(balance["granted"]) if balance else 0,
-            "credits_remaining": int(balance["remaining"]) if balance else 0,
+            "kind": kind,
+            "credits_granted": granted,
+            "credits_used": used,
+            "credits_remaining": remaining,
             "paid_at": latest.paid_at.isoformat() if latest.paid_at else None,
             "amount_pesewas": int(latest.amount_pesewas or 0),
             "payment_method": latest.payment_method or "",
             "channel": latest.channel or "",
             "fulfilment_status": fulfilment,
+            "entitlement_status": (
+                purchase_ent.status if purchase_ent is not None else
+                ("active" if fulfilment == "activated" else fulfilment)),
+            "expires_at": expires_at.isoformat() if expires_at else None,
             "reference": latest.reference,
         }
     else:

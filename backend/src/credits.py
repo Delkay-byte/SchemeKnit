@@ -106,17 +106,24 @@ def status(db: Session, user_id: str) -> Dict[str, Any]:
             packages.append({
                 "slug": b.package_slug,
                 "label": b.label,
+                "kind": "timed",
+                "granted": int(b.credits_granted),
+                "used": max(int(b.credits_granted)
+                            - int(b.credits_remaining), 0),
                 "remaining": int(b.credits_remaining),
                 "expires_at": b.expires_at.isoformat() if b.expires_at else None,
-                "granted": int(b.credits_granted),
             })
         elif b.source == SOURCE_PURCHASED:
             purchased_packages.append({
                 "slug": b.package_slug,
                 "label": b.label,
+                "kind": "flexible",
                 "remaining": int(b.credits_remaining),
                 "granted": int(b.credits_granted),
+                "used": max(int(b.credits_granted)
+                            - int(b.credits_remaining), 0),
                 "granted_at": b.granted_at.isoformat() if b.granted_at else None,
+                "expires_at": None,
                 "reference": b.reference,
             })
 

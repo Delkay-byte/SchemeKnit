@@ -7,7 +7,7 @@ attempt is recorded on the transaction so a retry can see what remains unsent.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
 from sqlalchemy.orm import Session
@@ -54,8 +54,14 @@ def _mark(notifications: Dict[str, Any], channel: str, result: Any,
 def notify_purchase(db: Session, tx: SubscriptionTransactionDB, user: User,
                     plan: SubscriptionPlanDB,
                     sub: Optional[UserSubscriptionDB],
-                    lic: Optional[UserLicenseDB]) -> Dict[str, Any]:
-    """Send each missing notification once; record every attempt."""
+                    lic: Optional[UserLicenseDB],
+                    only_channels: Optional[set] = None) -> Dict[str, Any]:
+    """Send each missing notification once; record every attempt.
+
+    ``only_channels`` limits a background retry to the channels that are
+    actually due (backoff respected); a direct webhook/verify call leaves it
+    unset and sends every missing channel immediately.
+    """
     from .email_service import get_email
 
     notifications = _notifications(tx.payment_details)
@@ -75,7 +81,8 @@ def notify_purchase(db: Session, tx: SubscriptionTransactionDB, user: User,
     # Owner notification: every successful paid transaction, with the honest
     # fulfilment state. Persistent visibility also lives on the admin page.
     owner = notifications.get("owner") or {}
-    if owner.get("status") != "sent":
+    if owner.get("status") != "sent" and (
+            only_channels is None or "owner" in only_channels):
         from .config import get_settings
         to = (getattr(get_settings(), "OWNER_ALERT_EMAIL", "") or "").strip()
         if to:
@@ -107,7 +114,8 @@ def notify_purchase(db: Session, tx: SubscriptionTransactionDB, user: User,
     # Customer notification: only describe activation as complete when the
     # licence and credits really exist.
     customer = notifications.get("customer") or {}
-    if customer.get("status") != "sent":
+    if customer.get("status") != "sent" and (
+            only_channels is None or "customer" in only_channels):
         from . import credits as credit_service
 
         credit_status = credit_service.status(db, user.id)
@@ -142,32 +150,94 @@ def notify_purchase(db: Session, tx: SubscriptionTransactionDB, user: User,
     return notifications
 
 
-def retry_pending(db: Session, limit: int = 20) -> int:
-    """Retry failed/missing notifications for recent successful purchases."""
-    rows = (db.query(SubscriptionTransactionDB)
-            .filter(SubscriptionTransactionDB.status == "success")
-            .order_by(SubscriptionTransactionDB.created_at.desc())
-            .limit(max(1, min(int(limit), 100))).all())
+#: A notification is attempted at most this many times automatically. Failed
+#: records are retained (status stays "failed") for authorised manual recovery.
+MAX_NOTIFICATION_ATTEMPTS = 8
+#: Base delay for exponential backoff between automatic attempts.
+NOTIFICATION_BACKOFF_SECONDS = 60
+
+
+def _parse_attempted_at(entry: Dict[str, Any]) -> Optional[datetime]:
+    raw = entry.get("attempted_at")
+    if not raw:
+        return None
+    try:
+        return datetime.fromisoformat(str(raw).replace("Z", "+00:00")).replace(
+            tzinfo=None)
+    except ValueError:
+        return None
+
+
+def notification_due(entry: Dict[str, Any], now: Optional[datetime] = None) -> bool:
+    """True when an unsent notification may be attempted automatically.
+
+    Respects the per-channel retry limit and exponential backoff. A record
+    already marked ``sent`` or ``not_configured`` is never due.
+    """
+    if entry.get("status") in ("sent", "not_configured"):
+        return False
+    attempts = int(entry.get("attempts") or 0)
+    if attempts >= MAX_NOTIFICATION_ATTEMPTS:
+        return False
+    last = _parse_attempted_at(entry)
+    if last is None:
+        return True
+    now = now or datetime.utcnow()
+    delay = NOTIFICATION_BACKOFF_SECONDS * (2 ** max(attempts - 1, 0))
+    return now - last >= timedelta(seconds=min(delay, 3600))
+
+
+def retry_pending(db: Session, batch_size: int = 100,
+                  max_batches: int = 100) -> int:
+    """Recover failed/missing notifications for ALL successful purchases.
+
+    Uses stable keyset pagination (``created_at`` + ``id``) in bounded batches,
+    so an old notification gap outside the most recent 20 records is still
+    found after a restart. The per-transaction state remains the idempotency
+    key per channel: a delivered notification is never resent.
+    """
+    batch_size = max(1, min(int(batch_size or 100), 500))
+    max_batches = max(1, min(int(max_batches or 100), 1000))
     retried = 0
-    for tx in rows:
-        details = tx.payment_details or {}
-        notes = _notifications(details)
-        if all((notes.get(ch) or {}).get("status") in ("sent", "not_configured")
-               for ch in ("customer", "owner")):
-            continue
-        user = db.query(User).filter(User.id == tx.user_id).first()
-        plan = db.query(SubscriptionPlanDB).filter(
-            SubscriptionPlanDB.id == tx.plan_id).first()
-        if user is None or plan is None:
-            continue
-        sub = db.query(UserSubscriptionDB).filter(
-            UserSubscriptionDB.user_id == user.id).first()
-        lic = db.query(UserLicenseDB).filter(
-            UserLicenseDB.user_id == user.id).first()
-        try:
-            notify_purchase(db, tx, user, plan, sub, lic)
-            retried += 1
-        except Exception as exc:
-            log_error("purchase_notification_retry_failed",
-                      reference=tx.reference, error=type(exc).__name__)
+    cursor_id = ""
+
+    for _ in range(max_batches):
+        query = db.query(SubscriptionTransactionDB).filter(
+            SubscriptionTransactionDB.status == "success")
+        if cursor_id:
+            query = query.filter(SubscriptionTransactionDB.id > cursor_id)
+        rows = (query.order_by(
+            SubscriptionTransactionDB.id.asc(),
+        ).limit(batch_size).all())
+        if not rows:
+            break
+        cursor_id = rows[-1].id
+
+        now = datetime.utcnow()
+        for tx in rows:
+            notes = _notifications(tx.payment_details)
+            due = {
+                channel for channel in ("customer", "owner")
+                if notification_due(notes.get(channel) or {}, now)
+            }
+            if not due:
+                continue
+            user = db.query(User).filter(User.id == tx.user_id).first()
+            plan = db.query(SubscriptionPlanDB).filter(
+                SubscriptionPlanDB.id == tx.plan_id).first()
+            if user is None or plan is None:
+                continue
+            sub = db.query(UserSubscriptionDB).filter(
+                UserSubscriptionDB.user_id == user.id).first()
+            lic = db.query(UserLicenseDB).filter(
+                UserLicenseDB.user_id == user.id).first()
+            try:
+                notify_purchase(db, tx, user, plan, sub, lic,
+                                only_channels=due)
+                retried += 1
+            except Exception as exc:
+                log_error("purchase_notification_retry_failed",
+                          reference=tx.reference, error=type(exc).__name__)
+        if len(rows) < batch_size:
+            break
     return retried

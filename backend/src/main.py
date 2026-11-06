@@ -81,7 +81,7 @@ async def _webhook_recovery_loop() -> None:
                 db = SessionLocal()
                 try:
                     counts = sweep_once(db)
-                    counts["notifications_retried"] = retry_pending(db, limit=20)
+                    counts["notifications_retried"] = retry_pending(db)
                     return counts
                 finally:
                     db.close()

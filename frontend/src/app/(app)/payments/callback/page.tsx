@@ -160,6 +160,12 @@ export default function PaymentCallbackPage() {
               an OTP alone does not complete the purchase.
             </p>
           )}
+          {phase === 'payment_failed' && (
+            <p className="mt-3 text-sm text-muted-foreground">
+              This payment did not complete. No credits were issued. You can start
+              a new purchase from the package page.
+            </p>
+          )}
 
           <div className="mt-6 flex flex-wrap gap-3">
             {(phase === 'payment_pending' || phase === 'processing' ||

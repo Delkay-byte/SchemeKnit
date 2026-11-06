@@ -863,8 +863,28 @@ async def reconcile_paystack_purchase(
             detail="A reversed/refunded payment cannot be activated.",
         )
     before = paystack.purchase_payload(db, tx)
-    verified = paystack.verify(reference)
     account = db.query(User).filter(User.id == tx.user_id).first()
+    try:
+        verified = paystack.verify(reference)
+    except paystack.PaystackError as exc:
+        # A provider outage must never surface as an unhandled 500, and no
+        # local state may change because verification did not succeed.
+        from ..logging_config import log_error
+        log_error(
+            "paystack_reconcile_verification_unavailable",
+            reference=reference,
+            provider_status=exc.status_code,
+            error_type=type(exc).__name__,
+        )
+        provider_unavailable = exc.status_code in (429, 502, 503, 504)
+        raise HTTPException(
+            status_code=502 if provider_unavailable else exc.status_code,
+            detail=(
+                "Paystack verification is temporarily unavailable. "
+                "No entitlement was changed. Try again shortly. "
+                f"Reference: {reference}"
+            ) if provider_unavailable else exc.message,
+        )
     try:
         paystack._validate_verified_payment(tx, verified, account)
     except paystack.PaystackError as exc:

@@ -360,8 +360,13 @@ export default function Dashboard() {
                     </h2>
                     <p className="mt-1 text-sm text-slate-600">
                       {plan.active_package.kind === 'flexible'
-                        ? 'Credit pack — credits never expire'
+                        ? 'Flexible credit pack — credits never expire'
                         : 'Time-limited package'}
+                      {plan.active_package.kind === 'flexible'
+                        ? ''
+                        : plan.active_package.expires_at
+                          ? ` · valid until ${new Date(plan.active_package.expires_at).toLocaleDateString()}`
+                          : ''}
                       {plan.active_package.paid_at
                         ? ` · purchased ${new Date(plan.active_package.paid_at).toLocaleDateString()}`
                         : ''}
@@ -379,10 +384,14 @@ export default function Dashboard() {
                         : 'Activation pending'}
                   </span>
                 </div>
-                <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+                <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
                   <div>
                     <p className="text-xs uppercase text-slate-500">Credits added</p>
                     <p className="text-xl font-bold text-[#102A43]">{plan.active_package.credits_granted ?? 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase text-slate-500">Used</p>
+                    <p className="text-xl font-bold text-[#102A43]">{plan.active_package.credits_used ?? 0}</p>
                   </div>
                   <div>
                     <p className="text-xs uppercase text-slate-500">Remaining</p>

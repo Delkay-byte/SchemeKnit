@@ -895,6 +895,71 @@ class TestAdminPurchaseVisibility:
         assert row["credits_granted"] == 20
         assert "customer" in row["notifications"]
 
+    def test_admin_reconcile_provider_outage_returns_502_without_mutation(
+            self, db, monkeypatch):
+        import asyncio
+        from fastapi import HTTPException
+        from src.routers import platform_admin as admin_router
+
+        user, ref = TestFulfilmentRecovery()._successful_flexible(db, monkeypatch)
+        admin = make_user(db, role="platform_admin")
+        before_credits = credits.status(db, user.id)["purchased"]
+        from src.database import PlatformAuditLogDB
+        before_audit = db.query(PlatformAuditLogDB).count()
+
+        def unavailable(_reference):
+            raise paystack.PaystackError("Paystack could not be reached.", 504)
+
+        monkeypatch.setattr(paystack, "verify", unavailable)
+        with pytest.raises(HTTPException) as exc:
+            asyncio.run(admin_router.reconcile_paystack_purchase(
+                ref, admin_router.ReconcilePurchaseRequest(
+                    reason="Provider outage must not change local state"),
+                user=admin, db=db))
+        assert exc.value.status_code == 502
+        assert ref in exc.value.detail
+        assert "No entitlement was changed" in exc.value.detail
+        db.expire_all()
+        assert credits.status(db, user.id)["purchased"] == before_credits
+        assert db.query(PlatformAuditLogDB).count() == before_audit
+
+    def test_admin_reconcile_unknown_reference_is_404(self, db, monkeypatch):
+        import asyncio
+        from fastapi import HTTPException
+        from src.routers import platform_admin as admin_router
+
+        admin = make_user(db, role="platform_admin")
+        with pytest.raises(HTTPException) as exc:
+            asyncio.run(admin_router.reconcile_paystack_purchase(
+                "TFM-does-not-exist", admin_router.ReconcilePurchaseRequest(
+                    reason="Unknown reference should be a controlled 404"),
+                user=admin, db=db))
+        assert exc.value.status_code == 404
+
+    def test_admin_reconcile_amount_mismatch_is_400_and_unchanged(
+            self, db, monkeypatch):
+        import asyncio
+        from fastapi import HTTPException
+        from src.routers import platform_admin as admin_router
+
+        user, ref = TestFulfilmentRecovery()._successful_flexible(db, monkeypatch)
+        admin = make_user(db, role="platform_admin")
+        before = credits.status(db, user.id)["purchased"]
+        monkeypatch.setattr(paystack, "verify", lambda reference: {
+            "status": "success", "amount": 999, "currency": "GHS",
+            "reference": reference, "channel": "bank_transfer",
+            "customer": {"email": user.email},
+        })
+        with pytest.raises(HTTPException) as exc:
+            asyncio.run(admin_router.reconcile_paystack_purchase(
+                ref, admin_router.ReconcilePurchaseRequest(
+                    reason="Amount mismatch must be refused"),
+                user=admin, db=db))
+        assert exc.value.status_code == 400
+        assert "amount" in exc.value.detail.lower()
+        db.expire_all()
+        assert credits.status(db, user.id)["purchased"] == before
+
     def test_admin_reconcile_repairs_once_and_is_auditable(self, db, monkeypatch):
         import asyncio
         from src.routers import platform_admin as admin_router

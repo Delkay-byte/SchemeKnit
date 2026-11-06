@@ -81,6 +81,24 @@ def main(argv=None) -> int:
         before = _summary(db, tx)
         print("BEFORE", before)
         if not args.apply:
+            # Read-only provider check: proves the live payment status without
+            # changing local state or creating a charge.
+            try:
+                provider = paystack.verify(args.reference)
+                print("PROVIDER", {
+                    "status": provider.get("status"),
+                    "reference": provider.get("reference"),
+                    "amount_pesewas": provider.get("amount"),
+                    "currency": provider.get("currency"),
+                    "channel": provider.get("channel"),
+                    "paid_at": provider.get("paid_at"),
+                    "transaction_id": provider.get("id"),
+                })
+            except paystack.PaystackError as exc:
+                print(
+                    "PROVIDER unavailable (provider status "
+                    f"{exc.status_code}); local state is unchanged."
+                )
             print("READ-ONLY. Re-run with --apply --confirm <reference> to reconcile.")
             return 0
         if args.confirm != args.reference:
@@ -93,7 +111,15 @@ def main(argv=None) -> int:
             print("ERROR: reversed/refunded payment cannot be activated")
             return 2
 
-        verified = paystack.verify(args.reference)  # server-side, live status
+        try:
+            verified = paystack.verify(args.reference)  # server-side, live status
+        except paystack.PaystackError as exc:
+            print(
+                "ERROR: Paystack verification is unavailable (provider status "
+                f"{exc.status_code}). No entitlement was changed. "
+                f"Reference: {args.reference}"
+            )
+            return 2
         user = db.query(User).filter(User.id == tx.user_id).first()
         try:
             paystack._validate_verified_payment(tx, verified, user)

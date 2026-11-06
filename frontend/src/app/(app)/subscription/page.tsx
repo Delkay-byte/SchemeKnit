@@ -231,7 +231,10 @@ export default function SubscriptionPage() {
               <SurfaceCard className="px-6 py-6" data-licence-status={data.licence.status}>
                 <h2 className="text-lg font-semibold text-[#102A43]">Licence</h2>
                 <p className="mt-1 text-sm">
-                  Status: {data.licence.status} · Valid until {fmtDate(data.licence.expires_at)}
+                  Status: {data.licence.status}
+                  {data.licence.expires_at
+                    ? ` · Valid until ${fmtDate(data.licence.expires_at)}`
+                    : ' · No expiry on your flexible credit pack'}
                 </p>
                 <p className="mt-2 text-sm text-green-700">
                   Your licence is activated automatically on this account. No key
