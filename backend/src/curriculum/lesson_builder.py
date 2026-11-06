@@ -3133,13 +3133,23 @@ def build_lesson(
     # every lesson. Teacher multi-select is authoritative once set on the
     # lesson review object; the generator never re-forces a removed value.
     competencies: List[str] = []
-    comp_sources = list(getattr(config, "core_competencies", []) or [])
-    if exemplar and exemplar.core_competencies:
-        # The competencies the official curriculum attaches to THIS indicator
-        # (PART 1) rather than the activity-type default.
-        comp_sources.extend(exemplar.core_competencies)
+    selected_competencies = normalize_text_items(
+        (getattr(config, "competency_selections", None) or {}).get(
+            occurrence_key, [])
+    )
+    if selected_competencies:
+        # The teacher's explicit per-lesson selection is authoritative: the
+        # generated plan shows exactly those approved competencies, in the
+        # order selected. No inferred competency is added alongside them.
+        comp_sources = list(selected_competencies)
     else:
-        comp_sources.extend(_COMPETENCIES_BY_ACTIVITY.get(bank_key, []))
+        comp_sources = list(getattr(config, "core_competencies", []) or [])
+        if exemplar and exemplar.core_competencies:
+            # The competencies the official curriculum attaches to THIS indicator
+            # (PART 1) rather than the activity-type default.
+            comp_sources.extend(exemplar.core_competencies)
+        else:
+            comp_sources.extend(_COMPETENCIES_BY_ACTIVITY.get(bank_key, []))
     for c in comp_sources:
         c = (c or "").strip()
         if c and c.lower() not in [x.lower() for x in competencies]:

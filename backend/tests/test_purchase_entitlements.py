@@ -108,6 +108,44 @@ def test_flexible_pack_has_no_expiry_and_grants_credits(db):
     assert paystack.fulfilment_state(db, tx) == "activated"
 
 
+def test_dashboard_exposes_activated_licences_with_canonical_names_and_credits(db):
+    """Platform Admin sees the authoritative entitlement, not just payment."""
+    from src.routers.platform_admin import platform_dashboard
+
+    admin = make_user(db, role="platform_admin")
+    user = make_user(db)
+
+    # A historical/local label must not leak into the admin display.
+    plan = db.query(SubscriptionPlanDB).filter_by(slug="teacher-monthly").one()
+    plan.name = "Kyerɛkyerɛni — Individual Teacher (Monthly)"
+    db.commit()
+
+    timed = _buy(db, user, "teacher-monthly", "TFM-dashboard-timed")
+    flexible = _buy(db, user, "flexible-credit-pack", "TFM-dashboard-flex")
+    dashboard = asyncio.run(platform_dashboard(user=admin, db=db))
+    rows = {row["reference"]: row for row in dashboard["recent_entitlements"]}
+
+    timed_row = rows[timed.reference]
+    assert timed_row["package_name"] == "Teacher Monthly"
+    assert timed_row["entitlement_status"] == "active"
+    assert timed_row["licence_status"] == "active"
+    assert timed_row["payment_status"] == "success"
+    assert timed_row["fulfilment_status"] == "activated"
+    assert timed_row["credits_granted"] == 40
+    assert timed_row["credits_remaining"] == 40
+    assert timed_row["credits_used"] == 0
+    assert timed_row["expires_at"] is not None
+
+    flex_row = rows[flexible.reference]
+    assert flex_row["package_name"] == "Flexible Credit Pack"
+    assert flex_row["kind"] == "flexible"
+    # A flexible pack has no expiry, even when a timed licence exists.
+    assert flex_row["expires_at"] is None
+    assert flex_row["credits_granted"] == 20
+    assert dashboard["entitlement_counts"]["active"] == 2
+    assert dashboard["capabilities"]["standard_generation"] is True
+
+
 def test_timed_package_has_its_own_expiry(db):
     user = make_user(db)
     tx = _buy(db, user, "teacher-monthly", "TFM-timed-only")

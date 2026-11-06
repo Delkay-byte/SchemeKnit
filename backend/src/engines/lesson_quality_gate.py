@@ -441,6 +441,13 @@ def _phase_duplication_failures(lp: LessonPlan) -> List[str]:
         if "PHASE 2" in (a.phase or "").upper()
         or not any(k in (a.phase or "").upper()
                    for k in ("STARTER", "PHASE 1", "PLENARY", "PHASE 3")))
+    main_rows = [
+        a for a in (getattr(lp, "main_activities", None) or [])
+        if (a.description or "").strip()
+        and ("PHASE 2" in (a.phase or "").upper()
+             or not any(k in (a.phase or "").upper()
+                        for k in ("STARTER", "PHASE 1", "PLENARY", "PHASE 3")))
+    ]
     plenary_text = " ".join([
         getattr(lp, "conclusion", "") or "",
     ])
@@ -479,6 +486,25 @@ def _phase_duplication_failures(lp: LessonPlan) -> List[str]:
             out.append("main_activity_repeated")
             break
         seen.add(key)
+    # A later main phase that OPENS by repeating an earlier main phase restarts
+    # the lesson instead of continuing it. Compare each phase's opening sentence
+    # against earlier phase text; repeated subject vocabulary later in a phase
+    # is legitimate and never treated as duplication.
+    if "main_activity_repeated" not in out:
+        earlier_sentences: List[str] = []
+        for row in main_rows:
+            row_sentences = _sentences(row.description or "")
+            if not row_sentences:
+                continue
+            opening = row_sentences[0]
+            if any(
+                _norm_sentence(opening) == _norm_sentence(previous)
+                or _overlap(opening, previous) >= 0.82
+                for previous in earlier_sentences
+            ):
+                out.append("main_phase_repeated")
+                break
+            earlier_sentences.extend(row_sentences)
     return out
 
 

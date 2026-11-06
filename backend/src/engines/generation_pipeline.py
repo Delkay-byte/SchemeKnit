@@ -432,14 +432,52 @@ class GenerationPipeline:
     ) -> List[Path]:
         return self.docx_engine.export_batch_custom(lesson_plans, structure, output_dir, context=context)
 
+    def _phase_repetition_score(self, lp: LessonPlan) -> float:
+        """How strongly a main-learning phase repeats an earlier phase.
+
+        Returns the highest token overlap (0..1) between a main-learning phase
+        and either the starter or an earlier main phase. Used as a content
+        check before accepting a provider lesson: a repeated opening means the
+        lesson is not progressing, so Zeli gets one bounded correction attempt.
+        """
+        import re
+
+        def tokens(text: str) -> set:
+            words = re.findall(r"[a-z0-9]+", (text or "").lower())
+            return {w for w in words if len(w) > 3}
+
+        def overlap(a: str, b: str) -> float:
+            ta, tb = tokens(a), tokens(b)
+            if not ta or not tb:
+                return 0.0
+            return len(ta & tb) / len(ta | tb)
+
+        starter = " ".join([
+            getattr(lp, "introduction", "") or "",
+            getattr(lp, "starter_activity", "") or "",
+        ]).strip()
+        earlier = [starter] if starter else []
+        scores = []
+        for row in list(getattr(lp, "main_activities", None) or []):
+            label = (getattr(row, "phase", "") or "").upper()
+            if any(k in label for k in ("STARTER", "PHASE 1", "PLENARY", "PHASE 3")):
+                continue
+            text = (getattr(row, "description", "") or "").strip()
+            if not text:
+                continue
+            for previous in earlier:
+                scores.append(overlap(text, previous))
+            earlier.append(text)
+        return max(scores) if scores else 0.0
+
     def _strip_cross_phase_repetition(self, lp: LessonPlan) -> None:
         """Remove copied Starter/Plenary content from Main Learning.
 
         Providers sometimes restate the opening move as the first main step
-        and repeat the exit check in the plenary. Every phase must have ONE
-        pedagogical purpose. This pass removes only text that duplicates
-        another phase's sentence (exact, or >= 0.85 token overlap); it never
-        rewrites or invents a teaching move.
+        and repeat that same move again in a later main phase. Every phase must
+        have ONE pedagogical purpose. This pass removes only text that
+        duplicates another phase's sentence (exact, or >= 0.85 token overlap);
+        it never rewrites or invents a teaching move.
         """
         import re
 
@@ -467,6 +505,8 @@ class GenerationPipeline:
         starter_norms = {norm(s) for s in sentences(starter)}
         closing_norms = {norm(s) for s in sentences(closing)}
         closing_has_exit = "exit check" in closing.lower()
+        #: Sentences already used by the starter or an earlier main phase.
+        prior_sentences = list(sentences(starter))
 
         def _keep(sentence: str) -> bool:
             key = norm(sentence)
@@ -476,11 +516,13 @@ class GenerationPipeline:
                 return False
             if closing_has_exit and "exit check" in sentence.lower():
                 return False
-            if any(overlap(sentence, s) >= 0.85 for s in sentences(starter)):
+            if any(norm(sentence) == norm(s) for s in prior_sentences):
+                return False
+            if any(overlap(sentence, s) >= 0.85 for s in prior_sentences):
                 return False
             return True
 
-        def _clean_rows(rows):
+        def _clean_rows(rows, *, remember_prior: bool = False):
             out = []
             for row in rows or []:
                 desc = (getattr(row, "description", "") or "").strip()
@@ -495,10 +537,13 @@ class GenerationPipeline:
                 if not kept:
                     continue
                 row.description = " ".join(kept)
+                if remember_prior:
+                    prior_sentences.extend(kept)
                 out.append(row)
             return out
 
-        cleaned_main = _clean_rows(getattr(lp, "main_activities", None))
+        cleaned_main = _clean_rows(
+            getattr(lp, "main_activities", None), remember_prior=True)
         # Never empty the main phase: if every row was a verbatim copy, keep
         # the first non-boundary row so the lesson still has a main body.
         if not cleaned_main and lp.main_activities:
@@ -509,6 +554,9 @@ class GenerationPipeline:
             ]
             cleaned_main = fallback[:1] or list(lp.main_activities)
         lp.main_activities = cleaned_main
+        # Teacher/learner columns legitimately mirror the main activity; only
+        # remove text copied from the starter or closing there.
+        prior_sentences = list(sentences(starter))
         lp.teacher_activities = _clean_rows(getattr(lp, "teacher_activities", None))
         lp.learner_activities = _clean_rows(getattr(lp, "learner_activities", None))
 
@@ -614,6 +662,18 @@ class GenerationPipeline:
 
         lp.main_activities = activities
 
+    def _record_zeli_meta(self, job: GenerationJob, meta: dict,
+                          primary_name: str, primary_model: str) -> None:
+        """Accumulate sanitized Zeli provider provenance on the job."""
+        job._zeli_attempts.extend(meta.get("attempts") or [])
+        if meta.get("fallback_used"):
+            job._zeli_fallback_used = True
+            job._zeli_primary_error = meta.get("primary_error")
+        if meta.get("external_calls"):
+            job._zeli_fresh_calls += 1
+        if meta.get("cache_hit"):
+            job._zeli_cache_hits += 1
+
     def _generate_with_zeli(
         self,
         lesson_plans: List[LessonPlan],
@@ -657,6 +717,10 @@ class GenerationPipeline:
         job._zeli_cache_hits = 0
 
         sorted_plans = sorted(lesson_plans, key=lambda lp: lp.lesson_sequence)
+        failed_ids: set = set()
+        failures: list = []
+        last_error: Optional[ZeliGenerationError] = None
+
         for idx, lp in enumerate(sorted_plans):
             if bool(getattr(lp, "special_period_label", "") or ""):
                 logger.info(
@@ -665,60 +729,147 @@ class GenerationPipeline:
                 )
                 continue
 
-            prev_context = None
-            next_context = None
-            if idx > 0:
-                prev_lp = sorted_plans[idx - 1]
-                prev_context = (
-                    f"Previous lesson: {prev_lp.strand} - {prev_lp.sub_strand}. "
-                    f"Indicator: {prev_lp.indicators[0] if prev_lp.indicators else 'N/A'}"
+            try:
+                prev_context = None
+                next_context = None
+                if idx > 0:
+                    prev_lp = sorted_plans[idx - 1]
+                    prev_context = (
+                        f"Previous lesson: {prev_lp.strand} - {prev_lp.sub_strand}. "
+                        f"Indicator: {prev_lp.indicators[0] if prev_lp.indicators else 'N/A'}"
+                    )
+                if idx < len(sorted_plans) - 1:
+                    next_lp = sorted_plans[idx + 1]
+                    next_context = (
+                        f"Next lesson: {next_lp.strand} - {next_lp.sub_strand}. "
+                        f"Indicator: {next_lp.indicators[0] if next_lp.indicators else 'N/A'}"
+                    )
+
+                context = zeli_lesson_context(
+                    lp, config,
+                    previous_lesson_context=prev_context,
+                    next_lesson_context=next_context,
                 )
-            if idx < len(sorted_plans) - 1:
-                next_lp = sorted_plans[idx + 1]
-                next_context = (
-                    f"Next lesson: {next_lp.strand} - {next_lp.sub_strand}. "
-                    f"Indicator: {next_lp.indicators[0] if next_lp.indicators else 'N/A'}"
+                job.ai_enrichment_total_attempted += 1
+
+                def _generate(ctx):
+                    return generate_zeli_with_fallback(
+                        primary=provider, fallback=fallback, context=ctx, db=db,
+                        user_id=getattr(job, "owner_id", None), request_id=job.id)
+
+                content, meta = _generate(context)
+                self._record_zeli_meta(job, meta, primary_name, primary_model)
+                provider_name = meta.get("provider") or primary_name
+                model = meta.get("model") or primary_model
+
+                # Apply the validated whole-lesson content. Curriculum fields
+                # and teacher-owned metadata are protected inside
+                # _apply_v2_content; whole_lesson=True lets the provider's own
+                # teaching moves, materials and prior knowledge replace the
+                # deterministic scaffold.
+                self._apply_v2_content(lp, content, config, whole_lesson=True)
+
+                # Content check: a provider phase that repeats the previous
+                # phase is not a lesson that progresses. Give the provider ONE
+                # bounded correction attempt before any mechanical clean-up.
+                if self._phase_repetition_score(lp) >= 0.75:
+                    revision_context = dict(context)
+                    revision_context["previous_lesson_context"] = (
+                        (prev_context or "")
+                        + "\nREVISION REQUIRED: The previous attempt repeated the "
+                          "starter or an earlier main-learning phase inside a "
+                          "later phase. Rewrite each phase so it begins from the "
+                          "outcome of the preceding phase, introduces a new "
+                          "learner action, and never restates a completed activity."
+                    )
+                    try:
+                        retry_content, retry_meta = _generate(revision_context)
+                        self._record_zeli_meta(
+                            job, retry_meta, primary_name, primary_model)
+                        provider_name = retry_meta.get("provider") or provider_name
+                        model = retry_meta.get("model") or model
+                        self._apply_v2_content(
+                            lp, retry_content, config, whole_lesson=True)
+                        content = retry_content
+                    except ZeliGenerationError:
+                        # Keep the original valid lesson and clean exact
+                        # duplication below; the quality gate remains the
+                        # final authority.
+                        pass
+
+                self._strip_cross_phase_repetition(lp)
+                self._complete_zeli_timeline(lp, content)
+
+                lp.ai_generated = True
+                lp.generation_method = "zeli"
+                lp.ai_provider = provider_name
+                lp.ai_model = model
+                job.ai_enrichment_succeeded += 1
+            except ZeliGenerationError as exc:
+                # One lesson's provider failure must not discard other lessons
+                # the teacher asked for. This occurrence stays pending and
+                # uncharged; the router reports it and supports a true retry.
+                last_error = exc
+                failed_ids.add(lp.id)
+                failures.append({
+                    "source_occurrence_id": getattr(lp, "source_occurrence_id", "") or "",
+                    "lesson_sequence": getattr(lp, "lesson_sequence", None),
+                    "indicator_code": (
+                        lp.indicator_codes[0] if lp.indicator_codes else ""),
+                    "category": (
+                        "provider_busy" if exc.status_code == 429
+                        else "provider_timeout" if exc.status_code == 504
+                        else "provider_unavailable" if exc.status_code == 503
+                        else "provider_content"
+                    ),
+                    "message": exc.message,
+                    "status_code": exc.status_code,
+                })
+                logger.warning(
+                    "Zeli lesson %s failed (status=%s); leaving it pending: %s",
+                    lp.id, exc.status_code, exc.message,
+                )
+            except Exception as exc:
+                last_error = ZeliGenerationError(
+                    "Zeli could not generate this lesson plan. No lesson plan "
+                    "was saved for it and no lesson-quota credit was used. "
+                    "Please retry it, or choose Standard generation.",
+                    502,
+                )
+                failed_ids.add(lp.id)
+                failures.append({
+                    "source_occurrence_id": getattr(lp, "source_occurrence_id", "") or "",
+                    "lesson_sequence": getattr(lp, "lesson_sequence", None),
+                    "indicator_code": (
+                        lp.indicator_codes[0] if lp.indicator_codes else ""),
+                    "category": "unexpected",
+                    "message": last_error.message,
+                    "status_code": last_error.status_code,
+                })
+                logger.error(
+                    "Unexpected Zeli lesson failure for %s: %s: %s",
+                    lp.id, type(exc).__name__, exc,
                 )
 
-            context = zeli_lesson_context(
-                lp, config,
-                previous_lesson_context=prev_context,
-                next_lesson_context=next_context,
+        if failed_ids:
+            job._generation_failures = failures
+            # Never persist a lesson the provider did not successfully write.
+            lesson_plans[:] = [
+                lp for lp in lesson_plans if lp.id not in failed_ids]
+        if failures and not job.ai_enrichment_succeeded:
+            # Nothing succeeded: the whole run is a failure, so no job is
+            # reported as complete and no quota is committed.
+            raise last_error or ZeliGenerationError(
+                "Zeli could not generate any lesson plan in this run. No "
+                "lesson plans were saved and no lesson-plan quota was used. "
+                "Please try again later, or choose Standard generation.",
+                503,
             )
-            job.ai_enrichment_total_attempted += 1
-
-            content, meta = generate_zeli_with_fallback(
-                primary=provider, fallback=fallback, context=context, db=db,
-                user_id=getattr(job, "owner_id", None), request_id=job.id)
-            job._zeli_attempts.extend(meta.get("attempts") or [])
-            if meta.get("fallback_used"):
-                job._zeli_fallback_used = True
-                job._zeli_primary_error = meta.get("primary_error")
-            if meta.get("external_calls"):
-                job._zeli_fresh_calls += 1
-            if meta.get("cache_hit"):
-                job._zeli_cache_hits += 1
-            provider_name = meta.get("provider") or primary_name
-            model = meta.get("model") or primary_model
-
-            # Apply the validated whole-lesson content. Curriculum fields and
-            # teacher-owned metadata are protected inside _apply_v2_content;
-            # whole_lesson=True lets the provider's own teaching moves,
-            # materials and prior knowledge replace the deterministic scaffold.
-            self._apply_v2_content(lp, content, config, whole_lesson=True)
-            self._strip_cross_phase_repetition(lp)
-            self._complete_zeli_timeline(lp, content)
-
-            lp.ai_generated = True
-            lp.generation_method = "zeli"
-            lp.ai_provider = provider_name
-            lp.ai_model = model
-            job.ai_enrichment_succeeded += 1
 
         logger.info(
-            "Zeli generated %d lesson(s) with provider=%s fallback_used=%s "
-            "for job %s",
-            job.ai_enrichment_succeeded, primary_name,
+            "Zeli generated %d lesson(s), %d pending, with provider=%s "
+            "fallback_used=%s for job %s",
+            job.ai_enrichment_succeeded, len(failures), primary_name,
             job._zeli_fallback_used, job.id,
         )
 

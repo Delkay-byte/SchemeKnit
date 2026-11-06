@@ -25,6 +25,7 @@ from ..database import (
     CreditBalanceDB,
 )
 from .. import credits, paystack, webhook_sweeper
+from .. import catalogue
 from ..logging_config import log_event, log_error
 
 router = APIRouter()
@@ -100,11 +101,13 @@ def _callback_url(request: Request) -> str:
 
 
 def _plan_payload(plan: SubscriptionPlanDB) -> dict:
+    from .. import catalogue
+
     kind = getattr(plan, "package_kind", "") or "timed"
     validity = getattr(plan, "credit_validity_days", None)
     return {
         "slug": plan.slug,
-        "name": plan.name,
+        "name": catalogue.display_name(plan.slug, plan.name),
         "description": plan.description,
         "price_pesewas": int(plan.price_pesewas),
         "price_ghs": int(plan.price_pesewas) / 100,
@@ -718,6 +721,27 @@ async def my_subscription(
             SubscriptionPlanDB.id == pending.plan_id).first()
     last_success = next(
         (t for t in history if t.status == "success"), None)
+    payment_rows = []
+    for t in history:
+        payment_plan = (db.query(SubscriptionPlanDB).filter(
+            SubscriptionPlanDB.id == t.plan_id).first() if t.plan_id else None)
+        payment_rows.append({
+            "reference": t.reference, "status": t.status,
+            "amount_pesewas": t.amount_pesewas,
+            "currency": t.currency,
+            "payment_method": t.payment_method,
+            "plan_id": t.plan_id,
+            "plan_name": (
+                catalogue.display_name(payment_plan.slug, payment_plan.name)
+                if payment_plan is not None else ""),
+            "created_at": t.created_at.isoformat() if t.created_at else None,
+            "paid_at": t.paid_at.isoformat() if t.paid_at else None,
+            "credits_granted": int(getattr(
+                db.query(CreditBalanceDB).filter(
+                    CreditBalanceDB.grant_key == f"package:{t.reference}").first(),
+                "credits_granted", 0) or 0),
+            "fulfilment_status": paystack.fulfilment_state(db, t),
+        })
     return {
         "subscription": _sub_payload(sub),
         "plan": _plan_payload(plan) if plan else None,
@@ -737,25 +761,7 @@ async def my_subscription(
             "plan": _plan_payload(pending_plan) if pending_plan else None,
             "created_at": pending.created_at.isoformat() if pending.created_at else None,
         } if pending is not None else None),
-        "payments": [
-            {"reference": t.reference, "status": t.status,
-             "amount_pesewas": t.amount_pesewas,
-             "currency": t.currency,
-             "payment_method": t.payment_method,
-             "plan_id": t.plan_id,
-             "plan_name": (
-                 (db.query(SubscriptionPlanDB).filter(
-                     SubscriptionPlanDB.id == t.plan_id).first()).name
-                 if t.plan_id else ""),
-             "created_at": t.created_at.isoformat() if t.created_at else None,
-             "paid_at": t.paid_at.isoformat() if t.paid_at else None,
-             "credits_granted": int(getattr(
-                 db.query(CreditBalanceDB).filter(
-                     CreditBalanceDB.grant_key == f"package:{t.reference}").first(),
-                 "credits_granted", 0) or 0),
-             "fulfilment_status": paystack.fulfilment_state(db, t)}
-            for t in history
-        ],
+        "payments": payment_rows,
     }
 
 

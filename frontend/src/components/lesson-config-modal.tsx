@@ -18,6 +18,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 import { DraftRecoveryBanner, DraftSaveStatus } from '@/components/ui/draft-recovery'
+import { MultilineListField } from '@/components/ui/multiline-list-field'
 import { toast } from '@/components/ui/toaster'
 import { Loader2, Save, Settings } from 'lucide-react'
 import { api } from '@/lib/api'
@@ -27,8 +28,8 @@ import { useFormDraft } from '@/hooks/use-form-draft'
 import { prefillLessonConfig } from '@/lib/prefill'
 import { readClearedFields, setFieldCleared } from '@/lib/prefill-overrides'
 import {
-  TERMS, WEEK_DAYS, firstLessonConfigProblem, indicatorCode,
-  sourceOccurrenceId, splitEntries, validateLessonConfig, weekOccurrences,
+  CORE_COMPETENCY_LABELS, TERMS, WEEK_DAYS, firstLessonConfigProblem, indicatorCode,
+  sourceOccurrenceId, toggleCompetency, validateLessonConfig, weekOccurrences,
 } from '@/lib/lesson-config'
 import { LessonRubricConfig } from '@/types'
 
@@ -167,17 +168,24 @@ export function LessonConfigModal({
     setClearedFields(Array.from(readClearedFields(overrideIdentity)))
   }
 
-  const indicatorValue = (key: string, field: 'references' | 'tlrs'): string => {
-    const entry = draft.indicator_resources?.[key]
-    return (entry?.[field] || []).join('\n')
-  }
-
-  const setIndicatorValue = (key: string, field: 'references' | 'tlrs', raw: string) => {
+  const setIndicatorValue = (key: string, field: 'references' | 'tlrs', entries: string[]) => {
     setDraft((current) => {
       const resources = { ...(current.indicator_resources || {}) }
       const entry = resources[key] || { references: [], tlrs: [] }
-      resources[key] = { ...entry, [field]: splitEntries(raw) }
+      resources[key] = { ...entry, [field]: entries }
       return { ...current, indicator_resources: resources }
+    })
+  }
+
+  const competencyValue = (key: string): string[] => (
+    draft.competency_selections?.[key] || []
+  )
+
+  const setCompetencyValue = (key: string, label: string) => {
+    setDraft((current) => {
+      const selections = { ...(current.competency_selections || {}) }
+      selections[key] = toggleCompetency(selections[key], label)
+      return { ...current, competency_selections: selections }
     })
   }
 
@@ -220,6 +228,7 @@ export function LessonConfigModal({
         ai_mode: draft.ai_mode || 'OFF',
         template_id: draft.template_id || null,
         indicator_resources: draft.indicator_resources || {},
+        competency_selections: draft.competency_selections || {},
         reference: null,
       })
       const savedConfig = resp.config || draft
@@ -403,14 +412,14 @@ export function LessonConfigModal({
             <div className="grid gap-2 sm:grid-cols-2">
               <button type="button" aria-pressed={activeMethod === 'standard'}
                 data-generation-method="standard"
-                onClick={() => setDraft({ ...draft, generation_method: 'standard' })}
+                onClick={() => setDraft({ ...draft, generation_method: 'standard', ai_mode: 'OFF' })}
                 className={`rounded-xl border p-3 text-left ${activeMethod === 'standard' ? 'border-[#04A9CE] bg-[#04A9CE]/5' : 'border-slate-200'}`}>
                 <span className="block font-semibold">Standard</span>
-                <span className="text-xs text-muted-foreground">Deterministic lessons, optionally enriched.</span>
+                <span className="text-xs text-muted-foreground">Deterministic lesson plans from your scheme.</span>
               </button>
               <button type="button" aria-pressed={activeMethod === 'zeli'}
                 data-generation-method="zeli"
-                onClick={() => setDraft({ ...draft, generation_method: 'zeli' })}
+                onClick={() => setDraft({ ...draft, generation_method: 'zeli', ai_mode: 'OFF' })}
                 className={`rounded-xl border p-3 text-left ${activeMethod === 'zeli' ? 'border-[#04A9CE] bg-[#04A9CE]/5' : 'border-slate-200'}`}>
                 <span className="block font-semibold">Generate with Zeli</span>
                 <span className="text-xs text-muted-foreground">Zeli writes each whole lesson plan.</span>
@@ -437,23 +446,7 @@ export function LessonConfigModal({
                   ))}
                 </select>
               </Field>
-              <Field label="AI mode" htmlFor="lcfg-ai-mode"
-                hint={activeMethod === 'zeli' ? 'Zeli writes whole lessons; enrichment mode is not used.' : undefined}>
-                <select id="lcfg-ai-mode" className="h-10 w-full rounded-md border border-input bg-white px-3 text-sm"
-                  value={draft.ai_mode || 'OFF'} disabled={activeMethod === 'zeli'}
-                  onChange={(e) => setDraft({ ...draft, ai_mode: e.target.value })}>
-                  <option value="OFF">OFF — deterministic</option>
-                  <option value="BASIC">BASIC — teacher-facing assistance</option>
-                  <option value="ENHANCED">ENHANCED — fuller AI assistance</option>
-                </select>
-              </Field>
             </div>
-            <p id="cfg-ai-mode-note" className="text-xs text-muted-foreground">
-              {activeMethod === 'zeli'
-                ? 'Zeli writes whole lessons, so enrichment mode is not used.'
-                : 'Reading and writing support is controlled by the selected method and your provider configuration.'}{' '}
-              Zeli never silently falls back to Standard.
-            </p>
           </section>
 
           <section aria-labelledby="per-lesson-heading" className="space-y-3 border-t pt-4">
@@ -494,19 +487,52 @@ export function LessonConfigModal({
                               {indicatorCode(indicator) ? `${indicatorCode(indicator)} — ` : ''}{indicator}
                             </p>
                             <Field label="References" htmlFor={`ref-${key}`}>
-                              <textarea id={`ref-${key}`} rows={2}
-                                className="w-full rounded-md border border-input bg-white px-2.5 py-2 text-xs"
+                              <MultilineListField
+                                id={`ref-${key}`}
+                                rows={2}
                                 placeholder="One reference per line"
-                                value={indicatorValue(key, 'references')}
-                                onChange={(e) => setIndicatorValue(key, 'references', e.target.value)} />
+                                value={draft.indicator_resources?.[key]?.references || []}
+                                onChange={(entries) => setIndicatorValue(key, 'references', entries)}
+                              />
                             </Field>
                             <Field label="Additional TLRs" htmlFor={`tlr-${key}`}>
-                              <textarea id={`tlr-${key}`} rows={2}
-                                className="w-full rounded-md border border-input bg-white px-2.5 py-2 text-xs"
+                              <MultilineListField
+                                id={`tlr-${key}`}
+                                rows={2}
                                 placeholder="One teacher-added resource per line"
-                                value={indicatorValue(key, 'tlrs')}
-                                onChange={(e) => setIndicatorValue(key, 'tlrs', e.target.value)} />
+                                value={draft.indicator_resources?.[key]?.tlrs || []}
+                                onChange={(entries) => setIndicatorValue(key, 'tlrs', entries)}
+                              />
                             </Field>
+                            <fieldset className="space-y-1.5">
+                              <legend className="text-xs font-medium text-[#102A43]">
+                                Core competencies
+                              </legend>
+                              <p className="text-[11px] text-muted-foreground">
+                                Select every approved competency this lesson genuinely develops.
+                              </p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {CORE_COMPETENCY_LABELS.map((label) => {
+                                  const selected = competencyValue(key).includes(label)
+                                  return (
+                                    <button
+                                      key={label}
+                                      type="button"
+                                      aria-pressed={selected}
+                                      data-competency={label}
+                                      onClick={() => setCompetencyValue(key, label)}
+                                      className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                                        selected
+                                          ? 'border-[#102A43] bg-[#102A43] text-white'
+                                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                      }`}
+                                    >
+                                      {label}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            </fieldset>
                           </div>
                         )
                       })

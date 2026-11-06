@@ -688,12 +688,15 @@ def test_generate_page_offers_zeli_and_keeps_existing_options():
     assert 'data-generation-method="standard"' in modal
     assert 'data-generation-method="zeli"' in modal
     assert "generation_method" in modal and "generation_method" in page
-    # Existing generation options are preserved.
-    for option in ('"OFF"', '"BASIC"', '"ENHANCED"'):
-        assert f"value={option}" in modal or f"'{option}'" in modal
-    # Zeli availability drives a real message, not a misleading button.
+    # The unnecessary AI-mode selector and its OFF/BASIC/ENHANCED explanation
+    # were removed from the generation experience.
+    for retired in ('AI mode', 'value="OFF"', 'value="BASIC"', 'value="ENHANCED"',
+                    'Zeli never silently falls back', 'enrichment mode is not used'):
+        assert retired not in modal
+        assert retired not in page
+    # Zeli availability drives a real blocking message, not a misleading CTA.
     assert "zeliStatus" in modal and "zeliStatus" in page
-    assert "Zeli available" in page
+    assert "Zeli is unavailable" in page
 
 
 def test_api_client_sends_generation_method_and_reports_zeli_status():
@@ -702,12 +705,15 @@ def test_api_client_sends_generation_method_and_reports_zeli_status():
     assert "generation_method=" in api or "generationMethod" in api
 
 
-def test_generate_page_disables_enrichment_mode_for_zeli():
+def test_generate_page_removes_the_enrichment_mode_selector():
     modal = _frontend("src/components/lesson-config-modal.tsx")
-    # Exposed only as an explicit choice; the existing OFF/BASIC/ENHANCED
-    # select is disabled (with a reason) while Zeli is selected.
-    assert "disabled={activeMethod === 'zeli'}" in modal
-    assert "cfg-ai-mode-note" in modal
+    page = _frontend("src/app/(app)/generate/[id]/page.tsx")
+    # No AI mode control or duplicate explanatory note in either path.
+    assert "lcfg-ai-mode" not in modal
+    assert "cfg-ai-mode-note" not in modal
+    assert "BASIC — teacher-facing assistance" not in modal
+    assert "ENHANCED — fuller AI assistance" not in modal
+    assert "AI mode" not in page
 
 
 # ── 10. Resume / retry / recovery ───────────────────────────────────────────
@@ -762,6 +768,54 @@ def test_resume_preserves_zeli_method(db, monkeypatch):
     for row in rows:
         assert row.generation_method == "zeli"
         assert row.ai_provider == "groq"
+
+
+def test_partial_zeli_failure_keeps_successful_lesson_and_resumes_without_duplicate(
+    db, monkeypatch,
+):
+    """One provider failure must not discard the other requested lesson."""
+    user = make_user(db)
+    _entitle_ai(db, user)
+    scheme = _seed_scheme(db, user.id, weeks=2)
+
+    class OneLessonFails(FakeZeliProvider):
+        def __init__(self):
+            super().__init__()
+            self.failed_week_one = False
+
+        def generate_lesson_v2(self, **kwargs):
+            self.calls.append(kwargs)
+            if (int(kwargs.get("week_number") or 0) == 1
+                    and not self.failed_week_one):
+                self.failed_week_one = True
+                self.last_error = "timeout"
+                raise zg.ZeliGenerationError(
+                    "Zeli took too long to respond for this lesson.", 504)
+            return json.loads(json.dumps(self.content))
+
+    provider = OneLessonFails()
+    first = _run_http_zeli(db, monkeypatch, user, scheme, provider)
+    assert first.status_code == 200, first.text
+    body = first.json()
+    assert body["generated_occurrence_ids"] == ["week2:0:B7.1.1.2.1"]
+    assert body["failed_occurrence_ids"] == ["week1:0:B7.1.1.1.1"]
+    assert body["failed"][0]["week_number"] == 1
+    assert "week1:0:B7.1.1.1.1" in body["resumable_occurrence_ids"]
+
+    lessons = db.query(LessonPlanDB).all()
+    assert len(lessons) == 1
+    assert lessons[0].week_number == 2
+
+    job = db.query(GenerationJobDB).one()
+    with TestClient(_app(db, user)) as client:
+        resumed = client.post(
+            f"/api/generation/{scheme.id}/generate/resume",
+            json={"job_id": job.id},
+        )
+    assert resumed.status_code == 200, resumed.text
+    rows = db.query(LessonPlanDB).order_by(LessonPlanDB.week_number).all()
+    assert [row.week_number for row in rows] == [1, 2]
+    assert resumed.json()["generated_occurrence_ids"] == ["week1:0:B7.1.1.1.1"]
 
 
 def test_resume_does_not_consume_a_second_ai_credit(db, monkeypatch):

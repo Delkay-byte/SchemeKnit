@@ -19,10 +19,11 @@ from ..database import (
     ActivationCodeDB, IndividualActivationCodeDB, ProductPlanDB, PaymentDB, PlatformAuditLogDB,
     LicenseCacheDB, generate_id, SubscriptionTransactionDB,
     SubscriptionPlanDB, UserLicenseDB, CreditBalanceDB,
-    PaystackWebhookEventDB, SubscriptionEventDB,
+    PaystackWebhookEventDB, SubscriptionEventDB, PurchaseEntitlementDB,
 )
 from ..auth import get_current_user, require_platform_admin
 from ..config import get_settings
+from .. import catalogue
 from ..entitlements import FREE_TIER_LESSON_PLANS_PER_MONTH
 from ..logging_config import get_logger, log_event
 
@@ -141,7 +142,13 @@ def _license_view(db: Session, lic: SchoolLicenseDB) -> dict:
         "school_id": lic.school_id,
         "school_name": school.name if school else "Unknown",
         "school_code": school.school_code if school else "",
-        "plan_name": plan.name if plan else "Unknown",
+        "plan_name": (
+            catalogue.display_name(
+                getattr(plan, "slug", "") if plan else "",
+                plan.name if plan else "Unknown",
+            )
+            if plan else "Unknown"
+        ),
         "seat_limit": lic.seat_limit,
         "seats_used": int(seats_used),
         "seats_available": max(0, (lic.seat_limit or 0) - int(seats_used)),
@@ -219,6 +226,86 @@ async def platform_dashboard(
         1 for tx in recent_paid
         if fulfilment_state(db, tx) != "activated")
 
+    # ── Purchased licences / entitlements (authoritative rows) ─────────────
+    # A dashboard that counts payments but cannot show whether fulfilment
+    # happened is how an activated package looked invisible. These rows come
+    # from the entitlement record keyed by payment reference, never from a
+    # payment provider claim.
+    from ..paystack import purchase_payload
+
+    entitlement_counts = {
+        "active": db.query(PurchaseEntitlementDB).filter(
+            PurchaseEntitlementDB.status == "active").count(),
+        "expired": db.query(PurchaseEntitlementDB).filter(
+            PurchaseEntitlementDB.status == "expired").count(),
+        "revoked": db.query(PurchaseEntitlementDB).filter(
+            PurchaseEntitlementDB.status == "revoked").count(),
+        "pending": paystack_attention,
+    }
+    recent_entitlements = []
+    entitlement_rows = (db.query(PurchaseEntitlementDB)
+                        .order_by(PurchaseEntitlementDB.updated_at.desc(),
+                                  PurchaseEntitlementDB.created_at.desc())
+                        .limit(50).all())
+    for ent in entitlement_rows:
+        tx = (db.query(SubscriptionTransactionDB)
+              .filter(SubscriptionTransactionDB.reference == ent.reference)
+              .first())
+        account = db.query(User).filter(User.id == ent.user_id).first()
+        licence = (db.query(UserLicenseDB)
+                   .filter(UserLicenseDB.id == ent.licence_id).first()
+                   if ent.licence_id else None)
+        balance = (db.query(CreditBalanceDB)
+                   .filter(CreditBalanceDB.grant_key == f"package:{ent.reference}")
+                   .first())
+        payload = purchase_payload(db, tx) if tx is not None else {}
+        kind = (ent.kind or payload.get("package", {}).get("kind") or "")
+        recent_entitlements.append({
+            "reference": ent.reference,
+            "teacher_name": account.full_name if account else "",
+            "teacher_email": account.email if account else "",
+            "package_name": catalogue.display_name(
+                ent.package_slug,
+                ent.package_name or payload.get("package", {}).get("name", ""),
+            ),
+            "package_slug": ent.package_slug,
+            "kind": kind,
+            # Flexible credit packs have no expiry of their own. Never invent
+            # one from a different timed licence on the same account.
+            "expires_at": (
+                None if kind == "flexible"
+                else ent.expires_at.isoformat() if ent.expires_at else None
+            ),
+            "entitlement_status": ent.status,
+            "activated_at": (
+                ent.starts_at.isoformat() if ent.starts_at
+                else licence.activated_at.isoformat() if licence and licence.activated_at
+                else None
+            ),
+            "licence_status": licence.status if licence else "",
+            "licence_key": licence.licence_key if licence else "",
+            "payment_status": payload.get("payment_status", "pending"),
+            "fulfilment_status": payload.get("fulfilment_status", ""),
+            "channel": payload.get("channel", ""),
+            "payment_method": payload.get("payment_method", ""),
+            "credits_granted": int(balance.credits_granted) if balance else 0,
+            "credits_remaining": int(balance.credits_remaining) if balance else 0,
+            "credits_used": (
+                max(int(balance.credits_granted) - int(balance.credits_remaining), 0)
+                if balance else 0
+            ),
+        })
+
+    settings = get_settings()
+    from ..engines.zeli_generation import zeli_availability
+    capabilities = {
+        "standard_generation": True,
+        "zeli_generation": bool(zeli_availability().get("available")),
+        "paystack_checkout": bool(settings.PAYSTACK_ENABLED),
+        "platform_admin_sso": bool(settings.PLATFORM_OIDC_ENABLED),
+        "maintenance_mode": bool(settings.MAINTENANCE_MODE),
+    }
+
     return {
         "active_schools": active_schools,
         "total_schools": total_schools,
@@ -232,6 +319,9 @@ async def platform_dashboard(
         "verified_revenue": float(verified_revenue),
         "paystack_sales_today": paystack_sales_today,
         "paystack_attention": paystack_attention,
+        "entitlement_counts": entitlement_counts,
+        "recent_entitlements": recent_entitlements,
+        "capabilities": capabilities,
         "currency": "GHS",
     }
 
@@ -794,8 +884,14 @@ async def list_paystack_purchases(
         plan = db.query(SubscriptionPlanDB).filter(
             SubscriptionPlanDB.id == tx.plan_id).first()
         account = db.query(User).filter(User.id == tx.user_id).first()
-        lic = db.query(UserLicenseDB).filter(
-            UserLicenseDB.user_id == tx.user_id).first()
+        entitlement = paystack.purchase_entitlement(db, tx.reference)
+        lic = None
+        if entitlement is not None and entitlement.licence_id:
+            lic = db.query(UserLicenseDB).filter(
+                UserLicenseDB.id == entitlement.licence_id).first()
+        if lic is None:
+            lic = db.query(UserLicenseDB).filter(
+                UserLicenseDB.user_id == tx.user_id).first()
         balance = db.query(CreditBalanceDB).filter(
             CreditBalanceDB.grant_key == f"package:{tx.reference}").first()
         hooks = (db.query(PaystackWebhookEventDB)
@@ -813,10 +909,24 @@ async def list_paystack_purchases(
                 "name": account.full_name if account else "",
                 "school": account.school_name if account else "",
             },
-            "plan": plan.name if plan else "",
+            "plan": catalogue.display_name(
+                plan.slug if plan else "",
+                plan.name if plan else payload.get("package", {}).get("name", ""),
+            ),
             "licence_issued": lic is not None,
             "licence_status": lic.status if lic else "",
+            "licence_activated_at": (
+                lic.activated_at.isoformat() if lic and lic.activated_at else None),
+            "entitlement_status": (
+                entitlement.status if entitlement is not None
+                else payload.get("entitlement_status", "")),
+            "entitlement_kind": (
+                entitlement.kind if entitlement is not None
+                else payload.get("package", {}).get("kind", "")),
             "credits_granted": int(balance.credits_granted) if balance else 0,
+            "credits_used": (
+                max(int(balance.credits_granted) - int(balance.credits_remaining), 0)
+                if balance else 0),
             "credits_remaining": int(balance.credits_remaining) if balance else 0,
             "notifications": notes,
             "webhooks": [{

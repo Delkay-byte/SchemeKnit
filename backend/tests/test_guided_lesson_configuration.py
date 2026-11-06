@@ -278,6 +278,42 @@ class TestExtendedLessonConfiguration:
             f"/api/generation/{scheme.id}/lesson-config", json=bad_key
         ).status_code == 422
 
+    def test_per_lesson_core_competencies_round_trip_and_normalize(self, http):
+        scheme = http.scheme_factory()
+        payload = {
+            **FULL_CONFIG,
+            "competency_selections": {
+                "week1:0:B9.1.1.1.1": [
+                    "Critical Thinking and Problem Solving",
+                    "CC",
+                    "Not an approved competency",
+                ],
+                "week1:0:B9.1.1.1.2": ["Digital Literacy (DL)"],
+            },
+        }
+        assert http.put(
+            f"/api/generation/{scheme.id}/lesson-config", json=payload
+        ).status_code == 200
+        body = http.get(f"/api/generation/{scheme.id}/lesson-config").json()["config"]
+        assert body["competency_selections"]["week1:0:B9.1.1.1.1"] == [
+            "Critical Thinking and Problem Solving (CP)",
+            "Communication and Collaboration (CC)",
+        ]
+        assert body["competency_selections"]["week1:0:B9.1.1.1.2"] == [
+            "Digital Literacy (DL)",
+        ]
+
+        # A later setup-only save must not wipe the per-lesson selections.
+        assert http.put(
+            f"/api/generation/{scheme.id}/lesson-config",
+            json={**FULL_CONFIG, "class_size": 41},
+        ).status_code == 200
+        body = http.get(f"/api/generation/{scheme.id}/lesson-config").json()["config"]
+        assert body["competency_selections"]["week1:0:B9.1.1.1.1"] == [
+            "Critical Thinking and Problem Solving (CP)",
+            "Communication and Collaboration (CC)",
+        ]
+
     def test_saving_without_indicator_resources_keeps_existing_ones(self, http):
         scheme = http.scheme_factory()
         resources = {

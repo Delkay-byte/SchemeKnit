@@ -18,6 +18,31 @@ export const WEEK_DAYS = [
 
 export const TERMS = ['First Term', 'Second Term', 'Third Term'] as const
 
+/**
+ * The six approved NaCCA core competencies, with their official codes.
+ * Teachers select from this fixed list; the interface never accepts free text.
+ */
+export const CORE_COMPETENCIES = [
+  { name: 'Critical Thinking and Problem Solving', code: 'CP' },
+  { name: 'Creativity and Innovation', code: 'CI' },
+  { name: 'Communication and Collaboration', code: 'CC' },
+  { name: 'Cultural Identity and Global Citizenship', code: 'CG' },
+  { name: 'Personal Development and Leadership', code: 'PL' },
+  { name: 'Digital Literacy', code: 'DL' },
+] as const
+
+export const CORE_COMPETENCY_LABELS = CORE_COMPETENCIES.map(
+  (competency) => `${competency.name} (${competency.code})`,
+)
+
+/** Toggle one approved competency without mutating the current selection. */
+export function toggleCompetency(selected: string[] | null | undefined, label: string): string[] {
+  const current = Array.isArray(selected) ? selected : []
+  return current.includes(label)
+    ? current.filter((item) => item !== label)
+    : [...current, label]
+}
+
 export type LessonConfigField =
   | 'school_name'
   | 'class_size'

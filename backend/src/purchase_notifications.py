@@ -12,7 +12,7 @@ from typing import Any, Dict, Optional
 
 from sqlalchemy.orm import Session
 
-from . import paystack
+from . import catalogue, paystack
 from .database import (
     SubscriptionPlanDB, SubscriptionTransactionDB, User, UserLicenseDB,
     UserSubscriptionDB,
@@ -71,7 +71,10 @@ def notify_purchase(db: Session, tx: SubscriptionTransactionDB, user: User,
     details = tx.payment_details if isinstance(tx.payment_details, dict) else {}
     snapshot = details.get("package_snapshot") if isinstance(
         details.get("package_snapshot"), dict) else {}
-    package_name = snapshot.get("name") or plan.name
+    package_name = catalogue.display_name(
+        snapshot.get("slug") or getattr(plan, "slug", ""),
+        snapshot.get("name") or plan.name,
+    )
     package_credits = int(snapshot.get("credits")
                           or paystack._plan_credit_allowance(plan))
 

@@ -391,16 +391,16 @@ def _planned_scope(
         codes = set(requested_codes)
         scope = [a for a in allocations if a.indicator_code in codes]
 
-    planned = sorted({
+    planned = list(dict.fromkeys(
         a.source_occurrence_id for a in scope
         if a.source_occurrence_id
         and not getattr(a, "is_special_period", False)
         and not getattr(a, "needs_review", False)
-    })
-    blocked = sorted({
+    ))
+    blocked = list(dict.fromkeys(
         a.source_occurrence_id for a in scope
         if a.source_occurrence_id and getattr(a, "needs_review", False)
-    })
+    ))
     return planned, blocked
 
 
@@ -847,6 +847,8 @@ class LessonConfigRequest(BaseModel):
     template_id: Optional[str] = None
     #: Canonical occurrence id -> {"references": [...], "tlrs": [...]}
     indicator_resources: Optional[Dict[str, Dict[str, List[str]]]] = None
+    #: Canonical occurrence id -> selected approved core competencies.
+    competency_selections: Optional[Dict[str, List[str]]] = None
 
 
 def _normalize_lesson_config(payload: LessonConfigRequest) -> dict:
@@ -938,6 +940,27 @@ def _normalize_lesson_config(payload: LessonConfigRequest) -> dict:
                     "tlrs": _list("Additional TLR", tlrs),
                 }
             out["indicator_resources"] = cleaned
+
+    if payload.competency_selections is not None:
+        from ..curriculum.competencies import normalize_competencies
+
+        if len(payload.competency_selections) > 500:
+            errors.append("Too many per-lesson competency entries.")
+        else:
+            selected: Dict[str, List[str]] = {}
+            for key, values in payload.competency_selections.items():
+                text = str(key or "").strip()
+                parts = text.split(":", 2)
+                if (not text.startswith("week") or len(parts) != 3
+                        or not parts[0][4:].isdigit()
+                        or not parts[1].isdigit() or len(text) > 160):
+                    errors.append(f"Invalid competency lesson key: {text[:40]}")
+                    continue
+                if not isinstance(values, list):
+                    errors.append(f"Invalid competency selection for {text[:40]}")
+                    continue
+                selected[text] = normalize_competencies(values)
+            out["competency_selections"] = selected
 
     cs = payload.class_size
     if cs is not None:
@@ -1058,6 +1081,10 @@ async def put_lesson_config(
         existing = _saved_lesson_config(scheme_db)
         if isinstance(existing.get("indicator_resources"), dict):
             config["indicator_resources"] = existing["indicator_resources"]
+    if payload.competency_selections is None:
+        existing = _saved_lesson_config(scheme_db)
+        if isinstance(existing.get("competency_selections"), dict):
+            config["competency_selections"] = existing["competency_selections"]
     scheme_db.lesson_config = config
     db.commit()
     readiness = _lesson_config_readiness(config)
@@ -1498,6 +1525,19 @@ def _generate_lesson_plans(
             for a in _cov.allocations
             if a.source_occurrence_id
         }
+        # Curriculum order is authoritative: Week 1 before Week 2, then the
+        # indicator's own order within the week. The request's click order (or
+        # a lexicographic id sort) must never decide generation order.
+        _occ_order = {
+            a.source_occurrence_id: (
+                int(getattr(a, "week_number", 0) or 0),
+                int(getattr(a, "lesson_sequence", 0) or 0),
+            )
+            for a in _cov.allocations
+            if a.source_occurrence_id
+        }
+        selected_occ.sort(
+            key=lambda o: _occ_order.get(o, (10 ** 9, 10 ** 9)))
         missing = [o for o in selected_occ if o not in resolved_by_occ]
         if missing:
             raise HTTPException(
@@ -1721,6 +1761,16 @@ def _generate_lesson_plans(
     config.scheme_of_work_id = scheme_id
     config.selected_indicator_codes = requested_codes
     config.selected_occurrence_ids = list(selected_occ)
+    _correlation_id = (getattr(config, "request_id", "") or "").strip()
+    log_event(
+        "generation_requested",
+        user_id=user.id,
+        scheme_id=scheme_id,
+        request_id=_correlation_id or None,
+        selected_occurrences=len(selected_occ),
+        selected_codes=len(requested_codes),
+        method=config.generation_method.value,
+    )
 
     # Persist the occurrence identity of this run BEFORE generation. A hard
     # process death skips the endpoint's exception handlers; without this
@@ -2085,6 +2135,34 @@ def _generate_lesson_plans(
                 key=lambda o: (
                     getattr(_by_occ.get(o), "lesson_sequence", 0) or 0, o))
         ]
+        _generation_failures = list(
+            getattr(job, "_generation_failures", None) or [])
+        _failed_occurrence_ids = [
+            str(item.get("source_occurrence_id") or "")
+            for item in _generation_failures
+            if item.get("source_occurrence_id")
+        ]
+        failed_items = []
+        for item in sorted(
+            _generation_failures,
+            key=lambda f: (
+                getattr(_by_occ.get(f.get("source_occurrence_id")), "lesson_sequence", 0)
+                or f.get("lesson_sequence") or 0,
+                f.get("source_occurrence_id") or "",
+            ),
+        ):
+            occ = str(item.get("source_occurrence_id") or "")
+            detail = _item(occ) if occ else {
+                "source_occurrence_id": "",
+                "week_number": None,
+                "lesson_sequence": item.get("lesson_sequence"),
+                "indicator_code": item.get("indicator_code") or "",
+                "indicator_description": "",
+                "reasons": [],
+            }
+            detail["category"] = item.get("category") or "provider_content"
+            detail["message"] = item.get("message") or ""
+            failed_items.append(detail)
         pending_items = [
             _item(occ) for occ in sorted(
                 pending_occurrence_ids,
@@ -2332,6 +2410,7 @@ def _generate_lesson_plans(
 
         return {
             "job_id": job_db.id,
+            "request_id": _correlation_id or None,
             "status": job.status.value,
             "total_lessons": scheme_total,
             "completed_lessons": scheme_total,
@@ -2339,6 +2418,8 @@ def _generate_lesson_plans(
             "generated_occurrence_ids": sorted(_accepted_occurrences),
             "rejected_occurrence_ids": rejected_occurrence_ids,
             "rejected": rejected_items,
+            "failed_occurrence_ids": _failed_occurrence_ids,
+            "failed": failed_items,
             "pending_occurrence_ids": pending_occurrence_ids,
             "pending": pending_items,
             "planned_occurrence_ids": sorted(_batch_planned),
@@ -2385,7 +2466,8 @@ def _generate_lesson_plans(
             if reservation and reservation.charged:
                 credit_service.release(db, reservation)
             data_service.update_job(db, job_db.id, status="failed", error_message=str(e))
-            log_error("generation_failed", user_id=user.id, scheme_id=scheme_id, error=str(e))
+            log_error("generation_failed", user_id=user.id, scheme_id=scheme_id,
+                      request_id=_correlation_id or None, error=str(e))
             raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
         # The run committed. Any later error is a finalization problem, not a
         # rolled-back generation: recover the truthful result from durable
@@ -2534,6 +2616,8 @@ def _resume_lesson_plans(
             "generated_indicator_codes": [],
             "generated_occurrence_ids": [],
             "rejected_occurrence_ids": [],
+            "failed_occurrence_ids": [],
+            "failed": [],
             "pending_occurrence_ids": [],
             "planned_occurrence_ids": sorted(set(known)),
             "resumable_occurrence_ids": [],
@@ -3420,6 +3504,8 @@ def _apply_saved_lesson_config(db: Session, scheme_db, config: TermConfig,
             pass
     if isinstance(saved.get("indicator_resources"), dict):
         config.indicator_resources = saved["indicator_resources"]
+    if isinstance(saved.get("competency_selections"), dict):
+        config.competency_selections = saved["competency_selections"]
     if saved.get("reference"):
         config.references = [saved["reference"]]
 
@@ -3682,8 +3768,12 @@ def _apply_lesson_review_draft(lp, drafts: dict) -> None:
         lp.teaching_learning_resources = union
     if "core_competencies" in draft:
         from ..curriculum.competencies import normalize_competencies
-        lp.core_competencies = normalize_competencies(
-            draft.get("core_competencies") or [])
+        chosen = normalize_competencies(draft.get("core_competencies") or [])
+        # An empty list means "no per-lesson override": keep the competencies
+        # the lesson builder derived for this activity instead of erasing them.
+        # A non-empty selection is authoritative and replaces inference exactly.
+        if chosen:
+            lp.core_competencies = chosen
     if "structured_references" in draft:
         refs = [
             entry

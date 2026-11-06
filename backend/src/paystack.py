@@ -106,11 +106,13 @@ def environment() -> str:
 
 def package_snapshot(plan: SubscriptionPlanDB) -> dict:
     """Immutable package details captured at purchase initiation."""
+    from . import catalogue
+
     entitlement = dict(plan.entitlements or {})
     return {
         "plan_id": plan.id,
         "slug": plan.slug,
-        "name": plan.name,
+        "name": catalogue.display_name(plan.slug, plan.name),
         "package_kind": getattr(plan, "package_kind", "") or "timed",
         "price_pesewas": int(plan.price_pesewas or 0),
         "currency": plan.currency or "GHS",
@@ -611,7 +613,7 @@ def fulfilment_state(db: Session, tx: SubscriptionTransactionDB) -> str:
 
 def purchase_payload(db: Session, tx: SubscriptionTransactionDB) -> dict:
     """Everything the confirmation UI needs, in one redacted object."""
-    from . import credits as credit_service
+    from . import catalogue, credits as credit_service
 
     plan = db.query(SubscriptionPlanDB).filter(
         SubscriptionPlanDB.id == tx.plan_id).first()
@@ -654,7 +656,10 @@ def purchase_payload(db: Session, tx: SubscriptionTransactionDB) -> dict:
         "fulfilment_status": state,
         "package": {
             "slug": snapshot.get("slug") or (plan.slug if plan else ""),
-            "name": snapshot.get("name") or (plan.name if plan else ""),
+            "name": catalogue.display_name(
+                snapshot.get("slug") or (plan.slug if plan else ""),
+                snapshot.get("name") or (plan.name if plan else ""),
+            ),
             "credits": int(snapshot.get("credits") or 0)
             if snapshot else (_plan_credit_allowance(plan) if plan else 0),
             "kind": kind,

@@ -111,6 +111,9 @@ You generate lesson plans that are:
 4. COHERENT: Starter → Main → Assessment → Plenary form a logical instructional story.
 5. PRACTICAL: Activities work in ordinary Ghanaian classrooms using ONLY the
    resources the teacher's scheme supplies or the teacher adds.
+6. SEQUENTIAL: Starter, each main-learning phase, assessment and plenary form
+   ONE continuous lesson. Every phase starts from the previous phase's outcome,
+   introduces a new step, and never repeats the opening activity.
 6. DIFFERENTIATED: Support, core, and extension are compact and actionable.
 
 RULES:
@@ -387,10 +390,16 @@ CRITICAL RULES:
     activity, instruction or sentence. Main learning develops new knowledge
     and practice; it never restates the opening. Do not copy the starter's
     teacher_action or learner_action into any main_learning phase.
-20. The exit check / closing evidence belongs ONLY in the plenary. It MUST NOT
-    also appear in main_learning. Each phase has ONE purpose: starter =
-    activate prior knowledge and introduce the problem; main = explain,
-    investigate, practise and apply; plenary = consolidate, check and reflect.
+20. SEQUENTIAL PROGRESSION: every main_learning phase must CONTINUE from the
+    previous phase's outcome. Phase 2 must not restart the starter, repeat the
+    Phase 1 teacher explanation, or repeat Phase 1 learner practice. Each phase
+    needs a distinct purpose and a new learner action: for example introduce,
+    then model, then guided practice, then independent application. Name what
+    learners already completed in the preceding phase and move forward from it.
+    Each phase must have ONE purpose: starter = activate prior knowledge and
+    introduce the problem; main = explain, investigate, practise and apply;
+    plenary = consolidate, check and reflect. The exit check / closing evidence
+    belongs ONLY in the plenary and MUST NOT also appear in main_learning.
 21. CORE COMPETENCIES: use exactly the labels supplied in CORE COMPETENCIES
     (when supplied) and never invent a competency name. When none are supplied,
     do not add a competency field.""")

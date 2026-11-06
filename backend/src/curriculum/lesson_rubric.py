@@ -756,7 +756,10 @@ def hard_failures(entry, lp):
         failures.append("placeholder_reference")
 
     resources = [r for r in (lp.teaching_learning_resources or []) if (r or "").strip()]
-    if not resources or all(len((r or "").strip()) < 3 for r in resources):
+    # An empty resource list is a valid source state: the scheme and the teacher
+    # supplied none, and the generator must not invent a resource merely to
+    # populate the cell. Only a present-but-invalid list is a hard failure.
+    if resources and all(len((r or "").strip()) < 3 for r in resources):
         failures.append("invalid_or_empty_resources")
 
     seen = set()

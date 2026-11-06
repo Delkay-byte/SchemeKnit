@@ -169,6 +169,29 @@ def get(slug: str) -> Optional[Package]:
     return BY_SLUG.get(slug)
 
 
+def display_name(slug: str, fallback: str = "") -> str:
+    """Canonical English package name for display.
+
+    Plan rows are renamed by historical migrations and purchase snapshots keep
+    the name captured at checkout. Both can therefore carry superseded local
+    labels. Display always resolves through this catalogue first; IDs, prices,
+    credits and entitlement kinds are never changed.
+    """
+    key = (slug or "").strip().lower()
+    direct = BY_SLUG.get(key)
+    if direct is not None:
+        return direct.name
+    base = key.split("-legacy", 1)[0]
+    canonical = BY_SLUG.get(base)
+    if canonical is not None:
+        return f"{canonical.name} (Legacy)"
+    legacy = {
+        "teacher-annual": "Teacher Annual (Legacy)",
+        "school-monthly": "School Monthly (Legacy)",
+    }
+    return legacy.get(key, (fallback or "").strip())
+
+
 def purchasable() -> Tuple[Package, ...]:
     return tuple(p for p in PACKAGES if p.purchasable)
 

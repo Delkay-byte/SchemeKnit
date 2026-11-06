@@ -637,7 +637,117 @@ export default function PlatformAdminPage() {
                     <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Verified Revenue</p>
                     <p className="mt-1.5 text-2xl font-bold text-[#102A43]">{formatCurrency(dashboard.verified_revenue)}</p>
                   </SurfaceCard>
+                  <SurfaceCard className="px-5 py-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Active Entitlements</p>
+                    <p className="mt-1.5 text-2xl font-bold text-[#102A43]">{dashboard.entitlement_counts?.active ?? 0}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {dashboard.entitlement_counts?.expired ?? 0} expired ·{' '}
+                      {dashboard.entitlement_counts?.pending ?? 0} pending
+                    </p>
+                  </SurfaceCard>
                 </div>
+
+                {/* Licence and entitlement visibility. Every row is derived from
+                    the authoritative purchase, entitlement and credit records;
+                    payment success and fulfilment are shown separately. */}
+                <SurfaceCard className="overflow-hidden">
+                  <div className="border-b px-5 py-4">
+                    <h2 className="text-base font-semibold text-[#102A43]">Activated licences &amp; entitlements</h2>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      The latest purchases with their licence, activation and credit state.
+                      A successful payment is not shown as activated until fulfilment is recorded.
+                    </p>
+                  </div>
+                  {(dashboard.recent_entitlements || []).length === 0 ? (
+                    <p className="px-5 py-8 text-center text-sm text-muted-foreground">
+                      No purchase entitlements recorded yet.
+                    </p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/50 hover:bg-muted/50">
+                            <TableHead>Teacher</TableHead>
+                            <TableHead>Package</TableHead>
+                            <TableHead>Licence</TableHead>
+                            <TableHead>Activation</TableHead>
+                            <TableHead>Purchase</TableHead>
+                            <TableHead>Credits</TableHead>
+                            <TableHead>Expiry</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {(dashboard.recent_entitlements || []).map((row: any) => (
+                            <TableRow key={row.reference} data-licence-row={row.reference}>
+                              <TableCell>
+                                <p className="font-medium text-[#102A43]">{row.teacher_name || row.teacher_email || '—'}</p>
+                                <p className="text-[11px] text-muted-foreground">{row.teacher_email}</p>
+                              </TableCell>
+                              <TableCell>
+                                <p className="text-sm">{row.package_name || '—'}</p>
+                                <p className="text-[11px] capitalize text-muted-foreground">{row.kind || '—'}</p>
+                              </TableCell>
+                              <TableCell>
+                                <StatusPill tone={row.licence_status === 'active' ? 'success' : row.licence_status ? 'warning' : 'neutral'}>
+                                  {row.licence_status || 'No licence'}
+                                </StatusPill>
+                              </TableCell>
+                              <TableCell>
+                                <StatusPill tone={
+                                  row.entitlement_status === 'active'
+                                    ? 'success'
+                                    : row.entitlement_status === 'expired' || row.entitlement_status === 'revoked'
+                                      ? 'danger'
+                                      : 'warning'
+                                }>
+                                  {row.entitlement_status || 'pending'}
+                                </StatusPill>
+                                <p className="mt-1 text-[11px] text-muted-foreground">
+                                  {row.activated_at ? new Date(row.activated_at).toLocaleString() : 'Not activated'}
+                                </p>
+                              </TableCell>
+                              <TableCell>
+                                <p className="text-xs font-medium">{row.payment_status}</p>
+                                <p className="text-[11px] text-muted-foreground">{row.channel || '—'}</p>
+                                <p className="font-mono text-[10px] text-muted-foreground">{row.reference}</p>
+                              </TableCell>
+                              <TableCell>
+                                <p className="text-xs">
+                                  {row.credits_granted} granted · {row.credits_used} used
+                                </p>
+                                <p className="text-xs font-semibold text-[#102A43]">
+                                  {row.credits_remaining} remaining
+                                </p>
+                              </TableCell>
+                              <TableCell className="text-xs text-muted-foreground">
+                                {row.expires_at ? new Date(row.expires_at).toLocaleDateString() : 'Never'}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </SurfaceCard>
+
+                {dashboard.capabilities && (
+                  <SurfaceCard className="px-5 py-4">
+                    <h2 className="text-base font-semibold text-[#102A43]">Platform capabilities in this environment</h2>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Implemented features and whether this deployment has them enabled.
+                    </p>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {Object.entries(dashboard.capabilities).map(([name, value]) => (
+                        <div key={name} className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2">
+                          <span className="text-sm capitalize">{name.replace(/_/g, ' ')}</span>
+                          <StatusPill tone={value ? 'success' : 'neutral'}>
+                            {value ? 'Enabled' : 'Disabled'}
+                          </StatusPill>
+                        </div>
+                      ))}
+                    </div>
+                  </SurfaceCard>
+                )}
 
                 {/* Development/acceptance-only demo data reset. Compiled out
                     of production builds; backend also 403s unless DEBUG is on. */}
@@ -1063,9 +1173,15 @@ export default function PlatformAdminPage() {
                               </StatusPill>
                             </TableCell>
                             <TableCell>
-                              <p className="text-xs">{p.licence_issued ? `Licence ${p.licence_status}` : 'No licence'}</p>
+                              <p className="text-xs">
+                                {p.licence_issued ? `Licence ${p.licence_status}` : 'No licence'}
+                              </p>
+                              <p className="text-[11px] text-muted-foreground">
+                                Entitlement {p.entitlement_status || '—'}
+                                {p.entitlement_kind ? ` · ${p.entitlement_kind}` : ''}
+                              </p>
                               <p className="text-xs text-muted-foreground">
-                                {p.credits_granted} granted · {p.credits_remaining} left
+                                {p.credits_granted} granted · {p.credits_used || 0} used · {p.credits_remaining} left
                               </p>
                             </TableCell>
                             <TableCell>

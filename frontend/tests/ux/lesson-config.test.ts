@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
+  CORE_COMPETENCY_LABELS,
   firstLessonConfigProblem,
   indicatorCode,
   mergeIndicatorResources,
   sourceOccurrenceId,
   splitEntries,
   splitSourceIndicators,
+  toggleCompetency,
   validateLessonConfig,
   weekOccurrences,
 } from '../../src/lib/lesson-config.ts'
@@ -147,4 +149,29 @@ test('duplicate source rows are deduped like the allocation engine', () => {
   const rows = ['B6.1.1.1.1 Use a mouse', 'B6.1.1.1.1 Use a mouse']
   assert.equal(weekOccurrences(rows).length, 1)
   assert.equal(weekOccurrences([...rows, 'B6.1.1.1.2 Use a keyboard']).length, 2)
+})
+
+test('all six approved core competencies are selectable together', () => {
+  assert.equal(CORE_COMPETENCY_LABELS.length, 6)
+  assert.deepEqual(CORE_COMPETENCY_LABELS, [
+    'Critical Thinking and Problem Solving (CP)',
+    'Creativity and Innovation (CI)',
+    'Communication and Collaboration (CC)',
+    'Cultural Identity and Global Citizenship (CG)',
+    'Personal Development and Leadership (PL)',
+    'Digital Literacy (DL)',
+  ])
+  let selected: string[] = []
+  for (const label of CORE_COMPETENCY_LABELS.slice(0, 3)) {
+    selected = toggleCompetency(selected, label)
+  }
+  assert.equal(selected.length, 3)
+  selected = toggleCompetency(selected, CORE_COMPETENCY_LABELS[1])
+  assert.deepEqual(selected, [
+    CORE_COMPETENCY_LABELS[0],
+    CORE_COMPETENCY_LABELS[2],
+  ])
+  assert.deepEqual(toggleCompetency(null, CORE_COMPETENCY_LABELS[5]), [
+    CORE_COMPETENCY_LABELS[5],
+  ])
 })

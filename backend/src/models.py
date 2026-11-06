@@ -608,6 +608,10 @@ class TermConfig(BaseModel):
     #: ``tlrs`` for THAT indicator only. A present empty entry is authoritative
     #: (it must not fall back to a global seed).
     indicator_resources: Dict[str, Dict[str, List[str]]] = {}
+    #: Per-lesson teacher-selected approved core competencies keyed by the same
+    #: canonical occurrence id. Empty entry = the teacher selected none for
+    #: that lesson; the generator may still infer appropriate competencies.
+    competency_selections: Dict[str, List[str]] = {}
     created_date: datetime = Field(default_factory=datetime.now)
 
     @field_validator("term_start_date", "term_end_date", mode="before")

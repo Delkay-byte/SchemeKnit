@@ -137,6 +137,8 @@ export interface LessonRubricConfig {
   template_id?: string | null
   /** Canonical source occurrence id -> per-lesson teacher resources. */
   indicator_resources?: Record<string, { references: string[]; tlrs: string[] }>
+  /** Canonical source occurrence id -> teacher-selected approved competencies. */
+  competency_selections?: Record<string, string[]>
 }
 
 export interface LessonConfigResponse {
@@ -177,6 +179,8 @@ export interface TermConfig {
   core_competencies?: string[]
   references?: string[]
   indicator_resources?: Record<string, { references: string[]; tlrs: string[] }>
+  // Canonical occurrence id -> the approved competencies selected for that lesson.
+  competency_selections?: Record<string, string[]>
   // Free Tier: which indicators the teacher chose to spend this month's
   // lesson-plan units on. Empty = all indicators (paid/unlimited).
   selected_indicator_codes?: string[]

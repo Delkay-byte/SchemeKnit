@@ -222,6 +222,20 @@ class TestAdversarialHardFailures:
         bad = _with(lp, teaching_learning_resources=["a"])
         assert "invalid_or_empty_resources" in hard_failures(bad, entry)
 
+    def test_no_scheme_or_teacher_resource_is_a_valid_state(self, lesson_and_entry):
+        """A scheme with no TLRs must not be rejected for an empty resource row.
+
+        The generator is forbidden from inventing a resource, so an empty list
+        is the honest output when neither the scheme nor the teacher supplied
+        one.
+        """
+        lp, entry, _c, _x, _l = lesson_and_entry
+        clean = _with(
+            lp, source_tlrs=[], other_tlrs=[],
+            teaching_learning_resources=[],
+        )
+        assert "invalid_or_empty_resources" not in hard_failures(clean, entry)
+
     def test_duplicate_phases(self, lesson_and_entry):
         lp, entry, _c, _x, _l = lesson_and_entry
         dup = [a.model_copy() for a in lp.main_activities]

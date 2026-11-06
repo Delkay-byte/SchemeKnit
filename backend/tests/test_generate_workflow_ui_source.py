@@ -65,11 +65,12 @@ class TestWeekCentricSurface:
             "data-generate-summary",
             "data-generate-config",
             "data-generate-action",
-            "data-generate-mode",
             "data-wapef-setup",
             "data-coverage",
         ):
             assert attr in src, f"missing {attr}"
+        # The competing Quick Generate / Build with me selector was removed.
+        assert "data-generate-mode" not in src
 
     def test_primary_actions_are_per_week_and_per_lesson(self):
         src = _page()

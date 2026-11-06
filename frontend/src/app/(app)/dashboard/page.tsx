@@ -498,11 +498,11 @@ export default function Dashboard() {
                       ) : plan.edition === 'teacher' ? (
                         <>
                           <StatusPill tone="info" className="mb-1 rounded text-[11px] font-bold uppercase tracking-wider">
-                            Kyerɛkyerɛni — Individual Teacher
+                            Individual Teacher
                           </StatusPill>
-                          <h3 className="font-semibold">Kyerɛkyerɛni — Individual Teacher</h3>
+                          <h3 className="font-semibold">Individual Teacher</h3>
                           <p className="text-sm text-muted-foreground">
-                            Individual subscription
+                            {plan.plan_name || 'Individual subscription'}
                           </p>
                         </>
                       ) : (

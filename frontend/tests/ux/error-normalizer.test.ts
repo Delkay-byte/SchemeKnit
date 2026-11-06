@@ -127,3 +127,13 @@ test('503 still surfaces a controlled refusal (PDF converter missing)', () => {
   assert.ok(String(result.message).includes('document converter'))
   assert.equal(result.showBanner, true)
 })
+
+test('provider timeout keeps the safe recoverable explanation', () => {
+  const detail =
+    'Zeli took too long to respond. No lesson plans were saved and no ' +
+    'lesson-plan quota was used. Please try again, or choose Standard generation.'
+  const result = normalizeError(apiError(detail, 504))
+  assert.equal(result.category, 'provider')
+  assert.equal(result.canRetry, true)
+  assert.match(result.message, /no lesson-plan quota was used/i)
+})

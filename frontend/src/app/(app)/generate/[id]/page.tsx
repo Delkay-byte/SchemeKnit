@@ -8,7 +8,7 @@ import { SurfaceCard } from '@/components/ui/surface-card'
 import { Banner } from '@/components/ui/banner'
 import { Select } from '@/components/ui/select'
 import { Field, TextArea } from '@/components/ui/field'
-import { Download, Settings, Play, CheckCircle, FileText, FileSpreadsheet, FileArchive, Loader2, Eye, ChevronDown, ChevronRight } from 'lucide-react'
+import { Download, Settings, Play, CheckCircle, FileText, FileArchive, Loader2, Eye, ChevronDown, ChevronRight } from 'lucide-react'
 import { api, sanitizeTermConfig } from '@/lib/api'
 import { DetailPageSkeleton } from '@/components/ui/skeleton'
 import { normalizeError } from '@/lib/error-normalizer'
@@ -61,6 +61,7 @@ export default function GeneratePage() {
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [errorRequestId, setErrorRequestId] = useState<string | null>(null)
   const [coverage, setCoverage] = useState<CurriculumCoverage | null>(null)
   const [jobId, setJobId] = useState<string | null>(null)
   const [exporting, setExporting] = useState<string | null>(null)
@@ -85,10 +86,6 @@ export default function GeneratePage() {
   // Weeks collapse individually; every week starts expanded so the curriculum
   // is visible without hunting (a long scheme can be collapsed week by week).
   const [collapsedWeeks, setCollapsedWeeks] = useState<number[]>([])
-  // Generation experience (Pattern 7): Quick Generate is the default; Build
-  // with me reveals the generated lesson one section at a time. Persisted so
-  // the teacher's choice survives a reload.
-  const [genMode, setGenMode] = useState<'quick' | 'guided'>('quick')
   const [reviewedLessons, setReviewedLessons] = useState<number | null>(null)
   // Per-lesson review drafts (keywords / Other TLRs / competencies / refs)
   // edited BEFORE generation and applied when lessons are built.
@@ -185,7 +182,7 @@ export default function GeneratePage() {
       term_start_date: saved.term_start_date || prev.term_start_date,
       term_end_date: saved.term_end_date || prev.term_end_date,
       generation_method: (saved.generation_method || prev.generation_method) as any,
-      ai_mode: (saved.ai_mode || prev.ai_mode) as any,
+      ai_mode: 'OFF',
       template_id: saved.template_id || prev.template_id,
       indicator_resources: saved.indicator_resources || {},
     }))
@@ -231,19 +228,14 @@ export default function GeneratePage() {
   })
 
   useEffect(() => {
-    // Restore the teacher's last AI mode choice so it persists across visits.
+    // A method chosen on the upload screen arrives in the URL and is saved
+    // on the scheme; the last-used local value must not override it.
     try {
-      const saved = window.localStorage.getItem('schemeknit.ai_mode')
-      if (saved) setConfig(prev => ({ ...prev, ai_mode: saved as any }))
-      // A method chosen on the upload screen arrives in the URL and is saved
-      // on the scheme; the last-used local value must not override it.
       const queryMethod = new URLSearchParams(window.location.search).get('method')
       const savedMethod = window.localStorage.getItem('schemeknit.generation_method')
       if (!queryMethod && (savedMethod === 'zeli' || savedMethod === 'standard')) {
         setConfig(prev => ({ ...prev, generation_method: savedMethod }))
       }
-      const savedGenMode = window.localStorage.getItem('schemeknit.gen_mode')
-      if (savedGenMode === 'guided' || savedGenMode === 'quick') setGenMode(savedGenMode)
       // Autopilot intent (§17): the upload page's ONE explicit action records
       // it here; a plain visit never auto-generates, so quota is never spent
       // without a teacher click.
@@ -354,7 +346,7 @@ export default function GeneratePage() {
           ...prev,
           generation_method:
             (savedConfig.config.generation_method || prev.generation_method) as TermConfig['generation_method'],
-          ai_mode: (savedConfig.config.ai_mode || prev.ai_mode) as TermConfig['ai_mode'],
+          ai_mode: 'OFF',
           template_id: savedConfig.config.template_id || prev.template_id,
           term: savedConfig.config.term || prev.term,
           term_start_date: savedConfig.config.term_start_date || prev.term_start_date,
@@ -617,6 +609,7 @@ export default function GeneratePage() {
     try {
       setGenerating(true)
       setError(null)
+      setErrorRequestId(null)
       setFinalizationWarning(null)
       setAutopilotOutcome(null)
       setGenProgress('Generating your lesson plans…')
@@ -636,6 +629,7 @@ export default function GeneratePage() {
         selected_occurrence_ids: selection.occurrences,
         request_id: (globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`),
       }
+      setErrorRequestId(body.request_id)
       const response = await api.generateLessonPlans(schemeId, body)
       setJobRecovery(null)
       setJobId(response.job_id)
@@ -658,6 +652,15 @@ export default function GeneratePage() {
       const pendingIds: string[] = Array.isArray(response.pending_occurrence_ids)
         ? response.pending_occurrence_ids
         : []
+      const failedItems: Array<any> = Array.isArray(response.failed)
+        ? response.failed
+        : []
+      const failedIds: string[] = Array.isArray(response.failed_occurrence_ids)
+        ? response.failed_occurrence_ids
+        : failedItems.map((item) => item?.source_occurrence_id).filter(Boolean)
+      const rejectedItems: Array<any> = Array.isArray(response.rejected)
+        ? response.rejected
+        : []
       if (plan) {
         // Quota wait / review counts are the SERVER plan's numbers (§20);
         // generated/already/rejected/pending are the run's real response.
@@ -673,13 +676,27 @@ export default function GeneratePage() {
       const readyRows = Array.isArray(response.generated_occurrence_ids)
         ? progress.filter((r) => r.source_occurrence_id && generatedIds.has(r.source_occurrence_id))
         : progress
-      if (rejectedIds.length > 0) {
+      const failedCount = failedIds.length
+      const rejectedCount = rejectedIds.length
+      if (rejectedCount > 0 || failedCount > 0) {
+        const parts = [...rejectedItems, ...failedItems]
+          .map((item) => {
+            const week = item?.week_number ? `Week ${item.week_number}` : 'A lesson'
+            const code = item?.indicator_code ? ` (${item.indicator_code})` : ''
+            return `${week}${code}`
+          })
+          .filter(Boolean)
         setBatchNotice(
-          `${rejectedIds.length} lesson plan${rejectedIds.length === 1 ? '' : 's'} ` +
-          'could not be generated and remain pending. They were not saved and ' +
-          'no quota was charged for them — try those again, or review the source scheme.',
+          `${failedCount + rejectedCount} lesson plan${failedCount + rejectedCount === 1 ? '' : 's'} ` +
+          'could not be generated and remain pending' +
+          (parts.length ? `: ${Array.from(new Set(parts)).join(', ')}` : '') +
+          '. They were not saved and no quota was charged for them — retry ' +
+          'the pending lessons, or review the source scheme.',
         )
-        setGenProgress(`${readyRows.length} lesson plan${readyRows.length === 1 ? '' : 's'} generated; ${rejectedIds.length} remain pending.`)
+        setGenProgress(
+          `${readyRows.length} lesson plan${readyRows.length === 1 ? '' : 's'} generated; ` +
+          `${failedCount + rejectedCount} remain pending.`,
+        )
       } else {
         setBatchNotice(null)
         setGenProgress('Lesson plans generated successfully!')
@@ -693,7 +710,9 @@ export default function GeneratePage() {
       // view; ONE generated lesson opens directly in the workspace below.
       setAutopilotResult(readyRows.length > 1 ? { rows: readyRows } : null)
     } catch (err) {
-      setError(normalizeError(err).message)
+      const normalized = normalizeError(err)
+      setError(normalized.message)
+      setErrorRequestId(normalized.requestId || null)
       setGenProgress('')
     } finally {
       setGenerating(false)
@@ -788,7 +807,9 @@ export default function GeneratePage() {
       await refreshSchemeLessons()
       setAutopilotResult(null)
     } catch (err) {
-      setError(normalizeError(err).message)
+      const normalized = normalizeError(err)
+      setError(normalized.message)
+      setErrorRequestId(normalized.requestId || null)
       setGenProgress('')
     } finally {
       setGenerating(false)
@@ -1301,7 +1322,7 @@ export default function GeneratePage() {
           {jobId && (
             <LessonWorkspace
               jobId={jobId}
-              guided={genMode === 'guided'}
+              guided={false}
               onExport={handleExport}
               exporting={exporting}
               onLessonsLoaded={setReviewedLessons}
@@ -1397,11 +1418,9 @@ export default function GeneratePage() {
                   </dd>
                 </div>
               </dl>
-              {config.generation_method === 'zeli' && (
-                <p className={`mt-3 text-xs ${zeliStatus?.active ? 'text-green-700' : 'text-amber-800'}`} role="status">
-                  {zeliStatus?.active
-                    ? 'Zeli available for this scheme.'
-                    : 'Zeli unavailable — choose Standard generation or configure a provider in the lesson dialog.'}
+              {config.generation_method === 'zeli' && zeliStatus && !zeliStatus.active && (
+                <p className="mt-3 text-xs text-amber-800" role="status">
+                  Zeli is unavailable — choose Standard generation or configure a provider in the lesson dialog.
                 </p>
               )}
               {configSavedAt && (
@@ -1960,48 +1979,17 @@ export default function GeneratePage() {
                   stays generic because this banner serves BOTH flows (PART 22). */}
               {error && scheme && (
                 <Banner tone="danger" className="mt-3" title="Action failed">
-                  {error}
+                  <p>{error}</p>
+                  {errorRequestId && (
+                    <p className="mt-1 text-xs opacity-80">
+                      Reference: <span className="font-mono">{errorRequestId}</span>
+                    </p>
+                  )}
                 </Banner>
               )}
 
               {!jobId ? (
                 <>
-                  {/* Generation experience (Pattern 7). Quick Generate remains
-                      the default; Build with me is opt-in and never asks the
-                      teacher ten questions before delivering a lesson. */}
-                  <div data-generate-mode className="mt-3 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Generation mode">
-                    {([
-                      { key: 'quick', label: 'Quick Generate' },
-                      { key: 'guided', label: 'Build with me' },
-                    ] as const).map((m) => {
-                      const active = genMode === m.key
-                      return (
-                        <button
-                          key={m.key}
-                          type="button"
-                          role="radio"
-                          aria-checked={active}
-                          onClick={() => {
-                            setGenMode(m.key)
-                            try { window.localStorage.setItem('schemeknit.gen_mode', m.key) } catch { /* ignore */ }
-                          }}
-                          className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                            active
-                              ? 'border-[#102A43] bg-[#102A43] text-white'
-                              : 'border-slate-200 bg-white text-[#102A43] hover:bg-slate-50'
-                          }`}
-                        >
-                          {m.label}
-                        </button>
-                      )
-                    })}
-                  </div>
-                  <p className="mt-1 text-center text-xs text-muted-foreground">
-                    {genMode === 'guided'
-                      ? 'Build with me — review one section at a time after generating.'
-                      : 'Quick Generate — one complete draft from your scheme.'}
-                  </p>
-
                   {/* Free Tier allowance (PART C) — the exact line phase17
                       and teachers parse, plus what the scheme may spend. Lives
                       here ONCE (§14), not repeated across cards. */}
@@ -2054,7 +2042,7 @@ export default function GeneratePage() {
                     ) : (
                       <>
                         <Play className="mr-2 h-4 w-4" />
-                        Generate lesson plans
+                        Generate
                       </>
                     )}
                   </Button>
@@ -2096,19 +2084,6 @@ export default function GeneratePage() {
                       {reviewedLessons ?? coverage?.total_generated_lessons ?? 0} lesson plans generated — shown on the left
                     </span>
                   </div>
-                  {aiResult && (
-                    <p className="text-center text-xs text-muted-foreground">
-                      {aiResult.generation_method === 'zeli'
-                        ? aiResult.active && aiResult.lessons_ai > 0
-                          ? `All ${aiResult.lessons_ai} lesson plan${aiResult.lessons_ai === 1 ? '' : 's'} were generated by Zeli.`
-                          : 'Zeli did not produce usable lesson plans for this run — nothing was saved and no quota was used.'
-                        : aiResult.active && aiResult.lessons_ai > 0
-                          ? `Zeli enriched ${aiResult.lessons_ai} lesson${aiResult.lessons_ai === 1 ? '' : 's'}; ${aiResult.lessons_deterministic} used the deterministic engine.`
-                          : aiResult.mode === 'OFF'
-                            ? 'All lessons generated deterministically (Zeli off).'
-                            : 'Zeli unavailable right now — all lessons generated deterministically.'}
-                    </p>
-                  )}
                   <Button className="w-full" variant="outline" asChild>
                     <Link href="/lessons">
                       <Eye className="mr-2 h-4 w-4" />
@@ -2122,10 +2097,6 @@ export default function GeneratePage() {
                   <Button onClick={() => handleExport('pdf')} disabled={exporting === 'pdf'} className="w-full" variant="outline">
                     <Download className="mr-2 h-4 w-4" />
                     {exporting === 'pdf' ? 'Exporting...' : 'Download PDF'}
-                  </Button>
-                  <Button onClick={() => handleExport('xlsx')} disabled={exporting === 'xlsx'} className="w-full" variant="outline">
-                    <FileSpreadsheet className="mr-2 h-4 w-4" />
-                    {exporting === 'xlsx' ? 'Exporting...' : 'Download Register (XLSX)'}
                   </Button>
                   <Button onClick={() => handleExport('zip')} disabled={exporting === 'zip'} className="w-full" variant="outline">
                     <FileArchive className="mr-2 h-4 w-4" />

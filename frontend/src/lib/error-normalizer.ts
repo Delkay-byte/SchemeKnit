@@ -23,6 +23,7 @@ export type ErrorCategory =
   | 'too_large'
   | 'unsupported'
   | 'rate_limit'
+  | 'provider'
   | 'server'
   | 'unknown'
 
@@ -51,6 +52,7 @@ const FRIENDLY_MESSAGES: Record<ErrorCategory, string> = {
   too_large: 'This file is too large. Choose a smaller file and try again.',
   unsupported: 'This file format is not supported. Please choose a supported document.',
   rate_limit: 'Too many requests. Please wait a moment before trying again.',
+  provider: 'The lesson-generation provider could not complete this request. No lesson plans were saved and no quota was used. Please try again.',
   server: 'SchemeKnit is temporarily unavailable. Please try again.',
   unknown: "Something went wrong. Your unsaved work has been kept where possible.",
 }
@@ -287,6 +289,16 @@ export function normalizeError(error: unknown): NormalizedError {
     }
   }
 
+  if (status === 502 || status === 504) {
+    // A provider failure is a controlled, teacher-safe outcome. The backend
+    // message names the provider state and states that nothing was saved and
+    // no quota was used; raw stack traces stay excluded by safeDetail.
+    const detail = safeDetail(api) || safeDetail(body?.detail)
+    if (detail && /(zeli|provider|lesson plan|no quota|not saved)/i.test(detail)) {
+      return { ...base, category: 'provider', message: detail, canRetry: true, showBanner: true }
+    }
+  }
+
   if (status >= 500) {
     // Two distinct cases (the ux-reliability E2E pins both):
     //   * 503 — a CONTROLLED refusal the teacher can act on (quality gate
@@ -341,6 +353,7 @@ const TOAST_TITLES: Partial<Record<ErrorCategory, string>> = {
   too_large: 'File too large',
   unsupported: 'Unsupported file',
   rate_limit: 'Please wait',
+  provider: 'Generation provider unavailable',
   network: 'Connection problem',
   timeout: 'Request timed out',
   maintenance: 'Maintenance in progress',

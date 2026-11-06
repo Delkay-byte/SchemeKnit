@@ -373,8 +373,10 @@ async def activate_individual_license(
 
     # Create or update subscription
     from ..database import EntitlementDB, SubscriptionDB
+    from ..catalogue import display_name
     now = datetime.utcnow()
     duration_days = plan.duration_days or 365
+    package_name = display_name(getattr(plan, "slug", ""), plan.name)
 
     sub = db.query(SubscriptionDB).filter(
         SubscriptionDB.user_id == user.id,
@@ -387,13 +389,13 @@ async def activate_individual_license(
         else:
             sub.expires_at = now + timedelta(days=duration_days)
         sub.status = "active"
-        sub.plan_name = plan.name
+        sub.plan_name = package_name
     else:
         sub = SubscriptionDB(
             id=generate_id(),
             user_id=user.id,
             edition="teacher",
-            plan_name=plan.name,
+            plan_name=package_name,
             status="active",
             started_at=now,
             expires_at=now + timedelta(days=duration_days),

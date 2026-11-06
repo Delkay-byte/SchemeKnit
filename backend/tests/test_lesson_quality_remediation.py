@@ -66,6 +66,25 @@ class TestClassAndHomeAssignments:
         # declare only a Homework row still render the follow-up.
         assert lp.homework == lp.home_assignment
 
+    def test_teacher_competency_selection_is_exact_and_multi(self):
+        from src.curriculum.lesson_builder import build_lesson
+
+        config = _cfg()
+        config.competency_selections = {
+            "week1:0:B7.1.1.1.2": [
+                "Critical Thinking and Problem Solving (CP)",
+                "Communication and Collaboration (CC)",
+                "Digital Literacy (DL)",
+            ],
+        }
+        lp = build_lesson(
+            _alloc("B7.1.1.1.2 Classify input and output devices"), config, "s")
+        assert lp.core_competencies == [
+            "Critical Thinking and Problem Solving (CP)",
+            "Communication and Collaboration (CC)",
+            "Digital Literacy (DL)",
+        ]
+
     def test_assignments_follow_the_indicators_activity_type(self):
         """A practical indicator and a classification indicator must not be
         handed the same task — that was the generic-homework defect."""
