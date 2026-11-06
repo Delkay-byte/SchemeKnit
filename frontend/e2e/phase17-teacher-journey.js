@@ -411,11 +411,9 @@ function attachCapture(page) {
         docx.ok && docx.head.startsWith('PK') && docx.suggested.toLowerCase().endsWith('.docx'),
         docx.ok ? `${docx.suggested} (${docx.size} bytes)` : docx.error)
 
-      const xlsx = await saveDownload(page, 'xlsx', () =>
-        page.click('button:has-text("Download Register (XLSX)")'), 60000)
-      record('[XLSX] download reaches disk and is a real workbook (PK container)',
-        xlsx.ok && xlsx.head.startsWith('PK') && xlsx.suggested.toLowerCase().endsWith('.xlsx'),
-        xlsx.ok ? `${xlsx.suggested} (${xlsx.size} bytes)` : xlsx.error)
+      const registerButtons = await page.locator('button:has-text("Download Register (XLSX)")').count()
+      record('[XLSX] register download is removed', registerButtons === 0,
+        'no Download Register button')
 
       const pdf = await saveDownload(page, 'pdf', () =>
         page.click('button:has-text("Download PDF")'), 120000)

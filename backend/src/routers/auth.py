@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 import hashlib
 import secrets
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Request, Response
 from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from typing import Optional
@@ -914,12 +914,18 @@ async def logout(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    background_tasks: BackgroundTasks = None,
 ):
     """Sign out this session server-side.
 
     The access token is stateless, so logout records its unique ``jti`` until
     the token's natural expiry. Other devices keep their independent sessions;
     the password-version check is unchanged. Only the token id is stored.
+
+    SSO-created sessions (``amr`` claim present) additionally trigger a
+    best-effort, non-blocking revocation at the identity provider. Phase 1
+    never stores IdP refresh tokens, so the hook is a safeguarded no-op until
+    refresh-token storage is added; it must never delay or fail the logout.
     """
     payload = decode_token(credentials.credentials)
     jti = payload.get("jti")
@@ -945,6 +951,14 @@ async def logout(
         if session is not None and session.revoked_at is None:
             session.revoked_at = datetime.utcnow()
             db.commit()
+    # Best-effort IdP revocation for SSO sessions (never blocks/fails logout).
+    if isinstance(payload.get("amr"), list):
+        try:
+            from .. import oidc_client
+            if get_settings().PLATFORM_OIDC_ENABLED:
+                background_tasks.add_task(oidc_client.revoke_idp_token, None)
+        except Exception:
+            pass
     # Bounded cleanup: expired rows can never match a live token.
     try:
         db.query(RevokedTokenDB).filter(
@@ -1152,8 +1166,76 @@ async def get_my_plan(
     """
     from ..entitlements import resolve_entitlement
     from .. import credits
+    from ..database import (
+        CreditBalanceDB, SubscriptionPlanDB, SubscriptionTransactionDB,
+    )
     resolved = resolve_entitlement(db, user)
     resolved["credits"] = credits.status(db, user.id)
+    latest = (db.query(SubscriptionTransactionDB)
+              .filter(SubscriptionTransactionDB.user_id == user.id,
+                      SubscriptionTransactionDB.status == "success")
+              .order_by(SubscriptionTransactionDB.paid_at.desc())
+              .first())
+    # Prefer an entitlement that is actually still live. A timed package that
+    # expired must not hide a flexible credit pack the teacher still owns.
+    from .. import paystack
+    live = paystack.active_purchase_entitlements(db, user.id)
+    if live:
+        live_reference = live[0].reference
+        live_tx = (db.query(SubscriptionTransactionDB)
+                   .filter(SubscriptionTransactionDB.user_id == user.id,
+                           SubscriptionTransactionDB.reference == live_reference)
+                   .first())
+        if live_tx is not None:
+            latest = live_tx
+    if latest is not None:
+        plan = db.query(SubscriptionPlanDB).filter(
+            SubscriptionPlanDB.id == latest.plan_id).first()
+        # The purchase snapshot is authoritative: a later catalogue edit must
+        # not relabel what the teacher already bought.
+        details = (latest.payment_details
+                   if isinstance(latest.payment_details, dict) else {})
+        snapshot = (details.get("package_snapshot")
+                    if isinstance(details.get("package_snapshot"), dict) else {})
+        fulfilment = paystack.fulfilment_state(db, latest)
+        purchase_ent = paystack.purchase_entitlement(db, latest.reference)
+        kind = (purchase_ent.kind if purchase_ent is not None else
+                snapshot.get("package_kind")
+                or (getattr(plan, "package_kind", "") if plan else ""))
+        expires_at = (purchase_ent.expires_at
+                      if purchase_ent is not None else None)
+        if kind == "flexible":
+            expires_at = None
+        granted = 0
+        remaining = 0
+        used = 0
+        if purchase_ent is not None:
+            grant = db.query(CreditBalanceDB).filter(
+                CreditBalanceDB.grant_key == f"package:{latest.reference}").first()
+            if grant is not None:
+                granted = int(grant.credits_granted or 0)
+                remaining = int(grant.credits_remaining or 0)
+                used = max(granted - remaining, 0)
+        resolved["active_package"] = {
+            "slug": snapshot.get("slug") or (plan.slug if plan else ""),
+            "name": snapshot.get("name") or (plan.name if plan else ""),
+            "kind": kind,
+            "credits_granted": granted,
+            "credits_used": used,
+            "credits_remaining": remaining,
+            "paid_at": latest.paid_at.isoformat() if latest.paid_at else None,
+            "amount_pesewas": int(latest.amount_pesewas or 0),
+            "payment_method": latest.payment_method or "",
+            "channel": latest.channel or "",
+            "fulfilment_status": fulfilment,
+            "entitlement_status": (
+                purchase_ent.status if purchase_ent is not None else
+                ("active" if fulfilment == "activated" else fulfilment)),
+            "expires_at": expires_at.isoformat() if expires_at else None,
+            "reference": latest.reference,
+        }
+    else:
+        resolved["active_package"] = None
     return resolved
 
 

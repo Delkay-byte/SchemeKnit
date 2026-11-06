@@ -39,7 +39,6 @@ from .allocation_engine import AllocationEngine
 from .coverage_validator import CoverageValidator
 from .docx_export import DOCXExportEngine, default_template_for_lessons
 from .pdf_export import PDFExportEngine
-from .xlsx_export import XLSXExportEngine
 from .zip_export import ZIPExportEngine
 from .template_engine import (
     get_visible_sections,
@@ -170,7 +169,6 @@ class GenerationPipeline:
         self.coverage_validator = CoverageValidator()
         self.docx_engine = DOCXExportEngine()
         self.pdf_engine = PDFExportEngine()
-        self.xlsx_engine = XLSXExportEngine()
         self.zip_engine = ZIPExportEngine()
 
     def generate_all(
@@ -400,14 +398,6 @@ class GenerationPipeline:
             lesson_plans, template=template, output_path=output_path,
             render_context=context)
 
-    def export_xlsx(
-        self,
-        lesson_plans: List[LessonPlan],
-        output_path: Path = Path("exports/register.xlsx"),
-        title: str = "Lesson Plan Register",
-    ) -> Path:
-        return self.xlsx_engine.export_register(lesson_plans, output_path, title)
-
     def export_zip(
         self,
         lesson_plans: List[LessonPlan],
@@ -441,6 +431,86 @@ class GenerationPipeline:
         context: dict = None,
     ) -> List[Path]:
         return self.docx_engine.export_batch_custom(lesson_plans, structure, output_dir, context=context)
+
+    def _strip_cross_phase_repetition(self, lp: LessonPlan) -> None:
+        """Remove copied Starter/Plenary content from Main Learning.
+
+        Providers sometimes restate the opening move as the first main step
+        and repeat the exit check in the plenary. Every phase must have ONE
+        pedagogical purpose. This pass removes only text that duplicates
+        another phase's sentence (exact, or >= 0.85 token overlap); it never
+        rewrites or invents a teaching move.
+        """
+        import re
+
+        def sentences(text: str) -> list:
+            return [s.strip() for s in re.split(r"(?<=[.!?])\s+", text or "")
+                    if s.strip()]
+
+        def norm(text: str) -> str:
+            return re.sub(r"[^a-z0-9 ]+", " ", (text or "").lower()).strip()
+
+        def tokens(text: str) -> set:
+            return {w for w in norm(text).split() if len(w) > 3}
+
+        def overlap(a: str, b: str) -> float:
+            ta, tb = tokens(a), tokens(b)
+            if not ta or not tb:
+                return 0.0
+            return len(ta & tb) / len(ta | tb)
+
+        starter = " ".join([
+            getattr(lp, "introduction", "") or "",
+            getattr(lp, "starter_activity", "") or "",
+        ])
+        closing = getattr(lp, "conclusion", "") or ""
+        starter_norms = {norm(s) for s in sentences(starter)}
+        closing_norms = {norm(s) for s in sentences(closing)}
+        closing_has_exit = "exit check" in closing.lower()
+
+        def _keep(sentence: str) -> bool:
+            key = norm(sentence)
+            if not key:
+                return False
+            if key in starter_norms or key in closing_norms:
+                return False
+            if closing_has_exit and "exit check" in sentence.lower():
+                return False
+            if any(overlap(sentence, s) >= 0.85 for s in sentences(starter)):
+                return False
+            return True
+
+        def _clean_rows(rows):
+            out = []
+            for row in rows or []:
+                desc = (getattr(row, "description", "") or "").strip()
+                if not desc:
+                    continue
+                label = (getattr(row, "phase", "") or "").upper()
+                is_main = not any(k in label for k in ("STARTER", "PHASE 1"))
+                if not is_main:
+                    out.append(row)
+                    continue
+                kept = [s for s in sentences(desc) if _keep(s)]
+                if not kept:
+                    continue
+                row.description = " ".join(kept)
+                out.append(row)
+            return out
+
+        cleaned_main = _clean_rows(getattr(lp, "main_activities", None))
+        # Never empty the main phase: if every row was a verbatim copy, keep
+        # the first non-boundary row so the lesson still has a main body.
+        if not cleaned_main and lp.main_activities:
+            fallback = [
+                r for r in lp.main_activities
+                if not any(k in (r.phase or "").upper()
+                           for k in ("STARTER", "PHASE 1", "PLENARY", "PHASE 3"))
+            ]
+            cleaned_main = fallback[:1] or list(lp.main_activities)
+        lp.main_activities = cleaned_main
+        lp.teacher_activities = _clean_rows(getattr(lp, "teacher_activities", None))
+        lp.learner_activities = _clean_rows(getattr(lp, "learner_activities", None))
 
     def _complete_zeli_timeline(self, lp: LessonPlan,
                                 content: Optional[dict] = None) -> None:
@@ -636,6 +706,7 @@ class GenerationPipeline:
             # whole_lesson=True lets the provider's own teaching moves,
             # materials and prior knowledge replace the deterministic scaffold.
             self._apply_v2_content(lp, content, config, whole_lesson=True)
+            self._strip_cross_phase_repetition(lp)
             self._complete_zeli_timeline(lp, content)
 
             lp.ai_generated = True
@@ -713,6 +784,7 @@ class GenerationPipeline:
             except ZeliGenerationError:
                 continue
             self._apply_v2_content(lp, content, config, whole_lesson=True)
+            self._strip_cross_phase_repetition(lp)
             self._complete_zeli_timeline(lp, content)
             lp.generation_method = "zeli"
             lp.ai_generated = True
@@ -1395,22 +1467,17 @@ class GenerationPipeline:
             ai_resources.extend(_clean_resources(
                 resources_block.get("suggested_alternatives", [])))
         # Do NOT pull "source_resources" from AI — source comes from the scheme.
-        if ai_resources:
-            if whole_lesson:
-                # The provider chose the materials for its own activities.
-                # Keep the source TLRs (authoritative) and teacher-added TLRs,
-                # but drop the deterministic scaffold's generic science kit
-                # ("hand lens", "containers", ...), which does not describe
-                # this lesson and bloated the printed resource row.
-                lp.teaching_learning_resources = _merge_unique(
-                    list(lp.source_tlrs or []) + list(lp.other_tlrs or []),
-                    ai_resources,
-                )
-            else:
-                lp.teaching_learning_resources = _merge_unique(
-                    list(lp.source_tlrs or []) + list(lp.other_tlrs or []),
-                    _merge_unique(lp.teaching_learning_resources, ai_resources),
-                )
+        if whole_lesson:
+            # Part F: a whole-lesson provider chooses its own teaching moves,
+            # but the PRINTED materials stay teacher/scheme owned. Provider
+            # suggestions may not become required TLRs.
+            lp.teaching_learning_resources = _merge_unique(
+                list(lp.source_tlrs or []), list(lp.other_tlrs or []))
+        elif ai_resources:
+            lp.teaching_learning_resources = _merge_unique(
+                list(lp.source_tlrs or []) + list(lp.other_tlrs or []),
+                _merge_unique(lp.teaching_learning_resources, ai_resources),
+            )
 
     def _lesson_to_dict(self, lp: LessonPlan) -> dict:
         """Convert a LessonPlan to a dict for the quality gate."""

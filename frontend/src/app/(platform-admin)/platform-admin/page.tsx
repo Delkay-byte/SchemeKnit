@@ -31,7 +31,7 @@ import { MfaSettingsCard } from '@/components/mfa-settings-card'
 import { MfaEnrollPanel } from '@/components/mfa-enroll-panel'
 import { normalizeError } from '@/lib/error-normalizer'
 
-type Tab = 'dashboard' | 'schools' | 'licenses' | 'plans' | 'teachers' | 'payments' | 'activations' | 'audit' | 'accounts' | 'settings'
+type Tab = 'dashboard' | 'schools' | 'licenses' | 'plans' | 'teachers' | 'payments' | 'purchases' | 'activations' | 'audit' | 'accounts' | 'settings'
 
 /**
  * Smart account filter: case-insensitive, whitespace-tolerant, multi-token.
@@ -76,6 +76,10 @@ export default function PlatformAdminPage() {
 
   // Payments data
   const [payments, setPayments] = useState<any[]>([])
+  const [paystackPurchases, setPaystackPurchases] = useState<any[]>([])
+  const [purchaseSummary, setPurchaseSummary] = useState<any>(null)
+  const [purchaseFilter, setPurchaseFilter] = useState('')
+  const [reconcileBusy, setReconcileBusy] = useState<string | null>(null)
 
   // Activations data
   const [activations, setActivations] = useState<any[]>([])
@@ -193,6 +197,12 @@ export default function PlatformAdminPage() {
         case 'payments':
           const pay = await api.listPlatformPayments()
           setPayments(pay.payments || [])
+          break
+        case 'purchases':
+          const purchases = await api.listPlatformPaystackPurchases(
+            undefined, purchaseFilter || undefined)
+          setPaystackPurchases(purchases.purchases || [])
+          setPurchaseSummary(purchases.summary || null)
           break
         case 'activations':
           const [act, indAct] = await Promise.all([
@@ -548,7 +558,7 @@ export default function PlatformAdminPage() {
             aria-label="Console sections"
             className="h-auto max-w-full flex-wrap justify-start gap-1 bg-transparent p-0"
           >
-            {(['dashboard', 'schools', 'licenses', 'plans', 'teachers', 'payments', 'activations', 'audit', 'accounts', 'settings'] as Tab[]).map((tab) => (
+            {(['dashboard', 'schools', 'licenses', 'plans', 'teachers', 'payments', 'purchases', 'activations', 'audit', 'accounts', 'settings'] as Tab[]).map((tab) => (
               <TabsTrigger
                 key={tab}
                 value={tab}
@@ -614,6 +624,14 @@ export default function PlatformAdminPage() {
                   <SurfaceCard className="px-5 py-4">
                     <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Pending Payments</p>
                     <p className="mt-1.5 text-2xl font-bold text-[#102A43]">{dashboard.pending_payments}</p>
+                  </SurfaceCard>
+                  <SurfaceCard className="px-5 py-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Paystack Sales Today</p>
+                    <p className="mt-1.5 text-2xl font-bold text-[#102A43]">{dashboard.paystack_sales_today ?? 0}</p>
+                  </SurfaceCard>
+                  <SurfaceCard className="px-5 py-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Purchases Needing Activation</p>
+                    <p className="mt-1.5 text-2xl font-bold text-amber-700">{dashboard.paystack_attention ?? 0}</p>
                   </SurfaceCard>
                   <SurfaceCard className="px-5 py-4">
                     <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Verified Revenue</p>
@@ -940,6 +958,153 @@ export default function PlatformAdminPage() {
                     </TableBody>
                   </Table>
                 </SurfaceCard>
+                )}
+              </div>
+            )}
+
+            {/* Paystack Purchases Tab */}
+            {activeTab === 'purchases' && (
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-semibold text-[#102A43]">
+                      Paystack purchases ({paystackPurchases.length})
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      Verified payments and their licence/credit fulfilment. Payment
+                      success is not the same as activation.
+                    </p>
+                  </div>
+                  <select
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    value={purchaseFilter}
+                    onChange={(event) => {
+                      const value = event.target.value
+                      setPurchaseFilter(value)
+                      api.listPlatformPaystackPurchases(undefined, value || undefined)
+                        .then((data) => {
+                          setPaystackPurchases(data.purchases || [])
+                          setPurchaseSummary(data.summary || null)
+                        })
+                        .catch((err) => setError(normalizeError(err).message))
+                    }}
+                    data-purchase-filter
+                  >
+                    <option value="">All purchases</option>
+                    <option value="activated">Activated</option>
+                    <option value="needs_attention">Fulfilment pending</option>
+                    <option value="payment_failed">Payment failed</option>
+                    <option value="payment_reversed">Reversed/refunded</option>
+                    <option value="notification_failed">Notification failed</option>
+                  </select>
+                </div>
+
+                {purchaseSummary && (
+                  <div className="grid gap-3 sm:grid-cols-4">
+                    {[
+                      ['Activated', purchaseSummary.activated || 0],
+                      ['Needs attention', purchaseSummary.needs_attention || 0],
+                      ['Failed', purchaseSummary.payment_failed || 0],
+                      ['Notification failed', purchaseSummary.notification_failed || 0],
+                    ].map(([label, value]) => (
+                      <SurfaceCard key={String(label)} className="px-4 py-3">
+                        <p className="text-xs uppercase text-slate-500">{label}</p>
+                        <p className="mt-1 text-xl font-bold text-[#102A43]">{String(value)}</p>
+                      </SurfaceCard>
+                    ))}
+                  </div>
+                )}
+
+                {paystackPurchases.length === 0 ? (
+                  <SurfaceCard className="px-6 py-10 text-center">
+                    <p className="font-medium text-[#102A43]">No Paystack purchases</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Successful and failed online purchases appear here with their
+                      fulfilment evidence.
+                    </p>
+                  </SurfaceCard>
+                ) : (
+                  <SurfaceCard className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50 hover:bg-muted/50">
+                          <TableHead>Customer / reference</TableHead>
+                          <TableHead>Package</TableHead>
+                          <TableHead className="text-right">Amount</TableHead>
+                          <TableHead>Payment</TableHead>
+                          <TableHead>Fulfilment</TableHead>
+                          <TableHead>Licence / credits</TableHead>
+                          <TableHead>Notifications</TableHead>
+                          <TableHead className="text-right">Action</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {paystackPurchases.map((p) => (
+                          <TableRow key={p.reference} data-purchase-row={p.reference}>
+                            <TableCell>
+                              <p className="font-medium text-[#102A43]">{p.customer?.email || p.customer?.id}</p>
+                              <p className="font-mono text-[11px] text-muted-foreground">{p.reference}</p>
+                              <p className="text-[11px] text-muted-foreground">
+                                {p.paid_at ? new Date(p.paid_at).toLocaleString() : '—'}
+                              </p>
+                            </TableCell>
+                            <TableCell>{p.plan || p.package?.name || '—'}</TableCell>
+                            <TableCell className="text-right font-semibold">
+                              {formatCurrency((p.amount_pesewas || 0) / 100)}
+                            </TableCell>
+                            <TableCell>
+                              <StatusPill tone={p.payment_status === 'success' ? 'success' : p.payment_status === 'pending' ? 'warning' : 'danger'}>
+                                {p.payment_status}
+                              </StatusPill>
+                            </TableCell>
+                            <TableCell>
+                              <StatusPill tone={p.fulfilment_status === 'activated' ? 'success' : p.fulfilment_status === 'needs_attention' ? 'warning' : 'danger'}>
+                                {p.fulfilment_status}
+                              </StatusPill>
+                            </TableCell>
+                            <TableCell>
+                              <p className="text-xs">{p.licence_issued ? `Licence ${p.licence_status}` : 'No licence'}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {p.credits_granted} granted · {p.credits_remaining} left
+                              </p>
+                            </TableCell>
+                            <TableCell>
+                              <p className="text-xs">Customer: {p.notifications?.customer?.status || 'pending'}</p>
+                              <p className="text-xs">Owner: {p.notifications?.owner?.status || 'pending'}</p>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {p.fulfilment_status !== 'activated' && p.payment_status === 'success' && (
+                                <Button
+                                  size="sm"
+                                  disabled={reconcileBusy === p.reference}
+                                  onClick={() => {
+                                    const reason = window.prompt(
+                                      `Reconcile ${p.reference}. Enter the support reason:`,
+                                      'Verified Paystack success; completing missing entitlement.',
+                                    )
+                                    if (!reason || reason.trim().length < 5) return
+                                    setPendingConfirm({
+                                      title: 'Reconcile purchase',
+                                      message: `Verify ${p.reference} with Paystack and complete any missing licence/credits? This is idempotent and does not create a charge.`,
+                                      onConfirm: () => {
+                                        setReconcileBusy(p.reference)
+                                        return api.reconcilePlatformPurchase(p.reference, reason.trim())
+                                          .then(() => loadTabData('purchases'))
+                                          .catch((err) => setError(normalizeError(err).message))
+                                          .finally(() => setReconcileBusy(null))
+                                      },
+                                    })
+                                  }}
+                                >
+                                  {reconcileBusy === p.reference ? 'Checking…' : 'Reconcile'}
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </SurfaceCard>
                 )}
               </div>
             )}

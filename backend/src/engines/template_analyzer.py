@@ -128,7 +128,8 @@ PHASE_MARKER_RE = re.compile(r"^\s*phase\s+\d+", re.IGNORECASE)
 # e.g. "Phase/Duration | Learners Activities | Resources".
 PHASE_COL_KEYWORDS = ("phase", "duration", "stage", "step", "time")
 ACTIVITY_COL_KEYWORDS = ("activit", "learner", "pupil", "student", "task", "group work", "class work")
-RESOURCE_COL_KEYWORDS = ("resource", "material", "tlm", "tlrs", "teaching aid", "apparatus")
+RESOURCE_COL_KEYWORDS = ("resource", "material", "tlm", "tlrs", "teaching aid",
+                         "apparatus", "assessment")
 
 
 def _col_kind(label: Optional[str]) -> Optional[str]:

@@ -1166,6 +1166,44 @@ class UserLicenseDB(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class PurchaseEntitlementDB(Base):
+    """One purchased entitlement, with its own lifecycle.
+
+    A flexible credit pack and a time-limited package are separate commercial
+    products and must never share an expiry. Each verified transaction owns one
+    row keyed by its payment reference:
+
+    * ``kind='flexible'`` — ``expires_at`` is NULL; the pack stays valid while
+      its credit bucket remains.
+    * ``kind='timed'`` — ``expires_at`` is the package period end. Expiring it
+      never changes a flexible pack or an unrelated credit bucket.
+
+    ``UserLicenseDB`` remains the internal, single-per-account licence mirror
+    for compatibility/admin. Fulfilment and access decisions are keyed by
+    ``reference`` here, so one expired product cannot make another purchase
+    look unfulfilled.
+    """
+    __tablename__ = "purchase_entitlements"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    reference = Column(String, unique=True, nullable=False, index=True)
+    plan_id = Column(String, ForeignKey("subscription_plans.id"), nullable=True)
+    package_slug = Column(String, default="")
+    package_name = Column(String, default="")
+    kind = Column(String, default="timed", nullable=False)  # flexible|timed
+    status = Column(String, default="active", nullable=False)  # active|expired|revoked
+    starts_at = Column(DateTime, nullable=True)
+    expires_at = Column(DateTime, nullable=True)  # NULL for flexible packs
+    licence_id = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_purchase_entitlement_user_status", "user_id", "status"),
+    )
+
+
 class CreditBalanceDB(Base):
     """One auditable credit bucket for a user.
 
@@ -1403,11 +1441,32 @@ class UserSessionDB(Base):
     last_seen_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     expires_at = Column(DateTime, nullable=False, index=True)
     revoked_at = Column(DateTime, nullable=True)
+    # Provenance (Phase 1.1). NULL on rows created before v053, which are
+    # treated as local sessions: central revocation never touches them.
+    auth_source = Column(String, nullable=True)  # 'local' | 'sso'
+    idp_sub = Column(String, nullable=True)  # immutable Authentik uid
+    idp_sid = Column(String, nullable=True)  # OIDC session id
 
     __table_args__ = (
         Index("ix_user_sessions_user", "user_id", "revoked_at"),
         Index("ix_user_sessions_expiry", "expires_at"),
+        Index("ix_user_sessions_idp_sub", "idp_sub"),
+        Index("ix_user_sessions_idp_sid", "idp_sid"),
     )
+
+
+class OidcRevocationEventDB(Base):
+    """Processed revocation message ids — replay and duplicate protection.
+
+    A revocation or IdP logout token is applied at most once. Repeated delivery
+    is acknowledged (idempotent) instead of revoking again or erroring.
+    """
+
+    __tablename__ = "oidc_revocation_events"
+
+    event_id = Column(String, primary_key=True)
+    source = Column(String, nullable=False, default="control_center")
+    received_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 
 class LoginFailureDB(Base):
@@ -1428,6 +1487,31 @@ class LoginFailureDB(Base):
     last_lockout_at = Column(DateTime, nullable=True)
     lockout_until = Column(DateTime, nullable=True, index=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class PlatformAdminOidcLinkDB(Base):
+    """Platform-admin account link to the central BloomCore Identity (OIDC).
+
+    One row binds a local ``platform_admin`` user to a single IdP subject
+    (``idp_sub``) at a specific ``issuer``. A row is written only after the
+    Control Center linking flow succeeds: either the association is already
+    ``verified`` centrally, or the admin proved the local password
+    (``linked_via='local_credential_proof'``) for a pending declaration.
+    No credential material is stored here.
+    """
+    __tablename__ = "platform_admin_oidc_links"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    issuer = Column(String, nullable=False)
+    idp_sub = Column(String, nullable=False, unique=True, index=True)
+    linked_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    linked_via = Column(String, default="local_credential_proof", nullable=False)
+    created_by = Column(String, default="", nullable=False)
+
+    __table_args__ = (
+        Index("ix_oidc_links_issuer_sub", "issuer", "idp_sub"),
+    )
 
 
 class StorageLedgerDB(Base):

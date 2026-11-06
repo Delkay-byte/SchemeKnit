@@ -14,13 +14,13 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, Optional, Tuple
 
 import requests
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
 from sqlalchemy.orm import Session
 
 from .database import (
-    EntitlementDB, PaystackWebhookEventDB, SubscriptionEventDB,
-    SubscriptionPlanDB, SubscriptionTransactionDB, User, UserLicenseDB,
-    UserSubscriptionDB, generate_id,
+    EntitlementDB, PaystackWebhookEventDB, PurchaseEntitlementDB,
+    SubscriptionEventDB, SubscriptionPlanDB, SubscriptionTransactionDB, User,
+    UserLicenseDB, UserSubscriptionDB, generate_id,
 )
 
 logger = logging.getLogger(__name__)
@@ -102,6 +102,23 @@ def environment() -> str:
     if currency() != "GHS":
         raise PaystackError("Paystack currency must be GHS.", 503)
     return env
+
+
+def package_snapshot(plan: SubscriptionPlanDB) -> dict:
+    """Immutable package details captured at purchase initiation."""
+    entitlement = dict(plan.entitlements or {})
+    return {
+        "plan_id": plan.id,
+        "slug": plan.slug,
+        "name": plan.name,
+        "package_kind": getattr(plan, "package_kind", "") or "timed",
+        "price_pesewas": int(plan.price_pesewas or 0),
+        "currency": plan.currency or "GHS",
+        "credits": int(getattr(plan, "credit_allowance", 0) or 0)
+        or int(entitlement.get("credit_allowance", 0) or 0),
+        "duration_days": int(plan.duration_days or 0),
+        "credit_validity_days": getattr(plan, "credit_validity_days", None),
+    }
 
 
 def plan_code(plan: SubscriptionPlanDB) -> str:
@@ -293,9 +310,13 @@ def _update_entitlement(db: Session, user_id: str, plan: SubscriptionPlanDB,
     ent.status = "active"
     ent.source = "paystack"
     # A flexible pack has no period of its own; it must not clear an active
-    # timed package's expiry.
-    if is_timed or ent.expires_at is None:
+    # timed package's expiry. It DOES clear an already-elapsed expiry, because
+    # the shared entitlement row is what grants access and the new pack is
+    # still valid.
+    if is_timed:
         ent.expires_at = paid_through
+    elif ent.expires_at is not None and ent.expires_at < datetime.utcnow():
+        ent.expires_at = None
     ent.generation_limit = int(cfg.get("generation_limit", 0) or 0)
     ent.batch_generation = bool(cfg.get("batch_generation", True))
     ent.zip_export = bool(cfg.get("zip_export", True))
@@ -313,6 +334,394 @@ def _event(db: Session, sub: UserSubscriptionDB, kind: str,
     ))
 
 
+def _plan_credit_allowance(plan: SubscriptionPlanDB) -> int:
+    entitlement = (plan.entitlements or {}) if plan is not None else {}
+    return int(getattr(plan, "credit_allowance", 0) or 0) or int(
+        entitlement.get("credit_allowance", 0) or 0)
+
+
+def _tx_package(tx: SubscriptionTransactionDB,
+                plan: SubscriptionPlanDB) -> Dict[str, Any]:
+    """The immutable package snapshot, or a safe live-plan fallback."""
+    details = tx.payment_details if isinstance(tx.payment_details, dict) else {}
+    snapshot = details.get("package_snapshot")
+    if isinstance(snapshot, dict) and snapshot.get("slug"):
+        return snapshot
+    return package_snapshot(plan)
+
+
+def _with_fulfilment_state(details: Any, **values: Any) -> dict:
+    out = dict(details) if isinstance(details, dict) else {}
+    current = out.get("fulfilment")
+    fulfilment = dict(current) if isinstance(current, dict) else {}
+    fulfilment.update(values)
+    out["fulfilment"] = fulfilment
+    return out
+
+
+def _credit_grant_for(db: Session, tx: SubscriptionTransactionDB):
+    from .database import CreditBalanceDB
+
+    return (db.query(CreditBalanceDB)
+            .filter(CreditBalanceDB.grant_key == f"package:{tx.reference}")
+            .first())
+
+
+def purchase_entitlement(db: Session, reference: str) -> Optional[PurchaseEntitlementDB]:
+    """The entitlement row owned by one transaction reference (or None).
+
+    Tolerates a database that has not yet applied v054 (rolling deploy or a
+    read-only reconciliation before migration): callers fall back to the
+    legacy licence/credit evidence instead of failing.
+    """
+    try:
+        return (db.query(PurchaseEntitlementDB)
+                .filter(PurchaseEntitlementDB.reference == reference).first())
+    except (ProgrammingError, OperationalError):
+        db.rollback()
+        return None
+
+
+def active_purchase_entitlements(db: Session, user_id: str,
+                                 now: Optional[datetime] = None,
+                                 ) -> list[PurchaseEntitlementDB]:
+    """Live purchased entitlements: flexible always, timed only while in date."""
+    now = now or datetime.utcnow()
+    try:
+        rows = (db.query(PurchaseEntitlementDB)
+                .filter(PurchaseEntitlementDB.user_id == user_id,
+                        PurchaseEntitlementDB.status == "active")
+                .order_by(PurchaseEntitlementDB.starts_at.desc()).all())
+    except (ProgrammingError, OperationalError):
+        db.rollback()
+        return []
+    return [row for row in rows
+            if row.kind == "flexible"
+            or row.expires_at is None
+            or row.expires_at > now]
+
+
+def has_live_flexible_entitlement(db: Session, user_id: str) -> bool:
+    """True when the teacher still owns a flexible pack (independent of time)."""
+    try:
+        return (db.query(PurchaseEntitlementDB.id)
+                .filter(PurchaseEntitlementDB.user_id == user_id,
+                        PurchaseEntitlementDB.kind == "flexible",
+                        PurchaseEntitlementDB.status == "active").first()) is not None
+    except (ProgrammingError, OperationalError):
+        db.rollback()
+        return False
+
+
+def _record_purchase_entitlement(
+    db: Session, tx: SubscriptionTransactionDB, plan: SubscriptionPlanDB,
+    user: User, sub: Optional[UserSubscriptionDB],
+    lic: Optional[UserLicenseDB], paid_at: datetime, snapshot: dict,
+) -> PurchaseEntitlementDB:
+    """Upsert the entitlement row for this exact transaction.
+
+    Idempotent: the row is keyed by the payment reference, so repeated
+    webhook/verify/reconcile deliveries update the same entitlement. A timed
+    row already expired by its own lifecycle is never resurrected by a repair.
+    """
+    kind = snapshot.get("package_kind") or "timed"
+    ent = purchase_entitlement(db, tx.reference)
+    if ent is None:
+        ent = PurchaseEntitlementDB(
+            id=generate_id(), user_id=user.id, reference=tx.reference,
+            status="active",
+        )
+        db.add(ent)
+    ent.plan_id = plan.id if plan is not None else tx.plan_id
+    ent.package_slug = (snapshot.get("slug")
+                        or (plan.slug if plan is not None else ""))
+    ent.package_name = (snapshot.get("name")
+                        or (plan.name if plan is not None else ""))
+    ent.kind = kind
+    ent.starts_at = paid_at
+    if kind == "timed":
+        duration = int(snapshot.get("duration_days")
+                       or (plan.duration_days if plan is not None else 0) or 0)
+        if sub is not None and sub.paid_through:
+            ent.expires_at = sub.paid_through
+        elif duration:
+            ent.expires_at = paid_at + timedelta(days=duration)
+    else:
+        # A flexible credit pack has no subscription period of its own.
+        ent.expires_at = None
+    if ent.status != "revoked":
+        if kind == "timed" and ent.expires_at and ent.expires_at < datetime.utcnow():
+            # A late reconciliation of an already-elapsed period is fulfilled
+            # historically, but it is not a live entitlement.
+            ent.status = "expired"
+        elif ent.status != "expired":
+            ent.status = "active"
+    ent.licence_id = lic.id if lic is not None else ent.licence_id
+    ent.updated_at = datetime.utcnow()
+    return ent
+
+
+def _repair_fulfilment(db: Session, tx: SubscriptionTransactionDB,
+                       plan: SubscriptionPlanDB, user: User,
+                       sub: Optional[UserSubscriptionDB],
+                       lic: Optional[UserLicenseDB]) -> bool:
+    """Heal a successful payment whose licence/credits are missing.
+
+    Safe to repeat: every write is keyed by the original transaction and the
+    credit grant uses the unique ``package:<reference>`` idempotency key.
+    Does not extend a timed package again and does not move the period start.
+    """
+    repaired = False
+    paid_at = tx.paid_at or datetime.utcnow()
+    if tx.paid_at is None:
+        tx.paid_at = paid_at
+        repaired = True
+    snapshot = _tx_package(tx, plan)
+    kind = snapshot.get("package_kind") or "timed"
+    if sub is None:
+        sub = UserSubscriptionDB(
+            id=generate_id(), user_id=user.id, plan_id=plan.id,
+            status="active", billing_mode="prepaid",
+            payment_method=tx.payment_method or "mobile_money",
+            provider=tx.provider or "paystack", environment=tx.environment,
+            current_period_start=paid_at, current_period_end=paid_at,
+            paid_through=paid_at,
+        )
+        if kind == "timed":
+            sub.current_period_end = paid_at + timedelta(
+                days=int(snapshot.get("duration_days") or 0))
+            sub.paid_through = sub.current_period_end
+        db.add(sub)
+        db.flush()
+        repaired = True
+    if lic is None:
+        key = _licence_key()
+        licence_expiry = sub.paid_through if kind == "timed" else None
+        lic = UserLicenseDB(
+            id=generate_id(), user_id=user.id, plan_id=plan.id,
+            subscription_id=sub.id, licence_key=key,
+            key_hash=_hash_key(key), status="active",
+            issued_at=paid_at, starts_at=paid_at, expires_at=licence_expiry,
+            activated_at=paid_at,
+        )
+        db.add(lic)
+        db.flush()
+        repaired = True
+    elif kind == "flexible" and (lic.status != "active"
+                                 or (lic.expires_at
+                                     and lic.expires_at < datetime.utcnow())):
+        # A flexible pack keeps the internal licence usable; a timed package
+        # expiry elsewhere must not revoke it.
+        lic.status = "active"
+        lic.expires_at = None
+        repaired = True
+
+    expected_credits = int(snapshot.get("credits") or 0)
+    balance = _credit_grant_for(db, tx)
+    if expected_credits > 0 and balance is None:
+        from . import credits as credit_service
+
+        balance = credit_service.grant_package(
+            db, user.id, plan, tx.reference, activated_at=paid_at,
+            commit=False,
+            credits_override=expected_credits,
+            kind_override=kind,
+            days_override=snapshot.get("duration_days"),
+            label_override=snapshot.get("name"),
+            slug_override=snapshot.get("slug"),
+        )
+        if balance is None:
+            raise PaystackError(
+                "The package credit grant could not be created.", 500)
+        repaired = True
+
+    _update_entitlement(
+        db, user.id, plan, sub.paid_through or paid_at,
+        is_timed=kind == "timed")
+    _record_purchase_entitlement(
+        db, tx, plan, user, sub, lic, paid_at, snapshot)
+    tx.payment_details = _with_fulfilment_state(
+        tx.payment_details,
+        state="activated",
+        plan_credits=expected_credits,
+        licence_id=lic.id,
+        credit_grant_key=f"package:{tx.reference}" if balance is not None else "",
+        activated_at=(tx.paid_at or paid_at).isoformat(),
+        repaired_at=(datetime.utcnow().isoformat() if repaired else None),
+    )
+    if repaired:
+        _event(db, sub, "fulfilment_repaired", "active", "active",
+               {"reference": tx.reference, "credits": expected_credits})
+    return repaired
+
+
+def fulfilment_state(db: Session, tx: SubscriptionTransactionDB) -> str:
+    """Payment/fulfilment state for the API (never a provider claim).
+
+    Fulfilment is scoped to THIS transaction. A flexible purchase must not be
+    called ``needs_attention`` merely because an unrelated timed package on the
+    same account has expired.
+    """
+    status = str(tx.status or "").lower()
+    if status in ("failed", "expired"):
+        return "payment_failed"
+    if status in ("reversed", "refunded"):
+        return "payment_reversed"
+    if status != "success":
+        if status == "pending" and str(tx.charge_status or "").lower() == "success":
+            # Paystack already confirmed the charge but local activation did
+            # not finish. This is not "pending payment" and must never invite
+            # a second payment.
+            details = tx.payment_details if isinstance(tx.payment_details, dict) else {}
+            fulfilment = details.get("fulfilment") if isinstance(
+                details.get("fulfilment"), dict) else {}
+            return ("needs_attention" if fulfilment.get("error")
+                    else "processing")
+        return "payment_pending"
+    plan = db.query(SubscriptionPlanDB).filter(
+        SubscriptionPlanDB.id == tx.plan_id).first()
+    balance = _credit_grant_for(db, tx)
+    expected = (int((_tx_package(tx, plan) if plan is not None else {})
+                    .get("credits") or 0))
+
+    entitlement = purchase_entitlement(db, tx.reference)
+    lic = None
+    if entitlement is not None and entitlement.licence_id:
+        lic = db.query(UserLicenseDB).filter(
+            UserLicenseDB.id == entitlement.licence_id).first()
+    if lic is None:
+        lic = db.query(UserLicenseDB).filter(
+            UserLicenseDB.user_id == tx.user_id).first()
+    if entitlement is not None:
+        if entitlement.status == "revoked":
+            return "needs_attention"
+        if lic is None or (expected > 0 and balance is None):
+            return "needs_attention"
+        return "activated"
+
+    # Legacy compatibility (records created before v054): the grant/ledger is
+    # the durable proof of fulfilment. An expired licence for a different,
+    # later product is not evidence that this purchase was never fulfilled.
+    if lic is None:
+        return "needs_attention"
+    if expected > 0 and balance is None:
+        return "needs_attention"
+    return "activated"
+
+
+def purchase_payload(db: Session, tx: SubscriptionTransactionDB) -> dict:
+    """Everything the confirmation UI needs, in one redacted object."""
+    from . import credits as credit_service
+
+    plan = db.query(SubscriptionPlanDB).filter(
+        SubscriptionPlanDB.id == tx.plan_id).first()
+    user = db.query(User).filter(User.id == tx.user_id).first()
+    sub = db.query(UserSubscriptionDB).filter(
+        UserSubscriptionDB.user_id == tx.user_id).first()
+    entitlement = purchase_entitlement(db, tx.reference)
+    lic = None
+    if entitlement is not None and entitlement.licence_id:
+        lic = db.query(UserLicenseDB).filter(
+            UserLicenseDB.id == entitlement.licence_id).first()
+    if lic is None:
+        lic = db.query(UserLicenseDB).filter(
+            UserLicenseDB.user_id == tx.user_id).first()
+    balance = _credit_grant_for(db, tx)
+    snapshot = _tx_package(tx, plan) if plan is not None else {}
+    state = fulfilment_state(db, tx)
+    credit_status = credit_service.status(db, tx.user_id) if user else None
+    details = dict(tx.payment_details or {}) if isinstance(tx.payment_details, dict) else {}
+    notifications = details.get("notifications") if isinstance(
+        details.get("notifications"), dict) else {}
+    kind = (entitlement.kind if entitlement is not None else
+            snapshot.get("package_kind") or "")
+    expires_at = entitlement.expires_at if entitlement is not None else None
+    if kind == "flexible":
+        expires_at = None
+    granted = int(balance.credits_granted) if balance is not None else 0
+    remaining = int(balance.credits_remaining) if balance is not None else 0
+    entitlement_status = (entitlement.status if entitlement is not None else
+                          ("active" if state == "activated" else state))
+    return {
+        "reference": tx.reference,
+        "payment_status": (
+            "success" if (tx.status == "success"
+                          or (tx.status == "pending"
+                              and str(tx.charge_status or "").lower() == "success"))
+            else "failed" if tx.status in ("failed", "expired")
+            else "reversed" if tx.status in ("reversed", "refunded")
+            else "pending"),
+        "fulfilment_status": state,
+        "package": {
+            "slug": snapshot.get("slug") or (plan.slug if plan else ""),
+            "name": snapshot.get("name") or (plan.name if plan else ""),
+            "credits": int(snapshot.get("credits") or 0)
+            if snapshot else (_plan_credit_allowance(plan) if plan else 0),
+            "kind": kind,
+        },
+        "amount_pesewas": int(tx.amount_pesewas or 0),
+        "currency": tx.currency or "GHS",
+        "paid_at": tx.paid_at.isoformat() if tx.paid_at else None,
+        "channel": tx.channel or "",
+        "payment_method": tx.payment_method or "",
+        "provider": tx.provider or "",
+        "credits_granted": granted,
+        "credits_used": max(granted - remaining, 0),
+        "credits_remaining": remaining,
+        "entitlement_status": entitlement_status,
+        "expires_at": expires_at.isoformat() if expires_at else None,
+        "credit_balance": credit_status,
+        "licence": _licence_public(lic),
+        "subscription": {
+            "status": sub.status if sub else None,
+            "paid_through": sub.paid_through.isoformat() if sub and sub.paid_through else None,
+        },
+        "notifications": {
+            "customer": notifications.get("customer"),
+            "owner": notifications.get("owner"),
+        },
+        "next_action": (
+            "Your package is active. No further action is needed."
+            if state == "activated" else
+            "Your payment was received. SchemeKnit is completing activation; "
+            "refresh this page shortly or contact support with the reference."
+            if state == "needs_attention" else
+            "Approve the payment on your phone, then refresh this page."
+            if state == "payment_pending" else
+            "This payment did not complete. No credits were issued."
+        ),
+    }
+
+
+def _licence_public(lic: Optional[UserLicenseDB]) -> Optional[dict]:
+    if lic is None:
+        return None
+    return {
+        "key": lic.licence_key,
+        "status": lic.status,
+        "issued_at": lic.issued_at.isoformat() if lic.issued_at else None,
+        "expires_at": lic.expires_at.isoformat() if lic.expires_at else None,
+        "plan_id": lic.plan_id,
+    }
+
+
+def notify_purchase(db: Session, tx: SubscriptionTransactionDB,
+                    user: User, plan: SubscriptionPlanDB,
+                    sub: Optional[UserSubscriptionDB],
+                    lic: Optional[UserLicenseDB]) -> None:
+    """Best-effort, idempotent customer + owner notifications."""
+    try:
+        from . import purchase_notifications
+        purchase_notifications.notify_purchase(
+            db, tx, user, plan, sub, lic)
+    except Exception:
+        # Notification delivery must never undo a paid, activated purchase.
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
+
 def activate_paid_transaction(db: Session, tx: SubscriptionTransactionDB,
                               payload: dict) -> Tuple[UserSubscriptionDB, UserLicenseDB]:
     """Idempotently credit ONE verified transaction and issue/renew the licence."""
@@ -327,10 +736,50 @@ def activate_paid_transaction(db: Session, tx: SubscriptionTransactionDB,
     else:
         db.refresh(tx)
     if tx.status == "success":
+        # Idempotent REPAIR path. A payment must never stay activated in
+        # Paystack while the local licence or credit grant is missing. The
+        # old code returned here unconditionally, so a partial/legacy state
+        # could never heal on a later webhook or verification call.
+        plan = db.query(SubscriptionPlanDB).filter(
+            SubscriptionPlanDB.id == tx.plan_id).first()
+        user = db.query(User).filter(User.id == tx.user_id).first()
         sub = (db.query(UserSubscriptionDB)
                .filter(UserSubscriptionDB.user_id == tx.user_id).first())
         lic = (db.query(UserLicenseDB)
                .filter(UserLicenseDB.user_id == tx.user_id).first())
+        if plan is None or user is None:
+            raise PaystackError("The local payment record is incomplete.", 500)
+        already_fulfilled = fulfilment_state(db, tx) == "activated"
+        if already_fulfilled:
+            # Legacy success records may predate the independent entitlement
+            # table. Backfill it idempotently so future expiry checks and the
+            # dashboard are transaction-scoped, without touching credits.
+            if purchase_entitlement(db, tx.reference) is None:
+                snapshot = _tx_package(tx, plan)
+                _record_purchase_entitlement(
+                    db, tx, plan, user, sub, lic,
+                    tx.paid_at or datetime.utcnow(), snapshot)
+                db.commit()
+                db.refresh(sub)
+                if lic is not None:
+                    db.refresh(lic)
+            notify_purchase(db, tx, user, plan, sub, lic)
+            return sub, lic
+        try:
+            repaired = _repair_fulfilment(db, tx, plan, user, sub, lic)
+        except Exception:
+            # Keep the successful payment visible and notify honestly, then
+            # let the caller report the activation problem.
+            notify_purchase(db, tx, user, plan, sub, lic)
+            raise
+        if repaired:
+            db.commit()
+            db.refresh(sub)
+            lic = (db.query(UserLicenseDB)
+                   .filter(UserLicenseDB.user_id == tx.user_id).first())
+            if lic is not None:
+                db.refresh(lic)
+        notify_purchase(db, tx, user, plan, sub, lic)
         return sub, lic
     if tx.status in ("failed", "reversed", "refunded"):
         # A failed/reversed payment must never be activated by a late or
@@ -363,15 +812,15 @@ def activate_paid_transaction(db: Session, tx: SubscriptionTransactionDB,
         db.flush()
     old_status = sub.status or ""
 
-    # A flexible credit pack is not a period-limited package: it must never
-    # shorten an existing timed package, and it has no expiry of its own.
-    kind = getattr(plan, "package_kind", "") or "timed"
+    snapshot = _tx_package(tx, plan)
+    kind = snapshot.get("package_kind") or "timed"
     is_timed = kind == "timed"
     if is_timed:
         base = sub.paid_through or paid_at
         if base < paid_at:
             base = paid_at
-        paid_through = base + timedelta(days=int(plan.duration_days or 0))
+        paid_through = base + timedelta(days=int(
+            snapshot.get("duration_days") or plan.duration_days or 0))
     else:
         paid_through = sub.paid_through
 
@@ -411,7 +860,7 @@ def activate_paid_transaction(db: Session, tx: SubscriptionTransactionDB,
 
     lic = db.query(UserLicenseDB).filter(
         UserLicenseDB.user_id == user.id).first()
-    licence_expiry = paid_through
+    licence_expiry = paid_through if is_timed else None
     if lic is None:
         key = _licence_key()
         lic = UserLicenseDB(
@@ -426,10 +875,16 @@ def activate_paid_transaction(db: Session, tx: SubscriptionTransactionDB,
         lic.plan_id = plan.id
         lic.subscription_id = sub.id
         lic.status = "active"
-        if is_timed or licence_expiry is None:
+        if is_timed:
             lic.expires_at = licence_expiry
+        elif lic.expires_at is None or lic.expires_at < datetime.utcnow():
+            # A flexible pack has no period; an old timed expiry must not
+            # mark the newly bought pack as expired.
+            lic.expires_at = None
 
     _update_entitlement(db, user.id, plan, paid_through, is_timed=is_timed)
+    _record_purchase_entitlement(
+        db, tx, plan, user, sub, lic, paid_at, snapshot)
     tx.status = "success"
     tx.provider_transaction_id = str(payload.get("id") or "")
     tx.channel = str(payload.get("channel") or "")
@@ -440,10 +895,31 @@ def activate_paid_transaction(db: Session, tx: SubscriptionTransactionDB,
     _event(db, sub, "payment_success", old_status, "active",
            {"reference": tx.reference, "amount": tx.amount_pesewas})
 
-    # Exactly once per verified transaction (unique grant key).
+    # Exactly once per verified transaction (unique grant key). The balance is
+    # REQUIRED: a licence without the purchased credits is a failed fulfilment,
+    # not a success. `grant_package` is idempotent, so a retry returns the
+    # existing bucket instead of adding again.
     from . import credits
-    credits.grant_package(
-        db, user.id, plan, tx.reference, activated_at=paid_at, commit=False)
+    balance = credits.grant_package(
+        db, user.id, plan, tx.reference, activated_at=paid_at, commit=False,
+        credits_override=int(snapshot.get("credits") or 0),
+        kind_override=kind,
+        days_override=snapshot.get("duration_days"),
+        label_override=snapshot.get("name"),
+        slug_override=snapshot.get("slug"),
+    )
+    expected_credits = int(snapshot.get("credits") or 0)
+    if expected_credits > 0 and balance is None:
+        raise PaystackError(
+            "The package credit grant could not be created.", 500)
+    tx.payment_details = _with_fulfilment_state(
+        tx.payment_details,
+        state="activated",
+        plan_credits=expected_credits,
+        licence_id=lic.id,
+        credit_grant_key=(balance.grant_key if balance is not None else ""),
+        activated_at=paid_at.isoformat(),
+    )
     db.commit()
     db.refresh(sub)
     db.refresh(lic)
@@ -455,7 +931,7 @@ def activate_paid_transaction(db: Session, tx: SubscriptionTransactionDB,
         referrals.qualify(db, user, tx)
     except Exception:
         db.rollback()
-    _notify(user, plan, paid_through, tx.amount_pesewas)
+    notify_purchase(db, tx, user, plan, sub, lic)
     return sub, lic
 
 
@@ -497,20 +973,6 @@ def _validate_verified_payment(tx: SubscriptionTransactionDB, payload: dict,
     email = str(customer.get("email") or "").strip().lower()
     if email and email != (user.email or "").strip().lower():
         raise PaystackError("Payment customer does not match this account.", 400)
-
-
-def _notify(user: User, plan: SubscriptionPlanDB, paid_through: datetime,
-            amount_pesewas: int = 0) -> None:
-    """Best-effort email; never fails the verified payment."""
-    try:
-        from .email_service import get_email
-        get_email().send_subscription_notification(
-            to=user.email, plan_name=plan.name,
-            amount=f"GHS {int(amount_pesewas or plan.price_pesewas) / 100:.2f}",
-            expiry=paid_through.strftime("%d %B %Y"),
-        )
-    except Exception:
-        pass
 
 
 def event_key(event: str, data: dict) -> str:
@@ -583,7 +1045,10 @@ def handle_webhook(db: Session, event: str, data: dict) -> None:
         tx = db.query(SubscriptionTransactionDB).filter(
             SubscriptionTransactionDB.reference == ref).first()
         if tx is None:
-            return
+            # Never mark an unmatched successful payment "processed": that
+            # silently loses the only delivery. The durable event row stays
+            # failed/retryable and the reference is visible to support.
+            raise PaystackError("Unknown local purchase for this reference.", 404)
         verified = verify(ref)
         _validate_verified_payment(
             tx, verified, db.query(User).filter(User.id == tx.user_id).first())
@@ -674,19 +1139,65 @@ def handle_webhook(db: Session, event: str, data: dict) -> None:
 
 
 def expire_overdue(db: Session) -> int:
+    """Expire ONLY genuinely time-limited entitlements.
+
+    A flexible credit pack never expires here, unspent credits are never
+    deleted, and expiring one timed package never revokes an unrelated
+    purchase. The shared licence/entitlement mirror is only marked expired
+    when the teacher has no remaining live purchased entitlement.
+    """
     now = datetime.utcnow()
+    changed = 0
+
+    # 1. Time-limited purchased entitlements have their own lifecycle.
+    try:
+        timed = (db.query(PurchaseEntitlementDB)
+                 .filter(PurchaseEntitlementDB.kind == "timed",
+                         PurchaseEntitlementDB.status == "active",
+                         PurchaseEntitlementDB.expires_at.isnot(None),
+                         PurchaseEntitlementDB.expires_at < now)
+                 .all())
+    except (ProgrammingError, OperationalError):
+        db.rollback()
+        timed = []
+    for ent in timed:
+        ent.status = "expired"
+        ent.updated_at = now
+        changed += 1
+
+    # 2. Legacy/periodic subscription rows.
     rows = db.query(UserSubscriptionDB).filter(
         UserSubscriptionDB.status.in_(("active", "past_due", "non_renewing")),
         UserSubscriptionDB.paid_through.isnot(None),
         UserSubscriptionDB.paid_through < now,
     ).all()
-    changed = 0
     for sub in rows:
         grace = sub.grace_until or sub.paid_through
         if grace and grace >= now:
             continue
         old = sub.status
         sub.status = "expired"
+        changed += 1
+
+        # A live flexible pack (or another in-date purchased entitlement)
+        # means this expiry must not revoke account access or the licence.
+        if active_purchase_entitlements(db, sub.user_id, now):
+            ent = db.query(EntitlementDB).filter(
+                EntitlementDB.user_id == sub.user_id).first()
+            if ent and ent.source == "paystack":
+                ent.status = "active"
+                if ent.expires_at and ent.expires_at < now:
+                    ent.expires_at = None
+            lic = db.query(UserLicenseDB).filter(
+                UserLicenseDB.user_id == sub.user_id).first()
+            if lic and has_live_flexible_entitlement(db, sub.user_id):
+                lic.status = "active"
+                if lic.expires_at and lic.expires_at < now:
+                    lic.expires_at = None
+            _event(db, sub, "expired", old, "expired",
+                   {"other_entitlement_active": True})
+            continue
+
         lic = db.query(UserLicenseDB).filter(
             UserLicenseDB.user_id == sub.user_id).first()
         if lic:
@@ -697,7 +1208,6 @@ def expire_overdue(db: Session) -> int:
             ent.status = "expired"
             ent.expires_at = sub.paid_through
         _event(db, sub, "expired", old, "expired", {})
-        changed += 1
     if changed:
         db.commit()
     return changed

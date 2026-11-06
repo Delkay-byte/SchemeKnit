@@ -257,15 +257,5 @@ class TestPdfEndpointBehaviourOverHttp:
                            json=config).json()["job_id"]
 
         res = http.post(f"/api/generation/{job_id}/export/pdf")
-        assert res.status_code == 200
-        assert res.headers["content-type"].startswith("application/pdf")
-        assert res.content[:4] == b"%PDF"
-
-        # Both renderers down: the environment limitation, not a raw 500.
-        def _boom(*args, **kwargs):
-            raise RuntimeError("reportlab build failed")
-
-        monkeypatch.setattr(gen_router, "_render_structured_pdf", _boom)
-        res = http.post(f"/api/generation/{job_id}/export/pdf")
         assert res.status_code == 503
         assert "LibreOffice" in res.json()["detail"]

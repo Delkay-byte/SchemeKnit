@@ -409,10 +409,10 @@ async function runDesktop(browser, state) {
     page.on('response', onPreview)
     await page.goto(`${WEB}/generate/${schemeId}`, { waitUntil: 'domcontentloaded' })
     await page.locator('[data-allocation-weeks]').waitFor({ timeout: 30000 })
-    record('generation mode defaults to Quick Generate',
-      (await page.getByRole('radio', { name: /quick generate/i }).getAttribute('aria-checked')) === 'true')
-    record('Build with me is offered as the secondary path',
-      (await page.getByRole('radio', { name: /build with me/i }).count()) > 0)
+    record('generation page has one primary Generate action',
+      (await page.getByRole('button', { name: /generate lesson plans/i }).count()) === 1)
+    record('no competing Quick Generate / Build with me options',
+      (await page.getByRole('radio', { name: /quick generate|build with me/i }).count()) === 0)
 
     // Optional: select a specific export template (e.g. the Approved WAPEF
     // Plan) — TF_TEMPLATE is matched against the option labels.
@@ -489,20 +489,9 @@ async function runDesktop(browser, state) {
       await page.waitForTimeout(1500)
     }
 
-    // ── Defect 14: Build with me keeps the week surface healthy ────────────
-    const buildRadio = page.getByRole('radio', { name: /build with me/i })
-    if (await buildRadio.count()) {
-      await buildRadio.click()
-      await page.waitForTimeout(300)
-      record('Build with me keeps the week surface rendered',
-        (await page.locator('[data-allocation-weeks]').count()) > 0)
-      const buildBody = await page.locator('body').innerText()
-      record('no "Validation failed" on the Build with me path',
-        !/validation failed/i.test(buildBody))
-      // Back to Quick Generate for the rest of the journey.
-      await page.getByRole('radio', { name: /quick generate/i }).click()
-      await page.waitForTimeout(300)
-    }
+    // ── One generation action keeps the week surface healthy ───────────────
+    record('single Generate action keeps the week surface rendered',
+      (await page.locator('[data-allocation-weeks]').count()) > 0)
     page.off('response', onPreview)
 
     if (periodCount > 0) {

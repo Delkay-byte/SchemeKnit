@@ -149,12 +149,12 @@ export default function LessonDetailPage() {
     { type: string; title: string; author_publisher?: string; page?: string; notes?: string }[]
   >([])
   const NACCA_COMPETENCIES = [
-    'Critical Thinking and Problem Solving',
-    'Creativity and Innovation',
-    'Communication and Collaboration',
-    'Cultural Identity and Global Citizenship',
-    'Personal Development and Leadership',
-    'Digital Literacy',
+    'Critical Thinking and Problem Solving (CP)',
+    'Creativity and Innovation (CI)',
+    'Communication and Collaboration (CC)',
+    'Cultural Identity and Global Citizenship (CG)',
+    'Personal Development and Leadership (PL)',
+    'Digital Literacy (DL)',
   ]
   // PART 2/28: the curriculum reference option names THIS lesson's subject
   // ("Science Curriculum") — never a hard-coded "Subject Curriculum" label.
@@ -1117,14 +1117,19 @@ export default function LessonDetailPage() {
             <h3 className="mb-2 text-sm font-semibold text-[#102A43]">Core Competencies</h3>
             <div className="flex flex-wrap gap-1.5">
               {NACCA_COMPETENCIES.map(label => {
-                const selected = coreCompetencies.includes(label)
+                const base = label.replace(/\s*\([A-Z]{2}\)$/, '')
+                const selected = coreCompetencies.some(
+                  (value) => value === label || value === base,
+                )
                 return (
                   <button
                     key={label}
                     type="button"
                     aria-pressed={selected}
                     onClick={() => setCoreCompetencies(prev =>
-                      selected ? prev.filter(c => c !== label) : [...prev, label]
+                      selected
+                        ? prev.filter(c => c !== label && c !== base)
+                        : [...prev.filter(c => c !== base), label]
                     )}
                     className={`rounded border px-2 py-1 text-xs ${
                       selected

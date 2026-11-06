@@ -334,11 +334,92 @@ export default function Dashboard() {
                     ))}
                   </ul>
                 )}
+                {credits.purchased_packages?.length > 0 && (
+                  <ul className="mt-3 space-y-1 text-xs text-slate-500" data-purchased-packages>
+                    {credits.purchased_packages.map((p: any) => (
+                      <li key={p.reference || `${p.slug}-${p.granted_at}`}>
+                        {p.label}: {p.remaining} of {p.granted} credits remaining · never expires
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 {credits.total === 0 && (
                   <p className="mt-3 text-sm text-muted-foreground">
                     You have no credits available. Saved plans stay editable and exportable; buy a package to generate more.
                   </p>
                 )}
+              </SurfaceCard>
+            )}
+
+            {plan?.active_package && (
+              <SurfaceCard className="px-5 py-5" data-active-package={plan.active_package.slug}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h2 className="font-semibold text-[#102A43]">
+                      {plan.active_package.name || 'Active package'}
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {plan.active_package.kind === 'flexible'
+                        ? 'Flexible credit pack — credits never expire'
+                        : 'Time-limited package'}
+                      {plan.active_package.kind === 'flexible'
+                        ? ''
+                        : plan.active_package.expires_at
+                          ? ` · valid until ${new Date(plan.active_package.expires_at).toLocaleDateString()}`
+                          : ''}
+                      {plan.active_package.paid_at
+                        ? ` · purchased ${new Date(plan.active_package.paid_at).toLocaleDateString()}`
+                        : ''}
+                    </p>
+                  </div>
+                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                    plan.active_package.fulfilment_status === 'activated'
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-amber-100 text-amber-800'
+                  }`}>
+                    {plan.active_package.fulfilment_status === 'activated'
+                      ? 'Active'
+                      : plan.active_package.fulfilment_status === 'needs_attention'
+                        ? 'Activation needs attention'
+                        : 'Activation pending'}
+                  </span>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
+                  <div>
+                    <p className="text-xs uppercase text-slate-500">Credits added</p>
+                    <p className="text-xl font-bold text-[#102A43]">{plan.active_package.credits_granted ?? 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase text-slate-500">Used</p>
+                    <p className="text-xl font-bold text-[#102A43]">{plan.active_package.credits_used ?? 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase text-slate-500">Remaining</p>
+                    <p className="text-xl font-bold text-[#102A43]">{plan.active_package.credits_remaining ?? 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase text-slate-500">Amount paid</p>
+                    <p className="text-xl font-bold text-[#102A43]">
+                      GH₵{((plan.active_package.amount_pesewas || 0) / 100).toFixed(2)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase text-slate-500">Payment</p>
+                    <p className="font-medium">
+                      {plan.active_package.payment_method === 'bank_transfer'
+                        ? 'Bank Transfer'
+                        : plan.active_package.payment_method === 'mobile_money'
+                          ? 'Mobile Money'
+                          : plan.active_package.payment_method === 'card'
+                            ? 'Card (historical)'
+                            : plan.active_package.channel || '—'}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button asChild size="sm"><Link href="/upload">Start creating lesson plans</Link></Button>
+                  <Button asChild size="sm" variant="outline"><Link href="/subscription">Purchase history</Link></Button>
+                </div>
               </SurfaceCard>
             )}
 

@@ -21,7 +21,6 @@ from src.engines.allocation_engine import AllocationEngine
 from src.engines.coverage_validator import CoverageValidator
 from src.engines.generation_pipeline import GenerationPipeline
 from src.engines.docx_export import DOCXExportEngine
-from src.engines.xlsx_export import XLSXExportEngine
 from src.engines.zip_export import ZIPExportEngine
 from src.engines.template_engine import get_template_by_type, get_visible_sections, DEFAULT_TEMPLATES
 from src.engines.ai_provider import get_provider, MockProvider
@@ -177,15 +176,10 @@ class TestGenerationPipeline:
         assert all(f.exists() for f in files)
         assert all(f.suffix == '.docx' for f in files)
 
-    def test_export_xlsx(self, sample_scheme, term_config, tmp_path):
+    def test_register_xlsx_export_is_removed(self):
+        """The Download Register (XLSX) feature is gone from the pipeline."""
         pipeline = GenerationPipeline()
-        job = pipeline.generate_all(sample_scheme, term_config)
-        
-        plans = job._lesson_plans
-        output = pipeline.export_xlsx(plans, tmp_path / "register.xlsx")
-        
-        assert output.exists()
-        assert output.suffix == '.xlsx'
+        assert not hasattr(pipeline, "export_xlsx")
 
 
 class TestTemplateEngine:
@@ -254,15 +248,12 @@ class TestExportEngines:
         
         assert output.exists()
 
-    def test_XLSXExport(self, sample_scheme, term_config, tmp_path):
-        pipeline = GenerationPipeline()
-        job = pipeline.generate_all(sample_scheme, term_config)
-        
-        engine = XLSXExportEngine()
-        plans = job._lesson_plans
-        output = engine.export_register(plans, tmp_path / "register.xlsx")
-        
-        assert output.exists()
+    def test_XLSXExport_removed(self, sample_scheme, term_config, tmp_path):
+        """No register export engine ships with SchemeKnit any more."""
+        import importlib
+        import pytest
+        with pytest.raises(ModuleNotFoundError):
+            importlib.import_module("src.engines.xlsx_export")
 
     def test_ZIPExport(self, sample_scheme, term_config, tmp_path):
         pipeline = GenerationPipeline()

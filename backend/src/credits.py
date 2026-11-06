@@ -99,15 +99,32 @@ def status(db: Session, user_id: str) -> Dict[str, Any]:
 
     by_source = {SOURCE_PURCHASED: 0, SOURCE_PACKAGE: 0, SOURCE_REFERRAL: 0}
     packages: List[dict] = []
+    purchased_packages: List[dict] = []
     for b in balances:
         by_source[b.source] = by_source.get(b.source, 0) + int(b.credits_remaining)
         if b.source == SOURCE_PACKAGE:
             packages.append({
                 "slug": b.package_slug,
                 "label": b.label,
+                "kind": "timed",
+                "granted": int(b.credits_granted),
+                "used": max(int(b.credits_granted)
+                            - int(b.credits_remaining), 0),
                 "remaining": int(b.credits_remaining),
                 "expires_at": b.expires_at.isoformat() if b.expires_at else None,
+            })
+        elif b.source == SOURCE_PURCHASED:
+            purchased_packages.append({
+                "slug": b.package_slug,
+                "label": b.label,
+                "kind": "flexible",
+                "remaining": int(b.credits_remaining),
                 "granted": int(b.credits_granted),
+                "used": max(int(b.credits_granted)
+                            - int(b.credits_remaining), 0),
+                "granted_at": b.granted_at.isoformat() if b.granted_at else None,
+                "expires_at": None,
+                "reference": b.reference,
             })
 
     # Include recently expired package balances in the display so the teacher
@@ -147,6 +164,7 @@ def status(db: Session, user_id: str) -> Dict[str, Any]:
         "package": by_source[SOURCE_PACKAGE],
         "referral": by_source[SOURCE_REFERRAL],
         "packages": packages,
+        "purchased_packages": purchased_packages,
         "expired_packages": expired_packages,
         "total": free_remaining + total_paid,
         "spending_order": ["free", "package", "referral", "purchased"],
@@ -225,22 +243,38 @@ def grant_package(
     reference: str,
     activated_at: Optional[datetime] = None,
     commit: bool = True,
+    credits_override: Optional[int] = None,
+    kind_override: Optional[str] = None,
+    days_override: Optional[int] = None,
+    label_override: Optional[str] = None,
+    slug_override: Optional[str] = None,
 ) -> Optional[CreditBalanceDB]:
-    """Grant the plan's credits once, starting the validity at activation."""
+    """Grant the plan's credits once, starting the validity at activation.
+
+    ``*_override`` values come from the immutable package snapshot captured at
+    purchase initiation, so a later catalogue edit cannot change what the
+    customer already bought.
+    """
     entitlement = dict(plan.entitlements or {})
     credits = int(
-        getattr(plan, "credit_allowance", 0)
-        or entitlement.get("credit_allowance", 0)
-        or 0
+        credits_override
+        if credits_override is not None else
+        (getattr(plan, "credit_allowance", 0)
+         or entitlement.get("credit_allowance", 0)
+         or 0)
     )
     if credits <= 0:
         return None
-    kind = getattr(plan, "package_kind", "") or entitlement.get("package_kind", "")
-    days = getattr(plan, "credit_validity_days", None)
-    if days is None:
-        days = entitlement.get("credit_validity_days")
-    if days is None and kind == PACKAGE_KIND_TIMED:
-        days = getattr(plan, "duration_days", 0) or None
+    kind = kind_override or getattr(plan, "package_kind", "") or entitlement.get(
+        "package_kind", "")
+    if days_override is not None:
+        days = days_override
+    else:
+        days = getattr(plan, "credit_validity_days", None)
+        if days is None:
+            days = entitlement.get("credit_validity_days")
+        if days is None and kind == PACKAGE_KIND_TIMED:
+            days = getattr(plan, "duration_days", 0) or None
     start = activated_at or _now()
     expires_at = None
     if kind == PACKAGE_KIND_TIMED and days:
@@ -251,8 +285,8 @@ def grant_package(
         source=source,
         credits=credits,
         grant_key=f"package:{reference}",
-        package_slug=plan.slug,
-        label=plan.name,
+        package_slug=slug_override or plan.slug,
+        label=label_override or plan.name,
         expires_at=expires_at,
         reference=reference,
         commit=commit,

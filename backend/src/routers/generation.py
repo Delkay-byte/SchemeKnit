@@ -877,7 +877,7 @@ def _normalize_lesson_config(payload: LessonConfigRequest) -> dict:
     # that intent without changing the profile.
     if "teacher_name" in payload.model_fields_set and not out.get("teacher_name"):
         out["teacher_name_cleared"] = True
-    out["reference"] = _clean_str("Reference", payload.reference, max_len=400)
+    out["reference"] = _clean_str("Reference", payload.reference, max_len=2000)
     out["period"] = _clean_str("Period", payload.period, max_len=60)
     out["term"] = _clean_str("Academic term", payload.term, max_len=40)
     out["template_id"] = _clean_str("Template", payload.template_id, max_len=80)
@@ -1809,6 +1809,7 @@ def _generate_lesson_plans(
         # lessons are persisted, counted and quota-charged.
         accepted: List[Any] = list(getattr(job, '_lesson_plans', None) or [])
         gate_metrics: Optional[Dict[str, Any]] = None
+        gate_reasons: Dict[str, List[str]] = {}
 
         if hasattr(job, '_lesson_plans'):
             # ── Occurrence-scoped replacement + job merge (Priority 3) ─────
@@ -1842,6 +1843,7 @@ def _generate_lesson_plans(
             drafts = data_service.get_lesson_review_drafts(db, scheme_id, user.id) or {}
             for lp in job._lesson_plans:
                 _apply_lesson_review_draft(lp, drafts)
+                _ensure_resources_used(lp)
 
             # ── Priority 4: the deterministic quality gate ────────────────
             # Every lesson is validated in memory BEFORE any row is written.
@@ -1901,6 +1903,13 @@ def _generate_lesson_plans(
                 "quality_gate_run", user_id=user.id, scheme_id=scheme_id,
                 job_id=job_db.id, **gate_metrics,
             )
+            gate_reasons = {
+                report.lesson_id: list(
+                    report.hard_failures or []) + list(
+                    report.floors_failed or [])
+                for report in gate_report["reports"]
+                if not report.accepted
+            }
 
             # Replacement is keyed to what the run actually ACCEPTED: a lesson
             # the gate refused keeps its existing row (never zero lessons,
@@ -2043,6 +2052,45 @@ def _generate_lesson_plans(
         }
         pending_occurrence_ids = sorted(
             _pending_pool - _accepted_occurrences - _existing_occ)
+
+        # Teacher-facing, per-item partial result (Part E): the exact week and
+        # indicator that stayed pending, in scheme order. A generic "some
+        # plans failed" message is not actionable when the teacher selected
+        # Week 1 and Week 2.
+        _by_occ = {
+            a.source_occurrence_id: a for a in _all_allocations
+            if getattr(a, "source_occurrence_id", "")
+        }
+        _lesson_by_occ = {
+            getattr(lp, "source_occurrence_id", ""): lp.id
+            for lp in (getattr(job, "_lesson_plans", None) or [])
+            if getattr(lp, "source_occurrence_id", "")
+        }
+
+        def _item(occ: str) -> Dict[str, Any]:
+            alloc = _by_occ.get(occ)
+            return {
+                "source_occurrence_id": occ,
+                "week_number": getattr(alloc, "week_number", None),
+                "lesson_sequence": getattr(alloc, "lesson_sequence", None),
+                "indicator_code": getattr(alloc, "indicator_code", ""),
+                "indicator_description": getattr(
+                    alloc, "indicator_description", ""),
+                "reasons": gate_reasons.get(_lesson_by_occ.get(occ, ""), []),
+            }
+
+        rejected_items = [
+            _item(occ) for occ in sorted(
+                rejected_occurrence_ids,
+                key=lambda o: (
+                    getattr(_by_occ.get(o), "lesson_sequence", 0) or 0, o))
+        ]
+        pending_items = [
+            _item(occ) for occ in sorted(
+                pending_occurrence_ids,
+                key=lambda o: (
+                    getattr(_by_occ.get(o), "lesson_sequence", 0) or 0, o))
+        ]
 
         # The durable resume scope: the plan persisted on this job, intersected
         # with occurrences still present in the scheme. This is deliberately
@@ -2290,7 +2338,9 @@ def _generate_lesson_plans(
             "generated_indicator_codes": requested_codes,
             "generated_occurrence_ids": sorted(_accepted_occurrences),
             "rejected_occurrence_ids": rejected_occurrence_ids,
+            "rejected": rejected_items,
             "pending_occurrence_ids": pending_occurrence_ids,
+            "pending": pending_items,
             "planned_occurrence_ids": sorted(_batch_planned),
             "resumable_occurrence_ids": _resumable,
             "preserved_occurrence_ids": _preserved,
@@ -2866,45 +2916,35 @@ async def _build_export_pdf(db, user, job, scheme_label, lp_models, tt,
     resolved = _resolve_export_template_id(job, lp_models, template_id)
     target = Path(f"exports/{user_id}/{job_id}/pdf/lesson_plans.pdf")
 
-    if PDFExportEngine.is_available():
-        # ONE combined DOCX, converted once. The previous per-lesson batch held
-        # the request open for the whole multi-minute conversion — long enough
-        # for the browser to abort the fetch — and then returned only the first
-        # lesson's PDF.
-        combined_docx = target.with_suffix(".docx")
-        try:
-            await _run_pipeline(
-                pipeline.export_docx_combined, scheme_label, lp_models, tt,
-                combined_docx, template_id=resolved, context=context)
-        except Exception as e:
-            logger.error("pdf_source_docx_failed", user_id=user_id, job_id=job_id, detail=str(e))
-            raise HTTPException(status_code=500, detail=PDF_CONVERSION_FAILED)
+    if not PDFExportEngine.is_available():
+        # ONE canonical document. Without a converter the app refuses rather
+        # than silently producing a visually different PDF from a second
+        # template.
+        log_error("pdf_converter_missing", user_id=user_id, job_id=job_id)
+        raise HTTPException(status_code=503, detail=PDF_CONVERTER_REQUIREMENT)
 
-        # Layer 2 — converter present but produced nothing usable.
-        try:
-            await _run_pipeline(_convert_only, pipeline, combined_docx, target)
-        except PDFConversionError as e:
-            logger.error("pdf_conversion_failed", user_id=user_id, job_id=job_id, detail=str(e))
-            raise HTTPException(status_code=500, detail=PDF_CONVERSION_FAILED)
-
-        if not _is_real_pdf(target):
-            logger.error("pdf_conversion_failed", user_id=user_id, job_id=job_id,
-                         detail="output failed PDF signature check")
-            raise HTTPException(status_code=500, detail=PDF_CONVERSION_FAILED)
-        return target
-
-    log_event("pdf_export_structured", user_id=user_id, job_id=job_id)
+    # ONE combined DOCX — the exact document the Word download serves — then
+    # converted. Every section, table, column, competency, TLR and assessment
+    # item therefore appears in the PDF byte-for-byte as authored.
+    combined_docx = target.with_suffix(".docx")
     try:
-        await _run_pipeline(_render_structured_pdf, pipeline, lp_models,
-                            target, resolved, context)
+        await _run_pipeline(
+            pipeline.export_docx_combined, scheme_label, lp_models, tt,
+            combined_docx, template_id=resolved, context=context)
     except Exception as e:
-        logger.error("pdf_structured_render_failed", user_id=user_id,
-                     job_id=job_id, detail=str(e))
-        raise HTTPException(status_code=503, detail=PDF_CONVERTER_REQUIREMENT)
+        logger.error("pdf_source_docx_failed", user_id=user_id, job_id=job_id, detail=str(e))
+        raise HTTPException(status_code=500, detail=PDF_CONVERSION_FAILED)
+
+    try:
+        await _run_pipeline(_convert_only, pipeline, combined_docx, target)
+    except PDFConversionError as e:
+        logger.error("pdf_conversion_failed", user_id=user_id, job_id=job_id, detail=str(e))
+        raise HTTPException(status_code=500, detail=PDF_CONVERSION_FAILED)
+
     if not _is_real_pdf(target):
-        logger.error("pdf_structured_render_failed", user_id=user_id, job_id=job_id,
+        logger.error("pdf_conversion_failed", user_id=user_id, job_id=job_id,
                      detail="output failed PDF signature check")
-        raise HTTPException(status_code=503, detail=PDF_CONVERTER_REQUIREMENT)
+        raise HTTPException(status_code=500, detail=PDF_CONVERSION_FAILED)
     return target
 
 
@@ -3058,7 +3098,7 @@ async def issue_download_url(
         raise HTTPException(status_code=404, detail="No lesson plans found")
 
     fmt = (format or "").lower()
-    if fmt not in ("docx", "pdf", "zip", "xlsx"):
+    if fmt not in ("docx", "pdf", "zip"):
         raise HTTPException(status_code=400, detail="Unsupported format")
 
     # ── Entitlement gate: ZIP export requires Pro or school license ────────
@@ -3109,13 +3149,6 @@ async def issue_download_url(
             context=render_context)
         media_type = "application/zip"
         filename = f"Lesson_Plans_{scheme_label}.zip"
-    elif fmt == "xlsx":
-        out = await _run_pipeline(
-            pipeline.export_xlsx, lp_models,
-            Path(f"exports/{user.id}/{job_id}/register.xlsx"))
-        media_type = ("application/vnd.openxmlformats-officedocument"
-                      ".spreadsheetml.sheet")
-        filename = f"Lesson_Register_{scheme_label}.xlsx"
     else:  # pdf
         out = await _build_export_pdf(
             db, user, job, scheme_label, lp_models, tt, template_id,
@@ -3167,35 +3200,6 @@ async def download_by_token(
             # cue to save rather than render.
             "Content-Disposition": f"attachment; filename*=UTF-8''{quote(name, safe='')}",
         },
-    )
-
-
-@router.post("/{job_id}/export/xlsx")
-async def export_xlsx(
-    job_id: str,
-    user: User = Depends(get_current_user),
-    db=Depends(get_db),
-):
-    job = data_service.get_job(db, job_id, user.id)
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-    enforce_authenticated_budget(user.id, "export")
-
-    lessons = data_service.get_lesson_plans_for_job(db, job_id, user.id)
-    if not lessons:
-        raise HTTPException(status_code=404, detail="No lesson plans found")
-
-    lp_models = [_db_to_lesson_model(lp) for lp in lessons]
-    output_path = Path(f"exports/{user.id}/{job_id}/register.xlsx")
-    await _run_pipeline(pipeline.export_xlsx, lp_models, output_path)
-    scheme_db = data_service.get_scheme(db, job.scheme_id, user.id)
-    scheme_stem = Path(scheme_db.filename).stem if scheme_db and scheme_db.filename else ""
-    scheme_label = re.sub(r'[^A-Za-z0-9]+', '_', scheme_stem).strip('_') or 'lesson_plans'
-    data_service.log_export_event(db, job.id, job.scheme_id, user.id, "xlsx")
-    return _download_response(
-        output_path,
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        f"Lesson_Register_{scheme_label}.xlsx",
     )
 
 
@@ -3487,6 +3491,138 @@ def _replacement_ids_for_occurrences(existing, occurrence_ids, chosen_allocs) ->
     return ids
 
 
+def _resource_key(value: str) -> str:
+    """Comparison key for resource de-duplication (case/space/plural-safe)."""
+    import re as _re
+
+    text = _re.sub(r"\s+", " ", (value or "")).strip().lower()
+    if len(text) > 4 and text.endswith("s") and not text.endswith("ss"):
+        text = text[:-1]
+    return text
+
+
+def _approved_resources(lp) -> list:
+    """Scheme resources + teacher-added resources, de-duplicated."""
+    approved: list = []
+    seen: set = set()
+    for value in (list(getattr(lp, "source_tlrs", None) or [])
+                  + list(getattr(lp, "other_tlrs", None) or [])):
+        text = (value or "").strip()
+        key = _resource_key(text)
+        if not text or not key or key in seen:
+            continue
+        seen.add(key)
+        approved.append(text)
+    return approved
+
+
+def _resource_named(text: str, resource: str) -> bool:
+    """Does this prose use the resource by name (not merely list it)?"""
+    import re as _re
+
+    prose = _re.sub(r"\s+", " ", (text or "")).lower()
+    name = _re.sub(r"\s+", " ", (resource or "")).strip().lower()
+    if not prose or not name:
+        return False
+    if name in prose:
+        return True
+    # Plural/possessive tolerance: "exercise book" matches "exercise books".
+    if name.endswith("s"):
+        return name[:-1] in prose and name[:-1] in prose
+    return f"{name}s" in prose
+
+
+def _resource_focus(lp) -> str:
+    for value in (getattr(lp, "sub_strand", ""),
+                  getattr(lp, "lesson_topic", "")):
+        text = (value or "").strip().rstrip(" .;:,")
+        if text:
+            return text
+    indicators = list(getattr(lp, "indicators", None) or [])
+    return (indicators[0].strip().rstrip(" .;:,") if indicators
+            else "the lesson focus")
+
+
+def _ensure_resources_used(lp) -> None:
+    """Make the approved resource list and the activities agree.
+
+    * The TLR summary is rebuilt from scheme + teacher entries only, so an AI
+      or scaffold suggestion can never leak into the printed list.
+    * Every activity row's resource list is filtered to approved entries.
+    * A resource that no phase activity mentions gets ONE concrete use
+      sentence in the main-learning phase, so a teacher-added TLR is not just
+      appended to the summary row.
+    """
+    from ..models import TeachingActivity
+
+    approved = _approved_resources(lp)
+    lp.teaching_learning_resources = list(approved)
+    approved_keys = {_resource_key(r): r for r in approved}
+    rows = list(getattr(lp, "main_activities", None) or [])
+    for row in rows:
+        row.resources = [
+            r for r in list(getattr(row, "resources", None) or [])
+            if _resource_key(r) in approved_keys
+        ]
+
+    corpus = " ".join([
+        getattr(lp, "introduction", "") or "",
+        getattr(lp, "starter_activity", "") or "",
+        getattr(lp, "assessment", "") or "",
+        getattr(lp, "conclusion", "") or "",
+    ] + [
+        (getattr(row, "description", "") or "")
+        for row in list(rows)
+        + list(getattr(lp, "learner_activities", None) or [])
+        + list(getattr(lp, "teacher_activities", None) or [])
+    ])
+    focus = _resource_focus(lp)
+    missing = [r for r in approved if not _resource_named(corpus, r)]
+    if not missing:
+        return
+    target = None
+    for row in rows:
+        label = (getattr(row, "phase", "") or "").upper()
+        if not any(k in label for k in (
+                "STARTER", "PHASE 1", "PLENARY", "PHASE 3")):
+            target = row
+            break
+    if target is None:
+        target = TeachingActivity(
+            phase="PHASE 2 · MAIN LEARNING",
+            description="",
+            duration_minutes=0,
+            resources=[],
+        )
+        rows.append(target)
+    uses = []
+    from ..curriculum.resource_use import resource_use_sentence
+    for index, resource in enumerate(missing):
+        sentence = resource_use_sentence(resource, focus, index)
+        if sentence:
+            uses.append(sentence)
+    existing = (target.description or "").strip()
+    target.description = (existing + " " + " ".join(uses)).strip()
+    target.resources = list(dict.fromkeys(
+        list(getattr(target, "resources", None) or []) + missing))
+    lp.main_activities = rows
+
+
+def _validate_resources(lp) -> list:
+    """Report resources in the lesson that the scheme/teacher did not approve."""
+    approved = {_resource_key(r) for r in _approved_resources(lp)}
+    problems = []
+    if any(_resource_key(r) not in approved
+           for r in (getattr(lp, "teaching_learning_resources", None) or [])):
+        problems.append("unapproved_resource")
+    for row in list(getattr(lp, "main_activities", None) or []):
+        if any(_resource_key(r) not in approved
+               for r in (getattr(row, "resources", None) or [])):
+            problems.append("unapproved_activity_resource")
+            break
+    return problems
+
+
 def _apply_lesson_review_draft(lp, drafts: dict) -> None:
     """Apply teacher-saved pre-generation review fields onto a built lesson.
 
@@ -3545,7 +3681,9 @@ def _apply_lesson_review_draft(lp, drafts: dict) -> None:
             # Activity extras stay; only rewrite when source+other already cover.
         lp.teaching_learning_resources = union
     if "core_competencies" in draft:
-        lp.core_competencies = list(draft.get("core_competencies") or [])
+        from ..curriculum.competencies import normalize_competencies
+        lp.core_competencies = normalize_competencies(
+            draft.get("core_competencies") or [])
     if "structured_references" in draft:
         refs = [
             entry
@@ -3702,6 +3840,7 @@ def _run_quality_gate(job, config, scheme_id, drafts, allow_rebuild: bool = True
                 for field_name in _REBUILD_METADATA_FIELDS:
                     setattr(rebuilt, field_name, getattr(lp, field_name))
                 _apply_lesson_review_draft(rebuilt, drafts)
+                _ensure_resources_used(rebuilt)
                 rebuilt_outcome = evaluate(
                     rebuilt, build_entry(ctx.alloc, rebuilt),
                     wapef_canonical=_wapef_canonical_for(rebuilt))

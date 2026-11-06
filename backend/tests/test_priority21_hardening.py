@@ -369,19 +369,17 @@ class TestResourceRealism:
         from src.curriculum.lesson_builder import _resource_is_available
         assert _resource_is_available(resource, subject) is expect
 
-    def test_non_ict_lesson_never_requires_the_banned_equipment(self):
-        from src.curriculum.lesson_builder import _IMPOSSIBLE_RESOURCE_RE, build_lesson
+    def test_non_ict_lesson_uses_only_the_scheme_resources(self):
+        from src.curriculum.lesson_builder import build_lesson
         from src.models import Subject
         lp = build_lesson(
             _alloc("B7.1.1.1.2 Discuss the features of a healthy community",
                    resources=["projector", "chart", "internet resources"]),
             _cfg(subject=Subject.RME), "s")
-        assert lp.teaching_learning_resources, "display resources must not be empty"
-        for r in lp.teaching_learning_resources:
-            assert not _IMPOSSIBLE_RESOURCE_RE.search(r), (
-                f"impossible resource {r!r} shown as required"
-            )
-        # source authority: the scheme's own wording stays verbatim
+        # Source authority: exactly what the uploaded scheme names. The
+        # builder no longer filters or augments the teacher's list.
+        assert lp.teaching_learning_resources == [
+            "projector", "chart", "internet resources"]
         assert lp.source_tlrs == ["projector", "chart", "internet resources"]
 
     def test_ict_lesson_keeps_digital_resources(self):

@@ -15,7 +15,8 @@ import { isDesktop } from '@/lib/build-target'
 import { TurnstileWidget, TURNSTILE_SITE_KEY } from '@/components/turnstile-widget'
 import type { ApiError } from '@/lib/api'
 import { authHref, currentNextPath } from '@/lib/purchase-return'
-import { Building2, Shield, GraduationCap, KeyRound, AlertCircle, ArrowRight } from 'lucide-react'
+import { Building2, Shield, GraduationCap, KeyRound, AlertCircle, ArrowRight, Fingerprint } from 'lucide-react'
+import { getApiBaseUrl } from '@/lib/api'
 import { normalizeError } from '@/lib/error-normalizer'
 
 /**
@@ -102,11 +103,31 @@ export function RoleLogin({ entry }: { entry: EntryRole }) {
   const [challengeToken, setChallengeToken] = useState('')
   const [challengeReset, setChallengeReset] = useState(0)
   const [nextPath, setNextPath] = useState<string | null>(null)
+  // Platform-admin SSO (BloomCore Identity). Rendered ONLY when the backend
+  // reports the feature enabled; the backend 404s the flow endpoints while
+  // PLATFORM_OIDC_ENABLED is off, so the button simply never appears.
+  const [ssoEnabled, setSsoEnabled] = useState(false)
 
   const copy = ENTRY_COPY[entry]
 
   useEffect(() => {
     setNextPath(entry === 'teacher' ? currentNextPath() : null)
+  }, [entry])
+
+  useEffect(() => {
+    if (entry !== 'platform_admin') return
+    let cancelled = false
+    fetch(`${getApiBaseUrl()}/api/auth/oidc/status`)
+      .then((res) => (res.ok ? res.json() : { enabled: false }))
+      .then((body) => {
+        if (!cancelled && body?.enabled) setSsoEnabled(true)
+      })
+      .catch(() => {
+        /* feature probe is best-effort; the button stays hidden on failure */
+      })
+    return () => {
+      cancelled = true
+    }
   }, [entry])
 
   useEffect(() => {
@@ -364,6 +385,30 @@ export function RoleLogin({ entry }: { entry: EntryRole }) {
           )}
         </Button>
       </form>
+
+      {entry === 'platform_admin' && ssoEnabled && (
+        <div className="mt-5">
+          <div className="mb-4 flex items-center gap-3" aria-hidden="true">
+            <span className="h-px flex-1 bg-border" />
+            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              or
+            </span>
+            <span className="h-px flex-1 bg-border" />
+          </div>
+          <a
+            href={`${getApiBaseUrl()}/api/auth/oidc/start`}
+            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-[#04A9CE]/40 bg-[#04A9CE]/10 text-sm font-semibold text-[#0389a8] transition hover:bg-[#04A9CE]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#04A9CE]/50"
+            data-testid="platform-admin-sso-button"
+          >
+            <Fingerprint className="h-4 w-4" aria-hidden="true" />
+            Sign in with BloomCore Identity
+          </a>
+          <p className="mt-2 text-center text-xs text-muted-foreground">
+            Central sign-in via your organisation&apos;s identity provider. Your
+            SchemeKnit password still works as a fallback.
+          </p>
+        </div>
+      )}
 
       {entry === 'teacher' && (
         <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">

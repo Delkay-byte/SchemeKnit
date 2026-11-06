@@ -103,3 +103,27 @@ test('Turnstile failures keep their domain guidance', () => {
   assert.equal(normalized.category, 'validation')
   assert.match(normalized.message, /verification/i)
 })
+
+// 500 vs 503 server-fault contract (pinned by the ux-reliability E2E).
+test('500 never surfaces server detail — even "Internal database failure"', () => {
+  const error: { status: number; body: unknown; message: string } = {
+    status: 500,
+    body: { detail: 'Internal database failure' },
+    message: 'Internal database failure',
+  }
+  const result = normalizeError(error)
+  assert.ok(!String(result.message).includes('Internal database failure'))
+  assert.equal(result.message, 'SchemeKnit is temporarily unavailable. Please try again.')
+})
+
+test('503 still surfaces a controlled refusal (PDF converter missing)', () => {
+  const detail = 'PDF export requires a document converter on the server (LibreOffice for cross-platform production use).'
+  const error: { status: number; body: unknown; message: string } = {
+    status: 503,
+    body: { detail },
+    message: detail,
+  }
+  const result = normalizeError(error)
+  assert.ok(String(result.message).includes('document converter'))
+  assert.equal(result.showBanner, true)
+})

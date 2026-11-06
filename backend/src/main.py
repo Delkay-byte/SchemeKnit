@@ -4,7 +4,8 @@ SchemeKnit Backend - Production Application
 
 import os
 import sys
-from contextlib import asynccontextmanager
+import asyncio
+from contextlib import asynccontextmanager, suppress
 from datetime import datetime, date
 from pathlib import Path
 
@@ -54,9 +55,47 @@ async def lifespan(app: FastAPI):
             db.close()
     except Exception as e:
         logger.error("stale_job_reconciliation_failed", error=str(e))
+    recovery_task = asyncio.create_task(_webhook_recovery_loop())
     logger.info("SchemeKnit started", version=settings.APP_VERSION, debug=settings.DEBUG)
     yield
+    recovery_task.cancel()
+    with suppress(asyncio.CancelledError):
+        await recovery_task
     logger.info("SchemeKnit shutting down")
+
+
+async def _webhook_recovery_loop() -> None:
+    """Retry durable Paystack webhook events that failed after the HTTP ack.
+
+    Paystack only retries when the endpoint does not return 2xx; the endpoint
+    acknowledges immediately and processes in the background. Without this
+    loop, a background failure had no automatic recovery path.
+    """
+    from .webhook_sweeper import sweep_once
+
+    interval = 60
+    while True:
+        try:
+            def _run() -> dict:
+                from .purchase_notifications import retry_pending
+                db = SessionLocal()
+                try:
+                    counts = sweep_once(db)
+                    counts["notifications_retried"] = retry_pending(db)
+                    return counts
+                finally:
+                    db.close()
+
+            counts = await asyncio.to_thread(_run)
+            if any(counts.get(k) for k in (
+                    "processed", "failed", "exhausted", "notifications_retried")):
+                logger.info("paystack_webhook_recovery", **counts)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.error("paystack_webhook_recovery_failed",
+                         error=type(exc).__name__)
+        await asyncio.sleep(interval)
 
 
 def _seed_global_holidays():
@@ -270,6 +309,8 @@ from .routers import ai_regeneration as ai_router
 from .routers import platform_admin as platform_admin_router
 from .routers import weekly_plans as weekly_plans_router
 from .routers import referrals as referrals_router
+from .routers import auth_oidc as auth_oidc_router
+from .routers import session_revocation as session_revocation_router
 
 app.include_router(auth_router.router, prefix="/api/auth", tags=["authentication"])
 app.include_router(documents.router, prefix="/api/documents", tags=["documents"])
@@ -284,6 +325,11 @@ app.include_router(ai_router.router, prefix="/api/ai", tags=["ai"])
 app.include_router(platform_admin_router.router, prefix="/api/platform-admin", tags=["platform-admin"])
 app.include_router(weekly_plans_router.router, prefix="/api/weekly-plans", tags=["weekly-plans"])
 app.include_router(referrals_router.router, prefix="/api/referrals", tags=["referrals"])
+# Platform-admin OIDC SSO adapter — every endpoint 404s while the
+# PLATFORM_OIDC_ENABLED feature flag is off (default), keeping the local
+# login paths unchanged.
+app.include_router(auth_oidc_router.router, prefix="/api/auth/oidc", tags=["sso"])
+app.include_router(session_revocation_router.router, tags=["sso-session-revocation"])
 
 
 @app.get("/api/health")

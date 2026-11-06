@@ -127,7 +127,7 @@ export default function UpgradePage() {
         setStatusError('')
         if (isSuccess(next)) {
           window.clearInterval(id)
-          router.push('/subscription?activated=1')
+          router.push(`/payments/callback?reference=${encodeURIComponent(next.reference || charge.reference)}`)
         } else if (isFinalFailure(next)) {
           window.clearInterval(id)
           setBusy(false)
@@ -379,7 +379,7 @@ export default function UpgradePage() {
                             setCharge(next)
                             setOtp('')
                             if (isSuccess(next)) {
-                              router.push('/subscription?activated=1')
+                              router.push(`/payments/callback?reference=${encodeURIComponent(next.reference || charge.reference)}`)
                             } else if (isFinalFailure(next)) {
                               setBusy(false)
                             } else if (isOtpRequired(next)) {
@@ -475,7 +475,7 @@ export default function UpgradePage() {
                             if (seq !== checkSeq.current) return
                             setCharge(next)
                             if (isSuccess(next)) {
-                              router.push('/subscription?activated=1')
+                              router.push(`/payments/callback?reference=${encodeURIComponent(next.reference || charge.reference)}`)
                             } else if (isFinalFailure(next)) {
                               setBusy(false)
                             }

@@ -2349,11 +2349,10 @@ def build_lesson(
         else (alloc.indicator_description or "")
     )
     # REAL resource for {resource} substitution (Priority 2 §19): the scheme's
-    # own TLR first, else the selected activity's materials, else the subject
-    # profile's base resources — never an empty substitution that renders
-    # "using ." artifacts. Resources most Ghanaian classrooms cannot assume
-    # (projector, internet …) are skipped here so prose never REQUIRES them;
-    # the scheme's own wording survives on ``source_tlrs`` below (§F).
+    # OWN resource only. When the source names none, the prose says "the
+    # available classroom materials" — it never invents a resource entry. This
+    # is the teacher-facing rule: a TLR may only come from the uploaded scheme
+    # or from the teacher's own additions (applied from the review draft).
     _resource_pool: List[str] = []
     for _r in normalize_text_items(list(getattr(alloc, "source_resources", []) or [])):
         # Display-list normalisation: "Charts And Pictures" → "Charts and
@@ -2362,12 +2361,6 @@ def build_lesson(
         if (_r and _resource_is_available(_r, subject_name)
                 and _r.lower() not in [x.lower() for x in _resource_pool]):
             _resource_pool.append(_r)
-    if not _resource_pool:
-        for _r in list(activity.materials) + list(profile.resources):
-            _r = text_hygiene.fix_resource_capitalisation((_r or "").strip())
-            if (_r and _resource_is_available(_r, subject_name)
-                    and _r.lower() not in [x.lower() for x in _resource_pool]):
-                _resource_pool.append(_r)
     if not _resource_pool:
         # Pathological: every named resource is unavailable — the first
         # source entry still beats an empty "{resource}" substitution.
@@ -2383,7 +2376,8 @@ def build_lesson(
         class_level=class_level, prev=prev_short, next=next_short,
         content_standard=alloc.content_standard_description or "",
         verb=verb, bloom=bloom, evidence=evidence, activity=act_key or "",
-        resource=(_resource_pool[0] if _resource_pool else ""),
+        resource=(_resource_pool[0] if _resource_pool
+                  else "the available classroom materials"),
     )
 
     # ── STARTER — prepares learners for THIS indicator's activity ───────
@@ -2396,8 +2390,6 @@ def build_lesson(
         # sentence via {focus_short}; the mode only changes HOW it opens, so a
         # batch does not share one opening skeleton.
         starter = _safe_format(STARTER_MODE_TEMPLATES[pattern.starter_mode], **fmt)
-        if prev_short:
-            starter = f"Build on the previous lesson ('{prev_short}'). " + starter
         if position_index and (prev_short or focus_short):
             link = prev_short or focus_short
             label = previous_day_label or "the previous lesson"
@@ -2407,8 +2399,6 @@ def build_lesson(
         # teacher action, learner action and object, replacing the generic
         # prior-knowledge formula.
         starter = _safe_format(exemplar_starter, **fmt)
-        if prev_short:
-            starter = f"Build on the previous lesson ('{prev_short}'). " + starter
     else:
         starter_line = _STARTER_BANK.get(act_key) or profile.starter_template
         starter = _safe_format(starter_line, **fmt)
@@ -2419,10 +2409,14 @@ def build_lesson(
             link = prev_short or focus_short
             label = previous_day_label or "the previous lesson"
             starter = f"Continue from {label} on '{link}'. " + starter
-        elif prev_short:
-            starter = f"Build on the previous lesson ('{prev_short}'). " + starter
         if misconceptions and "Monitor for general" not in misconceptions:
             starter += f" Watch for: {misconceptions}"
+    # Early-years / indicatorless continuation rows have no separate
+    # introduction line in their printed form: the starter itself must state
+    # what it builds on.
+    if (prev_short and early_years
+            and "previous lesson" not in starter.lower()):
+        starter = f"Build on the previous lesson ('{prev_short}'). " + starter
     # A code-only/exemplar starter can be a concrete activity that never names
     # the lesson's focus (e.g. a list of devices for "input devices"). Name
     # the focus explicitly so the opening is anchored to THIS occurrence and
@@ -2503,11 +2497,11 @@ def build_lesson(
     if prev_short:
         intro = f"This lesson builds on '{prev_short}' and moves the class on to {skill}."
     elif topic and topic.strip() and topic.strip().lower() != (skill or "").strip().lower():
-        intro = f"This lesson focuses on {skill} within {topic}."
+        intro = f"This lesson focuses on {focus_short or skill} within {topic}."
     else:
         # The topic IS the focus (a code-only scheme filled from the official
         # exemplar corpus): "within {topic}" would repeat the same words twice.
-        intro = f"This lesson focuses on {skill}."
+        intro = f"This lesson focuses on {focus_short or skill}."
     if position_index:
         # Same curriculum focus on a later teaching day: the framing states the
         # continuation explicitly (never a cloned opening sentence).
@@ -2563,6 +2557,40 @@ def build_lesson(
     else:
         phase_specs = _compose_main_phases(profile, fmt, act_key,
                                            position_index=position_index)
+
+    # ── Phase uniqueness (Part G) ─────────────────────────────────────────
+    # The MAIN block must develop the lesson; it must not repeat the opening
+    # or the closing. Some pattern/exemplar step sets re-use the same "orient"
+    # move that composed the starter, which printed Phase 1 twice. Drop any
+    # main step that duplicates the starter/conclusion, keeping at least two
+    # genuine main steps.
+    def _text_overlap(a: str, b: str) -> float:
+        ta = {w for w in re.findall(r"[a-z0-9]+", (a or "").lower())
+              if len(w) > 3}
+        tb = {w for w in re.findall(r"[a-z0-9]+", (b or "").lower())
+              if len(w) > 3}
+        if not ta or not tb:
+            return 0.0
+        return len(ta & tb) / len(ta | tb)
+
+    def _is_duplicate(text: str) -> bool:
+        for reference in (starter,):
+            if not reference:
+                continue
+            ref_norm = re.sub(r"\s+", " ", reference).strip().lower()
+            text_norm = re.sub(r"\s+", " ", text).strip().lower()
+            if text_norm and (text_norm == ref_norm
+                              or text_norm.startswith(ref_norm)
+                              or ref_norm.startswith(text_norm)):
+                return True
+            if _text_overlap(text, reference) >= 0.82:
+                return True
+        return False
+
+    unique_specs = [spec for spec in phase_specs if not _is_duplicate(spec[1])]
+    if len(unique_specs) >= 2:
+        phase_specs = unique_specs
+
     # ── TIMING — hard invariant (Priority 2 §10) ──────────────────────────
     # Partition the lesson duration EXACTLY across the three phases:
     #   Phase 1 starter + Phase 2 steps + Phase 3 plenary == duration_minutes.
@@ -2596,9 +2624,10 @@ def build_lesson(
     learner_activities: List[TeachingActivity] = []
     teacher_activities: List[TeachingActivity] = []
 
-    # Per-row resources: this lesson's scheme TLRs first, then the selected
-    # activity's own materials — each activity row carries the resources it
-    # actually needs (they were previously all empty).
+    # Per-row resources: this lesson's scheme TLRs only. The activity's own
+    # material suggestions are no longer allowed to enter the plan (they were
+    # AI-style generic additions such as "hand lens" that the uploaded scheme
+    # never named).
     _row_base = [r for r in _resource_pool[:2] if r]
     _library_learner_used = False
 
@@ -2655,10 +2684,6 @@ def build_lesson(
                     _ev += "."
                 row_desc = f"{row_desc} {_ev}"
         row_res = list(_row_base)
-        for _m in list(activity.materials)[:2]:
-            _m = (_m or "").strip()
-            if _m and _m.lower() not in [x.lower() for x in row_res]:
-                row_res.append(_m)
         main_activities.append(TeachingActivity(
             phase=phase_name.upper(), description=row_desc,
             duration_minutes=minutes, resources=row_res,
@@ -2787,7 +2812,7 @@ def build_lesson(
     main_activities.append(TeachingActivity(
         phase="PHASE 3 · PLENARY", description=conclusion,
         duration_minutes=plenary_min,
-        resources=["exercise books"] if not early_years else [],
+        resources=list(_row_base),
     ))
     learner_activities.append(TeachingActivity(
         phase="PHASE 3 · PLENARY",
@@ -2798,6 +2823,27 @@ def build_lesson(
         phase="PHASE 3 · PLENARY", description=conclusion,
         duration_minutes=plenary_min, resources=[],
     ))
+
+    # The closing must not be printed again as a MAIN step. Keep boundary
+    # rows (Phase 1/3) and at least two substantive main steps.
+    _conclusion_norm = re.sub(r"\s+", " ", conclusion or "").strip().lower()
+    _main_only = [
+        row for row in main_activities
+        if "STARTER" not in (row.phase or "").upper()
+        and "PLENARY" not in (row.phase or "").upper()
+        and "PHASE 1" not in (row.phase or "").upper()
+        and "PHASE 3" not in (row.phase or "").upper()
+    ]
+    if _conclusion_norm and len(_main_only) > 2:
+        _kept_main = [
+            row for row in _main_only
+            if re.sub(r"\s+", " ", row.description or "").strip().lower()
+            not in {_conclusion_norm}
+            and _text_overlap(row.description or "", conclusion) < 0.82
+        ]
+        if len(_kept_main) >= 2:
+            _drop = {id(row) for row in _main_only} - {id(row) for row in _kept_main}
+            main_activities = [row for row in main_activities if id(row) not in _drop]
 
     # Differentiation tiers come from the SELECTED ACTIVITY (Priority 2 §14):
     # support/challenge describe this task, the core tier states the evidence
@@ -2998,41 +3044,16 @@ def build_lesson(
             if r and r.lower() not in [x.lower() for x in other_tlrs]:
                 other_tlrs.append(r)
 
-    # Display union for templates that expect one TLR list.
+    # Display union for templates that expect one TLR list. ONLY the uploaded
+    # scheme's resources are allowed here; teacher additions are merged from
+    # the saved review draft by the generation router. Subject/activity
+    # "materials" are deliberately NOT appended — generic items the scheme
+    # never named (hand lens, flowcharts, picture cards …) must not appear as
+    # if the source or the teacher supplied them.
     resources: List[str] = list(source_tlrs)
     for r in other_tlrs:
         if r.lower() not in [x.lower() for x in resources]:
             resources.append(r)
-    # Subject/activity-specific support materials (deterministic, lesson-scoped).
-    if bank_key and interp is not None:
-        for r in list(getattr(interp, "suggested_resources", []) or []) + _ACTIVITY_RESOURCES.get(bank_key, []):
-            r = (r or "").strip()
-            if r and r.lower() not in [x.lower() for x in resources]:
-                resources.append(r)
-    # Official curriculum material patterns for THIS indicator (e.g. "picture
-    # cards showing keyboard, mouse, touchscreen, barcode reader, scanner").
-    if exemplar:
-        for r in (exemplar.suitable_resource_patterns or []):
-            r = (r or "").strip()
-            if r and r.lower() not in [x.lower() for x in resources]:
-                resources.append(r)
-    # The SELECTED ACTIVITY's own materials (Priority 2 §5/§12): the resources
-    # of the activity this lesson actually performs — realistic, low-cost
-    # classroom items — always present even when the scheme named none.
-    for r in list(activity.materials):
-        r = (r or "").strip()
-        if r and r.lower() not in [x.lower() for x in resources]:
-            resources.append(r)
-    # Priority 2.1 §F: the DISPLAY list (rendered as the lesson's required
-    # resources, read by the quality gate and the benchmark) must not REQUIRE
-    # equipment most Ghanaian classrooms lack. ``source_tlrs`` above keeps the
-    # scheme's own wording verbatim — only the lesson's requirements move on
-    # to the next real item.
-    _teachable = [r for r in resources
-                  if _resource_is_available(r, subject_name)]
-    if not _teachable:
-        _teachable = list(profile.resources)
-    resources = _teachable or resources
     # Phase 6.4: the DISPLAY list is teacher-facing content — ordinary
     # resource names print with consistent capitalisation ("Charts and
     # Pictures"). ``source_tlrs`` above keeps the scheme's wording verbatim.
@@ -3123,6 +3144,8 @@ def build_lesson(
         c = (c or "").strip()
         if c and c.lower() not in [x.lower() for x in competencies]:
             competencies.append(c)
+    from .competencies import normalize_competencies
+    competencies = normalize_competencies(competencies)
 
     # ── References — TEACHER-ENTERED only (PART L/M) ────────────────────
     # DEFAULT: empty. The builder never invents curriculum/handbook references:
@@ -3286,6 +3309,14 @@ def build_lesson(
     # (indicators, content standard, source TLRs) are intentionally excluded.
     _normalize_lesson_text(lp)
 
+    # ── Resource provenance + use (Parts F/J) ────────────────────────────
+    # The TLR summary may carry only resources from the uploaded scheme (this
+    # builder never invents one). Every listed resource is then named in an
+    # activity: a resource that appears only in the summary row is not a
+    # teaching resource. Teacher-added TLRs are appended later, from the saved
+    # review draft, by the generation router.
+    _attach_source_resource_use(lp)
+
     # ── Layer 4: record this lesson's fingerprint for anti-repetition ────
     # The history is optional and NEVER changes this lesson's text; it only
     # lets the NEXT lesson's pattern selection vary. Recording happens after
@@ -3303,6 +3334,68 @@ def build_lesson(
             pass
 
     return lp
+
+
+def _attach_source_resource_use(lp) -> None:
+    """Name every scheme resource in a teaching activity (never invent one)."""
+    from .resource_use import resource_use_sentence
+    resources = []
+    scheme_resources = []
+    seen = set()
+    source_keys = {
+        str(r or "").strip().lower()
+        for r in (getattr(lp, "source_tlrs", None) or [])
+    }
+    for value in (list(getattr(lp, "source_tlrs", None) or [])
+                  + list(getattr(lp, "other_tlrs", None) or [])):
+        text = (value or "").strip()
+        key = text.lower()
+        if not text or key in seen:
+            continue
+        seen.add(key)
+        resources.append(text)
+        if key in source_keys:
+            scheme_resources.append(text)
+    lp.teaching_learning_resources = list(resources)
+    if not scheme_resources:
+        return
+    corpus = " ".join([
+        getattr(lp, "introduction", "") or "",
+        getattr(lp, "starter_activity", "") or "",
+        getattr(lp, "assessment", "") or "",
+        getattr(lp, "conclusion", "") or "",
+    ] + [(a.description or "") for a in (
+        list(getattr(lp, "main_activities", None) or [])
+        + list(getattr(lp, "learner_activities", None) or [])
+        + list(getattr(lp, "teacher_activities", None) or [])
+    )]).lower()
+    missing = [
+        r for r in scheme_resources
+        if r.lower() not in corpus and f"{r.lower()}s" not in corpus
+    ]
+    if not missing:
+        return
+    focus = (getattr(lp, "sub_strand", "") or getattr(lp, "lesson_topic", "")
+             or "the lesson focus").strip().rstrip(" .;:,")
+    target = None
+    for row in list(getattr(lp, "main_activities", None) or []):
+        label = (getattr(row, "phase", "") or "").upper()
+        if not any(k in label for k in (
+                "STARTER", "PHASE 1", "PLENARY", "PHASE 3")):
+            target = row
+            break
+    if target is None:
+        return
+    sentences = [
+        resource_use_sentence(r, focus, i)
+        for i, r in enumerate(missing)
+    ]
+    sentences = [s for s in sentences if s]
+    target.description = (
+        (target.description or "").strip() + " " + " ".join(sentences)
+    ).strip()
+    target.resources = list(dict.fromkeys(
+        list(getattr(target, "resources", None) or []) + missing))
 
 
 def _phase_role(phase_name: str) -> str:

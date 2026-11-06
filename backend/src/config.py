@@ -143,6 +143,33 @@ class Settings(BaseSettings):
     #: Require a login challenge after this many recent failed attempts.
     LOGIN_TURNSTILE_AFTER_FAILURES: int = 3
 
+    # ── Platform-admin OIDC SSO (BloomCore Identity / Control Center) ────
+    # Optional central sign-in for the platform administrator. DEFAULT OFF:
+    # every local (password + TOTP) login path is unchanged while disabled.
+    # All variables are prefixed PLATFORM_OIDC_ in the environment.
+    PLATFORM_OIDC_ENABLED: bool = False
+    #: Issuer of the BloomCore Identity provider (must match the IdP token
+    #: ``iss`` claim exactly, including the trailing slash).
+    PLATFORM_OIDC_ISSUER: str = "http://localhost:9000/application/o/schemeknit/"
+    #: OAuth2 client id registered on the IdP for this product.
+    PLATFORM_OIDC_CLIENT_ID: str = "schemeknit-sso"
+    #: OAuth2 client secret. NEVER commit a real value; set via environment.
+    PLATFORM_OIDC_CLIENT_SECRET: str = ""
+    #: Space-separated OIDC scopes requested at the authorize endpoint.
+    PLATFORM_OIDC_SCOPES: str = "openid email profile"
+    #: Per-product API key issued by the Control Center for the
+    #: server-to-server linking resolve/confirm calls. This is the schemeknit
+    #: entry of the Control Center's CC_PRODUCT_API_KEYS map.
+    PLATFORM_OIDC_LINKING_API_KEY: str = ""
+    # Control Center product slug used as the revocation audience (ADR-0004).
+    PLATFORM_REVOCATION_AUDIENCE: str = "schemeknit"
+    #: Base URL of the Control Center backend (linking endpoints live under
+    #: /api/v1/products/schemeknit/linking/...).
+    PLATFORM_OIDC_LINKING_BASE_URL: str = "http://localhost:8400"
+    #: Lifetime of the OIDC flow-state cookie and one-time attempt tokens.
+    #: Hard-capped at 10 minutes by the router regardless of this setting.
+    PLATFORM_OIDC_FLOW_TTL_SECONDS: int = 600
+
     # File Storage
     # STORAGE_BACKEND=local (default) or s3 for S3-compatible object storage.
     UPLOAD_DIR: str = "uploads"
@@ -618,6 +645,28 @@ class Settings(BaseSettings):
                 problems.append(
                     "TURNSTILE_ALLOWED_HOSTNAMES (required when "
                     "TURNSTILE_ENABLED=true)"
+                )
+
+        # Platform-admin OIDC SSO is opt-in. When it is switched on in
+        # production, it must not silently run with a plaintext-http issuer or
+        # an empty client secret / linking key. Desktop mode never reaches this
+        # block and the feature defaults to OFF everywhere.
+        if self.PLATFORM_OIDC_ENABLED:
+            issuer = (self.PLATFORM_OIDC_ISSUER or "").strip()
+            if not issuer.startswith("https://"):
+                problems.append(
+                    "PLATFORM_OIDC_ISSUER (must be an https:// URL when "
+                    "PLATFORM_OIDC_ENABLED=true in production)"
+                )
+            if not (self.PLATFORM_OIDC_CLIENT_SECRET or "").strip():
+                problems.append(
+                    "PLATFORM_OIDC_CLIENT_SECRET (required when "
+                    "PLATFORM_OIDC_ENABLED=true)"
+                )
+            if not (self.PLATFORM_OIDC_LINKING_API_KEY or "").strip():
+                problems.append(
+                    "PLATFORM_OIDC_LINKING_API_KEY (required when "
+                    "PLATFORM_OIDC_ENABLED=true)"
                 )
 
         # Invite-only registration must have a code to check against.

@@ -19,7 +19,6 @@ def _doc(name: str) -> Path:
 from src.models import SchemeOfWork, TermConfig, Subject, ClassLevel, AIMode, TemplateType
 from src.engines.generation_pipeline import GenerationPipeline
 from src.engines.docx_export import DOCXExportEngine
-from src.engines.xlsx_export import XLSXExportEngine
 from datetime import date
 
 
@@ -120,6 +119,5 @@ def test_export_science():
     assert all(f.exists() for f in docx_files)
     print(f"Science DOCX: {len(docx_files)} files exported")
 
-    xlsx_file = pipeline.export_xlsx(plans, output_dir / "register.xlsx")
-    assert xlsx_file.exists()
-    print(f"Science XLSX: register exported")
+    assert not hasattr(pipeline, "export_xlsx")
+    print("Science XLSX register export removed")

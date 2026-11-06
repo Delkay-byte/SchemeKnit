@@ -175,6 +175,7 @@ jobs:
           node e2e/ux-reliability.js
           node e2e/ux-editing-reliability.js
           node e2e/payment-checkout.js
+          node e2e/purchase-confirmation-ui.js
           node e2e/teacher-activation-admin.js
           node e2e/responsive-accessibility.js
           node e2e/accessibility-keyboard.js

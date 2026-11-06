@@ -436,6 +436,22 @@ export interface PlanResolution {
   expires_at: string | null
   is_active: boolean
   school_name: string | null
+  active_package?: {
+    slug: string
+    name: string
+    kind?: string
+    credits_granted?: number
+    credits_used?: number
+    credits_remaining?: number
+    entitlement_status?: string
+    expires_at?: string | null
+    paid_at?: string | null
+    amount_pesewas?: number
+    payment_method?: string
+    channel?: string
+    fulfilment_status?: string
+    reference?: string
+  } | null
 }
 
 export interface ContentPack {
@@ -634,7 +650,15 @@ export interface CreditStatus {
   purchased: number
   package: number
   referral: number
-  packages: Array<{ slug: string; label: string; remaining: number; expires_at: string | null }>
+  packages: Array<{
+    slug: string; label: string; kind?: string; granted?: number
+    used?: number; remaining: number; expires_at: string | null
+  }>
+  purchased_packages?: Array<{
+    slug: string; label: string; kind?: string; granted: number
+    used?: number; remaining: number; granted_at?: string | null
+    expires_at?: string | null; reference?: string
+  }>
   expired_packages: Array<{ slug: string; label: string; unused: number; expired_at: string | null }>
   total: number
   spending_order: string[]

@@ -205,10 +205,7 @@ async function configureWapef(page, { perWeek }) {
     return el && el.value === 'tpl-wapef-approved-plan'
   }, { timeout: 15000 })
 
-  // AI Mode OFF: this lesson comes from the deterministic engine. Zeli is
-  // invited later, on the review page, one section at a time.
-  await page.locator('#cfg-ai-mode').selectOption('OFF')
-
+  // Standard is the deterministic engine; no AI-mode selector exists.
   await page.locator('#cfg-term-start').fill('2026-09-14')
   await page.locator('#cfg-term-end').fill('2026-09-25')
   await page.locator('#cfg-lessons-per-week').fill(perWeek)

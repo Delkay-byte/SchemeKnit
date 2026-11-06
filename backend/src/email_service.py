@@ -228,21 +228,65 @@ class EmailService:
 
     def send_subscription_notification(
         self, to: str, plan_name: str, amount: str = "",
-        expiry: str = "",
+        expiry: str = "", credits_granted: int = 0,
+        credit_balance: int = 0, licence_key: str = "", reference: str = "",
+        fulfilment: str = "activated",
     ) -> EmailResult:
-        """Subscription receipt / renewal notice."""
+        """Purchase receipt. Never says "active" before fulfilment."""
         detail = f" ({amount})" if amount else ""
         exp = f" Valid until {expiry}." if expiry else ""
+        activated = fulfilment == "activated"
+        heading = ("Purchase successful" if activated
+                   else "Payment received — activation in progress")
+        licence_html = (
+            f"<p>Licence key: <code>{licence_key}</code></p>" if licence_key
+            else "")
+        balance_html = (
+            f"<p>Credits activated: <strong>{credits_granted}</strong><br/>"
+            f"Current credit balance: <strong>{credit_balance}</strong></p>"
+            if activated else
+            "<p>Your payment is recorded. SchemeKnit is completing activation; "
+            "no second payment is needed.</p>")
+        next_step = (
+            "Your licence is already active on this account. No further "
+            "action is needed."
+            if activated and licence_key else
+            "Open your purchase confirmation page to refresh activation or "
+            "contact support with the reference above."
+        )
+        reference_html = f"<p>Reference: <code>{reference}</code></p>" if reference else ""
         return self._send(
             to=to,
-            subject=f"SchemeKnit {plan_name} subscription{detail}",
+            subject=f"SchemeKnit purchase {detail}".strip(),
             html=(
-                f"<div style='font-family:sans-serif;max-width:480px;margin:auto'>"
-                f"<h2 style='color:#102A43'>Subscription confirmation</h2>"
-                f"<p>Your <strong>{plan_name}</strong> subscription is active.{exp}</p>"
+                f"<div style='font-family:sans-serif;max-width:520px;margin:auto'>"
+                f"<h2 style='color:#102A43'>{heading}</h2>"
+                f"<p>Package: <strong>{plan_name}</strong>{detail}</p>"
+                f"{reference_html}{balance_html}{licence_html}{exp}"
+                f"<p>{next_step}</p>"
+                f"<p style='color:#666'>Need help? Contact SchemeKnit support "
+                f"with the reference above.</p>"
                 f"</div>"
             ),
-            text=f"Your {plan_name} subscription is active.{exp}",
+            text=(f"{heading}. Package: {plan_name}{detail}. "
+                  f"Reference: {reference}. "
+                  f"Credits activated: {credits_granted}. "
+                  f"Balance: {credit_balance}. {next_step}"),
+        )
+
+    def send_owner_purchase(
+        self, to: str, plan_name: str, amount: str, reference: str,
+        channel: str, account_ref: str, fulfilment: str,
+    ) -> EmailResult:
+        """Owner purchase notification (no payment credentials)."""
+        return self.send_owner_alert(
+            to=to,
+            subject=f"New purchase {reference}",
+            summary=(
+                f"package={plan_name}; amount={amount}; reference={reference}; "
+                f"channel={channel or 'unknown'}; account={account_ref}; "
+                f"fulfilment={fulfilment}"
+            ),
         )
 
 

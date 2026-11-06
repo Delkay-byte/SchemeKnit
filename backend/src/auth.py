@@ -169,26 +169,40 @@ def _authenticate_user(credentials: HTTPAuthorizationCredentials, db: Session) -
 
 
 def create_user_token(user: User, expires_delta: Optional[timedelta] = None,
-                      jti: Optional[str] = None) -> str:
+                      jti: Optional[str] = None,
+                      amr: Optional[list] = None) -> str:
     """Create a JWT for ``user`` stamped with the current password version.
 
     Each token carries a unique ``jti`` so logout/revoke-all can invalidate the
     server-side session without affecting other devices.
+
+    ``amr`` (Authentication Method References) is present ONLY on tokens minted
+    by the OIDC SSO flow: it carries the IdP-attested authentication methods so
+    ``require_platform_admin`` can reconcile central MFA evidence. Local
+    password logins never set it, leaving their behavior unchanged.
     """
-    return create_access_token(
-        {
-            "sub": user.id,
-            "email": user.email,
-            "role": user.role,
-            "pwv": _password_version(user),
-            "jti": jti or uuid.uuid4().hex,
-        },
-        expires_delta=expires_delta,
-    )
+    payload = {
+        "sub": user.id,
+        "email": user.email,
+        "role": user.role,
+        "pwv": _password_version(user),
+        "jti": jti or uuid.uuid4().hex,
+    }
+    if amr is not None:
+        payload["amr"] = list(amr)
+    return create_access_token(payload, expires_delta=expires_delta)
 
 
-def create_session_record(db: Session, user_id: str, jti: str) -> UserSessionDB:
-    """Create the server-side row for a newly issued login token."""
+def create_session_record(db: Session, user_id: str, jti: str,
+                          auth_source: str = "local",
+                          idp_sub: Optional[str] = None,
+                          idp_sid: Optional[str] = None) -> UserSessionDB:
+    """Create the server-side row for a newly issued login token.
+
+    ``auth_source``/``idp_sub``/``idp_sid`` record provenance so central logout
+    and IdP back-channel logout can revoke exactly the SSO-derived sessions of
+    one immutable identity, leaving that administrator's local sessions alone.
+    """
     now = datetime.utcnow()
     row = UserSessionDB(
         jti=jti,
@@ -198,6 +212,9 @@ def create_session_record(db: Session, user_id: str, jti: str) -> UserSessionDB:
         expires_at=now + timedelta(
             hours=max(1, int(getattr(settings, "SESSION_ABSOLUTE_HOURS", 12)))
         ),
+        auth_source=auth_source,
+        idp_sub=idp_sub,
+        idp_sid=idp_sid,
     )
     db.add(row)
     db.commit()
@@ -300,6 +317,14 @@ async def require_platform_admin(
     pre-enrollment surfaces are ``require_platform_admin_unenrolled`` routes
     under ``/api/auth/mfa``.
 
+    MFA reconciliation: a session minted by the OIDC SSO flow carries the
+    IdP-attested ``amr`` claim. When the IdP attested a second factor
+    (MFA/passkey/OTP), that evidence satisfies this gate for a user without a
+    local TOTP enrollment. The claim is trusted because it is set exclusively
+    by the OIDC callback on a fully validated ID token — it is never
+    client-supplied. Local TOTP behavior is unchanged, and an amr WITHOUT a
+    second factor fails closed.
+
     In local DEBUG, enforcement is skipped for the existing test fixture set;
     production runs with DEBUG=false and enforces it.
     """
@@ -307,11 +332,31 @@ async def require_platform_admin(
     if user.role != "platform_admin":
         raise HTTPException(status_code=403, detail="Platform administrator access required")
     if not settings.DEBUG and not user.mfa_enabled:
-        raise HTTPException(
-            status_code=403,
-            detail="MFA enrollment is required before privileged administration.",
-        )
+        if not _sso_amr_satisfies_mfa(credentials):
+            raise HTTPException(
+                status_code=403,
+                detail="MFA enrollment is required before privileged administration.",
+            )
     return user
+
+
+def _sso_amr_satisfies_mfa(credentials: HTTPAuthorizationCredentials) -> bool:
+    """True when the CURRENT token's IdP-attested amr includes a second factor.
+
+    Re-validates the (already authenticated) token's signature/expiry before
+    reading the claim, then defers to the OIDC client's second-factor list.
+    Tokens without an ``amr`` claim (all local logins) return False, keeping
+    the local TOTP gate exactly as it was.
+    """
+    try:
+        payload = decode_token(credentials.credentials)
+    except HTTPException:
+        return False
+    amr = payload.get("amr")
+    if not isinstance(amr, list) or not amr:
+        return False
+    from .oidc_client import amr_has_second_factor
+    return amr_has_second_factor([str(a) for a in amr])
 
 
 def require_school_membership(school_id: str):

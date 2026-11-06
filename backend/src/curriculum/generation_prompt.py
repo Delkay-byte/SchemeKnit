@@ -49,8 +49,7 @@ LESSON_OUTPUT_SCHEMA = """
   "prior_knowledge": "What learners need to know before this lesson",
   "key_vocabulary": ["term1", "term2", "term3"],
   "resources": {
-    "source_resources": ["from the scheme"],
-    "suggested_alternatives": ["locally available alternatives"]
+    "source_resources": ["ONLY the exact scheme/teacher resources supplied below"]
   },
   "starter": {
     "activity": "Description of starter activity",
@@ -65,7 +64,7 @@ LESSON_OUTPUT_SCHEMA = """
       "duration_minutes": 20,
       "teacher_action": "What the teacher does",
       "learner_action": "What learners do",
-      "resources_used": ["resources for this phase"]
+      "resources_used": ["only resources from the approved list"]
     },
     "phase2": { ... }
   },
@@ -110,7 +109,8 @@ You generate lesson plans that are:
 2. SUBJECT-AWARE: Pedagogy matches the subject discipline.
 3. MEASURABLE: Objectives use observable verbs, not vague terms.
 4. COHERENT: Starter → Main → Assessment → Plenary form a logical instructional story.
-5. PRACTICAL: Activities work in ordinary Ghanaian classrooms with available resources.
+5. PRACTICAL: Activities work in ordinary Ghanaian classrooms using ONLY the
+   resources the teacher's scheme supplies or the teacher adds.
 6. DIFFERENTIATED: Support, core, and extension are compact and actionable.
 
 RULES:
@@ -120,6 +120,10 @@ RULES:
 - ALWAYS connect assessment to the indicator and objectives.
 - ALWAYS use the indicator's action verb in the objectives.
 - ALWAYS provide realistic Ghanaian classroom activities.
+- NEVER invent a Teaching & Learning Resource. Use only the SOURCE TLRs and
+  OTHER TLRs supplied in the prompt; leave resource lists empty when the
+  scheme and the teacher supplied none. Do not propose "alternatives",
+  "diagrams", "flowcharts", "hand lenses" or "locally available materials".
 - ALWAYS keep examples factually and scientifically correct. When the indicator
   names a category, every example MUST belong to that category (for example, a
   "binary compound" contains exactly two elements, so a carbonate or bicarbonate
@@ -294,9 +298,14 @@ Suggested Phases: {', '.join(strategy.get('phases', []))}""")
     # Resources
     if source_resources:
         sections.append(f"""SOURCE TLRs (from the scheme for this subject + source week)
-{chr(10).join(f'- {r}' for r in source_resources)}""")
+{chr(10).join(f'- {r}' for r in source_resources)}
+
+These are the ONLY resources allowed in the printed plan (plus OTHER TLRs
+below). Use each one in at least one activity.""")
     else:
-        sections.append("SOURCE TLRs: None specified in scheme — suggest realistic alternatives.")
+        sections.append(
+            "SOURCE TLRs: none specified in the scheme. Do NOT invent or "
+            "substitute resources; leave every resource list empty.")
 
     if other_tlrs:
         sections.append(f"""OTHER TLRs (teacher-added for THIS lesson)
@@ -341,7 +350,9 @@ CRITICAL RULES:
 3. Starter MUST prepare learners for the main activity.
 4. Main activities MUST address the objectives.
 5. Plenary MUST connect to the same learning.
-6. Resources MUST be realistic for Ghanaian classrooms.
+6. Resources MUST come ONLY from the SOURCE TLRs and OTHER TLRs supplied
+   above. NEVER add a resource the teacher/scheme did not name. Every listed
+   resource must be used in a starter, main or plenary activity.
 7. NO invented textbook references, page numbers, or curriculum codes.
 8. NO ICT/projector/smartboard assumptions unless clearly appropriate.
 9. Differentiation must be COMPACT — not three separate lessons.
@@ -371,7 +382,18 @@ CRITICAL RULES:
 18. assessment_items MUST test the actual objectives and indicator. Each item
     needs a concrete prompt and the evidence a correct response provides. Do
     NOT use generic experimental-variable language unless the indicator itself
-    requires it.""")
+    requires it.
+19. PHASE UNIQUENESS: the starter and main_learning MUST NOT contain the same
+    activity, instruction or sentence. Main learning develops new knowledge
+    and practice; it never restates the opening. Do not copy the starter's
+    teacher_action or learner_action into any main_learning phase.
+20. The exit check / closing evidence belongs ONLY in the plenary. It MUST NOT
+    also appear in main_learning. Each phase has ONE purpose: starter =
+    activate prior knowledge and introduce the problem; main = explain,
+    investigate, practise and apply; plenary = consolidate, check and reflect.
+21. CORE COMPETENCIES: use exactly the labels supplied in CORE COMPETENCIES
+    (when supplied) and never invent a competency name. When none are supplied,
+    do not add a competency field.""")
 
     return "\n\n".join(sections)
 
@@ -419,7 +441,8 @@ RULES:
 - Keep the content appropriate for {class_level} learners in Ghana.
 - Use observable verbs, not vague terms.
 - Connect to the specific indicator.
-- Use locally available resources.
+- Use only resources the scheme or the teacher supplied; never invent one.
+- Keep this section distinct from the other lesson phases.
 - Return ONLY the regenerated content for the '{section}' section.
 - No invented references or page numbers."""
 

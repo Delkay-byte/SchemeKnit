@@ -310,11 +310,14 @@ def _kv_table(rows: Sequence[Tuple[str, str]]) -> Table:
     return table
 
 
-def _activity_table(rows: Sequence[Tuple[str, str, str]]) -> Table:
-    data = [[_para(head, _CELL_HEAD_STYLE) for head in _ACTIVITY_HEADER]]
+def _activity_table(rows: Sequence[Tuple[str, str, str]],
+                    header: Sequence[str] = None,
+                    widths: Sequence[float] = None) -> Table:
+    heads = tuple(header or _ACTIVITY_HEADER)
+    data = [[_para(head, _CELL_HEAD_STYLE) for head in heads]]
     data.extend([[_para(cell, _CELL_STYLE) for cell in row] for row in rows])
     table = Table(data,
-                  colWidths=[_CONTENT_WIDTH * w for w in _ACTIVITY_WIDTHS],
+                  colWidths=[_CONTENT_WIDTH * w for w in (widths or _ACTIVITY_WIDTHS)],
                   repeatRows=1, hAlign="LEFT")
     table.setStyle(_grid_style(label_column=False, header_row=True))
     return table
@@ -472,6 +475,7 @@ class StructuredPDFEngine:
         story: List[Any] = [Paragraph(title, _TITLE_STYLE)]
         state: Dict[str, Any] = {"shown": set(), "resources": False}
         declared = _declared_fields(sections)
+        ges_delivery_rendered = False
 
         if not any(s["name"] in HEADER_SECTION_NAMES for s in sections):
             rows = _header_rows(family, lp, ctx, declared,
@@ -484,6 +488,22 @@ class StructuredPDFEngine:
             name = section["name"]
             rows: List[Tuple[str, str]] = []
             grid: Optional[List[Tuple[str, str, str]]] = None
+
+            # GES forms: ONE canonical three-column delivery table, rendered
+            # from the same phase rows and phase assessments as the DOCX.
+            # Rendering the form's phase sections one-by-one produced the
+            # divergent two-column "Lesson Delivery Layout" PDF.
+            if family == "ges" and name in DELIVERY_SECTION_NAMES:
+                if not ges_delivery_rendered:
+                    ges_delivery_rendered = True
+                    story.append(Paragraph("Lesson Delivery Layout",
+                                           _SECTION_STYLE))
+                    story.append(_activity_table(
+                        _ges_delivery_rows(lp),
+                        header=("Phase / Timeline",
+                                "Learner & Teacher Activities", "Assessment"),
+                        widths=(0.22, 0.50, 0.28)))
+                continue
 
             if name in DELIVERY_SECTION_NAMES:
                 rows, grid = self._render_delivery(section, lp, family, ctx,
@@ -632,6 +652,41 @@ class StructuredPDFEngine:
                                        _SECTION_STYLE))
                 story.append(_kv_table([("Resources", _join_lines(resources))]))
         return story
+
+
+def _ges_delivery_rows(lp) -> List[Tuple[str, str, str]]:
+    """Canonical three-column delivery rows (Phase | Activities | Assessment).
+
+    The same phase boundaries and the same assessment text the DOCX form
+    renders, so the PDF cannot drift into a different document structure.
+    """
+    from ..curriculum.lesson_rubric import phase_assessments, phase_rows
+
+    p1, p2, p3 = phase_rows(lp)
+    assessments = phase_assessments(lp)
+
+    def _descriptions(rows) -> List[str]:
+        out, seen = [], set()
+        for row in rows:
+            text = (getattr(row, "description", "") or "").strip()
+            key = re.sub(r"\s+", " ", text).lower()
+            if text and key not in seen:
+                seen.add(key)
+                out.append(text)
+        return out
+
+    def _combined(rows) -> str:
+        return "\n".join(f"- {line}" for line in _descriptions(rows))
+
+    labels = (
+        ("PHASE 1: STARTER / INTRO", p1, "phase_1"),
+        ("PHASE 2: MAIN LEARNING", p2, "phase_2"),
+        ("PHASE 3: PLENARY / REFLECTION", p3, "phase_3"),
+    )
+    return [
+        (label, _combined(rows), assessments.get(key, ""))
+        for label, rows, key in labels
+    ]
 
 
 def _merged_rows(section, lp, family, ctx, state) -> List[Tuple[str, str]]:

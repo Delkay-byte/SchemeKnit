@@ -824,12 +824,12 @@ class AnalyticRubric(BaseModel):
 
 #: Official NaCCA core-competency taxonomy (canonical labels + codes).
 NACCA_CORE_COMPETENCIES: List[Dict[str, str]] = [
-    {"code": "CP", "label": "Critical Thinking and Problem Solving"},
-    {"code": "CI", "label": "Creativity and Innovation"},
-    {"code": "CC", "label": "Communication and Collaboration"},
-    {"code": "CG", "label": "Cultural Identity and Global Citizenship"},
-    {"code": "PL", "label": "Personal Development and Leadership"},
-    {"code": "DL", "label": "Digital Literacy"},
+    {"code": "CP", "label": "Critical Thinking and Problem Solving (CP)"},
+    {"code": "CI", "label": "Creativity and Innovation (CI)"},
+    {"code": "CC", "label": "Communication and Collaboration (CC)"},
+    {"code": "CG", "label": "Cultural Identity and Global Citizenship (CG)"},
+    {"code": "PL", "label": "Personal Development and Leadership (PL)"},
+    {"code": "DL", "label": "Digital Literacy (DL)"},
 ]
 NACCA_COMPETENCY_LABELS: List[str] = [c["label"] for c in NACCA_CORE_COMPETENCIES]
 
