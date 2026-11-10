@@ -302,7 +302,7 @@ class TestLessonResourceOverride:
 
 
 class TestKeywordQuality:
-    def test_scheme_resources_seed_the_keyword_list(self):
+    def test_scheme_resources_do_not_seed_the_keyword_list(self):
         from src.curriculum.lesson_builder import build_lesson
 
         lp = build_lesson(
@@ -311,9 +311,12 @@ class TestKeywordQuality:
                 ["Touchscreen", "Mouse", "Keyboard"],
             ),
             _cfg(), "s")
-        # The scheme's own materials lead the list (PART 14): they are far more
-        # lesson-specific than the shared sub-strand.
-        assert lp.keywords[:3] == ["Touchscreen", "Mouse", "Keyboard"]
+        # Teaching materials are resources, not vocabulary (PART 18). The list
+        # comes from the indicator's subject terminology instead.
+        lowered = {k.lower() for k in lp.keywords}
+        for resource in ("touchscreen", "mouse", "keyboard"):
+            assert resource not in lowered
+        assert any(term in lowered for term in ("automatic devices", "manual", "device", "devices"))
 
     def test_generic_action_verbs_are_not_keywords(self):
         from src.curriculum.lesson_builder import build_lesson

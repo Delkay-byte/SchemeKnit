@@ -8,8 +8,11 @@ import { SurfaceCard } from '@/components/ui/surface-card'
 import { Banner } from '@/components/ui/banner'
 import { Select } from '@/components/ui/select'
 import { Field, TextArea } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 import { Download, Settings, Play, CheckCircle, FileText, FileArchive, Loader2, Eye, ChevronDown, ChevronRight } from 'lucide-react'
 import { api, sanitizeTermConfig } from '@/lib/api'
+import { exportLessonPlans } from '@/lib/docx'
+import { downloadBlob } from '@/lib/docx/filename'
 import { DetailPageSkeleton } from '@/components/ui/skeleton'
 import { normalizeError } from '@/lib/error-normalizer'
 import { resolveRouteId } from '@/lib/route-params'
@@ -46,6 +49,15 @@ interface WapefReviewRow {
   wapef_through_lines?: string[]
   wapef_gods_story?: string
   remarks?: string
+  keywords?: string[]
+  keywords_touched?: boolean
+  suggested_keywords?: string[]
+  suggested_wapef?: {
+    deep_hope?: string
+    storyline?: string
+    through_lines?: string[]
+    gods_story?: string
+  }
 }
 
 export default function GeneratePage() {
@@ -65,6 +77,7 @@ export default function GeneratePage() {
   const [coverage, setCoverage] = useState<CurriculumCoverage | null>(null)
   const [jobId, setJobId] = useState<string | null>(null)
   const [exporting, setExporting] = useState<string | null>(null)
+  const [exportProgress, setExportProgress] = useState('')
   const [genProgress, setGenProgress] = useState<string>('')
   // Honest batch outcome: occurrences the quality gate refused stay pending
   // and must not be presented as generated.
@@ -95,6 +108,8 @@ export default function GeneratePage() {
   // Approved WAPEF option lists (Deep Hope / Storyline / Through lines /
   // God's Story). Dropdown-only: the teacher picks, never free text, never AI.
   const [wapefOptions, setWapefOptions] = useState<WapefOptions | null>(null)
+  const [keywordInputs, setKeywordInputs] = useState<Record<number, string>>({})
+  const [throughlineInputs, setThroughlineInputs] = useState<Record<number, string>>({})
   // Guided lesson configuration (Phase 2): the seven plan-wide fields the
   // teacher confirms AFTER extraction and BEFORE generation, through the ONE
   // "Configure lesson rubrics" modal. Saved on the scheme; readiness comes
@@ -185,6 +200,7 @@ export default function GeneratePage() {
       ai_mode: 'OFF',
       template_id: saved.template_id || prev.template_id,
       indicator_resources: saved.indicator_resources || {},
+      indicator_keywords: saved.indicator_keywords || {},
     }))
     try { await handlePreviewAllocation() } catch { /* preview refreshes debounced anyway */ }
   }
@@ -224,6 +240,7 @@ export default function GeneratePage() {
     teaching_learning_resources: [],
     core_competencies: [],
     references: [],
+    indicator_keywords: {},
     selected_indicator_codes: [],
   })
 
@@ -936,6 +953,34 @@ export default function GeneratePage() {
     remarks: row.remarks || '',
   })
 
+  // Key words / new vocabulary for one review row. Until the teacher edits,
+  // the curriculum suggestion is shown; the first edit marks the row as
+  // teacher-owned so regeneration never silently replaces the approved list.
+  const activeKeywords = (row: WapefReviewRow): string[] => (
+    row.keywords_touched ? (row.keywords || []) : (row.suggested_keywords || [])
+  )
+
+  const setRowKeywords = (row: WapefReviewRow, terms: string[], touched = true) => {
+    const cleaned: string[] = []
+    for (const term of terms) {
+      const value = String(term || '').replace(/\s+/g, ' ').trim()
+      if (value && !cleaned.some((item) => item.toLowerCase() === value.toLowerCase())) {
+        cleaned.push(value)
+      }
+    }
+    updateLessonReviewRow(row.lesson_sequence, {
+      keywords: cleaned,
+      keywords_touched: touched,
+    })
+  }
+
+  const addRowKeyword = (row: WapefReviewRow) => {
+    const value = (keywordInputs[row.lesson_sequence] || '').trim()
+    if (!value) return
+    setRowKeywords(row, [...activeKeywords(row), value])
+    setKeywordInputs((current) => ({ ...current, [row.lesson_sequence]: '' }))
+  }
+
   // rows param: the CALLER passes the rows to save. runGeneration
   // passes its own in-scope `lessonReview` (the exact state the teacher sees
   // on screen at click time), so the payload can never be built from a stale
@@ -953,7 +998,8 @@ export default function GeneratePage() {
           // Teacher-adjusted timetable slot for this lesson (Pattern 1).
           // Applied to the built lesson; blank is preserved as blank.
           period: row.period || '',
-          keywords: row.keywords || [],
+          keywords: row.keywords_touched ? (row.keywords || []) : [],
+          keywords_touched: Boolean(row.keywords_touched),
           other_tlrs: row.other_tlrs || [],
           core_competencies: row.core_competencies || [],
           structured_references: row.structured_references || [],
@@ -992,15 +1038,56 @@ export default function GeneratePage() {
     if (!jobId) return
     try {
       setExporting(format)
+      setExportProgress('')
       const subject = scheme?.subject || 'Lesson'
       const cls = scheme?.class_level || 'Plans'
 
-      // Every export goes through the one-time download URL (PART 27): the
-      // POST validates and renders first — so a genuine server failure still
-      // surfaces as a real error — then the browser navigates to a single-use
-      // URL and the browser/download manager owns the transfer. There is no
-      // fetch() body read on the page, so a successful handoff (including IDM
-      // interception) can no longer be misreported as "Failed to fetch".
+      // DOCX and ZIP are serialized in the teacher's browser from a
+      // server-built render model. Content, template choice, ownership and
+      // entitlement stay server-side; only OOXML/ZIP packaging moved.
+      if (format === 'docx' || format === 'zip') {
+        const browserEnabled =
+          process.env.NEXT_PUBLIC_BROWSER_DOCX_EXPORT !== 'false'
+        if (browserEnabled) {
+          try {
+            setExportProgress('Preparing your saved lesson data...')
+            const model = await api.getExportModel(
+              jobId, format, config.template_type, config.template_id)
+            setExportProgress(
+              format === 'zip' ? 'Building lesson documents...' : 'Building your Word document...')
+            const file = await exportLessonPlans(model, format, {
+              onProgress: (progress) => {
+                if (progress.phase === 'zipping') {
+                  setExportProgress(`Packaging ${model.lesson_count} lesson plans...`)
+                } else if (progress.phase === 'rendering') {
+                  setExportProgress(
+                    progress.total > 1
+                      ? `Building document ${Math.min(progress.completed + 1, progress.total)} of ${progress.total}...`
+                      : 'Building your Word document...')
+                }
+              },
+            })
+            downloadBlob(file.blob, file.filename)
+            return
+          } catch (browserError) {
+            // Rollout safety: if browser serialization fails for any reason,
+            // fall back to the existing server export rather than leaving the
+            // teacher without their document. Abort stays a deliberate stop.
+            if ((browserError as Error)?.name === 'AbortError') throw browserError
+            if (typeof console !== 'undefined') {
+              console.warn('[docx] browser export failed; using server fallback',
+                browserError)
+            }
+          }
+        }
+        const res = await api.getDownloadUrl(
+          jobId, format, config.template_type, config.template_id)
+        void res.filename
+        api.navigateToDownload(res.download_url)
+        return
+      }
+
+      // PDF conversion still runs on the server (layout work is out of scope).
       const res = await api.getDownloadUrl(
         jobId, format, config.template_type, config.template_id)
       const fallback = `${subject} ${cls} - Lesson Plans.${format}`
@@ -1012,6 +1099,7 @@ export default function GeneratePage() {
       setError(normalizeError(err).message)
     } finally {
       setExporting(null)
+      setExportProgress('')
     }
   }
 
@@ -1601,29 +1689,51 @@ export default function GeneratePage() {
                         Week {row.week_number}{row.indicator_code ? ` · ${row.indicator_code}` : ''}
                       </p>
                       <div className="mt-2 grid gap-2.5 sm:grid-cols-2">
-                        <Field label="Deep Hope" htmlFor={`wapef-deep-hope-${row.lesson_sequence}`}>
-                          <Select
+                        <Field
+                          label="Deep Hope"
+                          htmlFor={`wapef-deep-hope-${row.lesson_sequence}`}
+                          hint="Formation, not the lesson objective. Edit freely."
+                        >
+                          <TextArea
                             id={`wapef-deep-hope-${row.lesson_sequence}`}
                             value={row.wapef_deep_hope || ''}
                             onChange={(e) => updateLessonReviewRow(row.lesson_sequence, { wapef_deep_hope: e.target.value })}
-                          >
-                            <option value="">— Select —</option>
+                            placeholder={row.suggested_wapef?.deep_hope || 'Write an enduring hope for your learners'}
+                            rows={2}
+                          />
+                          <div className="mt-1 flex flex-wrap gap-1.5">
+                            {row.suggested_wapef?.deep_hope && (
+                              <button type="button" className="text-xs font-medium text-[#035f7c] underline"
+                                onClick={() => updateLessonReviewRow(row.lesson_sequence, { wapef_deep_hope: row.suggested_wapef?.deep_hope || '' })}>
+                                Use suggested Deep Hope
+                              </button>
+                            )}
                             {wapefOptions.deep_hopes.map((option) => (
-                              <option key={option} value={option}>{option}</option>
+                              <button key={option} type="button" className="text-xs text-muted-foreground underline"
+                                onClick={() => updateLessonReviewRow(row.lesson_sequence, { wapef_deep_hope: option })}>
+                                Use approved wording
+                              </button>
                             ))}
-                          </Select>
+                          </div>
                         </Field>
-                        <Field label="Storyline" htmlFor={`wapef-storyline-${row.lesson_sequence}`}>
-                          <Select
+                        <Field
+                          label="Storyline"
+                          htmlFor={`wapef-storyline-${row.lesson_sequence}`}
+                          hint="Where this lesson sits in God's story."
+                        >
+                          <TextArea
                             id={`wapef-storyline-${row.lesson_sequence}`}
                             value={row.wapef_storyline || ''}
                             onChange={(e) => updateLessonReviewRow(row.lesson_sequence, { wapef_storyline: e.target.value })}
-                          >
-                            <option value="">— Select —</option>
-                            {wapefOptions.storylines.map((option) => (
-                              <option key={option} value={option}>{option}</option>
-                            ))}
-                          </Select>
+                            placeholder={row.suggested_wapef?.storyline || 'Connect the learning to God’s story'}
+                            rows={2}
+                          />
+                          {row.suggested_wapef?.storyline && (
+                            <button type="button" className="mt-1 text-xs font-medium text-[#035f7c] underline"
+                              onClick={() => updateLessonReviewRow(row.lesson_sequence, { wapef_storyline: row.suggested_wapef?.storyline || '' })}>
+                              Use suggested Storyline
+                            </button>
+                          )}
                         </Field>
                       </div>
                       <div className="mt-2.5">
@@ -1655,20 +1765,81 @@ export default function GeneratePage() {
                               </button>
                             )
                           })}
+                          {(row.wapef_through_lines || [])
+                            .filter((item: string) => !wapefOptions.through_lines.includes(item))
+                            .map((item: string) => (
+                              <button key={item} type="button" aria-pressed="true"
+                                onClick={() => updateLessonReviewRow(row.lesson_sequence, {
+                                  wapef_through_lines: (row.wapef_through_lines || []).filter((entry: string) => entry !== item),
+                                })}
+                                className="rounded border border-[#102A43] bg-[#102A43] px-2 py-0.5 text-xs text-white">
+                                {item} ×
+                              </button>
+                            ))}
                         </div>
+                        <div className="mt-1.5 flex gap-2">
+                          <Input
+                            aria-label={`Add a through line for lesson ${row.lesson_sequence}`}
+                            value={throughlineInputs[row.lesson_sequence] || ''}
+                            onChange={(e) => setThroughlineInputs((current) => ({ ...current, [row.lesson_sequence]: e.target.value }))}
+                            placeholder="Add your own through line"
+                            className="h-8 text-xs"
+                            onKeyDown={(e) => {
+                              if (e.key !== 'Enter') return
+                              e.preventDefault()
+                              const value = (throughlineInputs[row.lesson_sequence] || '').trim()
+                              if (!value) return
+                              const next = [...(row.wapef_through_lines || []), value]
+                              updateLessonReviewRow(row.lesson_sequence, { wapef_through_lines: next })
+                              setThroughlineInputs((current) => ({ ...current, [row.lesson_sequence]: '' }))
+                            }}
+                          />
+                          <Button type="button" size="sm" variant="outline"
+                            onClick={() => {
+                              const value = (throughlineInputs[row.lesson_sequence] || '').trim()
+                              if (!value) return
+                              updateLessonReviewRow(row.lesson_sequence, {
+                                wapef_through_lines: [...(row.wapef_through_lines || []), value],
+                              })
+                              setThroughlineInputs((current) => ({ ...current, [row.lesson_sequence]: '' }))
+                            }}>
+                            Add
+                          </Button>
+                        </div>
+                        {row.suggested_wapef?.through_lines?.length ? (
+                          <button type="button" className="mt-1 text-xs font-medium text-[#035f7c] underline"
+                            onClick={() => updateLessonReviewRow(row.lesson_sequence, { wapef_through_lines: row.suggested_wapef?.through_lines || [] })}>
+                            Use suggested through line
+                          </button>
+                        ) : null}
                       </div>
                       <div className="mt-2.5 grid gap-2.5 sm:grid-cols-2">
-                        <Field label="God's Story" htmlFor={`wapef-gods-story-${row.lesson_sequence}`}>
-                          <Select
+                        <Field
+                          label="God's Story"
+                          htmlFor={`wapef-gods-story-${row.lesson_sequence}`}
+                          hint="A truthful Biblical connection with its reference."
+                        >
+                          <TextArea
                             id={`wapef-gods-story-${row.lesson_sequence}`}
                             value={row.wapef_gods_story || ''}
                             onChange={(e) => updateLessonReviewRow(row.lesson_sequence, { wapef_gods_story: e.target.value })}
-                          >
-                            <option value="">— Select —</option>
+                            placeholder={row.suggested_wapef?.gods_story || 'Write the Biblical connection'}
+                            rows={3}
+                          />
+                          <div className="mt-1 flex flex-wrap gap-1.5">
+                            {row.suggested_wapef?.gods_story && (
+                              <button type="button" className="text-xs font-medium text-[#035f7c] underline"
+                                onClick={() => updateLessonReviewRow(row.lesson_sequence, { wapef_gods_story: row.suggested_wapef?.gods_story || '' })}>
+                                Use suggested God’s Story
+                              </button>
+                            )}
                             {wapefOptions.gods_story.map((option) => (
-                              <option key={option} value={option}>{option}</option>
+                              <button key={option} type="button" className="text-xs text-muted-foreground underline"
+                                onClick={() => updateLessonReviewRow(row.lesson_sequence, { wapef_gods_story: option })}>
+                                {option}
+                              </button>
                             ))}
-                          </Select>
+                          </div>
                         </Field>
                         <Field label="Remarks" htmlFor={`wapef-remarks-${row.lesson_sequence}`}>
                           <TextArea
@@ -1679,6 +1850,130 @@ export default function GeneratePage() {
                             rows={2}
                           />
                         </Field>
+                      </div>
+                      <div className="mt-2.5 rounded-md bg-slate-50 p-2.5">
+                        <p className="text-xs font-medium text-[#102A43]">Key Words / New Vocabulary</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Suggestions come from this indicator. Remove what you will not teach, or add your own terms.
+                        </p>
+                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                          {activeKeywords(row).map((term: string) => (
+                            <span key={term} className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs">
+                              {term}
+                              <button type="button" aria-label={`Remove ${term}`}
+                                onClick={() => setRowKeywords(row, activeKeywords(row).filter((item) => item !== term))}>
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                          {(row.suggested_keywords || [])
+                            .filter((term: string) => !activeKeywords(row).some((item) => item.toLowerCase() === term.toLowerCase()))
+                            .map((term: string) => (
+                              <button key={term} type="button"
+                                className="rounded-full border border-dashed border-slate-300 px-2 py-0.5 text-xs text-muted-foreground"
+                                onClick={() => setRowKeywords(row, [...activeKeywords(row), term])}>
+                                + {term}
+                              </button>
+                            ))}
+                        </div>
+                        <div className="mt-1.5 flex gap-2">
+                          <Input
+                            aria-label={`Add a key word for lesson ${row.lesson_sequence}`}
+                            value={keywordInputs[row.lesson_sequence] || ''}
+                            onChange={(e) => setKeywordInputs((current) => ({ ...current, [row.lesson_sequence]: e.target.value }))}
+                            placeholder="Add a word or phrase"
+                            className="h-8 text-xs"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault()
+                                addRowKeyword(row)
+                              }
+                            }}
+                          />
+                          <Button type="button" size="sm" variant="outline" onClick={() => addRowKeyword(row)}>
+                            Add
+                          </Button>
+                          {(row.suggested_keywords || []).length > 0 && (
+                            <Button type="button" size="sm" variant="ghost"
+                              onClick={() => setRowKeywords(row, row.suggested_keywords || [], false)}>
+                              Use suggestions
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </SurfaceCard>
+            )}
+
+            {/* Key Words / New Vocabulary — shared by GES and custom templates.
+                WAPEF has its own editor inside the WAPEF card above. */}
+            {!jobId && !isWapefSelected && lessonReview.length > 0 && (
+              <SurfaceCard className="px-5 py-5 sm:px-6">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-base font-semibold text-[#102A43]">Key Words / New Vocabulary</h2>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Suggested from each learning indicator. Leave untouched to use the suggestions, or edit per lesson.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {reviewSaved && <span className="text-xs text-green-700" role="status">Saved</span>}
+                    <Button size="sm" variant="outline" onClick={() => saveLessonReviewDrafts()} disabled={reviewSaving}>
+                      {reviewSaving ? <><Loader2 className="mr-1 h-3 w-3 animate-spin" aria-hidden="true" />Saving…</> : 'Save key words'}
+                    </Button>
+                  </div>
+                </div>
+                <div className="mt-4 max-h-96 space-y-3 overflow-y-auto pr-1">
+                  {lessonReview.filter((row: WapefReviewRow) => !row.is_special_period).map((row: WapefReviewRow) => (
+                    <div key={row.lesson_sequence} className="rounded-lg border border-slate-200 p-3">
+                      <p className="text-xs font-semibold text-[#102A43]">
+                        Week {row.week_number}{row.indicator_code ? ` · ${row.indicator_code}` : ''}
+                      </p>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {activeKeywords(row).map((term: string) => (
+                          <span key={term} className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs">
+                            {term}
+                            <button type="button" aria-label={`Remove ${term}`}
+                              onClick={() => setRowKeywords(row, activeKeywords(row).filter((item) => item !== term))}>
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                        {(row.suggested_keywords || [])
+                          .filter((term: string) => !activeKeywords(row).some((item) => item.toLowerCase() === term.toLowerCase()))
+                          .map((term: string) => (
+                            <button key={term} type="button"
+                              className="rounded-full border border-dashed border-slate-300 px-2 py-0.5 text-xs text-muted-foreground"
+                              onClick={() => setRowKeywords(row, [...activeKeywords(row), term])}>
+                              + {term}
+                            </button>
+                          ))}
+                      </div>
+                      <div className="mt-1.5 flex gap-2">
+                        <Input
+                          aria-label={`Add a key word for lesson ${row.lesson_sequence}`}
+                          value={keywordInputs[row.lesson_sequence] || ''}
+                          onChange={(e) => setKeywordInputs((current) => ({ ...current, [row.lesson_sequence]: e.target.value }))}
+                          placeholder="Add a word or phrase"
+                          className="h-8 text-xs"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault()
+                              addRowKeyword(row)
+                            }
+                          }}
+                        />
+                        <Button type="button" size="sm" variant="outline" onClick={() => addRowKeyword(row)}>
+                          Add
+                        </Button>
+                        {(row.suggested_keywords || []).length > 0 && (
+                          <Button type="button" size="sm" variant="ghost"
+                            onClick={() => setRowKeywords(row, row.suggested_keywords || [], false)}>
+                            Use suggestions
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -2102,6 +2397,15 @@ export default function GeneratePage() {
                     <FileArchive className="mr-2 h-4 w-4" />
                     {exporting === 'zip' ? 'Exporting...' : 'Export ZIP'}
                   </Button>
+                  {exporting && exportProgress && (
+                    <p
+                      role="status"
+                      aria-live="polite"
+                      className="text-xs text-muted-foreground"
+                    >
+                      {exportProgress}
+                    </p>
+                  )}
                   <Button
                     onClick={() => {
                       // Back to setup: config + review return (§15); the

@@ -612,6 +612,12 @@ class TermConfig(BaseModel):
     #: canonical occurrence id. Empty entry = the teacher selected none for
     #: that lesson; the generator may still infer appropriate competencies.
     competency_selections: Dict[str, List[str]] = {}
+    #: Teacher-supplied key words / new vocabulary keyed by the canonical
+    #: source occurrence id. Suggestions are generated automatically; this map
+    #: stores only teacher additions/edits so regeneration never overwrites
+    #: an approved list. An empty entry is authoritative (teacher removed all
+    #: suggestions for that lesson).
+    indicator_keywords: Dict[str, List[str]] = {}
     created_date: datetime = Field(default_factory=datetime.now)
 
     @field_validator("term_start_date", "term_end_date", mode="before")

@@ -1,0 +1,506 @@
+{
+  "schema_version": 1,
+  "job_id": "job-fixture",
+  "filename": "custom_structure.docx",
+  "lesson_count": 3,
+  "template": {
+    "id": "tpl-official-ges-nacca-jhs",
+    "name": "Approved GES Plan"
+  },
+  "render_context": {
+    "term": "Term 1",
+    "teaching_days": [
+      "Monday"
+    ]
+  },
+  "renderer": "blocks",
+  "structure": {
+    "meta": {
+      "title_lines": [
+        "{subject} — {class}",
+        "TERM {term}"
+      ]
+    },
+    "layout": {
+      "orientation": "portrait"
+    },
+    "tables": [
+      {
+        "rows": 3,
+        "cols": 3,
+        "cells": [
+          {
+            "r": 0,
+            "c": 0,
+            "label": "School",
+            "field": "school_name"
+          },
+          {
+            "r": 0,
+            "c": 1,
+            "label": "Teacher",
+            "field": "teacher_name"
+          },
+          {
+            "r": 0,
+            "c": 2,
+            "label": "Week",
+            "field": "week_number"
+          },
+          {
+            "r": 1,
+            "c": 0,
+            "label": "Strand",
+            "field": "strand",
+            "colspan": 2
+          },
+          {
+            "r": 1,
+            "c": 1,
+            "covered": true
+          },
+          {
+            "r": 1,
+            "c": 2,
+            "label": "Class",
+            "field": "class_level"
+          },
+          {
+            "r": 2,
+            "c": 0,
+            "role": "activity_content",
+            "row_phase_kind": "starter"
+          },
+          {
+            "r": 2,
+            "c": 1,
+            "role": "activity_content",
+            "row_phase_kind": "main",
+            "colspan": 2
+          },
+          {
+            "r": 2,
+            "c": 2,
+            "covered": true
+          }
+        ]
+      }
+    ]
+  },
+  "documents": [
+    {
+      "lesson_id": "lp-fixture-1-1",
+      "week_number": 1,
+      "lesson_sequence": 1,
+      "filename": "SCIENCE_Basic7_W01_L01_2026-02-03.docx",
+      "first": true,
+      "blocks": [
+        {
+          "kind": "heading",
+          "text": "Achimota Basic School",
+          "level": 1,
+          "align": "center"
+        },
+        {
+          "kind": "heading",
+          "text": "A. Mensah",
+          "level": 1,
+          "align": "center"
+        },
+        {
+          "kind": "heading",
+          "text": "WEEK 1",
+          "level": 1,
+          "align": "center"
+        },
+        {
+          "kind": "customTable",
+          "rows": 3,
+          "cols": 3,
+          "cells": [
+            {
+              "r": 0,
+              "c": 0,
+              "runs": [
+                {
+                  "text": "School: ",
+                  "bold": true
+                },
+                {
+                  "text": "Achimota Basic School",
+                  "bold": false
+                }
+              ],
+              "colspan": 1,
+              "rowspan": 1
+            },
+            {
+              "r": 0,
+              "c": 1,
+              "runs": [
+                {
+                  "text": "Teacher: ",
+                  "bold": true
+                },
+                {
+                  "text": "A. Mensah",
+                  "bold": false
+                }
+              ],
+              "colspan": 1,
+              "rowspan": 1
+            },
+            {
+              "r": 0,
+              "c": 2,
+              "runs": [
+                {
+                  "text": "Week: ",
+                  "bold": true
+                },
+                {
+                  "text": "1",
+                  "bold": false
+                }
+              ],
+              "colspan": 1,
+              "rowspan": 1
+            },
+            {
+              "r": 1,
+              "c": 0,
+              "runs": [
+                {
+                  "text": "Strand: ",
+                  "bold": true
+                },
+                {
+                  "text": "Materials and their properties",
+                  "bold": false
+                }
+              ],
+              "colspan": 2,
+              "rowspan": 1
+            },
+            {
+              "r": 1,
+              "c": 2,
+              "runs": [
+                {
+                  "text": "Class: ",
+                  "bold": true
+                },
+                {
+                  "text": "Basic 7",
+                  "bold": false
+                }
+              ],
+              "colspan": 1,
+              "rowspan": 1
+            },
+            {
+              "r": 2,
+              "c": 0,
+              "runs": [
+                {
+                  "text": "Show muddy water and ask how it can be made clear.\nPredict what happens to muddy water in a funnel.",
+                  "bold": false
+                }
+              ],
+              "colspan": 1,
+              "rowspan": 1
+            },
+            {
+              "r": 2,
+              "c": 1,
+              "runs": [
+                {
+                  "text": "Learners filter their own sample in pairs.\nDemonstrate folding filter paper and pouring the mixture.",
+                  "bold": false
+                }
+              ],
+              "colspan": 2,
+              "rowspan": 1
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "runs": [],
+          "style": null
+        },
+        {
+          "kind": "pageBreak"
+        }
+      ]
+    },
+    {
+      "lesson_id": "lp-fixture-1-2",
+      "week_number": 1,
+      "lesson_sequence": 2,
+      "filename": "SCIENCE_Basic7_W01_L02_2026-02-03.docx",
+      "first": false,
+      "blocks": [
+        {
+          "kind": "heading",
+          "text": "WEEK 1",
+          "level": 1,
+          "align": "center"
+        },
+        {
+          "kind": "customTable",
+          "rows": 3,
+          "cols": 3,
+          "cells": [
+            {
+              "r": 0,
+              "c": 0,
+              "runs": [
+                {
+                  "text": "School: ",
+                  "bold": true
+                },
+                {
+                  "text": "Achimota Basic School",
+                  "bold": false
+                }
+              ],
+              "colspan": 1,
+              "rowspan": 1
+            },
+            {
+              "r": 0,
+              "c": 1,
+              "runs": [
+                {
+                  "text": "Teacher: ",
+                  "bold": true
+                },
+                {
+                  "text": "A. Mensah",
+                  "bold": false
+                }
+              ],
+              "colspan": 1,
+              "rowspan": 1
+            },
+            {
+              "r": 0,
+              "c": 2,
+              "runs": [
+                {
+                  "text": "Week: ",
+                  "bold": true
+                },
+                {
+                  "text": "1",
+                  "bold": false
+                }
+              ],
+              "colspan": 1,
+              "rowspan": 1
+            },
+            {
+              "r": 1,
+              "c": 0,
+              "runs": [
+                {
+                  "text": "Strand: ",
+                  "bold": true
+                },
+                {
+                  "text": "Materials and their properties",
+                  "bold": false
+                }
+              ],
+              "colspan": 2,
+              "rowspan": 1
+            },
+            {
+              "r": 1,
+              "c": 2,
+              "runs": [
+                {
+                  "text": "Class: ",
+                  "bold": true
+                },
+                {
+                  "text": "Basic 7",
+                  "bold": false
+                }
+              ],
+              "colspan": 1,
+              "rowspan": 1
+            },
+            {
+              "r": 2,
+              "c": 0,
+              "runs": [
+                {
+                  "text": "Show muddy water and ask how it can be made clear.\nPredict what happens to muddy water in a funnel.",
+                  "bold": false
+                }
+              ],
+              "colspan": 1,
+              "rowspan": 1
+            },
+            {
+              "r": 2,
+              "c": 1,
+              "runs": [
+                {
+                  "text": "Learners filter their own sample in pairs.\nDemonstrate folding filter paper and pouring the mixture.",
+                  "bold": false
+                }
+              ],
+              "colspan": 2,
+              "rowspan": 1
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "runs": [],
+          "style": null
+        },
+        {
+          "kind": "pageBreak"
+        }
+      ]
+    },
+    {
+      "lesson_id": "lp-fixture-2-1",
+      "week_number": 2,
+      "lesson_sequence": 1,
+      "filename": "SCIENCE_Basic7_W02_L01_2026-02-04.docx",
+      "first": false,
+      "blocks": [
+        {
+          "kind": "heading",
+          "text": "WEEK 2",
+          "level": 1,
+          "align": "center"
+        },
+        {
+          "kind": "customTable",
+          "rows": 3,
+          "cols": 3,
+          "cells": [
+            {
+              "r": 0,
+              "c": 0,
+              "runs": [
+                {
+                  "text": "School: ",
+                  "bold": true
+                },
+                {
+                  "text": "Achimota Basic School",
+                  "bold": false
+                }
+              ],
+              "colspan": 1,
+              "rowspan": 1
+            },
+            {
+              "r": 0,
+              "c": 1,
+              "runs": [
+                {
+                  "text": "Teacher: ",
+                  "bold": true
+                },
+                {
+                  "text": "A. Mensah",
+                  "bold": false
+                }
+              ],
+              "colspan": 1,
+              "rowspan": 1
+            },
+            {
+              "r": 0,
+              "c": 2,
+              "runs": [
+                {
+                  "text": "Week: ",
+                  "bold": true
+                },
+                {
+                  "text": "2",
+                  "bold": false
+                }
+              ],
+              "colspan": 1,
+              "rowspan": 1
+            },
+            {
+              "r": 1,
+              "c": 0,
+              "runs": [
+                {
+                  "text": "Strand: ",
+                  "bold": true
+                },
+                {
+                  "text": "Materials and their properties",
+                  "bold": false
+                }
+              ],
+              "colspan": 2,
+              "rowspan": 1
+            },
+            {
+              "r": 1,
+              "c": 2,
+              "runs": [
+                {
+                  "text": "Class: ",
+                  "bold": true
+                },
+                {
+                  "text": "Basic 7",
+                  "bold": false
+                }
+              ],
+              "colspan": 1,
+              "rowspan": 1
+            },
+            {
+              "r": 2,
+              "c": 0,
+              "runs": [
+                {
+                  "text": "Show muddy water and ask how it can be made clear.\nPredict what happens to muddy water in a funnel.",
+                  "bold": false
+                }
+              ],
+              "colspan": 1,
+              "rowspan": 1
+            },
+            {
+              "r": 2,
+              "c": 1,
+              "runs": [
+                {
+                  "text": "Learners filter their own sample in pairs.\nDemonstrate folding filter paper and pouring the mixture.",
+                  "bold": false
+                }
+              ],
+              "colspan": 2,
+              "rowspan": 1
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "runs": [],
+          "style": null
+        },
+        {
+          "kind": "pageBreak"
+        }
+      ]
+    }
+  ]
+}

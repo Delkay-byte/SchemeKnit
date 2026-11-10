@@ -1,0 +1,1435 @@
+{
+  "schema_version": 1,
+  "job_id": "job-fixture",
+  "filename": "sections.docx",
+  "lesson_count": 3,
+  "template": {
+    "id": "tpl-jhs-ges",
+    "name": "GES-Style (JHS)"
+  },
+  "render_context": {
+    "term": "Term 1",
+    "teaching_days": [
+      "Monday"
+    ]
+  },
+  "renderer": "blocks",
+  "documents": [
+    {
+      "lesson_id": "lp-fixture-1-1",
+      "week_number": 1,
+      "lesson_sequence": 1,
+      "filename": "SCIENCE_Basic7_W01_L01_2026-02-03.docx",
+      "first": true,
+      "blocks": [
+        {
+          "kind": "heading",
+          "text": "LESSON PLAN",
+          "level": 1,
+          "align": "center"
+        },
+        {
+          "kind": "table",
+          "style": "Table Grid",
+          "rows": 6,
+          "cols": 2,
+          "cells": [
+            {
+              "r": 0,
+              "c": 0,
+              "text": "School",
+              "bold": true
+            },
+            {
+              "r": 0,
+              "c": 1,
+              "text": "Achimota Basic School",
+              "bold": false
+            },
+            {
+              "r": 1,
+              "c": 0,
+              "text": "Teacher",
+              "bold": true
+            },
+            {
+              "r": 1,
+              "c": 1,
+              "text": "A. Mensah",
+              "bold": false
+            },
+            {
+              "r": 2,
+              "c": 0,
+              "text": "Subject",
+              "bold": true
+            },
+            {
+              "r": 2,
+              "c": 1,
+              "text": "Science",
+              "bold": false
+            },
+            {
+              "r": 3,
+              "c": 0,
+              "text": "Class",
+              "bold": true
+            },
+            {
+              "r": 3,
+              "c": 1,
+              "text": "Basic 7  |  Size: 38",
+              "bold": false
+            },
+            {
+              "r": 4,
+              "c": 0,
+              "text": "Date",
+              "bold": true
+            },
+            {
+              "r": 4,
+              "c": 1,
+              "text": "03 February 2026",
+              "bold": false
+            },
+            {
+              "r": 5,
+              "c": 0,
+              "text": "Duration",
+              "bold": true
+            },
+            {
+              "r": 5,
+              "c": 1,
+              "text": "60 minutes",
+              "bold": false
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "text": "Strand / Sub-Strand",
+          "level": 2,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Strand: Materials and their properties",
+              "bold": true
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Sub-Strand: Mixtures",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "heading",
+          "text": "Content Standard",
+          "level": 2,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "B7.2.1 ",
+              "bold": true
+            },
+            {
+              "text": "Demonstrate understanding of mixtures and separation.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "heading",
+          "text": "Indicators",
+          "level": 2,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "B7.2.1.1 Describe mixtures",
+              "bold": false
+            }
+          ],
+          "style": "List Bullet"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "B7.2.1.2 Separate mixtures",
+              "bold": false
+            }
+          ],
+          "style": "List Bullet"
+        },
+        {
+          "kind": "heading",
+          "text": "Learning Objectives",
+          "level": 2,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Explain filtration using a diagram.",
+              "bold": false
+            }
+          ],
+          "style": "List Bullet"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Separate a sand-and-water mixture.",
+              "bold": false
+            }
+          ],
+          "style": "List Bullet"
+        },
+        {
+          "kind": "heading",
+          "text": "Teaching & Learning Resources",
+          "level": 2,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Filter paper",
+              "bold": false
+            }
+          ],
+          "style": "List Bullet"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Funnel",
+              "bold": false
+            }
+          ],
+          "style": "List Bullet"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Beakers",
+              "bold": false
+            }
+          ],
+          "style": "List Bullet"
+        },
+        {
+          "kind": "heading",
+          "text": "Introduction / Starter",
+          "level": 2,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Show muddy water and ask how it can be made clear.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "heading",
+          "text": "Main Teaching Activities",
+          "level": 2,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Phase 2: Active Learning: ",
+              "bold": true
+            },
+            {
+              "text": "Demonstrate folding filter paper and pouring the mixture.",
+              "bold": false
+            },
+            {
+              "text": " (25 min)",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "heading",
+          "text": "Learner Activities",
+          "level": 2,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Learners filter their own sample in pairs.",
+              "bold": false
+            },
+            {
+              "text": " (15 min)",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "heading",
+          "text": "Teacher Activities",
+          "level": 2,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Ask learners to compare the filtrate and residue.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "heading",
+          "text": "Assessment",
+          "level": 2,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Observe each pair's filtration and question their choices.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "heading",
+          "text": "Assessment Questions / Checks (with marking)",
+          "level": 3,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Why does the filter paper trap sand? (DoK 2)",
+              "bold": false
+            }
+          ],
+          "style": "List Bullet"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Expected evidence: Names particle size as the reason.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Marking: Accept any answer naming particle size.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Watch for: Sand dissolves in water.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "If not reached: Re-demonstrate with a transparent mixture.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "heading",
+          "text": "Marking Rubric for the Learner Task",
+          "level": 3,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Filter a sand-and-water mixture safely.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Criterion: Correct setup",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "  4 — exceeds the standard: Funnel and paper seated correctly. (4 pt)",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "  3 — meets the standard: Minor spillage only. (3 pt)",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Total marks: 4",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Award for a working setup.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "School assessment policy.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "heading",
+          "text": "Conclusion / Reflection",
+          "level": 2,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Summarise that filtration separates insoluble solids.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "pageBreak"
+        }
+      ]
+    },
+    {
+      "lesson_id": "lp-fixture-1-2",
+      "week_number": 1,
+      "lesson_sequence": 2,
+      "filename": "SCIENCE_Basic7_W01_L02_2026-02-03.docx",
+      "first": false,
+      "blocks": [
+        {
+          "kind": "heading",
+          "text": "LESSON PLAN",
+          "level": 1,
+          "align": "center"
+        },
+        {
+          "kind": "table",
+          "style": "Table Grid",
+          "rows": 6,
+          "cols": 2,
+          "cells": [
+            {
+              "r": 0,
+              "c": 0,
+              "text": "School",
+              "bold": true
+            },
+            {
+              "r": 0,
+              "c": 1,
+              "text": "Achimota Basic School",
+              "bold": false
+            },
+            {
+              "r": 1,
+              "c": 0,
+              "text": "Teacher",
+              "bold": true
+            },
+            {
+              "r": 1,
+              "c": 1,
+              "text": "A. Mensah",
+              "bold": false
+            },
+            {
+              "r": 2,
+              "c": 0,
+              "text": "Subject",
+              "bold": true
+            },
+            {
+              "r": 2,
+              "c": 1,
+              "text": "Science",
+              "bold": false
+            },
+            {
+              "r": 3,
+              "c": 0,
+              "text": "Class",
+              "bold": true
+            },
+            {
+              "r": 3,
+              "c": 1,
+              "text": "Basic 7  |  Size: 38",
+              "bold": false
+            },
+            {
+              "r": 4,
+              "c": 0,
+              "text": "Date",
+              "bold": true
+            },
+            {
+              "r": 4,
+              "c": 1,
+              "text": "03 February 2026",
+              "bold": false
+            },
+            {
+              "r": 5,
+              "c": 0,
+              "text": "Duration",
+              "bold": true
+            },
+            {
+              "r": 5,
+              "c": 1,
+              "text": "60 minutes",
+              "bold": false
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "text": "Strand / Sub-Strand",
+          "level": 2,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Strand: Materials and their properties",
+              "bold": true
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Sub-Strand: Mixtures",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "heading",
+          "text": "Content Standard",
+          "level": 2,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "B7.2.1 ",
+              "bold": true
+            },
+            {
+              "text": "Demonstrate understanding of mixtures and separation.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "heading",
+          "text": "Indicators",
+          "level": 2,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "B7.2.1.1 Describe mixtures",
+              "bold": false
+            }
+          ],
+          "style": "List Bullet"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "B7.2.1.2 Separate mixtures",
+              "bold": false
+            }
+          ],
+          "style": "List Bullet"
+        },
+        {
+          "kind": "heading",
+          "text": "Learning Objectives",
+          "level": 2,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Explain filtration using a diagram.",
+              "bold": false
+            }
+          ],
+          "style": "List Bullet"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Separate a sand-and-water mixture.",
+              "bold": false
+            }
+          ],
+          "style": "List Bullet"
+        },
+        {
+          "kind": "heading",
+          "text": "Teaching & Learning Resources",
+          "level": 2,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Filter paper",
+              "bold": false
+            }
+          ],
+          "style": "List Bullet"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Funnel",
+              "bold": false
+            }
+          ],
+          "style": "List Bullet"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Beakers",
+              "bold": false
+            }
+          ],
+          "style": "List Bullet"
+        },
+        {
+          "kind": "heading",
+          "text": "Introduction / Starter",
+          "level": 2,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Show muddy water and ask how it can be made clear.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "heading",
+          "text": "Main Teaching Activities",
+          "level": 2,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Phase 2: Active Learning: ",
+              "bold": true
+            },
+            {
+              "text": "Demonstrate folding filter paper and pouring the mixture.",
+              "bold": false
+            },
+            {
+              "text": " (25 min)",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "heading",
+          "text": "Learner Activities",
+          "level": 2,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Learners filter their own sample in pairs.",
+              "bold": false
+            },
+            {
+              "text": " (15 min)",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "heading",
+          "text": "Teacher Activities",
+          "level": 2,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Ask learners to compare the filtrate and residue.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "heading",
+          "text": "Assessment",
+          "level": 2,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Observe each pair's filtration and question their choices.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "heading",
+          "text": "Assessment Questions / Checks (with marking)",
+          "level": 3,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Why does the filter paper trap sand? (DoK 2)",
+              "bold": false
+            }
+          ],
+          "style": "List Bullet"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Expected evidence: Names particle size as the reason.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Marking: Accept any answer naming particle size.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Watch for: Sand dissolves in water.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "If not reached: Re-demonstrate with a transparent mixture.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "heading",
+          "text": "Marking Rubric for the Learner Task",
+          "level": 3,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Filter a sand-and-water mixture safely.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Criterion: Correct setup",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "  4 — exceeds the standard: Funnel and paper seated correctly. (4 pt)",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "  3 — meets the standard: Minor spillage only. (3 pt)",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Total marks: 4",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Award for a working setup.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "School assessment policy.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "heading",
+          "text": "Conclusion / Reflection",
+          "level": 2,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Summarise that filtration separates insoluble solids.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "pageBreak"
+        }
+      ]
+    },
+    {
+      "lesson_id": "lp-fixture-2-1",
+      "week_number": 2,
+      "lesson_sequence": 1,
+      "filename": "SCIENCE_Basic7_W02_L01_2026-02-04.docx",
+      "first": false,
+      "blocks": [
+        {
+          "kind": "heading",
+          "text": "LESSON PLAN",
+          "level": 1,
+          "align": "center"
+        },
+        {
+          "kind": "table",
+          "style": "Table Grid",
+          "rows": 6,
+          "cols": 2,
+          "cells": [
+            {
+              "r": 0,
+              "c": 0,
+              "text": "School",
+              "bold": true
+            },
+            {
+              "r": 0,
+              "c": 1,
+              "text": "Achimota Basic School",
+              "bold": false
+            },
+            {
+              "r": 1,
+              "c": 0,
+              "text": "Teacher",
+              "bold": true
+            },
+            {
+              "r": 1,
+              "c": 1,
+              "text": "A. Mensah",
+              "bold": false
+            },
+            {
+              "r": 2,
+              "c": 0,
+              "text": "Subject",
+              "bold": true
+            },
+            {
+              "r": 2,
+              "c": 1,
+              "text": "Science",
+              "bold": false
+            },
+            {
+              "r": 3,
+              "c": 0,
+              "text": "Class",
+              "bold": true
+            },
+            {
+              "r": 3,
+              "c": 1,
+              "text": "Basic 7  |  Size: 38",
+              "bold": false
+            },
+            {
+              "r": 4,
+              "c": 0,
+              "text": "Date",
+              "bold": true
+            },
+            {
+              "r": 4,
+              "c": 1,
+              "text": "04 February 2026",
+              "bold": false
+            },
+            {
+              "r": 5,
+              "c": 0,
+              "text": "Duration",
+              "bold": true
+            },
+            {
+              "r": 5,
+              "c": 1,
+              "text": "60 minutes",
+              "bold": false
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "text": "Strand / Sub-Strand",
+          "level": 2,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Strand: Materials and their properties",
+              "bold": true
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Sub-Strand: Mixtures",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "heading",
+          "text": "Content Standard",
+          "level": 2,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "B7.2.1 ",
+              "bold": true
+            },
+            {
+              "text": "Demonstrate understanding of mixtures and separation.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "heading",
+          "text": "Indicators",
+          "level": 2,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "B7.2.1.1 Describe mixtures",
+              "bold": false
+            }
+          ],
+          "style": "List Bullet"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "B7.2.1.2 Separate mixtures",
+              "bold": false
+            }
+          ],
+          "style": "List Bullet"
+        },
+        {
+          "kind": "heading",
+          "text": "Learning Objectives",
+          "level": 2,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Explain filtration using a diagram.",
+              "bold": false
+            }
+          ],
+          "style": "List Bullet"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Separate a sand-and-water mixture.",
+              "bold": false
+            }
+          ],
+          "style": "List Bullet"
+        },
+        {
+          "kind": "heading",
+          "text": "Teaching & Learning Resources",
+          "level": 2,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Filter paper",
+              "bold": false
+            }
+          ],
+          "style": "List Bullet"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Funnel",
+              "bold": false
+            }
+          ],
+          "style": "List Bullet"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Beakers",
+              "bold": false
+            }
+          ],
+          "style": "List Bullet"
+        },
+        {
+          "kind": "heading",
+          "text": "Introduction / Starter",
+          "level": 2,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Show muddy water and ask how it can be made clear.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "heading",
+          "text": "Main Teaching Activities",
+          "level": 2,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Phase 2: Active Learning: ",
+              "bold": true
+            },
+            {
+              "text": "Demonstrate folding filter paper and pouring the mixture.",
+              "bold": false
+            },
+            {
+              "text": " (25 min)",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "heading",
+          "text": "Learner Activities",
+          "level": 2,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Learners filter their own sample in pairs.",
+              "bold": false
+            },
+            {
+              "text": " (15 min)",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "heading",
+          "text": "Teacher Activities",
+          "level": 2,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Ask learners to compare the filtrate and residue.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "heading",
+          "text": "Assessment",
+          "level": 2,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Observe each pair's filtration and question their choices.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "heading",
+          "text": "Assessment Questions / Checks (with marking)",
+          "level": 3,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Why does the filter paper trap sand? (DoK 2)",
+              "bold": false
+            }
+          ],
+          "style": "List Bullet"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Expected evidence: Names particle size as the reason.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Marking: Accept any answer naming particle size.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Watch for: Sand dissolves in water.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "If not reached: Re-demonstrate with a transparent mixture.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "heading",
+          "text": "Marking Rubric for the Learner Task",
+          "level": 3,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Filter a sand-and-water mixture safely.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Criterion: Correct setup",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "  4 — exceeds the standard: Funnel and paper seated correctly. (4 pt)",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "  3 — meets the standard: Minor spillage only. (3 pt)",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Total marks: 4",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Award for a working setup.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "School assessment policy.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "heading",
+          "text": "Conclusion / Reflection",
+          "level": 2,
+          "align": "left"
+        },
+        {
+          "kind": "paragraph",
+          "runs": [
+            {
+              "text": "Summarise that filtration separates insoluble solids.",
+              "bold": false
+            }
+          ],
+          "style": null
+        },
+        {
+          "kind": "pageBreak"
+        }
+      ]
+    }
+  ]
+}

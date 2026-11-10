@@ -1302,11 +1302,24 @@ class GenerationPipeline:
         # A whole-lesson run starts from the teacher/config terms only: the
         # deterministic keyword guesses are not teacher input and were being
         # echoed back as if they were (e.g. "watch", "notice", "materials").
-        if "key_vocabulary" in content and content["key_vocabulary"]:
+        if (not getattr(lp, "keywords_teacher_owned", False)
+                and "key_vocabulary" in content and content["key_vocabulary"]):
             base_keywords = [] if whole_lesson else list(lp.keywords or [])
+            # Provider vocabulary is filtered against THIS lesson's sources: a
+            # model may refine wording but may not add generic words, resource
+            # names or random topic vocabulary.
+            from ..curriculum.vocabulary import filter_supported_terms
+            ai_terms = filter_supported_terms(
+                content["key_vocabulary"],
+                indicator=" ".join(lp.indicators or []),
+                content_standard=lp.content_standard or "",
+                lesson_texts=(lp.starter_activity, lp.assessment, lp.conclusion),
+                subject=str(getattr(lp, "subject", "") or ""),
+                resources=list(getattr(lp, "source_tlrs", None) or []),
+            )
             lp.keywords = _merge_unique(
                 _merge_unique(base_keywords, teacher_keywords),
-                content["key_vocabulary"])
+                ai_terms)
         elif teacher_keywords:
             base_keywords = [] if whole_lesson else list(lp.keywords or [])
             lp.keywords = _merge_unique(base_keywords, teacher_keywords)

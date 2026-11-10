@@ -346,8 +346,23 @@ def build_assessment_items(
 
 
 def _short(focus: str, max_chars: int = 40) -> str:
-    f = (focus or "").strip().rstrip(".")
-    return f if len(f) <= max_chars else f[:max_chars].rsplit(" ", 1)[0]
+    """A short focus for an assessment sentence, never cut mid-clause.
+
+    Character slicing produced "… whole numbers up to 100,000 to" and the
+    template then read "… to and state …". Prefer a word-boundary cut that
+    ends on a content word; if no clean cut exists, keep the whole phrase.
+    """
+    f = " ".join((focus or "").split()).rstrip(".")
+    if len(f) <= max_chars:
+        return f
+    cut = f[:max_chars].rsplit(" ", 1)[0].rstrip(" ,;:")
+    dangling = {"to", "the", "a", "an", "and", "or", "of", "for", "with",
+                "by", "in", "on", "at", "as", "from", "up", "nearest",
+                "next", "following", "given", "various", "several"}
+    words = cut.split()
+    while words and words[-1].lower() in dangling:
+        words.pop()
+    return " ".join(words) if words else f
 
 
 # ── Rubric banks (only lesson-applicable criteria; no invented authority) ───

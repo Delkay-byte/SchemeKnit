@@ -722,6 +722,45 @@ async def preview_allocation(
         draft = drafts.get(str(_lesson_number[id(alloc)]))
         return draft if isinstance(draft, dict) else {}
 
+    def _suggested_keywords_for(alloc) -> List[str]:
+        """Curriculum vocabulary suggestion for this allocation (both templates)."""
+        try:
+            from ..curriculum.vocabulary import suggest_vocabulary
+            from ..curriculum.exemplars import lookup_indicator
+            exemplar = lookup_indicator(
+                getattr(alloc, "indicator_code", "") or "",
+                str(getattr(scheme_db, "subject", "") or ""),
+            )
+            return suggest_vocabulary(
+                indicator=getattr(alloc, "indicator_description", "") or "",
+                content_standard=getattr(alloc, "content_standard_description", "") or "",
+                sub_strand=getattr(alloc, "sub_strand", "") or "",
+                strand=getattr(alloc, "strand", "") or "",
+                subject=str(getattr(scheme_db, "subject", "") or ""),
+                resources=list(getattr(alloc, "source_resources", None) or []),
+                exemplar_terms=(exemplar.focus_terms if exemplar else []),
+                limit=8,
+            )
+        except Exception:
+            return []
+
+    def _suggested_wapef_for(alloc) -> dict:
+        """Teacher-facing WAPEF defaults for the review cards."""
+        try:
+            from ..engines.wapef_connections import suggest_wapef_fields
+            return suggest_wapef_fields({
+                "subject": str(getattr(scheme_db, "subject", "") or ""),
+                "strand": getattr(alloc, "strand", "") or "",
+                "sub_strand": getattr(alloc, "sub_strand", "") or "",
+                "content_standard": getattr(alloc, "content_standard_description", "") or "",
+                "indicators": [getattr(alloc, "indicator_description", "") or ""],
+                "lesson_topic": getattr(alloc, "indicator_description", "") or "",
+                "keywords": _suggested_keywords_for(alloc),
+            })
+        except Exception:
+            return {}
+
+
     report["lesson_review"] = [
         {
             "lesson_sequence": _lesson_number[id(a)],
@@ -781,6 +820,14 @@ async def preview_allocation(
             # Draft fields normalize at the API boundary too: a serialized
             # string draft must never reach the UI as split characters.
             "keywords": normalize_text_items(_draft_for(a).get("keywords")),
+            # Read-only suggestions from the shared vocabulary engine. The UI
+            # shows these as editable chips; an untouched row generates them
+            # automatically, and teacher edits are stored in ``keywords``.
+            "suggested_keywords": _suggested_keywords_for(a),
+            # Read-only WAPEF defaults (meaningful prose, not four bare
+            # labels). A saved teacher value always wins; the exporter fills an
+            # empty field with this lesson-specific suggestion.
+            "suggested_wapef": _suggested_wapef_for(a),
             "other_tlrs": normalize_text_items(_draft_for(a).get("other_tlrs")),
             "core_competencies": normalize_text_items(_draft_for(a).get("core_competencies")),
             "structured_references": normalize_structured_references(_draft_for(a).get("structured_references")),
@@ -849,6 +896,9 @@ class LessonConfigRequest(BaseModel):
     indicator_resources: Optional[Dict[str, Dict[str, List[str]]]] = None
     #: Canonical occurrence id -> selected approved core competencies.
     competency_selections: Optional[Dict[str, List[str]]] = None
+    #: Canonical occurrence id -> teacher key words / new vocabulary. Optional;
+    #: suggestions are generated automatically when this is absent.
+    indicator_keywords: Optional[Dict[str, List[str]]] = None
 
 
 def _normalize_lesson_config(payload: LessonConfigRequest) -> dict:
@@ -961,6 +1011,35 @@ def _normalize_lesson_config(payload: LessonConfigRequest) -> dict:
                     continue
                 selected[text] = normalize_competencies(values)
             out["competency_selections"] = selected
+
+    if payload.indicator_keywords is not None:
+        if len(payload.indicator_keywords) > 500:
+            errors.append("Too many per-lesson vocabulary entries.")
+        else:
+            selected: Dict[str, List[str]] = {}
+            for key, values in payload.indicator_keywords.items():
+                text = str(key or "").strip()
+                parts = text.split(":", 2)
+                if (not text.startswith("week") or len(parts) != 3
+                        or not parts[0][4:].isdigit()
+                        or not parts[1].isdigit() or len(text) > 160):
+                    errors.append(f"Invalid vocabulary lesson key: {text[:40]}")
+                    continue
+                if not isinstance(values, list):
+                    errors.append(f"Invalid vocabulary selection for {text[:40]}")
+                    continue
+                cleaned_terms: List[str] = []
+                for value in values[:20]:
+                    term = " ".join(str(value or "").split()).strip(" ,;.")
+                    if not term:
+                        continue
+                    if len(term) > 80:
+                        errors.append("A key word is too long (max 80 characters).")
+                        continue
+                    if term.lower() not in {x.lower() for x in cleaned_terms}:
+                        cleaned_terms.append(term)
+                selected[text] = cleaned_terms
+            out["indicator_keywords"] = selected
 
     cs = payload.class_size
     if cs is not None:
@@ -2960,6 +3039,75 @@ async def export_docx(
     )
 
 
+@router.get("/{job_id}/export/model")
+async def get_export_model(
+    job_id: str,
+    format: str = "docx",
+    template_type: str = "GES-style",
+    template_id: str = None,
+    user: User = Depends(get_current_user),
+    db=Depends(get_db),
+):
+    """Return the persisted export content as a neutral DOCX render model.
+
+    The browser serializes this model to OOXML; the server still owns template
+    resolution, content composition, ownership, entitlement and audit. No file
+    is built and no quota is consumed here (the export rate guard still
+    applies), so refreshing and re-exporting a saved plan is always safe.
+    """
+    job = data_service.get_job(db, job_id, user.id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    enforce_authenticated_budget(user.id, "export")
+
+    fmt = (format or "docx").lower()
+    if fmt not in ("docx", "zip"):
+        raise HTTPException(status_code=400, detail="Unsupported format")
+
+    # ZIP remains a Pro/school entitlement. The browser must never be the only
+    # gate: a request for the ZIP model fails here without entitlement.
+    if fmt == "zip":
+        from ..entitlements import can_export_zip
+        allowed, reason = can_export_zip(user, db)
+        if not allowed:
+            raise HTTPException(status_code=403, detail=reason)
+
+    lessons = data_service.get_lesson_plans_for_job(db, job_id, user.id)
+    if not lessons:
+        raise HTTPException(status_code=404, detail="No lesson plans found")
+
+    from ..engines.export_model import build_docx_model
+    from ..engines.template_engine import get_template_by_id
+    from ..engines.docx_export import default_template_for_lessons
+
+    lp_models = [_db_to_lesson_model(lp) for lp in lessons]
+    tt = (TemplateType(template_type)
+          if template_type in [t.value for t in TemplateType]
+          else TemplateType.GES_STYLE)
+    scheme_db = data_service.get_scheme(db, job.scheme_id, user.id)
+    scheme_stem = Path(scheme_db.filename).stem if scheme_db and scheme_db.filename else ""
+    scheme_label = re.sub(r'[^A-Za-z0-9]+', '_', scheme_stem).strip('_') or 'lesson_plans'
+    resolved_template_id = _resolve_export_template_id(job, lp_models, template_id)
+    template = (get_template_by_id(resolved_template_id)
+                if resolved_template_id
+                else default_template_for_lessons(lp_models, tt))
+    custom_structure = _custom_structure_for(db, user.id, template_id)
+    render_context = _render_context(db, user.id, job, scheme_db, lp_models)
+
+    model = build_docx_model(
+        lp_models,
+        template=template,
+        template_type=tt,
+        structure=custom_structure,
+        render_context=render_context,
+        filename=f"Lesson_Plans_{scheme_label}.docx",
+        job_id=job.id,
+    )
+    data_service.log_export_event(db, job.id, job.scheme_id, user.id,
+                                  f"model:{fmt}")
+    return model
+
+
 def _convert_only(pipeline, docx_path: Path, pdf_path: Path) -> Path:
     """Convert an existing DOCX to PDF (no re-rendering) — runs in the executor."""
     return pipeline.pdf_engine._convert_docx_to_pdf(docx_path, pdf_path)
@@ -3716,64 +3864,100 @@ def _apply_lesson_review_draft(lp, drafts: dict, config=None) -> None:
     structured fields are written. source_tlrs, indicator, content standard,
     strand and week_ending remain whatever the deterministic builder produced
     from the source document (Section P authority). WAPEF selections are
-    normalized through the approved option lists — only approved values persist.
+    normalized through the approved option lists; a teacher's own connection
+    text is preserved verbatim.
     """
-    if not drafts:
-        return
-    seq = getattr(lp, "lesson_sequence", None)
-    draft = drafts.get(str(seq)) if seq is not None else None
-    # NOTE: no "sequence - 1" fallback. The review rows are numbered the same
-    # way the lessons are, and the generate page re-saves its rows immediately
-    # before generating, so a missing key means this lesson really has no
-    # draft. Falling back to the previous number would put one lesson's
-    # teacher additions onto its neighbour — the off-by-one being fixed here.
-    if not draft:
-        codes = list(getattr(lp, "indicator_codes", None) or [])
-        draft = drafts.get(codes[0]) if codes else None
-    if not isinstance(draft, dict):
-        return
-    if any(k in draft for k in (
-            "wapef_deep_hope", "wapef_storyline", "wapef_through_lines",
-            "wapef_gods_story")):
-        from ..engines.wapef_fields import normalize_wapef_payload
-        canonical = normalize_wapef_payload(draft)
-        lp.wapef_deep_hope = canonical["deep_hope"]
-        lp.wapef_storyline = canonical["storyline"]
-        lp.wapef_through_lines = canonical["through_lines"]
-        lp.wapef_gods_story = canonical["gods_story"]
-    if "remarks" in draft:
-        lp.remarks = str(draft.get("remarks") or "")
-    if "period" in draft:
-        # Teacher-adjusted timetable slot for this lesson (Pattern 1). Blank is
-        # permitted (the source/config supplied no period); never invented.
-        lp.period = str(draft.get("period") or "")
-    if "keywords" in draft:
-        # CANONICAL (PART 9/11): the client may send a string or dirty list;
-        # always store the normalized list form, and never store empty-string
-        # placeholders (", ," was previously stored verbatim).
+    draft = {}
+    if drafts:
+        seq = getattr(lp, "lesson_sequence", None)
+        draft = drafts.get(str(seq)) if seq is not None else None
+        # NOTE: no "sequence - 1" fallback. The review rows are numbered the same
+        # way the lessons are, and the generate page re-saves its rows immediately
+        # before generating, so a missing key means this lesson really has no
+        # draft. Falling back to the previous number would put one lesson's
+        # teacher additions onto its neighbour — the off-by-one being fixed here.
+        if not draft:
+            codes = list(getattr(lp, "indicator_codes", None) or [])
+            draft = drafts.get(codes[0]) if codes else None
+        if not isinstance(draft, dict):
+            draft = {}
+    if draft:
+        if any(k in draft for k in (
+                "wapef_deep_hope", "wapef_storyline", "wapef_through_lines",
+                "wapef_gods_story")):
+            from ..engines.wapef_fields import normalize_wapef_payload
+            canonical = normalize_wapef_payload(draft, allow_custom=True)
+            lp.wapef_deep_hope = canonical["deep_hope"]
+            lp.wapef_storyline = canonical["storyline"]
+            lp.wapef_through_lines = canonical["through_lines"]
+            lp.wapef_gods_story = canonical["gods_story"]
+        if "remarks" in draft:
+            lp.remarks = str(draft.get("remarks") or "")
+        if "period" in draft:
+            # Teacher-adjusted timetable slot for this lesson (Pattern 1). Blank is
+            # permitted (the source/config supplied no period); never invented.
+            lp.period = str(draft.get("period") or "")
+        if "keywords" in draft and (draft.get("keywords_touched")
+                                    or draft.get("keywords")):
+            # CANONICAL (PART 9/11): the client may send a string or dirty list;
+            # always store the normalized list form, and never store empty-string
+            # placeholders (", ," was previously stored verbatim). An untouched
+            # empty draft keeps the builder's curriculum suggestions.
+            from ..ai_resource_text import normalize_text_items
+            lp.keywords = normalize_text_items(draft.get("keywords"))
+            if draft.get("keywords_touched"):
+                # An explicit list (including an intentionally empty one) is
+                # teacher-owned: provider enrichment must not add terms back.
+                lp.keywords_teacher_owned = True
+        if "other_tlrs" in draft:
+            from ..ai_resource_text import normalize_text_items
+            lp.other_tlrs = normalize_text_items(draft.get("other_tlrs"))
+            # Keep the display union in sync without touching source_tlrs.
+            union = list(getattr(lp, "source_tlrs", None) or [])
+            for r in lp.other_tlrs:
+                if r and r.lower() not in [x.lower() for x in union]:
+                    union.append(r)
+            for r in (getattr(lp, "teaching_learning_resources", None) or []):
+                if r.lower() in [x.lower() for x in union]:
+                    continue
+                # Activity extras stay; only rewrite when source+other already cover.
+            lp.teaching_learning_resources = union
+        if "core_competencies" in draft:
+            from ..curriculum.competencies import normalize_competencies
+            chosen = normalize_competencies(draft.get("core_competencies") or [])
+            # An empty list means "no per-lesson override": keep the competencies
+            # the lesson builder derived for this activity instead of erasing them.
+            # A non-empty selection is authoritative and replaces inference exactly.
+            if chosen:
+                lp.core_competencies = chosen
+
+    # Teacher-supplied per-indicator vocabulary from the configuration dialog.
+    # Unlike a batch seed, an entry for THIS occurrence is authoritative (an
+    # explicitly empty entry means the teacher removed every suggestion).
+    if config is not None:
         from ..ai_resource_text import normalize_text_items
-        lp.keywords = normalize_text_items(draft.get("keywords"))
-    if "other_tlrs" in draft:
-        from ..ai_resource_text import normalize_text_items
-        lp.other_tlrs = normalize_text_items(draft.get("other_tlrs"))
-        # Keep the display union in sync without touching source_tlrs.
-        union = list(getattr(lp, "source_tlrs", None) or [])
-        for r in lp.other_tlrs:
-            if r and r.lower() not in [x.lower() for x in union]:
-                union.append(r)
-        for r in (getattr(lp, "teaching_learning_resources", None) or []):
-            if r.lower() in [x.lower() for x in union]:
-                continue
-            # Activity extras stay; only rewrite when source+other already cover.
-        lp.teaching_learning_resources = union
-    if "core_competencies" in draft:
-        from ..curriculum.competencies import normalize_competencies
-        chosen = normalize_competencies(draft.get("core_competencies") or [])
-        # An empty list means "no per-lesson override": keep the competencies
-        # the lesson builder derived for this activity instead of erasing them.
-        # A non-empty selection is authoritative and replaces inference exactly.
-        if chosen:
-            lp.core_competencies = chosen
+        occurrence = (
+            getattr(lp, "source_occurrence_id", "")
+            or (f"week{getattr(lp, 'week_number', 0)}:0:"
+                + ((getattr(lp, "indicator_codes", None) or [""])[0]))
+        )
+        configured = getattr(config, "indicator_keywords", None) or {}
+        if occurrence in configured:
+            teacher_terms = normalize_text_items(configured.get(occurrence))
+            lp.keywords_teacher_owned = True
+            # Review-row edits and configuration entries are both teacher input;
+            # merge them, never replace one with the other.
+            merged = list(teacher_terms)
+            for term in list(getattr(lp, "keywords", None) or []):
+                if term.lower() not in {x.lower() for x in merged}:
+                    merged.append(term)
+            lp.keywords = merged
+
+    # WAPEF faith integration is rendered from the teacher's selection when one
+    # exists, and from a lesson-specific suggestion only at export time. The
+    # stored fields stay genuinely empty when the teacher chose nothing (the
+    # save-boundary contract), while the printed plan is never blank.
+
     if "structured_references" in draft:
         refs = [
             entry

@@ -370,6 +370,8 @@ def normalize_resource_items(value: Any) -> List[str]:
                 "null", "none", "undefined", "n/a", "na", "-", "..."):
             continue
         text = clean_serialized_text(text)
+        text = re.sub(r"-\s*[\r\n]+\s*", "-", text)
+        text = _join_number_groups(text)
         text = re.sub(r"\s+", " ", text).strip(" \t\r\n;")
         if text:
             items.append(text)
@@ -382,6 +384,17 @@ def normalize_resource_items(value: Any) -> List[str]:
             seen.add(key)
             out.append(item)
     return out
+
+
+def _join_number_groups(text: str) -> str:
+    """Join thousand-separated numbers so a cell cannot split them."""
+    if not text:
+        return text
+    return re.sub(
+        r"(?<!\d)(\d{1,3})((?:[ \u00a0\r\n]+\d{3})+)(?!\d)",
+        lambda m: ",".join([m.group(1), *re.split(r"[ \u00a0\r\n]+", m.group(2).strip())]),
+        text,
+    )
 
 
 def normalize_text_items(value: Any) -> List[str]:
@@ -409,6 +422,9 @@ def normalize_text_items(value: Any) -> List[str]:
         text = str(raw).strip()
         if not text or text.lower() in ("null", "none", "undefined", "n/a", "na"):
             continue
+        # "paper-\nbased materials" is one resource broken by a line wrap, not
+        # two entries ("paper-", "based materials"). Rejoin before splitting.
+        text = re.sub(r"-\s*[\r\n]+\s*", "-", text)
         for piece in _split_items(clean_serialized_text(text)):
             piece = piece.strip().strip(",;.").strip()
             piece = re.sub(r"\s+", " ", piece)

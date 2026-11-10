@@ -164,8 +164,11 @@ def _text(value) -> str:
     if value is None:
         return ""
     if isinstance(value, str):
-        return value
-    return str(getattr(value, "value", value))
+        text = value
+    else:
+        text = str(getattr(value, "value", value))
+    from ..curriculum.vocabulary import normalize_numeric_groups
+    return normalize_numeric_groups(text)
 
 
 def _text_items(value) -> List[str]:
@@ -592,6 +595,52 @@ def _term_label(lesson, ctx: Dict[str, Any]) -> str:
     return text
 
 
+def header_lines(lesson, context: Optional[Dict[str, Any]] = None,
+                 first: bool = True) -> List[str]:
+    """The lines the form's generic title is replaced with.
+
+    Server-authoritative content: the browser model receives these lines and
+    only writes them into the document. School/teacher identity is always read
+    from the stored lesson or the server-built context, never from the client.
+    """
+    ctx = context or {}
+    school = _text(ctx.get("school_name") or _get(lesson, "school_name"))
+    teacher = _text(ctx.get("teacher_name") or _get(lesson, "teacher_name"))
+    week = _get(lesson, "week_number")
+    week_text = f"Week {_text(week)}" if week not in (None, "", 0) else ""
+
+    lines: List[str] = []
+    if first:
+        if school:
+            lines.append(school)
+        if teacher:
+            lines.append(teacher)
+    if week_text:
+        lines.append(week_text)
+    return lines
+
+
+def grid_fill_values(spec: GESLevelSpec, lesson,
+                     context: Optional[Dict[str, Any]] = None,
+                     table_offset: int = 0) -> List[Dict[str, Any]]:
+    """Declared delivery-grid cells as ``{table,row,column,text}`` records.
+
+    The cell text is resolved here with the same ``_grid_value`` contract the
+    python-docx renderer uses, so the browser serializes exactly what the server
+    decided. ``table_offset`` shifts the table index for cloned forms.
+    """
+    ctx = context or {}
+    out: List[Dict[str, Any]] = []
+    for fill in spec.grid_fills:
+        out.append({
+            "table": table_offset + fill.table,
+            "row": fill.row,
+            "column": fill.column,
+            "text": _grid_value(fill.kind, lesson, ctx, phase_index=fill.row),
+        })
+    return out
+
+
 def render_header(document, lesson, context: Optional[Dict[str, Any]] = None,
                   first: bool = True) -> bool:
     """Replace the form's generic template title with the real planning context.
@@ -611,20 +660,7 @@ def render_header(document, lesson, context: Optional[Dict[str, Any]] = None,
 
     Returns True when a title was replaced.
     """
-    ctx = context or {}
-    school = _text(ctx.get("school_name") or _get(lesson, "school_name"))
-    teacher = _text(ctx.get("teacher_name") or _get(lesson, "teacher_name"))
-    week = _get(lesson, "week_number")
-    week_text = f"Week {_text(week)}" if week not in (None, "", 0) else ""
-
-    lines = []
-    if first:
-        if school:
-            lines.append(school)
-        if teacher:
-            lines.append(teacher)
-    if week_text:
-        lines.append(week_text)
+    lines = header_lines(lesson, context, first=first)
     if not lines:
         return False
 

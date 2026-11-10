@@ -36,10 +36,7 @@ from .official_ges_template import (
     row_description,
     row_in_phase,
 )
-from .wapef_fields import (
-    format_through_lines,
-    normalize_through_lines,
-)
+from .wapef_connections import wapef_field_text
 
 TEMPLATE_VERSION = "1.0"
 
@@ -121,9 +118,11 @@ def _text(value) -> str:
     """Plain string for a stored value, unwrapping enums."""
     if value is None:
         return ""
-    if isinstance(value, str):
-        return value
-    return str(getattr(value, "value", value))
+    text = value if isinstance(value, str) else str(getattr(value, "value", value))
+    # Keep thousand-separated numbers in one unbreakable token so a narrow
+    # cell can never render "1" / "000" / "000" on separate lines.
+    from ..curriculum.vocabulary import normalize_numeric_groups
+    return normalize_numeric_groups(text)
 
 
 def _text_items(value) -> List[str]:
@@ -357,19 +356,13 @@ def _resolve(token: str, lesson, ctx: Dict[str, Any]) -> str:
         return ", ".join(_text_items(_get(lesson, "core_competencies")))
     if field == "keywords":
         return ", ".join(_text_items(_get(lesson, "keywords")))
-    # The four WAPEF selections. ``field`` is the canonical lesson attribute
-    # name (``WAPEF_TOKEN_FIELDS`` maps token -> lesson field), so these read
-    # the exact stored value: teacher selection wins, verbatim, approved order
-    # for the multi-select Through lines — never rewritten, never invented.
-    if field == "wapef_through_lines":
-        lines = _text_items(_get(lesson, "wapef_through_lines"))
-        return format_through_lines(normalize_through_lines(lines))
-    if field == "wapef_gods_story":
-        return _text(_get(lesson, "wapef_gods_story"))
-    if field == "wapef_deep_hope":
-        return _text(_get(lesson, "wapef_deep_hope"))
-    if field == "wapef_storyline":
-        return _text(_get(lesson, "wapef_storyline"))
+    # The four WAPEF selections. The teacher's value always wins. A stored
+    # approved label is preserved exactly and followed by a lesson-specific
+    # connection sentence; free text is rendered verbatim; a blank field gets
+    # the generated suggestion rather than an empty section.
+    if field in ("wapef_through_lines", "wapef_gods_story",
+                 "wapef_deep_hope", "wapef_storyline"):
+        return wapef_field_text(lesson, field.replace("wapef_", "", 1))
     if field == "phase_1_activities":
         return _phase_block(lesson, 1)
     if field == "phase_1_resources":
@@ -391,8 +384,13 @@ def _resolve(token: str, lesson, ctx: Dict[str, Any]) -> str:
 
 
 def _text_items_join(value) -> str:
+    from ..ai_resource_text import normalize_exact_items
+
+    raw = value
+    if isinstance(value, (list, tuple, set)):
+        raw = [getattr(item, "description", item) for item in value]
     parts = []
-    for item in _text_items(value):
+    for item in normalize_exact_items(raw):
         desc = item
         if " (" in item and item.endswith(")"):
             desc = item.split(" (")[0]
@@ -417,6 +415,19 @@ def load_wapef_document():
     if not path.is_file():
         raise FileNotFoundError(f"WAPEF template missing: {path}")
     return Document(str(path))
+
+
+def header_lines(lesson, context: Optional[Dict[str, Any]] = None) -> List[str]:
+    """Positional header lines: ``[school, FACILITATOR: teacher]``.
+
+    The server resolves identity; the browser only writes the two lines into the
+    form's first two body paragraphs. An absent value is an empty line, never a
+    placeholder (the title paragraph stays untouched).
+    """
+    ctx = context or {}
+    school = _text(ctx.get("school_name") or _get(lesson, "school_name"))
+    teacher = _text(ctx.get("teacher_name") or _get(lesson, "teacher_name"))
+    return [school, f"FACILITATOR: {teacher}" if teacher else ""]
 
 
 def render_header(document, lesson, context: Optional[Dict[str, Any]] = None) -> None:
@@ -491,6 +502,8 @@ def render_document(lesson_plans: List[Any], context: Optional[Dict[str, Any]] =
         render_into(document, lesson, context, table_offset=0)
         render_header(document, lesson, context)
 
+    from .wapef_style import style_wapef_document
+    style_wapef_document(document)
     return document
 
 

@@ -104,16 +104,16 @@ def normalize_through_lines(values) -> List[str]:
     return canonical
 
 
-def normalize_wapef_payload(data) -> dict:
+def normalize_wapef_payload(data, allow_custom: bool = False) -> dict:
     """Normalize a teacher-supplied WAPEF selection payload to canonical form.
 
     Returns {"deep_hope", "storyline", "through_lines", "gods_story"} with
     only approved values; anything else becomes empty. Never raises.
 
-    Accepts both key spellings — the bare canonical keys and the API/draft
-    store convention (``wapef_deep_hope``, …). The prefixed keys win when both
-    are present, so an API payload can never be silently dropped just because
-    the caller used the frontend's field names.
+    ``allow_custom=True`` is used only by the generation route when the teacher
+    has typed their own connection text. It preserves that text verbatim while
+    still canonicalising anything that matches an approved label. The strict
+    default keeps the original option-list contract (and its tests) intact.
     """
     data = data if isinstance(data, dict) else {}
 
@@ -124,11 +124,38 @@ def normalize_wapef_payload(data) -> dict:
             value = data.get(bare, value)
         return value
 
+    def _single(bare: str, normalizer):
+        value = _pick(bare)
+        if allow_custom and isinstance(value, str) and value.strip():
+            canonical = normalizer(value)
+            return canonical or value.strip()
+        return normalizer(value)
+
+    through_raw = _pick("through_lines")
+    if allow_custom:
+        if isinstance(through_raw, str):
+            custom_lines = [line.strip() for line in through_raw.splitlines() if line.strip()]
+        elif isinstance(through_raw, (list, tuple, set)):
+            custom_lines = [str(line).strip() for line in through_raw if str(line).strip()]
+        else:
+            custom_lines = []
+        approved = normalize_through_lines(custom_lines)
+        # Approved labels keep their canonical spelling and approved order;
+        # teacher-written labels are appended verbatim (deduplicated).
+        through = list(approved)
+        for line in custom_lines:
+            if _canonical(line, WAPEF_THROUGH_LINES):
+                continue
+            if line.lower() not in {x.lower() for x in through}:
+                through.append(line)
+    else:
+        through = normalize_through_lines(through_raw)
+
     return {
-        "deep_hope": normalize_deep_hope(_pick("deep_hope")),
-        "storyline": normalize_storyline(_pick("storyline")),
-        "through_lines": normalize_through_lines(_pick("through_lines")),
-        "gods_story": normalize_gods_story(_pick("gods_story")),
+        "deep_hope": _single("deep_hope", normalize_deep_hope),
+        "storyline": _single("storyline", normalize_storyline),
+        "through_lines": through,
+        "gods_story": _single("gods_story", normalize_gods_story),
     }
 
 

@@ -1377,8 +1377,14 @@ class DOCXParser:
                 # here so "MID-TERM (05-11-2026 to 06-11-2026)" can never
                 # reach a lesson's TLR list.
                 for item in normalize_text_items(res):
-                    if not is_special_label_text(item):
-                        all_resources.add(item)
+                    if is_special_label_text(item):
+                        continue
+                    from ..curriculum.vocabulary import is_malformed_fragment
+                    if is_malformed_fragment(item):
+                        # A truncated source label ("paper-") is not a usable
+                        # resource. Drop it rather than guess the missing word.
+                        continue
+                    all_resources.add(item)
 
         # ── Mixed week detection (Defect 4) ──────────────────────────
         # MIXED = the week holds BOTH a non-instructional period row (e.g. the

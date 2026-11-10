@@ -1,6 +1,7 @@
 // SchemeKnit API Service
 
 import { DEV_TOOLS_ENABLED } from './dev-tools'
+import type { ExportModel } from './docx/types'
 import type {
   LessonConfigResponse,
   LessonRubricConfig,
@@ -651,6 +652,23 @@ class ApiService {
 
   async getCurriculumCoverage(jobId: string): Promise<any> {
     return this.request(`/api/generation/${jobId}/coverage`)
+  }
+
+  /**
+   * Persisted export content for browser-side DOCX/ZIP serialization.
+   *
+   * The server resolves the template, composes all content, checks ownership
+   * and enforces the ZIP entitlement. The browser only builds the OOXML.
+   */
+  async getExportModel(
+    jobId: string,
+    format: 'docx' | 'zip',
+    templateType: string = 'GES-style',
+    templateId?: string,
+  ): Promise<ExportModel> {
+    const params = new URLSearchParams({ format, template_type: templateType })
+    if (templateId) params.set('template_id', templateId)
+    return this.request(`/api/generation/${jobId}/export/model?${params}`)
   }
 
   // Headers for raw fetch() calls (blob downloads). The backend's HTTPBearer

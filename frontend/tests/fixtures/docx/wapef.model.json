@@ -1,0 +1,720 @@
+{
+  "schema_version": 1,
+  "job_id": "job-fixture",
+  "filename": "wapef.docx",
+  "lesson_count": 3,
+  "template": {
+    "id": "tpl-wapef-approved-plan",
+    "name": "Approved WAPEF Plan"
+  },
+  "render_context": {
+    "term": "Term 1",
+    "teaching_days": [
+      "Monday"
+    ]
+  },
+  "renderer": "form",
+  "documents": [
+    {
+      "lesson_id": "lp-fixture-1-1",
+      "week_number": 1,
+      "lesson_sequence": 1,
+      "filename": "SCIENCE_Basic7_W01_L01_2026-02-03.docx",
+      "first": true,
+      "form": {
+        "kind": "wapef",
+        "asset": "docx-templates/wapef_approved_plan_template.docx",
+        "tokens": {
+          "WEEK": "1",
+          "WEEK_ENDING": "",
+          "SUBJECT": "Science",
+          "CLASS": "Basic 7",
+          "CLASS_SIZE": "38",
+          "STRAND": "Materials and their properties",
+          "SUB_STRAND": "Mixtures",
+          "CONTENT_STANDARD": "B7.2.1 Demonstrate understanding of mixtures and separation.",
+          "LEARNING_INDICATOR": "B7.2.1.1 Describe mixtures\nB7.2.1.2 Separate mixtures",
+          "PERFORMANCE_INDICATOR": "Explain filtration using a diagram\nSeparate a sand-and-water mixture",
+          "CORE_COMPETENCIES": "Critical thinking, Collaboration",
+          "KEY_WORDS": "filtration, filtrate, residue",
+          "THROUGH_LINE": "",
+          "GODS_STORY": "",
+          "DEEP_HOPE": "",
+          "STORYLINE": "",
+          "PHASE_1_STARTER": "- Show muddy water and ask how it can be made clear.\n- Predict what happens to muddy water in a funnel.",
+          "PHASE_1_RESOURCES": "",
+          "PHASE_2_MAIN": "- Learners filter their own sample in pairs.\n- Demonstrate folding filter paper and pouring the mixture.\n- Class Assignment: Draw and label the filtration setup.",
+          "PHASE_2_RESOURCES": "- Filter paper\n- Funnel\n- Beakers",
+          "PHASE_3_PLENARY": "- Summarise that filtration separates insoluble solids.\n- Home Assignment: List three household examples of filtration.",
+          "PHASE_3_RESOURCES": "",
+          "EVALUATION": "Observe each pair's filtration and question their choices.",
+          "REMARKS": ""
+        },
+        "grid_fills": [],
+        "header_lines": [
+          "Achimota Basic School",
+          "FACILITATOR: A. Mensah"
+        ],
+        "standalone_header_lines": [
+          "Achimota Basic School",
+          "FACILITATOR: A. Mensah"
+        ],
+        "first": true,
+        "strip_guidance": false,
+        "title_pattern": null
+      },
+      "appendix": [
+        {
+          "text": "Assessment Structure — Week 1 (Lesson 1)",
+          "bold": true,
+          "page_break_before": true
+        },
+        {
+          "text": "Assignments",
+          "bold": true,
+          "page_break_before": false
+        },
+        {
+          "text": "Class assignment: Draw and label the filtration setup.",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "Home assignment: List three household examples of filtration.",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "Assessment Questions / Checks (with marking)",
+          "bold": true,
+          "page_break_before": false
+        },
+        {
+          "text": "• Why does the filter paper trap sand? (DoK 2)",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "Expected evidence: Names particle size as the reason.",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "Marking: Accept any answer naming particle size.",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "Watch for: Sand dissolves in water.",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "If not reached: Re-demonstrate with a transparent mixture.",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "Marking Rubric for the Learner Task",
+          "bold": true,
+          "page_break_before": false
+        },
+        {
+          "text": "Filter a sand-and-water mixture safely.",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "Criterion: Correct setup",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "  4 — exceeds the standard: Funnel and paper seated correctly. (4 pt)",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "  3 — meets the standard: Minor spillage only. (3 pt)",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "Total marks: 4",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "Award for a working setup.",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "School assessment policy.",
+          "bold": false,
+          "page_break_before": false
+        }
+      ]
+    },
+    {
+      "lesson_id": "lp-fixture-1-2",
+      "week_number": 1,
+      "lesson_sequence": 2,
+      "filename": "SCIENCE_Basic7_W01_L02_2026-02-03.docx",
+      "first": false,
+      "form": {
+        "kind": "wapef",
+        "asset": "docx-templates/wapef_approved_plan_template.docx",
+        "tokens": {
+          "WEEK": "1",
+          "WEEK_ENDING": "",
+          "SUBJECT": "Science",
+          "CLASS": "Basic 7",
+          "CLASS_SIZE": "38",
+          "STRAND": "Materials and their properties",
+          "SUB_STRAND": "Mixtures",
+          "CONTENT_STANDARD": "B7.2.1 Demonstrate understanding of mixtures and separation.",
+          "LEARNING_INDICATOR": "B7.2.1.1 Describe mixtures\nB7.2.1.2 Separate mixtures",
+          "PERFORMANCE_INDICATOR": "Explain filtration using a diagram\nSeparate a sand-and-water mixture",
+          "CORE_COMPETENCIES": "Critical thinking, Collaboration",
+          "KEY_WORDS": "filtration, filtrate, residue",
+          "THROUGH_LINE": "",
+          "GODS_STORY": "",
+          "DEEP_HOPE": "",
+          "STORYLINE": "",
+          "PHASE_1_STARTER": "- Show muddy water and ask how it can be made clear.\n- Predict what happens to muddy water in a funnel.",
+          "PHASE_1_RESOURCES": "",
+          "PHASE_2_MAIN": "- Learners filter their own sample in pairs.\n- Demonstrate folding filter paper and pouring the mixture.\n- Class Assignment: Draw and label the filtration setup.",
+          "PHASE_2_RESOURCES": "- Filter paper\n- Funnel\n- Beakers",
+          "PHASE_3_PLENARY": "- Summarise that filtration separates insoluble solids.\n- Home Assignment: List three household examples of filtration.",
+          "PHASE_3_RESOURCES": "",
+          "EVALUATION": "Observe each pair's filtration and question their choices.",
+          "REMARKS": ""
+        },
+        "grid_fills": [],
+        "header_lines": [
+          "Achimota Basic School",
+          "FACILITATOR: A. Mensah"
+        ],
+        "standalone_header_lines": [
+          "Achimota Basic School",
+          "FACILITATOR: A. Mensah"
+        ],
+        "first": false,
+        "strip_guidance": false,
+        "title_pattern": null
+      },
+      "appendix": [
+        {
+          "text": "Assessment Structure — Week 1 (Lesson 2)",
+          "bold": true,
+          "page_break_before": true
+        },
+        {
+          "text": "Assignments",
+          "bold": true,
+          "page_break_before": false
+        },
+        {
+          "text": "Class assignment: Draw and label the filtration setup.",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "Home assignment: List three household examples of filtration.",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "Assessment Questions / Checks (with marking)",
+          "bold": true,
+          "page_break_before": false
+        },
+        {
+          "text": "• Why does the filter paper trap sand? (DoK 2)",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "Expected evidence: Names particle size as the reason.",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "Marking: Accept any answer naming particle size.",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "Watch for: Sand dissolves in water.",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "If not reached: Re-demonstrate with a transparent mixture.",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "Marking Rubric for the Learner Task",
+          "bold": true,
+          "page_break_before": false
+        },
+        {
+          "text": "Filter a sand-and-water mixture safely.",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "Criterion: Correct setup",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "  4 — exceeds the standard: Funnel and paper seated correctly. (4 pt)",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "  3 — meets the standard: Minor spillage only. (3 pt)",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "Total marks: 4",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "Award for a working setup.",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "School assessment policy.",
+          "bold": false,
+          "page_break_before": false
+        }
+      ]
+    },
+    {
+      "lesson_id": "lp-fixture-2-1",
+      "week_number": 2,
+      "lesson_sequence": 1,
+      "filename": "SCIENCE_Basic7_W02_L01_2026-02-04.docx",
+      "first": false,
+      "form": {
+        "kind": "wapef",
+        "asset": "docx-templates/wapef_approved_plan_template.docx",
+        "tokens": {
+          "WEEK": "2",
+          "WEEK_ENDING": "",
+          "SUBJECT": "Science",
+          "CLASS": "Basic 7",
+          "CLASS_SIZE": "38",
+          "STRAND": "Materials and their properties",
+          "SUB_STRAND": "Mixtures",
+          "CONTENT_STANDARD": "B7.2.1 Demonstrate understanding of mixtures and separation.",
+          "LEARNING_INDICATOR": "B7.2.1.1 Describe mixtures\nB7.2.1.2 Separate mixtures",
+          "PERFORMANCE_INDICATOR": "Explain filtration using a diagram\nSeparate a sand-and-water mixture",
+          "CORE_COMPETENCIES": "Critical thinking, Collaboration",
+          "KEY_WORDS": "filtration, filtrate, residue",
+          "THROUGH_LINE": "",
+          "GODS_STORY": "",
+          "DEEP_HOPE": "",
+          "STORYLINE": "",
+          "PHASE_1_STARTER": "- Show muddy water and ask how it can be made clear.\n- Predict what happens to muddy water in a funnel.",
+          "PHASE_1_RESOURCES": "",
+          "PHASE_2_MAIN": "- Learners filter their own sample in pairs.\n- Demonstrate folding filter paper and pouring the mixture.\n- Class Assignment: Draw and label the filtration setup.",
+          "PHASE_2_RESOURCES": "- Filter paper\n- Funnel\n- Beakers",
+          "PHASE_3_PLENARY": "- Summarise that filtration separates insoluble solids.\n- Home Assignment: List three household examples of filtration.",
+          "PHASE_3_RESOURCES": "",
+          "EVALUATION": "Observe each pair's filtration and question their choices.",
+          "REMARKS": ""
+        },
+        "grid_fills": [],
+        "header_lines": [
+          "Achimota Basic School",
+          "FACILITATOR: A. Mensah"
+        ],
+        "standalone_header_lines": [
+          "Achimota Basic School",
+          "FACILITATOR: A. Mensah"
+        ],
+        "first": false,
+        "strip_guidance": false,
+        "title_pattern": null
+      },
+      "appendix": [
+        {
+          "text": "Assessment Structure — Week 2 (Lesson 1)",
+          "bold": true,
+          "page_break_before": true
+        },
+        {
+          "text": "Assignments",
+          "bold": true,
+          "page_break_before": false
+        },
+        {
+          "text": "Class assignment: Draw and label the filtration setup.",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "Home assignment: List three household examples of filtration.",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "Assessment Questions / Checks (with marking)",
+          "bold": true,
+          "page_break_before": false
+        },
+        {
+          "text": "• Why does the filter paper trap sand? (DoK 2)",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "Expected evidence: Names particle size as the reason.",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "Marking: Accept any answer naming particle size.",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "Watch for: Sand dissolves in water.",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "If not reached: Re-demonstrate with a transparent mixture.",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "Marking Rubric for the Learner Task",
+          "bold": true,
+          "page_break_before": false
+        },
+        {
+          "text": "Filter a sand-and-water mixture safely.",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "Criterion: Correct setup",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "  4 — exceeds the standard: Funnel and paper seated correctly. (4 pt)",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "  3 — meets the standard: Minor spillage only. (3 pt)",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "Total marks: 4",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "Award for a working setup.",
+          "bold": false,
+          "page_break_before": false
+        },
+        {
+          "text": "School assessment policy.",
+          "bold": false,
+          "page_break_before": false
+        }
+      ]
+    }
+  ],
+  "appendices": [
+    [
+      {
+        "text": "Assessment Structure — Week 1 (Lesson 1)",
+        "bold": true,
+        "page_break_before": true
+      },
+      {
+        "text": "Assignments",
+        "bold": true,
+        "page_break_before": false
+      },
+      {
+        "text": "Class assignment: Draw and label the filtration setup.",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "Home assignment: List three household examples of filtration.",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "Assessment Questions / Checks (with marking)",
+        "bold": true,
+        "page_break_before": false
+      },
+      {
+        "text": "• Why does the filter paper trap sand? (DoK 2)",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "Expected evidence: Names particle size as the reason.",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "Marking: Accept any answer naming particle size.",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "Watch for: Sand dissolves in water.",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "If not reached: Re-demonstrate with a transparent mixture.",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "Marking Rubric for the Learner Task",
+        "bold": true,
+        "page_break_before": false
+      },
+      {
+        "text": "Filter a sand-and-water mixture safely.",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "Criterion: Correct setup",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "  4 — exceeds the standard: Funnel and paper seated correctly. (4 pt)",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "  3 — meets the standard: Minor spillage only. (3 pt)",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "Total marks: 4",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "Award for a working setup.",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "School assessment policy.",
+        "bold": false,
+        "page_break_before": false
+      }
+    ],
+    [
+      {
+        "text": "Assessment Structure — Week 1 (Lesson 2)",
+        "bold": true,
+        "page_break_before": true
+      },
+      {
+        "text": "Assignments",
+        "bold": true,
+        "page_break_before": false
+      },
+      {
+        "text": "Class assignment: Draw and label the filtration setup.",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "Home assignment: List three household examples of filtration.",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "Assessment Questions / Checks (with marking)",
+        "bold": true,
+        "page_break_before": false
+      },
+      {
+        "text": "• Why does the filter paper trap sand? (DoK 2)",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "Expected evidence: Names particle size as the reason.",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "Marking: Accept any answer naming particle size.",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "Watch for: Sand dissolves in water.",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "If not reached: Re-demonstrate with a transparent mixture.",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "Marking Rubric for the Learner Task",
+        "bold": true,
+        "page_break_before": false
+      },
+      {
+        "text": "Filter a sand-and-water mixture safely.",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "Criterion: Correct setup",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "  4 — exceeds the standard: Funnel and paper seated correctly. (4 pt)",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "  3 — meets the standard: Minor spillage only. (3 pt)",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "Total marks: 4",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "Award for a working setup.",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "School assessment policy.",
+        "bold": false,
+        "page_break_before": false
+      }
+    ],
+    [
+      {
+        "text": "Assessment Structure — Week 2 (Lesson 1)",
+        "bold": true,
+        "page_break_before": true
+      },
+      {
+        "text": "Assignments",
+        "bold": true,
+        "page_break_before": false
+      },
+      {
+        "text": "Class assignment: Draw and label the filtration setup.",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "Home assignment: List three household examples of filtration.",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "Assessment Questions / Checks (with marking)",
+        "bold": true,
+        "page_break_before": false
+      },
+      {
+        "text": "• Why does the filter paper trap sand? (DoK 2)",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "Expected evidence: Names particle size as the reason.",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "Marking: Accept any answer naming particle size.",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "Watch for: Sand dissolves in water.",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "If not reached: Re-demonstrate with a transparent mixture.",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "Marking Rubric for the Learner Task",
+        "bold": true,
+        "page_break_before": false
+      },
+      {
+        "text": "Filter a sand-and-water mixture safely.",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "Criterion: Correct setup",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "  4 — exceeds the standard: Funnel and paper seated correctly. (4 pt)",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "  3 — meets the standard: Minor spillage only. (3 pt)",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "Total marks: 4",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "Award for a working setup.",
+        "bold": false,
+        "page_break_before": false
+      },
+      {
+        "text": "School assessment policy.",
+        "bold": false,
+        "page_break_before": false
+      }
+    ]
+  ]
+}

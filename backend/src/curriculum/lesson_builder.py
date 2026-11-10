@@ -49,6 +49,7 @@ from ..ai_resource_text import normalize_text_items
 from .lesson_evidence import build_evidence, primary_verb as _indicator_primary_verb
 from . import activity_library
 from . import text_hygiene
+from . import vocabulary as vocabulary_engine
 
 #: Layer 3/4 integration — imported lazily inside ``build_lesson`` to avoid an
 #: import cycle (patterns imports nothing from the builder; the typing-only
@@ -1409,6 +1410,7 @@ def _clean_focus_text(text: str) -> str:
     text = strip_indicator_code(text or "")
     if not text:
         return ""
+    text = vocabulary_engine.normalize_numeric_groups(text)
     # Orphan code fragments left by the strip ("B9.2.1.1 .2 Reflect").
     text = re.sub(r"^(?:[BbKk]?\d+(?:\.\d+)*\.?\s*)+", "", text).strip()
     # Leading separator/dots from "CODE : prose" and "CODE . prose".
@@ -1545,6 +1547,7 @@ _DANGLING_CONNECTOR_RE = re.compile(
 def _normalize_prose(text: str) -> str:
     if not text:
         return text
+    text = vocabulary_engine.normalize_numeric_groups(text)
     text = _DANGLING_CONNECTOR_RE.sub(r"\2", text)
     text = re.sub(r"\s+([,.;:!?])", r"\1", text)
     # "experiences.. Read" / "techniques. . Summarise": fragmented source cells
@@ -1770,22 +1773,40 @@ def _first_clause(text: str, max_words: int = 12) -> str:
     return part
 
 
-def _content_terms(text: str, limit: int = 6) -> List[str]:
-    """Extract significant content words from indicator text (for vocabulary)."""
-    clean = strip_indicator_code(text or "")
-    words = re.findall(r"[A-Za-z][A-Za-z\-']{2,}", clean)
-    out: List[str] = []
-    for w in words:
-        lw = w.lower()
-        if lw in _STOPWORDS:
-            continue
-        if lw.isdigit():
-            continue
-        if lw not in out:
-            out.append(lw)
-        if len(out) >= limit:
-            break
-    return out
+def _teaching_focus(text: str, max_words: int = 14) -> str:
+    """The teachable object of an indicator, not the whole source cell.
+
+    A scheme cell often carries the apparatus as well as the learning target:
+    "Model number quantities more than 1 000 000 000 using graph sheets,
+    isometric paper and multi-base blocks". Embedding that whole cell in every
+    activity sentence repeated the apparatus six times and produced the
+    "using graph sheets, isometric paper" filler seen in real plans.
+
+    The focus keeps the indicator's own noun phrase and drops a trailing
+    "using/with/through …" apparatus clause. The full indicator remains
+    authoritative on the lesson (``skill``/``indicators``); only composed
+    prose uses the shorter phrase.
+    """
+    clean = _clean_focus_text(text or "")
+    if not clean:
+        return ""
+    # Drop a trailing apparatus clause. Only the LAST clause is removed, and
+    # only when the connector is followed by something (never a bare "a").
+    clean = re.split(
+        r"\s+(?:using|with the use of|through the use of|by means of|"
+        r"with|through)\s+.+$",
+        clean, maxsplit=1, flags=re.IGNORECASE,
+    )[0].strip(" ,;:")
+    # Stop at the first sentence break; the second sentence is a different
+    # requirement and belongs in the full indicator, not the teaching focus.
+    clean = re.split(r"[.;]", clean)[0].strip() or clean
+    focused = _noun_focus(clean)
+    words = focused.split()
+    if len(words) > max_words:
+        words = _trim_dangling_tail(words[:max_words])
+        focused = " ".join(words)
+    focused = _normalize_prose(focused)
+    return focused.strip(" ,;:")
 
 
 def _interpret(alloc: AllocatedIndicator, subject: str):
@@ -1872,6 +1893,68 @@ def _bank_key(profile: SubjectPedagogy, act_key: Optional[str]) -> str:
     if act_key:
         return act_key
     return _SUBJECT_DEFAULT_ACTIVITY.get(profile.key, "demonstration")
+
+
+def _focus_referent(text: str, start: int) -> str:
+    """A grammatically safe replacement for a repeated focus phrase."""
+    prefix = (text[:start] or "").rstrip().lower()
+    if prefix.endswith(" the") or prefix == "the":
+        return "same content"
+    if prefix.endswith((" a", " an")):
+        return "similar content"
+    return "the same content"
+
+
+def _reduce_focus_repetition(
+    specs: List[Tuple[str, str, float]], focus: str,
+) -> List[Tuple[str, str, float]]:
+    """Name the lesson focus once, then refer back to it.
+
+    Every phase template embeds ``{focus_short}``. When the focus is the whole
+    indicator phrase this produced six copies of
+    "number quantities more than 1,000,000,000 using graph sheets, isometric
+    paper" in one plan — filler that displaced the actual teaching move. Keep
+    the first naming in the MAIN block and replace later verbatim repeats with
+    "the same content"; the starter/introduction/assessment still carry the
+    exact focus for traceability.
+    """
+    phrase = (focus or "").strip()
+    if not phrase or len(phrase.split()) < 2:
+        return specs
+    pattern = re.compile(r"(?<![A-Za-z0-9])" + re.escape(phrase) + r"(?![A-Za-z0-9])", re.I)
+    seen = 0
+    out: List[Tuple[str, str, float]] = []
+    for name, description, weight in specs:
+        text = description or ""
+        def _swap(match: re.Match) -> str:
+            nonlocal seen
+            seen += 1
+            return match.group(0) if seen == 1 else _focus_referent(text, match.start())
+        out.append((name, pattern.sub(_swap, text), weight))
+    return out
+
+
+def _limit_focus_mentions(activities, focus: str, max_mentions: int = 2) -> None:
+    """Across a group of activity rows, name the focus at most N times.
+
+    Later rows keep their full teaching instruction but refer back to "the same
+    content". This is what stops a lesson from printing the entire indicator in
+    every bullet while the exact indicator remains in its own authoritative
+    curriculum cell.
+    """
+    phrase = (focus or "").strip()
+    if not phrase or len(phrase.split()) < 2:
+        return
+    pattern = re.compile(
+        r"(?<![A-Za-z0-9])" + re.escape(phrase) + r"(?![A-Za-z0-9])", re.I)
+    seen = 0
+    for activity in activities or []:
+        text = getattr(activity, "description", "") or ""
+        def _swap(match: re.Match) -> str:
+            nonlocal seen
+            seen += 1
+            return match.group(0) if seen <= max_mentions else _focus_referent(text, match.start())
+        setattr(activity, "description", pattern.sub(_swap, text))
 
 
 def _compose_main_phases(
@@ -2232,7 +2315,7 @@ def build_lesson(
     # is never phrased as learner-facing text or shown in its place.
     if alloc.indicator_description and _is_code_only(alloc.indicator_description):
         skill = ""
-    focus_short = "" if skill == "" else (_first_clause(alloc.indicator_description) or skill)
+    focus_short = "" if skill == "" else (_teaching_focus(alloc.indicator_description) or skill)
     # Embed the FULL cleaned indicator text into every phase template via
     # {focus} so the lesson visibly teaches this exact indicator (helps the
     # quality gate's exactness check and the teacher's own review).
@@ -2281,6 +2364,15 @@ def build_lesson(
     # Interpret the indicator: what learners must DO and how deeply.
     interp = _interpret(alloc, subject_name)
     act_key = _activity_key(interp, alloc.indicator_description)
+    # In mathematics "model" means represent/build a mathematical model, not
+    # "watch the teacher demonstrate". The generic activity keyword list maps
+    # "model" to demonstration, which produced a practical demonstration
+    # skeleton for an abstract place-value lesson. Subject-fit override only.
+    if (act_key == "demonstration"
+            and profile.key == "mathematics"
+            and re.search(r"\bmodel(?:ling|ing)?\b", alloc.indicator_description or "", re.I)
+            and not re.search(r"\bdemonstrat", alloc.indicator_description or "", re.I)):
+        act_key = "problem_solving"
     # Subject-fit bank key for the banks that must stay subject-specific even
     # when the indicator expressed no activity keyword (assignments, learner
     # actions, activity resources, competencies).
@@ -2369,8 +2461,20 @@ def build_lesson(
             _r = text_hygiene.fix_resource_capitalisation((_r or "").strip())
             if _r and _r.lower() not in [x.lower() for x in _resource_pool]:
                 _resource_pool.append(_r)
+    # A scheme's WEEK resource list can include apparatus for a neighbouring
+    # indicator ("made currency" beside a place-value lesson). Only a resource
+    # this lesson actually names may fill the {resource} substitution.
+    _relevant_pool = vocabulary_engine.filter_relevant_resources(
+        _resource_pool,
+        indicator=alloc.indicator_description or "",
+        content_standard=alloc.content_standard_description or "",
+        lesson_texts=(topic, focus_short),
+        subject=subject_name,
+    )
+    if _relevant_pool:
+        _resource_pool = _relevant_pool
     fmt = dict(
-        skill=skill, focus=skill, focus_short=focus_short, topic=topic,
+        skill=skill, focus=focus_short, focus_short=focus_short, topic=topic,
         indicators=indicators_for_templates,
         strand=alloc.strand or "", sub_strand=alloc.sub_strand or "",
         class_level=class_level, prev=prev_short, next=next_short,
@@ -2496,7 +2600,9 @@ def build_lesson(
     # being emitted twice into the exported plan.
     if prev_short:
         intro = f"This lesson builds on '{prev_short}' and moves the class on to {skill}."
-    elif topic and topic.strip() and topic.strip().lower() != (skill or "").strip().lower():
+    elif (topic and topic.strip()
+          and topic.strip().lower() != (skill or "").strip().lower()
+          and (focus_short or "").strip().lower() not in topic.strip().lower()):
         intro = f"This lesson focuses on {focus_short or skill} within {topic}."
     else:
         # The topic IS the focus (a code-only scheme filled from the official
@@ -2590,6 +2696,8 @@ def build_lesson(
     unique_specs = [spec for spec in phase_specs if not _is_duplicate(spec[1])]
     if len(unique_specs) >= 2:
         phase_specs = unique_specs
+    # Name the lesson focus once in the MAIN block, then refer back to it.
+    phase_specs = _reduce_focus_repetition(phase_specs, focus_short)
 
     # ── TIMING — hard invariant (Priority 2 §10) ──────────────────────────
     # Partition the lesson duration EXACTLY across the three phases:
@@ -2904,16 +3012,19 @@ def build_lesson(
             None,
         )
         if _practice_idx is not None:
-            def _short_clause(text: str, cap: int = 70) -> str:
+            def _short_clause(text: str, cap: int = 220) -> str:
                 # A clause is shortened at a word boundary and CLOSED with a
                 # full stop — never left as "…" (the fixture's "plus two key
                 # words from the…" defect came from ellipsis truncation).
-                first = re.split(r"(?<=[.!?])\s", (text or "").strip())[0]
-                first = first.rstrip(". ")
+                clean = " ".join((text or "").split())
+                first = re.split(r"(?<=[.!?])\s", clean)[0].strip()
+                if not first:
+                    return ""
                 if len(first) <= cap:
-                    return first
-                clipped = first[:cap].rsplit(" ", 1)[0]
-                return (clipped or first[:cap]).rstrip(",;:") + "."
+                    return first if first.endswith((".", "!", "?")) else first + "."
+                # Never cut mid-sentence: the previous character cap produced
+                # "counting materials so." and "swap with a." in exports.
+                return ""
             _ns_cue = _short_clause(_support_text)
             _ma_cue = _short_clause(_challenge_text)
             if _ns_cue and _ma_cue:
@@ -3058,6 +3169,31 @@ def build_lesson(
     # resource names print with consistent capitalisation ("Charts and
     # Pictures"). ``source_tlrs`` above keeps the scheme's wording verbatim.
     resources = [text_hygiene.fix_resource_capitalisation(r) for r in resources]
+    # Relevance filter (PART 15): a scheme may list several materials for a
+    # WEEK; this lesson must show only those its own indicator/activity names.
+    # `source_tlrs` keeps the scheme's verbatim record for provenance.
+    _lesson_resource_prose = " ".join([
+        alloc.indicator_description or "", alloc.content_standard_description or "",
+        starter, assessment, conclusion, class_assignment,
+        " ".join(a.description or "" for a in main_activities),
+        " ".join(a.description or "" for a in learner_activities),
+    ])
+    _relevant = vocabulary_engine.filter_relevant_resources(
+        resources,
+        indicator=alloc.indicator_description or "",
+        content_standard=alloc.content_standard_description or "",
+        lesson_texts=(_lesson_resource_prose,),
+        subject=(config.subject.value if isinstance(config.subject, Subject)
+                 else str(config.subject or "")),
+    )
+    if len(_relevant) >= 2:
+        resources = _relevant
+    else:
+        # One incidental word match is not enough evidence to discard the
+        # teacher's scheme list; keep the source list (minus malformed
+        # fragments). Two or more named materials are a real lesson match.
+        resources = [r for r in resources
+                     if not vocabulary_engine.is_malformed_fragment(r)]
 
     # ── Lived experience (Priority 2 §16) — a Ghanaian lesson is taught in a
     # real place ──────────────────────────────────────────────────────────
@@ -3080,51 +3216,31 @@ def build_lesson(
             "home, the nearby market or their local community.")
 
     # ── Keywords / vocabulary — PER-LESSON, curriculum-derived (PART G) ──
-    # Priority: exact lesson indicator / learning focus first, then sub-strand,
-    # then content standard, then subject-level activity context. Two lessons
-    # under the same scheme therefore do NOT receive one identical generic
-    # list merely because they share a subject: each list is derived from THIS
-    # lesson's own indicator/row text. AI may refine these in review; the
-    # teacher's edits always win once saved.
-    keywords: List[str] = []
-    kw_sources: List[str] = []
-    # 1. Scheme resources are the PRIMARY keyword seed (PART 14): the teacher's
-    #    own scheme names the concrete materials for THIS lesson ("light pen",
-    #    "touchscreen", "mouse", "keyboard", "personal computer"), which are far
-    #    more lesson-specific than the shared sub-strand. Normalized and deduped.
-    for r in normalize_text_items(list(getattr(alloc, "source_resources", []) or [])):
-        r = (r or "").strip()
-        if r and r.lower() not in [x.lower() for x in keywords]:
-            keywords.append(r)
-    # 2. Official exemplar focus terms for THIS indicator (concrete curriculum
-    #    vocabulary such as "microchip" or "barcode reader") before the
-    #    generic sub-strand can contribute anything.
-    if exemplar:
-        kw_sources.extend(exemplar.focus_terms or [])
-    # 3. Exact lesson indicator / learning focus.
-    kw_sources.extend(_content_terms(alloc.indicator_description, limit=5))
-    # 3. Sub-strand (the lesson's own curriculum focus when no indicator prose).
-    #    Limited to 2 so the shared sub-strand cannot dominate the list.
-    kw_sources.extend(_content_terms(alloc.sub_strand or "", limit=2))
-    # 4. Content standard.
-    kw_sources.extend(_content_terms(alloc.content_standard_description or "", limit=2))
-    # 5. Lesson-specific activity context from the interpreter.
-    if act_key and interp is not None:
-        kw_sources.extend(getattr(interp, "activity_keywords", []) or [])
-    # Teacher-supplied PER-LESSON terms always survive (never a batch seed).
-    kw_sources.extend((getattr(config, "keywords", []) or []))
-    for k in kw_sources:
-        k = (k or "").strip()
-        kl = k.lower()
-        if not k or len(kl) < 3 or kl in _KEYWORD_NOISE:
-            continue
-        # A single generic Bloom verb is not lesson vocabulary.
-        if " " not in kl and kl in _BLOOM_ACTION_WORDS:
-            continue
-        if kl not in [x.lower() for x in keywords]:
-            keywords.append(k)
-    # Phase 6.4: keywords print as the plan's "New words" row — ordinary
-    # resource names carry consistent capitalisation ("Charts and Pictures").
+    # A keyword is a term learners must understand, explain or use — never a
+    # teaching resource. The shared vocabulary engine selects subject terms
+    # from THIS lesson's indicator/content standard/exemplar, keeps multiword
+    # phrases whole, rejects malformed fragments and does not tokenize the
+    # source. Teacher-supplied terms always survive.
+    teacher_keyword_terms = list(getattr(config, "keywords", []) or [])
+    configured_keywords = (getattr(config, "indicator_keywords", None) or {})
+    if occurrence_key and occurrence_key in configured_keywords:
+        teacher_keyword_terms.extend(configured_keywords.get(occurrence_key) or [])
+    keywords = vocabulary_engine.suggest_vocabulary(
+        indicator=alloc.indicator_description or "",
+        content_standard=alloc.content_standard_description or "",
+        sub_strand=alloc.sub_strand or "",
+        strand=alloc.strand or "",
+        subject=(config.subject.value if isinstance(config.subject, Subject)
+                 else str(config.subject or "")),
+        lesson_texts=(starter, assessment, conclusion, class_assignment,
+                      home_assignment, topic),
+        resources=source_tlrs,
+        exemplar_terms=(exemplar.focus_terms if exemplar else []),
+        teacher_terms=teacher_keyword_terms,
+        limit=8,
+    )
+    # Phase 6.4: keywords print as the plan's "New words" row. Ordinary
+    # resource names are not present here by construction.
     keywords = [text_hygiene.fix_resource_capitalisation(k) for k in keywords]
 
     # ── Core competencies — PER-LESSON, activity-derived (PART H) ───────
@@ -3326,6 +3442,8 @@ def build_lesson(
     # teaching resource. Teacher-added TLRs are appended later, from the saved
     # review draft, by the generation router.
     _attach_source_resource_use(lp)
+    if not early_years:
+        _limit_focus_mentions(lp.main_activities, focus_short)
 
     # ── Layer 4: record this lesson's fingerprint for anti-repetition ────
     # The history is optional and NEVER changes this lesson's text; it only
@@ -3347,18 +3465,26 @@ def build_lesson(
 
 
 def _attach_source_resource_use(lp) -> None:
-    """Name every scheme resource in a teaching activity (never invent one)."""
+    """Name each DISPLAYED resource in a teaching activity (never invent one)."""
     from .resource_use import resource_use_sentence
-    resources = []
-    scheme_resources = []
-    seen = set()
     source_keys = {
         str(r or "").strip().lower()
         for r in (getattr(lp, "source_tlrs", None) or [])
     }
-    for value in (list(getattr(lp, "source_tlrs", None) or [])
-                  + list(getattr(lp, "other_tlrs", None) or [])):
-        text = (value or "").strip()
+    # ``teaching_learning_resources`` is the relevance-filtered display list
+    # built earlier. Do not re-add every source_TLR here: a week-level resource
+    # for another indicator ("made currency") must not reappear in this lesson.
+    display = [str(r or "").strip()
+               for r in (getattr(lp, "teaching_learning_resources", None) or [])
+               if str(r or "").strip()]
+    if not display:
+        display = [str(r or "").strip()
+                   for r in (getattr(lp, "source_tlrs", None) or [])
+                   if str(r or "").strip()]
+    seen = set()
+    resources = []
+    scheme_resources = []
+    for text in display:
         key = text.lower()
         if not text or key in seen:
             continue
@@ -3385,8 +3511,11 @@ def _attach_source_resource_use(lp) -> None:
     ]
     if not missing:
         return
-    focus = (getattr(lp, "sub_strand", "") or getattr(lp, "lesson_topic", "")
-             or "the lesson focus").strip().rstrip(" .;:,")
+    # The resource-use sentence names the lesson focus without the apparatus
+    # clause, so it stays specific without restoring the full indicator.
+    focus = _teaching_focus(getattr(lp, "lesson_topic", "") or "")
+    if not focus:
+        focus = (getattr(lp, "sub_strand", "") or "the lesson focus").strip().rstrip(" .;:,")
     target = None
     for row in list(getattr(lp, "main_activities", None) or []):
         label = (getattr(row, "phase", "") or "").upper()

@@ -177,6 +177,16 @@ export function LessonConfigModal({
     })
   }
 
+  const setIndicatorKeywords = (key: string, entries: string[]) => {
+    setDraft((current) => ({
+      ...current,
+      indicator_keywords: {
+        ...(current.indicator_keywords || {}),
+        [key]: entries,
+      },
+    }))
+  }
+
   const competencyValue = (key: string): string[] => (
     draft.competency_selections?.[key] || []
   )
@@ -533,6 +543,19 @@ export function LessonConfigModal({
                                 })}
                               </div>
                             </fieldset>
+                            <Field
+                              label="Key words / New vocabulary"
+                              htmlFor={`keywords-${key}`}
+                              hint="Optional. Leave blank to use the lesson-specific suggestions."
+                            >
+                              <MultilineListField
+                                id={`keywords-${key}`}
+                                rows={2}
+                                placeholder="One word or phrase per line (e.g. place value)"
+                                value={draft.indicator_keywords?.[key] || []}
+                                onChange={(entries) => setIndicatorKeywords(key, entries)}
+                              />
+                            </Field>
                           </div>
                         )
                       })

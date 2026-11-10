@@ -277,9 +277,16 @@ class TestTeacherKeywordPropagation:
                                    teaching_week=None, period=None,
                                    teacher_keywords=None):
                 # AI returns its own vocabulary and does NOT include the teacher's.
+                # AI proposes a term that genuinely belongs to this indicator;
+                # the pipeline keeps it without inventing unsupported words.
+                ai_term = (
+                    "addition" if "addition" in indicator_text.lower()
+                    else "place value" if "place value" in indicator_text.lower()
+                    else "whole numbers"
+                )
                 return {
                     "learning_objectives": [f"Learners can {indicator_text}"],
-                    "key_vocabulary": ["ai_term_one"],
+                    "key_vocabulary": [ai_term],
                     "starter": {"activity": f"AI starter about {indicator_text}"},
                     "main_learning": {"phase1": {
                         "name": "AI MAIN", "activity": f"AI main about {indicator_text}",
@@ -301,7 +308,9 @@ class TestTeacherKeywordPropagation:
             assert "keppler" in low and "geostationary" in low, (
                 f"teacher keywords were lost in AI enrichment: {lp.keywords}"
             )
-            assert "ai_term_one" in low
+            # The provider's supported term survives the merge.
+            assert any(term in low for term in (
+                "addition", "place value", "whole numbers"))
 
 
 # ── Defect 2 — AI mode wiring / provider reporting ──────────────────────────
