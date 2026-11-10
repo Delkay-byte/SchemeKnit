@@ -321,10 +321,12 @@ def build_subject_plan(
     metadata = build_subject_metadata(
         week, subject_name, class_level, request, subject_request,
     )
+    metadata.teaching_learning_resources = _prefilter_week_resources(metadata)
 
     day_plans = _build_day_plans(
         week, groups, metadata, request, subject_request, ctx,
     )
+    _apply_content_quality(metadata, day_plans)
 
     return SubjectPlan(
         scheme_of_work_id=subject_request.scheme_id,
@@ -372,6 +374,27 @@ def request_term_teaching_days(request: WeeklyPlanRequest) -> List[int]:
     # No explicit configuration: Monday-Friday is the Basic 1-3 school week,
     # stated as a calendar default rather than a subject timetable.
     return [0, 1, 2, 3, 4]
+
+
+def _prefilter_week_resources(metadata: SubjectMetadata) -> List[str]:
+    """Keep only week resources the curriculum text supports.
+
+    This runs BEFORE lesson prose is composed: once every source resource is
+    woven into an activity, a post-generation filter can no longer tell an
+    unrelated week-level material ("made currency" beside place value) from a
+    real one. Universal classroom basics and manipulatives stay available.
+    """
+    from ..curriculum import vocabulary as vocabulary_engine
+
+    resources = list(metadata.teaching_learning_resources or [])
+    if not resources:
+        return []
+    return vocabulary_engine.filter_relevant_resources(
+        resources,
+        indicator="\n".join(metadata.indicators or []),
+        content_standard="\n".join(metadata.content_standards or []),
+        subject=metadata.subject or "",
+    )
 
 
 def _build_day_plans(
@@ -491,6 +514,102 @@ def _term_config_for(
         template_id=ctx.get("template_id", ""),
         ai_mode=getattr(request, "ai_mode", AIMode.OFF),
     )
+
+
+def _drop_starter_duplicate(day: DayPlan) -> None:
+    """Remove the starter sentence repeated at the top of MAIN.
+
+    The lesson builder opens MAIN with the prior-knowledge activation so every
+    standalone lesson is self-contained. In the weekly row both columns print
+    side by side, so the repetition is visible and adds page height.
+    """
+    starter = (day.starter or "").strip()
+    if not starter or not day.main_activities:
+        return
+    first = day.main_activities[0]
+    description = (first.description or "").strip()
+    if not description.startswith(starter):
+        return
+    remainder = description[len(starter):].lstrip(" .;:")
+    if remainder:
+        first.description = remainder
+    else:
+        day.main_activities.pop(0)
+
+
+def _apply_content_quality(
+    metadata: SubjectMetadata,
+    day_plans: Sequence[DayPlan],
+) -> None:
+    """Apply the shared vocabulary and resource rules to one weekly section.
+
+    The Approved Plan's quality contract is reused rather than copied: key words
+    come from the curriculum text (never from resources), teacher terms always
+    survive, and the displayed resources are limited to materials this week's
+    activities actually name.
+    """
+    from ..curriculum import vocabulary as vocabulary_engine
+
+    for day in day_plans:
+        _drop_starter_duplicate(day)
+
+    lesson_texts: List[str] = []
+    for day in day_plans:
+        lesson_texts.extend([
+            day.starter or "",
+            day.reflection or "",
+            " ".join(a.description or "" for a in (day.main_activities or [])),
+        ])
+    lesson_prose = " ".join(text for text in lesson_texts if text)
+    indicator_text = "\n".join(metadata.indicators or [])
+    standard_text = "\n".join(metadata.content_standards or [])
+
+    teacher_terms = list(metadata.keywords or [])
+    metadata.keywords = vocabulary_engine.suggest_vocabulary(
+        indicator=indicator_text,
+        content_standard=standard_text,
+        sub_strand=metadata.sub_strand or "",
+        strand=metadata.strand or "",
+        subject=metadata.subject or "",
+        lesson_texts=(lesson_prose,),
+        resources=metadata.teaching_learning_resources or [],
+        teacher_terms=teacher_terms,
+        limit=8,
+    )
+
+    source_resources = list(metadata.teaching_learning_resources or [])
+    relevant = vocabulary_engine.filter_relevant_resources(
+        source_resources,
+        indicator=indicator_text,
+        content_standard=standard_text,
+        lesson_texts=(lesson_prose,),
+        subject=metadata.subject or "",
+    )
+    if len(relevant) >= 2:
+        metadata.teaching_learning_resources = relevant
+    else:
+        metadata.teaching_learning_resources = [
+            resource for resource in source_resources
+            if not vocabulary_engine.is_malformed_fragment(resource)
+        ]
+
+    for day in day_plans:
+        day_text = " ".join([
+            day.starter or "",
+            day.reflection or "",
+            " ".join(a.description or "" for a in (day.main_activities or [])),
+        ])
+        day_relevant = vocabulary_engine.filter_relevant_resources(
+            source_resources,
+            indicator="\n".join(day.focus_indicators or []) or indicator_text,
+            content_standard=standard_text,
+            lesson_texts=(day_text,),
+            subject=metadata.subject or "",
+        )
+        if len(day_relevant) >= 2:
+            day.resources = day_relevant
+        else:
+            day.resources = list(metadata.teaching_learning_resources)
 
 
 # ── Weekly plan assembly ───────────────────────────────────────────────────────

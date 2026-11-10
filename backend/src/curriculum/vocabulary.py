@@ -70,6 +70,8 @@ evaluate assess judge justify critique review argue defend recommend decide
 select choose rate convert simplify round add subtract multiply divide
 distinguish differentiate discriminate between
 read write speak listen pronounce recite respond ask participate
+trace count copy retell sing dance play skip hop jump throw catch kick bounce
+wash clean brush plant water collect gather visit
 """.split())
 
 #: Material words. A candidate containing one of these is a resource, not
@@ -103,7 +105,9 @@ _SUBJECT_GLOSSARY: dict[str, tuple[str, ...]] = {
         "decimal", "decimals", "decimal place", "decimal places",
         "decimal point", "significant figure", "significant figures",
         "rounding", "round off", "power of ten", "powers of ten",
-        "standard form", "expanded form", "word form", "benchmark fraction",
+        "standard form", "expanded form", "word form",
+        "number name", "number names", "counting sequence",
+        "counting sequences", "benchmark fraction",
         "benchmark fractions", "number line", "number lines", "ratio",
         "proportion", "percentage", "percent", "average", "mean", "median",
         "mode", "range", "probability", "angle", "angles", "triangle",
@@ -546,8 +550,12 @@ def suggest_vocabulary(
 _GENERIC_CLASSROOM_RESOURCES = frozenset({
     "exercise book", "exercise books", "chalkboard", "marker", "markers",
     "pen", "pens", "pencil", "pencils", "ruler", "rulers", "chart",
-    "charts", "pictures", "picture cards", "flash cards", "flashcards",
-    "real objects", "real object",
+    "charts", "wall chart", "wall charts", "pictures", "picture cards",
+    "flash cards", "flashcards", "word cards", "letter cards", "sound cards",
+    "number cards", "number chart", "real objects", "real object",
+    "counter", "counters", "straws", "bundle and loose straws", "sticks",
+    "lollipop sticks", "bottle tops", "abacus", "beads", "video clip",
+    "video clips",
 })
 
 

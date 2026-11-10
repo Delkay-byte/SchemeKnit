@@ -475,6 +475,9 @@ def _focus_phrase(lesson: Any) -> str:
         text = str(_get(lesson, "lesson_topic", "") or "")
     from ..curriculum.vocabulary import normalize_numeric_groups
     text = normalize_numeric_groups(" ".join(text.split()))
+    # An official indicator often begins with its code ("B1.1.2.1.1 Listen
+    # to ..."). The code is not the lesson focus.
+    text = re.sub(r"^[A-Z]?\d[\d.]*\s+", "", text).strip()
     text = text.strip(" .;:,")
     if not text:
         return "this lesson's focus"

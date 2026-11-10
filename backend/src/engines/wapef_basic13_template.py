@@ -316,6 +316,29 @@ def subject_metadata_values(section) -> Dict[str, str]:
         code = standard_codes[index] if index < len(standard_codes) else ""
         standard_lines.append(f"{code} {text}".strip() if code else text)
 
+    # The four faith fields render through the same connection engine as the
+    # Approved Plan: a teacher's stored value wins, and a genuinely blank field
+    # gets the lesson-specific suggestion at export time while the database
+    # record stays empty (the established save-boundary contract).
+    from .wapef_connections import wapef_field_text
+
+    connection_lesson = {
+        "subject": section_subject,
+        "strand": _text(_get(meta, "strand")),
+        "sub_strand": _text(_get(meta, "sub_strand")),
+        "content_standard": "\n".join(standards),
+        "indicators": list(indicator_texts),
+        "keywords": _text_items(_get(meta, "keywords")),
+        "wapef_through_lines": _text_items(_get(meta, "wapef_through_lines")),
+        "wapef_gods_story": _text(_get(meta, "wapef_gods_story")),
+        "wapef_deep_hope": _text(_get(meta, "wapef_deep_hope")),
+        "wapef_storyline": _text(_get(meta, "wapef_storyline")),
+    }
+    through_lines = wapef_field_text(connection_lesson, "through_lines")
+    if not through_lines:
+        through_lines = format_through_lines(normalize_through_lines(
+            _text_items(_get(meta, "wapef_through_lines"))))
+
     return {
         "WEEK_ENDING": format_wapef_date(_get(meta, "week_ending")
                                          or _get(section, "week_ending")),
@@ -331,11 +354,10 @@ def subject_metadata_values(section) -> Dict[str, str]:
         "SUB_STRAND": _text(_get(meta, "sub_strand")),
         "RESOURCES": ", ".join(_unique(
             _text_items(_get(meta, "teaching_learning_resources")))),
-        "THROUGH_LINES": format_through_lines(normalize_through_lines(
-            _text_items(_get(meta, "wapef_through_lines")))),
-        "GODS_STORY": _text(_get(meta, "wapef_gods_story")),
-        "DEEP_HOPE": _text(_get(meta, "wapef_deep_hope")),
-        "STORYLINE": _text(_get(meta, "wapef_storyline")),
+        "THROUGH_LINES": through_lines,
+        "GODS_STORY": wapef_field_text(connection_lesson, "gods_story"),
+        "DEEP_HOPE": wapef_field_text(connection_lesson, "deep_hope"),
+        "STORYLINE": wapef_field_text(connection_lesson, "storyline"),
         "CORE_COMPETENCIES": ", ".join(_unique(
             _text_items(_get(meta, "core_competencies")))),
         "KEY_WORDS": ", ".join(_unique(_text_items(_get(meta, "keywords")))),
@@ -509,6 +531,8 @@ def render_weekly_document(weekly_plan, context: Optional[Dict[str, Any]] = None
         _sectpr(body).addprevious(cloned)
         render_section_into(Table(cloned, document), section)
 
+    from .wapef_style import style_basic13_document
+    style_basic13_document(document)
     return document
 
 

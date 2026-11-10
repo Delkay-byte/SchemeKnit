@@ -26,7 +26,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Inches, Pt, RGBColor, Twips
 
-__all__ = ["style_wapef_document", "WAPEF_COLORS"]
+__all__ = ["style_wapef_document", "style_basic13_document", "WAPEF_COLORS"]
 
 WAPEF_COLORS = {
     "label_fill": "F2F4F8",
@@ -46,6 +46,10 @@ HEADER_SIZE = Pt(10.5)
 _USABLE_TWIPS = 10368
 _METADATA_WIDTHS = (1440, 1584, 1008, 3024, 1296, 2016)
 _PHASE_WIDTHS = (1872, 5904, 2592)
+#: The Basic 1-3 weekly form is a five-column grid: day label | starter
+#: (two grid columns) | main | reflection. Metadata rows merge the first two
+#: columns for the label and the last three for the value.
+_BASIC13_WIDTHS = (1400, 750, 750, 4400, 3000)
 
 
 def _set_cell_shading(cell, fill: str) -> None:
@@ -283,6 +287,129 @@ def _style_sections(document) -> None:
         section.left_margin = Inches(0.65)
         section.right_margin = Inches(0.65)
         section.footer_distance = Inches(0.25)
+
+
+def _row_label(row) -> str:
+    cells = _unique_cells(row)
+    return " ".join((cells[0].text or "").split()) if cells else ""
+
+
+def _row_is_blank(row) -> bool:
+    return all(not (cell.text or "").strip()
+               for cell in _unique_cells(row))
+
+
+def _set_table_borders(table) -> None:
+    """Table Grid borders without depending on the asset's style name."""
+    tbl_pr = table._tbl.tblPr
+    for borders in tbl_pr.findall(qn("w:tblBorders")):
+        tbl_pr.remove(borders)
+    borders = OxmlElement("w:tblBorders")
+    for edge in ("top", "left", "bottom", "right", "insideH", "insideV"):
+        node = OxmlElement(f"w:{edge}")
+        node.set(qn("w:val"), "single")
+        node.set(qn("w:sz"), "4")
+        node.set(qn("w:space"), "0")
+        node.set(qn("w:color"), WAPEF_COLORS["border"])
+        borders.append(node)
+    tbl_pr.append(borders)
+
+
+def _set_table_grid_style(table) -> None:
+    """Apply the Table Grid look, tolerating both style spellings."""
+    for name in ("Table Grid", "TableGrid"):
+        try:
+            table.style = name
+            return
+        except KeyError:
+            continue
+    _set_table_borders(table)
+
+
+def _style_basic13_table(table) -> None:
+    """Style one Basic 1-3 weekly subject section.
+
+    Its topology is one table per subject: metadata rows, an optional blank
+    spacer row, then the DAYS header and one row per teaching day. The spacer
+    is removed so it cannot consume page height, the metadata labels reuse the
+    Approved Plan's label fill, and day rows stay whole so a continuation page
+    never starts with empty phase labels.
+    """
+    _set_table_grid_style(table)
+    _set_table_layout(table)
+    _set_grid(table, _BASIC13_WIDTHS)
+
+    rows = list(table.rows)
+    header_index = next(
+        (i for i, row in enumerate(rows)
+         if _row_label(row).upper().startswith("DAYS")), None)
+    if header_index is None:
+        _style_metadata_table(table)
+        return
+
+    # Drop the source's blank spacer row between Key words and DAYS.
+    for row in rows[:header_index]:
+        if _row_is_blank(row):
+            row._tr.getparent().remove(row._tr)
+            header_index -= 1
+
+    for index, row in enumerate(list(table.rows)):
+        _set_row_auto_height(row)
+        text_length = sum(len(cell.text or "") for cell in _unique_cells(row))
+        cells = _unique_cells(row)
+        if index < header_index:
+            # A long metadata field may continue, but a day row must start on a
+            # fresh page rather than leave an orphan line under empty phase
+            # labels (the weekly header is mid-table, so it cannot repeat).
+            if text_length < 2000:
+                _cant_split(row)
+            else:
+                _allow_split(row)
+        else:
+            _cant_split(row)
+        if index == header_index:
+            _repeat_header(row)
+            for cell in cells:
+                _trim_empty_paragraphs(cell)
+                _set_cell_shading(cell, WAPEF_COLORS["header_fill"])
+                _set_cell_margins(cell, top=140, bottom=140)
+                _style_runs(cell, bold=True,
+                            color=WAPEF_COLORS["header_text"],
+                            size=HEADER_SIZE, centered=True)
+            continue
+        if index < header_index:
+            for cell in cells:
+                _trim_empty_paragraphs(cell)
+                _set_cell_shading(cell, WAPEF_COLORS["label_fill"])
+                _set_cell_margins(cell, top=60, bottom=60)
+                _style_runs(cell, color=WAPEF_COLORS["label_text"],
+                            size=METADATA_SIZE)
+                for paragraph in cell.paragraphs:
+                    paragraph.paragraph_format.space_after = Twips(10)
+                    paragraph.paragraph_format.space_before = Twips(10)
+                    paragraph.paragraph_format.line_spacing = 1.0
+            continue
+        for cell_index, cell in enumerate(cells):
+            _trim_empty_paragraphs(cell)
+            if cell_index == 0:
+                _set_cell_shading(cell, WAPEF_COLORS["phase_fill"])
+                _style_runs(cell, bold=True)
+            else:
+                _set_cell_shading(cell, "FFFFFF")
+                _style_runs(cell)
+            _set_cell_margins(cell)
+            for paragraph in cell.paragraphs:
+                paragraph.paragraph_format.space_after = Twips(40)
+                paragraph.paragraph_format.space_before = Twips(40)
+
+
+def style_basic13_document(document) -> None:
+    """Apply WAPEF visual language to the Basic 1-3 weekly class plan."""
+    _style_sections(document)
+    _style_body_paragraphs(document)
+    for table in document.tables:
+        _style_basic13_table(table)
+    _style_footer(document)
 
 
 def style_wapef_document(document) -> None:

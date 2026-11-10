@@ -130,6 +130,9 @@ def _subject(scheme_id, groups, **wapef):
         wapef_storyline=wapef.get("storyline", ""),
         wapef_through_lines=wapef.get("through_lines", []),
         wapef_gods_story=wapef.get("gods_story", ""),
+        keywords=wapef.get("keywords", []),
+        core_competencies=wapef.get("core_competencies", []),
+        other_tlrs=wapef.get("other_tlrs", []),
     )
 
 
@@ -737,3 +740,123 @@ def test_allocation_engine_still_allocates_indicators():
     calendar = __import__("src.engines.calendar_engine", fromlist=["CalendarEngine"]).CalendarEngine().build_calendar(config, weeks)
     coverage = AllocationEngine().allocate(weeks, calendar, config)
     assert coverage.total_generated_lessons >= 0
+
+# -- K. content quality and styling acceptance -------------------------------
+
+def test_basic13_keywords_are_curriculum_derived_not_resources():
+    schemes = _fixture_like_schemes()
+    schemes["scheme-maths"]["weeks"][0].resources = [
+        "Counters", "bundle and loose straws", "made currency",
+    ]
+    plan = build_weekly_plan(
+        _request(subjects=[_subject("scheme-maths", [["MONDAY"], ["TUESDAY"]])]),
+        schemes, {"template_id": TEMPLATE_ID},
+    )
+    meta = plan.subjects[0].metadata
+    lowered = {k.lower() for k in meta.keywords}
+    assert "counting sequences" in lowered
+    assert "number names" in lowered
+    for resource in ("made currency", "counters", "bundle and loose straws"):
+        assert resource not in lowered
+
+
+def test_basic13_teacher_keywords_survive_and_removal_is_respected():
+    schemes = _fixture_like_schemes()
+    plan = build_weekly_plan(
+        _request(subjects=[_subject(
+            "scheme-maths", [["MONDAY"]],
+            keywords=["Number names", "Cardinality"],
+        )]),
+        schemes, {"template_id": TEMPLATE_ID},
+    )
+    meta = plan.subjects[0].metadata
+    assert meta.keywords[:2] == ["Number names", "Cardinality"]
+    # A teacher who empties the list in the review card is not re-seeded at
+    # export time: the saved plan remains authoritative.
+    meta.keywords = []
+    document = render_weekly_document(plan, {"school_name": "Test School"})
+    key_rows = [
+        _row_value(row) for row in document.tables[0].rows
+        if _row_label(row).lower().startswith("key words")
+    ]
+    assert key_rows == [""]
+
+
+def test_basic13_resources_match_the_weeks_activities():
+    schemes = _fixture_like_schemes()
+    schemes["scheme-maths"]["weeks"][0].resources = [
+        "Counters", "bundle and loose straws", "made currency",
+    ]
+    plan = build_weekly_plan(
+        _request(subjects=[_subject("scheme-maths", [["MONDAY"], ["TUESDAY"]])]),
+        schemes, {"template_id": TEMPLATE_ID},
+    )
+    meta = plan.subjects[0].metadata
+    assert "made currency" not in meta.teaching_learning_resources
+    assert "Counters" in meta.teaching_learning_resources
+    for day in plan.subjects[0].day_plans:
+        assert "made currency" not in day.resources
+
+
+def test_basic13_blank_faith_fields_render_and_teacher_values_survive():
+    from src.engines.wapef_basic13_template import subject_metadata_values
+
+    schemes = _fixture_like_schemes()
+    plan = build_weekly_plan(
+        _request(subjects=[
+            _subject("scheme-maths", [["MONDAY"]]),
+            _subject("scheme-english", [["MONDAY"]],
+                     deep_hope="Beauty creator"),
+        ]),
+        schemes, {"template_id": TEMPLATE_ID},
+    )
+    blank_values = subject_metadata_values(plan.subjects[0])
+    for token in ("THROUGH_LINES", "GODS_STORY", "DEEP_HOPE", "STORYLINE"):
+        assert blank_values[token].strip(), token
+
+    teacher_values = subject_metadata_values(plan.subjects[1])
+    assert teacher_values["DEEP_HOPE"] == "Beauty creator"
+
+    document = render_weekly_document(plan, {"school_name": "Test School"})
+    text = " | ".join(
+        (cell.text or "") for row in document.tables[0].rows
+        for cell in _distinct_cells(row)
+    )
+    for label in ("Throughlines:", "God", "Deep Hope:", "Storyline:"):
+        assert label in text, label
+
+
+def test_basic13_docx_uses_wapef_style_tokens_and_repeats_the_header():
+    from docx.oxml.ns import qn
+
+    plan = _weekly_plan_for_export()
+    document = render_weekly_document(plan, {"school_name": "Test School"})
+    table = document.tables[0]
+
+    header_index = next(
+        index for index, row in enumerate(table.rows)
+        if _row_label(row).upper().startswith("DAYS")
+    )
+    header = table.rows[header_index]
+    header_fills = {
+        shd.get(qn("w:fill"))
+        for cell in _distinct_cells(header)
+        for shd in cell._tc.get_or_add_tcPr().findall(qn("w:shd"))
+    }
+    assert "1A365D" in header_fills
+    assert header._tr.trPr.find(qn("w:tblHeader")) is not None
+
+    first = table.rows[0]
+    label_fills = {
+        shd.get(qn("w:fill"))
+        for cell in _distinct_cells(first)
+        for shd in cell._tc.get_or_add_tcPr().findall(qn("w:shd"))
+    }
+    assert "F2F4F8" in label_fills
+
+    header_index = next(
+        index for index, row in enumerate(table.rows)
+        if _row_label(row).upper().startswith("DAYS")
+    )
+    for row in list(table.rows)[:header_index]:
+        assert _row_label(row), "blank spacer row survived styling"
