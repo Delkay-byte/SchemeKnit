@@ -415,125 +415,154 @@ topology. The regression test asserts `1A365D` on that row directly.
 
 ---
 
-## J. Git and deployment
+## J. Production environment and deployment
 
-Repository: `https://github.com/Delkay-byte/SchemeKnit.git`  
-Branch: `feat/cloudflare-free-browser-docx`  
-Final acceptance commit: `91828f0` (`fix: close Basic 1-3 WAPEF quality and
-styling gaps`), fast-forwarded to `main` together with the four quality commits
-(`237adc3`, `27fb3f6`, `124fc71`, `804e4c0`) and pushed.
+Official frontend: `https://schemeknit.bloomcoretech.com` (HTTP 200).  
+Production backend: `https://schemeknit-api.onrender.com` (health HTTP 200).  
+Deployed application version: `1.0.5`.  
+Final production commit: `820ebaf` (`fix: display Computing instead of internal ICT label`).
 
-### Deployment
+The branded domain was used for all UI testing. The old
+`schemeknit-frontend.onrender.com` hostname is not treated as a production
+failure; its Render subdomain remains blocked and was not re-enabled.
 
-The established release path is Render: both production services track `main`,
-and no deployment hook is stored in the repository. A Render API key was
-available in the environment, so the release was triggered through the existing
-Render API instead of the repository:
+Render deployments completed for both services at `820ebaf`:
 
 ```text
-schemeknit-api      srv-damsbb1ntn7c73d7eg10  deploy dep-dbpl6muk1f9s73fg2omg  LIVE  commit 91828f0
-schemeknit-frontend srv-damt6sjm8hqs7398lfl0  deploy dep-dbpl6n5g1s2s73dre5hg  LIVE  commit 91828f0
+schemeknit-api      dep-dbpqcf8n74is738nprd0  LIVE  commit 820ebaf
+schemeknit-frontend dep-dbpqem8ae00c73cbev40  LIVE  commit 820ebaf
 ```
 
-Verification:
+Smoke checks after deployment:
 
 ```text
-GET https://schemeknit-api.onrender.com/api/health
-200 {"status":"healthy","service":"SchemeKnit","version":"1.0.5"}
-
-GET https://schemeknit-api.onrender.com/api/service-status
-200 {"status":"healthy","maintenance":{"active":false},"version":"1.0.5"}
+GET https://schemeknit.bloomcoretech.com                 200
+GET https://schemeknit-api.onrender.com/api/health       200
+{"status":"healthy","service":"SchemeKnit","version":"1.0.5"}
 ```
 
-### Production acceptance blocker (exact)
+The frontend network log confirms all runtime API calls target
+`https://schemeknit-api.onrender.com`; no localhost or staging origin is used.
 
-Production lesson generation could not be completed:
+## K. Production authentication
 
-1. **Frontend public URL is blocked by Render.** Every path returns HTTP 404
-   with the response header `x-render-routing: blocked-render-subdomain`.
-   The frontend service itself is deployed and reports `live`, but it has
-   `renderSubdomainPolicy: disabled`. Enabling the policy through the Render API
-   did not clear the block, so it was reverted.
-2. **No usable production teacher session.** The documentation's former marker
-   and workspace accounts now return `401 Unauthorized`. Self-registration is
-   `invite_only` and Turnstile-enabled; a registration attempt with the valid
-   pilot invite code and no browser challenge returns
-   `turnstile_invalid`. No valid production credential or browser session was
-   available.
+Authentication through the branded UI succeeded. The normal production
+registration flow was used with the authorised pilot invitation and the live
+Turnstile widget; the challenge completed and the account was created normally.
+No security control was disabled, bypassed or weakened. Credentials, tokens,
+cookies and invitation values are deliberately not recorded here.
 
-Consequently, real DOCX files were **not** generated from the deployed
-application. The four required samples were generated locally from the same
-production code paths (see Section L) and are labelled local, not production.
-Without production generation and post-download inspection, production
-acceptance is not claimed.
+The account is a normal Free Tier teacher account with **2 lesson-plan credits
+for the calendar month**.
 
----
+## L. Production generation results
 
-## K. Outstanding issues
+| Test | Production generated | DOCX downloaded | Content passed | Formatting passed | Result |
+|---|---|---|---|---|---|
+| P1 WAPEF Basic 7 Mathematics | Yes | Yes | Yes | Yes | **PASS** |
+| P2 WAPEF Basic 1–3 weekly | Yes | Yes | Yes | Yes | **PASS** |
+| P3 GES Basic 6 Computing | Yes | Yes | Yes | Yes | **PASS** |
+| P4 GES Mathematics | No | No | — | — | **BLOCKED: 0 of 2 credits remaining** |
 
-1. **Production acceptance is blocked, not passed.** The backend is deployed at
-   `91828f0` and healthy. The frontend public subdomain is blocked by Render,
-   and no valid Turnstile-backed production session exists. Retry production
-   acceptance after the owner restores the frontend subdomain and supplies a
-   test account or a browser session that can complete Turnstile.
-2. **School vision is not configurable yet.** The hard-coded footer was removed;
-   the footer now shows only a page number. When a school vision field is added
-   to configuration, pass it into the WAPEF render context.
-3. **WAPEF suggestions are deterministic, not provider-generated.** This was a
-   deliberate choice so blank fields are always populated without spending AI
-   credit and without risking fabricated Scripture. Teacher text still overrides.
-4. **Production sample sets were not downloaded.** Local samples cover the four
-   required combinations; the production-specific checks (download, open the
-   deployed DOCX, inspect rendered pages) remain the gate for GREEN.
+Artifacts (local secure acceptance folder, no personal data):
+`temp/production-acceptance/P1_WAPEF_Basic7_Mathematics.docx`,
+`P2_WAPEF_Basic1_Weekly.docx`, `P3_GES_Basic6_Computing.docx`, with PDF page
+renders used for visual inspection.
 
----
+### P1 — WAPEF Basic 7 Mathematics
 
-## L. Final acceptance matrix
+- Throughline populated (fallback connection; relevant to place value).
+- God's Story, Deep Hope and Storyline populated from teacher-selected values.
+- Teacher-selected Deep Hope/Storyline/God's Story survived save and export.
+- No hard-coded school vision.
+- `1,000,000,000` is printed intact after the numeric-grouping fix.
+- Content standard code printed once.
+- Dark-blue `#1A365D` phase headers, light-grey `#F2F4F8` labels and phase
+  shading render correctly; 5 pages inspected.
+- Keywords are `significant figures, base ten numerals, decimal places, place
+  value, rounding`; no resource name appears.
+- Resources are graph sheets and multi-base materials; `made currency` is gone.
 
-| Gate | Status | Evidence |
-|---|---|---|
-| Basic 1-3 WAPEF content generation | Implemented | Shared vocabulary engine, resource pre-filter, faith-field fallback, starter-duplicate removal in `weekly_plan_engine.py` |
-| Basic 1-3 DOCX styling | Implemented | `style_basic13_document()` applied at render; `F2F4F8` labels, `1A365D` DAYS header, balanced widths, no spacer row, whole day rows |
-| Basic 1-3 faith integration | Implemented | `wapef_field_text()` fallback at export; stored teacher values win; GES untouched |
-| Basic 1-3 keyword handling | Implemented | Curriculum-derived, resource names excluded, teacher terms first, empty list honoured |
-| Basic 1-3 teacher controls | Preserved | Existing per-subject WAPEF controls and day selection unchanged |
-| Automated targeted tests | Passed | 434 relevant backend tests |
-| Full backend suite | Passed | 3357 passed, 27 skipped, 5 deselected, 0 failed (3389 discovered, 1123 s) |
-| Full frontend suite | Passed | tsc, lint, 14 DOCX tests, 87 UX tests, production build |
-| Basic 1-3 visual inspection | Passed (local) | 18-page PDF, every page inspected |
-| WAPEF Basic 7 Mathematics sample | Passed (local) | `temp/samples/WAPEF_quality_sample.docx` |
-| WAPEF Basic 1-3 sample | Passed (local) | `temp/wapef-basic13-sample.docx` |
-| GES Basic 6 Computing sample | Passed (local) | `temp/repro_basic6.docx` |
-| GES Mathematics sample | Passed (local) | `temp/samples/GES_Basic6_Mathematics.docx` |
-| Separate plans per indicator | Passed | GES Mathematics produced two lessons; Basic 1-3 distributes indicators over day groups |
-| Production deployment | Backend live, frontend blocked | Render deploy `91828f0`; health 200; frontend 404 `blocked-render-subdomain` |
-| Production generation and DOCX inspection | **Blocked** | No valid production session; Turnstile + invite-only registration, previous accounts return 401 |
+### P2 — WAPEF Basic 1–3 weekly
 
-### Local sample checks
+- Basic 1 weekly class-teacher structure intact; day rows not split into empty
+  phase columns; DAYS headings complete.
+- Spacer row absent; `#1A365D` DAYS header and `#F2F4F8` labels render.
+- Throughlines, God's Story, Deep Hope and Storyline populated.
+- Teacher-selected Deep Hope/Storyline/God's Story survived export.
+- Content standard code printed once after the production fix.
+- Key words `counting sequences, number names`; resources are counters, straws
+  and number cards.
+- 6 pages inspected; page numbers and table structure correct.
 
-The four local samples were rendered with LibreOffice and inspected as page
-images. Verified across them:
+### P3 — GES Basic 6 Computing
 
-- Throughline, God's Story, Deep Hope and Storyline are populated only in WAPEF;
-  GES output contains none of those labels.
-- Teacher overrides survive rendering; stored values are printed verbatim.
-- Keywords are subject-specific (`place value`, `base ten`, `number names`,
-  `counting sequences`, `computer system`, `peopleware`, `hardware`, `software`)
-  and indicator-specific; resource names do not appear.
-- Teacher-added terms persist; an explicitly emptied list renders empty.
-- `made currency` is absent from the Basic 7 WAPEF and GES Mathematics resource
-  cells; the remaining resources are named in the activities.
-- Official GES indicator text is unchanged and complete.
-- Multiple GES indicators produce separate lesson plans.
-- Activity sentences are complete; `1,000,000,000` is not split.
-- WAPEF and GES tables render with correct widths, shading and page numbers;
-  Basic 1-3 day rows do not start a continuation page with empty phase labels.
+- Subject displays as **Computing**; internal canonical storage remains ICT.
+- Approved GES structure preserved; indicator, content standard, keywords and
+  resources are Computing-specific.
+- Keywords: `computer system, peopleware, hardware, software, technology`.
+- Resources: Computer, keyboard, system unit, monitor, USB mouse, printer.
+- Sentences complete; no resource names in the vocabulary list.
+- 4 pages inspected; repeated table headers, headings and page breaks render.
 
-### Final status
+### P4 — GES Mathematics (not generated)
 
-**AMBER.** All code, targeted tests, the full backend/frontend suites, and the
-four local visual samples pass. Production acceptance is not claimed because
-the deployed frontend is blocked and no production generation session could be
-established. No critical source defect remains open; the blocker is
-infrastructure/authentication, and the exact evidence is recorded in Section J.
+The Free Tier account had exactly two lesson-plan credits. P1 consumed one and
+P3 consumed one; P2 (weekly plan) consumed none. The dashboard then reported
+`0 of 2` remaining. P4 therefore could not be generated. No purchase, credit
+top-up or account-privilege change was made, and no second account was created
+to evade the allowance. This is an account-allowance limitation, not an
+application defect. The local GES Mathematics sample remains local evidence
+only and is not counted as production acceptance.
 
+## M. Defects found and fixed during production acceptance
+
+1. **Content standard code printed twice** in the Basic 1–3 weekly DOCX
+   (`B1.1.1.1 B1.1.1.1 Describe ...`). Fixed by using the shared
+   `_code_and_text` helper; regression test added.
+2. **Thousands separators split into list items** (`1,000,000,000` became
+   `1 / 000 / 000`) in WAPEF output. Fixed in `ai_resource_text._split_items`
+   by protecting numeric comma groups; regression test added.
+3. **Approved WAPEF Plan was not selectable for Basic 4–JHS** in the production
+   template list. Fixed `get_templates_for_class_level` to add the shared WAPEF
+   form beside the level's GES default; regression tests added for Basic 7 and
+   Basic 1–3.
+4. **Computing printed as ICT** in GES output. Added canonical subject display
+   mapping (`Subject.ICT` → `Computing`) across renderers; existing contract
+   tests updated to the new user-facing label; regression test added.
+
+## N. Quality gates after the production fixes
+
+```text
+Backend full suite: 3362 passed, 27 skipped, 5 deselected, 0 failed
+Discovered: 3394 tests
+Frontend: TypeScript clean, lint clean, 14 DOCX tests passed,
+          87 UX tests passed, production build succeeded
+```
+
+The full backend suite was rerun after each backend change; no tests were
+deleted, skipped or weakened to obtain a pass. Targeted WAPEF/GES suites also
+passed after every fix.
+
+Remaining known limitations:
+
+- P4 production generation requires a teacher account with at least one
+  available lesson-plan credit (or a paid package). The current authorised Free
+  Tier account is exhausted for this calendar month.
+- Custom free-text WAPEF prose was verified by automated tests and local
+  rendering, but the production P1 run used approved teacher-selected values;
+  custom prose should be rechecked in the P4 or follow-up production run.
+- School vision remains configuration-driven and is intentionally not printed
+  until a school vision field exists.
+- WAPEF suggestions remain deterministic, not provider-generated.
+
+## O. Final status
+
+**AMBER — Production acceptance incomplete by account allowance.**
+
+P1, P2 and P3 were generated by the official production application, downloaded
+and inspected successfully. The deployed commit contains the tested fixes, and
+production smoke checks pass. P4 could not be generated because the authorised
+Free Tier account has 0 of 2 lesson-plan credits remaining. No application,
+security or document-formatting defect remains open from the three completed
+cases.
