@@ -42,6 +42,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 from ..models import ClassLevel
 from .official_ges_template import (
+    _code_and_text,
     _fill_paragraph,
     _iter_paragraphs,
     _sectpr,
@@ -314,7 +315,7 @@ def subject_metadata_values(section) -> Dict[str, str]:
     standard_lines: List[str] = []
     for index, text in enumerate(standards):
         code = standard_codes[index] if index < len(standard_codes) else ""
-        standard_lines.append(f"{code} {text}".strip() if code else text)
+        standard_lines.append(_code_and_text(code, text))
 
     # The four faith fields render through the same connection engine as the
     # Approved Plan: a teacher's stored value wins, and a genuinely blank field
@@ -661,14 +662,6 @@ def _unique(items: Iterable[str]) -> List[str]:
         seen.add(key)
         out.append(text)
     return out
-
-
-def _code_and_text(code, text) -> str:
-    code = _text(code).strip()
-    text = _text(text).strip()
-    if code and text:
-        return f"{code} {text}"
-    return code or text
 
 
 def _numbered_codes(codes: List[str], texts: List[str]) -> List[str]:

@@ -860,3 +860,17 @@ def test_basic13_docx_uses_wapef_style_tokens_and_repeats_the_header():
     )
     for row in list(table.rows)[:header_index]:
         assert _row_label(row), "blank spacer row survived styling"
+
+def test_basic13_content_standard_code_is_printed_once():
+    from src.engines.wapef_basic13_template import subject_metadata_values
+    schemes = _fixture_like_schemes()
+    schemes["scheme-maths"]["weeks"][0].content_standards = [
+        "B1.1.1.1 Describe numbers and relationships"
+    ]
+    plan = build_weekly_plan(
+        _request(subjects=[_subject("scheme-maths", [["MONDAY"]])]),
+        schemes, {"template_id": TEMPLATE_ID},
+    )
+    values = subject_metadata_values(plan.subjects[0])
+    assert values["CONTENT_STANDARD"].count("B1.1.1.1") == 1
+    assert values["CONTENT_STANDARD"].startswith("B1.1.1.1 Describe")
