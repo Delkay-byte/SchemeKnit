@@ -874,3 +874,17 @@ def test_basic13_content_standard_code_is_printed_once():
     values = subject_metadata_values(plan.subjects[0])
     assert values["CONTENT_STANDARD"].count("B1.1.1.1") == 1
     assert values["CONTENT_STANDARD"].startswith("B1.1.1.1 Describe")
+
+def test_approved_wapef_plan_is_selectable_for_basic7():
+    from src.engines.template_engine import get_templates_for_class_level
+    ids = {t.id for t in get_templates_for_class_level(ClassLevel.BASIC_7)}
+    assert "tpl-wapef-approved-plan" in ids
+    # The level's GES form remains the default choice.
+    assert "tpl-official-ges-nacca-jhs" in ids
+
+
+def test_basic13_offers_both_wapef_forms():
+    from src.engines.template_engine import get_templates_for_class_level
+    ids = {t.id for t in get_templates_for_class_level(ClassLevel.BASIC_1)}
+    assert "tpl-wapef-approved-plan" in ids
+    assert "tpl-wapef-basic13-weekly-plan" in ids

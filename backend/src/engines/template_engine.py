@@ -715,7 +715,16 @@ def get_templates_for_level(educational_level: EducationalLevel) -> List[Templat
 
 def get_templates_for_class_level(class_level: ClassLevel) -> List[Template]:
     el = CLASS_LEVEL_TO_EDUCATIONAL_LEVEL.get(class_level, EducationalLevel.JHS)
-    return get_templates_for_level(el)
+    templates = list(get_templates_for_level(el))
+    # The Approved WAPEF Plan is the common WAPEF output for Nursery through
+    # JHS (its own description and provenance say so). It is an ADDITIONAL
+    # choice beside the level's default GES form, never a replacement, and
+    # Basic 1-3 keeps its class-teacher weekly template as well.
+    if not any(t.id == WAPEF_TEMPLATE_ID for t in templates):
+        approved = get_template_by_id(WAPEF_TEMPLATE_ID)
+        if approved is not None:
+            templates.append(approved)
+    return templates
 
 
 def get_default_template_for_level(educational_level: EducationalLevel) -> Template:
