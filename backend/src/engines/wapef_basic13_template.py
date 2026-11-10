@@ -305,6 +305,8 @@ def subject_metadata_values(section) -> Dict[str, str]:
     """
     meta = _metadata(section)
     section_subject = _text(_get(meta, "subject") or _get(section, "subject"))
+    from ..models import subject_display_name
+    section_subject = subject_display_name(section_subject)
 
     standards = _unique(_text_items(_get(meta, "content_standards")))
     standard_codes = _unique(_text_items(_get(meta, "content_standard_codes")))

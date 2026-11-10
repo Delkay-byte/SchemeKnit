@@ -54,6 +54,18 @@ class Subject(str, Enum):
     UNKNOWN = "Unknown"
 
 
+def subject_display_name(value) -> str:
+    """Canonical subject label for printed/exported documents.
+
+    The internal taxonomy stores Computing as ``Subject.ICT`` for compatibility
+    with historical schemes; the teacher-facing/exported label is "Computing".
+    """
+    if isinstance(value, Subject):
+        return "Computing" if value is Subject.ICT else value.value
+    text = str(value or "").strip()
+    return "Computing" if text.lower() == "ict" else text
+
+
 class EducationalLevel(str, Enum):
     EARLY_CHILDHOOD = "Early Childhood"
     PRIMARY = "Primary"

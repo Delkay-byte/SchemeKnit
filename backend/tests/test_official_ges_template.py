@@ -1,4 +1,4 @@
-"""
+﻿"""
 Official GES / NaCCA template tests: bundled assets, per-level token contracts,
 guidance and example-prose removal, deterministic values, grid fills, rendering,
 registration and the AI contract.
@@ -294,7 +294,7 @@ class TestDeterministicValues:
 
     def test_jhs_specifics(self):
         values = placeholder_values(JHS_SPEC, make_lesson(JHS_SPEC))
-        assert values["INSERT_SUBJECT"] == "ICT"
+        assert values["INSERT_SUBJECT"] == "Computing"
         assert values["INSERT_CLASS_LEVEL"] == "Basic 7"
         assert values["INSERT_DURATION"] == "60 Minutes"
         assert values["INSERT_DATE_DAY"] == "Friday, 25th September, 2026"
@@ -337,7 +337,7 @@ class TestDeterministicValues:
         # lesson's own success criterion instead of a blank TLR cell.
         assert values["PHASE_3_SUMMATIVE_EVALUATION_METRICS"].startswith(
             "Success criteria:")
-        # SHS programme (Science/Business/Home Economics…) is not a lesson column.
+        # SHS programme (Science/Business/Home Economicsâ€¦) is not a lesson column.
         assert placeholder_values(SHS_SPEC, make_lesson(SHS_SPEC))["PROGRAMME"] == ""
         assert placeholder_values(PRIMARY_SPEC, make_lesson(PRIMARY_SPEC))["PERIOD"] == ""
 
@@ -369,7 +369,7 @@ class TestDeterministicValues:
     def test_enum_values_render_as_their_value(self):
         values = placeholder_values(JHS_SPEC, {"subject": Subject.ICT,
                                                "class_level": ClassLevel.BASIC_7})
-        assert values["INSERT_SUBJECT"] == "ICT"
+        assert values["INSERT_SUBJECT"] == "Computing"
         assert values["INSERT_CLASS_LEVEL"] == "Basic 7"
 
     def test_json_string_columns_render_like_lists(self):
@@ -792,7 +792,7 @@ class TestGoldenMaster:
     """The approved JHS source document is the structural authority (items 2/4/6).
 
     Ies normalized fingerprine lives in assees/ges_jhs_golden_maseer.json and the
-    renderer's ouepue is compared against ie wieh the structural validaeor —
+    renderer's ouepue is compared against ie wieh the structural validaeor â€”
     eopology (eables, dimensions, merges, labels), not juse "all fields filled".
     """
 

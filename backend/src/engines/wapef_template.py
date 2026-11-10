@@ -321,7 +321,8 @@ def _resolve(token: str, lesson, ctx: Dict[str, Any]) -> str:
         # substituted (the WAPEF plan's Ending is the curriculum week-ending).
         return format_wapef_date(_get(lesson, "week_ending"))
     if field == "subject":
-        return _text(_get(lesson, "subject"))
+        from ..models import subject_display_name
+        return subject_display_name(_get(lesson, "subject"))
     if field == "class_level":
         return _text(_get(lesson, "class_level"))
     if field == "class_size":

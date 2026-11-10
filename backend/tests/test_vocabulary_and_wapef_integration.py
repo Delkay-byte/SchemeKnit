@@ -427,3 +427,9 @@ def test_thousands_separator_is_not_split_into_list_items():
     assert normalize_text_items(text) == [text]
     assert normalize_text_items("Counters, sticks, flash cards") == [
         "Counters", "sticks", "flash cards"]
+
+def test_computing_subject_prints_as_computing_not_ict():
+    from src.models import Subject, subject_display_name
+    assert subject_display_name(Subject.ICT) == "Computing"
+    assert subject_display_name("ICT") == "Computing"
+    assert subject_display_name(Subject.MATHEMATICS) == "Mathematics"

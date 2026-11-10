@@ -415,7 +415,8 @@ def _resolve(field: Optional[str], lesson, ctx: Dict[str, Any]) -> str:
     if field == "class_level":
         return _text(_get(lesson, "class_level"))
     if field == "subject":
-        return _text(_get(lesson, "subject"))
+        from ..models import subject_display_name
+        return subject_display_name(_get(lesson, "subject"))
     if field == "class_size":
         size = _get(lesson, "class_size")
         return _text(size) if size not in (None, "", 0) else ""

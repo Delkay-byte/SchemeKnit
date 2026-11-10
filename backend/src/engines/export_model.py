@@ -58,6 +58,9 @@ TEMPLATE_ASSET_DIR = "docx-templates"
 def _display(value: Any) -> str:
     """Enum/string display value, matching the existing renderers."""
     if isinstance(value, (Subject, ClassLevel)):
+        from ..models import subject_display_name
+        if isinstance(value, Subject):
+            return subject_display_name(value)
         return value.value
     return str(value or "")
 
