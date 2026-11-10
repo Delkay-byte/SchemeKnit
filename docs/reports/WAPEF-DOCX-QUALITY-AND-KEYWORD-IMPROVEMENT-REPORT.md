@@ -420,7 +420,8 @@ topology. The regression test asserts `1A365D` on that row directly.
 Official frontend: `https://schemeknit.bloomcoretech.com` (HTTP 200).  
 Production backend: `https://schemeknit-api.onrender.com` (health HTTP 200).  
 Deployed application version: `1.0.5`.  
-Final production commit: `820ebaf` (`fix: display Computing instead of internal ICT label`).
+Final deployed commit: `efb7df8` (documentation commit; the production code
+commit is `820ebaf`, `fix: display Computing instead of internal ICT label`).
 
 The branded domain was used for all UI testing. The old
 `schemeknit-frontend.onrender.com` hostname is not treated as a production
@@ -429,8 +430,8 @@ failure; its Render subdomain remains blocked and was not re-enabled.
 Render deployments completed for both services at `820ebaf`:
 
 ```text
-schemeknit-api      dep-dbpqcf8n74is738nprd0  LIVE  commit 820ebaf
-schemeknit-frontend dep-dbpqem8ae00c73cbev40  LIVE  commit 820ebaf
+schemeknit-api      dep-dbpqgc0u01pc738t9jt0  LIVE  commit efb7df8
+schemeknit-frontend dep-dbpqgcd6e07s73b67ca0  LIVE  commit efb7df8
 ```
 
 Smoke checks after deployment:
