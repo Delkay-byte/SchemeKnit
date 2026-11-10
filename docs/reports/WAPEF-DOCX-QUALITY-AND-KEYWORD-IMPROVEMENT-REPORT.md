@@ -285,6 +285,37 @@ tests/test_prose_composition.py
 tests/test_structured_references_integrity.py   139 passed
 ```
 
+Full backend suite (AI-production tests excluded because they require live
+provider credentials):
+
+```text
+python -m pytest -q --ignore=tests/test_real_ai_provider.py \
+                   --ignore=tests/test_ai_production.py
+
+First run: 3317 passed, 26 skipped, 9 failed in 1225 s.
+```
+
+The nine failures were all in the changed contracts. Each affected file now
+passes after the fix:
+
+```text
+tests/test_exemplar_corpus_and_pedagogy.py
+tests/test_phase16_5_generation_remediation.py
+tests/test_priority21_hardening.py
+tests/test_phase16_6_section_f_t.py
+tests/test_real_use_remediation.py
+tests/test_template_lesson_remediation.py
+tests/test_generation_v2_integration.py
+tests/test_kg_acceptance.py                 323 passed
+```
+
+A second full run reached 49% with no failures and no skips other than the
+documented ones before the long-running suite was stopped; the remaining
+previously failing files were then run together and passed (323 tests above).
+The environment's full suite includes long external-process tests that exceed
+the practical run window, so the final evidence is the targeted + affected-file
+runs rather than a single uninterrupted 3,300-test invocation.
+
 New regression file:
 `backend/tests/test_vocabulary_and_wapef_integration.py` (25 tests) covers
 resource exclusion, multiword phrases, generic words, malformed fragments,
@@ -336,7 +367,7 @@ page numbers and no orphan continuation row.
 
 Repository: `https://github.com/Delkay-byte/SchemeKnit.git`  
 Branch: `feat/cloudflare-free-browser-docx`  
-Commit: `27fb3f6` (with the main quality commit `237adc3`) — pushed to origin.
+Commit: `124fc71` (main quality commits `237adc3`, `27fb3f6`, `124fc71`) — pushed to origin.
 
 No deployment workflow exists in `.github/workflows` (only `ci.yml` and
 `pilot-webhook-recovery.yml`); production deployment is external to this
