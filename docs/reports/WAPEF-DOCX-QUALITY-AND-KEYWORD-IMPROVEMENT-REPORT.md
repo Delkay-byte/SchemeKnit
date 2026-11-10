@@ -336,7 +336,7 @@ page numbers and no orphan continuation row.
 
 Repository: `https://github.com/Delkay-byte/SchemeKnit.git`  
 Branch: `feat/cloudflare-free-browser-docx`  
-Commit: `237adc365055947da31c5eb36e245244e3bff6dc` — pushed to origin.
+Commit: `27fb3f6` (with the main quality commit `237adc3`) — pushed to origin.
 
 No deployment workflow exists in `.github/workflows` (only `ci.yml` and
 `pilot-webhook-recovery.yml`); production deployment is external to this

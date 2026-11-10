@@ -269,6 +269,13 @@ def _style_footer(document) -> None:
         paragraph._p.append(fld)
 
 
+def _style_body_paragraphs(document) -> None:
+    """Use the same typeface for the header/title as the tables."""
+    for paragraph in document.paragraphs:
+        for run in paragraph.runs:
+            run.font.name = BODY_FONT
+
+
 def _style_sections(document) -> None:
     for section in document.sections:
         section.top_margin = Inches(0.5)
@@ -281,6 +288,7 @@ def _style_sections(document) -> None:
 def style_wapef_document(document) -> None:
     """Apply the GES-inspired visual language to a WAPEF form (idempotent)."""
     _style_sections(document)
+    _style_body_paragraphs(document)
     tables = list(document.tables)
     # One approved form = metadata table + two delivery tables. A multi-lesson
     # document repeats that group; styling every table after the first as a

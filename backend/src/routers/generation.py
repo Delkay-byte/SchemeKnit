@@ -4065,7 +4065,7 @@ def _run_quality_gate(job, config, scheme_id, drafts, allow_rebuild: bool = True
                 "wapef_deep_hope", "wapef_storyline",
                 "wapef_through_lines", "wapef_gods_story")):
             return None
-        return normalize_wapef_payload(draft)
+        return normalize_wapef_payload(draft, allow_custom=True)
 
     lessons = list(getattr(job, "_lesson_plans", None) or [])
     ledger = getattr(job, "_build_ledger", None)
