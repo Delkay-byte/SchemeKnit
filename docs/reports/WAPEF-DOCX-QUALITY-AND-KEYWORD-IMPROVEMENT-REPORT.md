@@ -270,7 +270,7 @@ python -m pytest \
   tests/test_lesson_quality_parts.py \
   tests/test_guided_lesson_configuration.py -q
 
-218 passed
+221 passed
 ```
 
 Additional suites:
@@ -286,7 +286,7 @@ tests/test_structured_references_integrity.py   139 passed
 ```
 
 New regression file:
-`backend/tests/test_vocabulary_and_wapef_integration.py` (22 tests) covers
+`backend/tests/test_vocabulary_and_wapef_integration.py` (25 tests) covers
 resource exclusion, multiword phrases, generic words, malformed fragments,
 `difference` positive/negative, `or`/`is` context, per-indicator lists, teacher
 overrides, WAPEF distinctness, custom text, blank-field rendering, GES absence
@@ -334,14 +334,15 @@ page numbers and no orphan continuation row.
 
 ## J. Git and deployment
 
-Repository: `https://github.com/Delkay-byte/SchemeKnit.git`
-Branch: `feat/cloudflare-free-browser-docx`
+Repository: `https://github.com/Delkay-byte/SchemeKnit.git`  
+Branch: `feat/cloudflare-free-browser-docx`  
+Commit: `237adc365055947da31c5eb36e245244e3bff6dc` — pushed to origin.
 
-Local changes are on that branch. Push/deployment requires repository
-credentials and the project's production workflow; the local environment has no
-verified deployment target. Production generation and post-deploy inspection were
-therefore not performed in this run. The committed code and local visual samples
-are the deployable artefacts.
+No deployment workflow exists in `.github/workflows` (only `ci.yml` and
+`pilot-webhook-recovery.yml`); production deployment is external to this
+repository. Production generation and post-deploy inspection were therefore not
+performed in this run. The committed code, test evidence and local visual
+samples are the deployable artefacts.
 
 ---
 

@@ -625,7 +625,15 @@ def wapef_field_text(lesson: Any, field: str) -> str:
     if field == "through_lines":
         raw = _get(lesson, "wapef_through_lines", [])
         if isinstance(raw, str):
-            raw = [line.strip() for line in raw.splitlines() if line.strip()]
+            text = raw.strip()
+            if text.startswith("["):
+                try:
+                    import json
+                    raw = json.loads(text)
+                except Exception:
+                    raw = [line.strip() for line in text.splitlines() if line.strip()]
+            else:
+                raw = [line.strip() for line in text.splitlines() if line.strip()]
         labels = [str(line).strip() for line in (raw or []) if str(line).strip()]
         if not labels:
             labels = list(suggestion.get("through_lines") or [])

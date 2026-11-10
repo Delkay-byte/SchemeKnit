@@ -30,6 +30,9 @@ def resource_use_sentence(resource: str, focus: str, index: int = 0) -> str:
     """One concrete use of ``resource`` in the lesson."""
     name = (resource or "").strip().rstrip(" .;:,")
     topic = (focus or "the lesson focus").strip().rstrip(" .;:,")
+    # The templates below already supply an article ("the {topic} task");
+    # a topic that itself starts with "the" produced "the the importance".
+    topic = re.sub(r"^(?:the|a|an)\s+", "", topic, flags=re.I).strip() or "lesson focus"
     if not name:
         return ""
     plural = name.split()[-1].lower().endswith("s") or "&" in name
