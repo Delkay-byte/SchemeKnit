@@ -419,3 +419,11 @@ def test_ges_document_contains_no_wapef_fields():
     text = str(model)
     assert "wapef_deep_hope" not in text
     assert "wapef_gods_story" not in text
+
+def test_thousands_separator_is_not_split_into_list_items():
+    from src.ai_resource_text import normalize_text_items
+    text = ("B7.1.1.1.1 Model number quantities more than 1,000,000,000 "
+            "using graph sheets")
+    assert normalize_text_items(text) == [text]
+    assert normalize_text_items("Counters, sticks, flash cards") == [
+        "Counters", "sticks", "flash cards"]

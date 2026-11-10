@@ -247,6 +247,9 @@ def _split_items(text: str) -> List[str]:
     ``Pictures showing Created things`` survives as one resource, while a
     genuine list ``Counters, sticks, flash cards`` becomes three items.
     """
+    # Protect thousands separators before the comma splitter: 1,000,000,000
+    # is one number, not three list items.
+    text = re.sub(r"(?<=\d),(?=\d{3}(?:\D|$))", "\uE000", text)
     parts = re.split(r"[;\n\r•·|]|•\s*", text)
     out: List[str] = []
     for chunk in parts:
@@ -275,7 +278,7 @@ def _split_items(text: str) -> List[str]:
                 merged.append(part)
         if merged:
             out.extend(merged)
-    return out
+    return [item.replace("\uE000", ",") for item in out]
 
 
 def _parse_bracketed(text: str) -> List[str] | None:
