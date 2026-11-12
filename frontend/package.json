@@ -18,7 +18,7 @@
     "e2e:entitlement:chrome": "node e2e/entitlement-download-acceptance.js chrome",
     "e2e:entitlement:edge": "node e2e/entitlement-download-acceptance.js msedge",
     "e2e:workspace": "node e2e/curriculum-workspace-acceptance.js",
-    "test:ux": "node --test tests/ux/drafts.test.ts tests/ux/error-normalizer.test.ts tests/ux/optimistic.test.ts tests/ux/prefill.test.ts tests/ux/prefill-overrides.test.ts tests/ux/multiline-list-field.test.ts tests/ux/purchase-state.test.ts tests/ux/payment-flow.test.ts tests/ux/lesson-config.test.ts tests/ux/branding.test.ts",
+    "test:ux": "node --test tests/ux/drafts.test.ts tests/ux/error-normalizer.test.ts tests/ux/optimistic.test.ts tests/ux/prefill.test.ts tests/ux/prefill-overrides.test.ts tests/ux/multiline-list-field.test.ts tests/ux/purchase-state.test.ts tests/ux/payment-flow.test.ts tests/ux/lesson-config.test.ts tests/ux/lesson-rubric.test.ts tests/ux/branding.test.ts",
     "test:docx": "node --test tests/docx/*.test.ts",
     "e2e:ux": "node e2e/ux-reliability.js",
     "e2e:ux:editing": "node e2e/ux-editing-reliability.js",

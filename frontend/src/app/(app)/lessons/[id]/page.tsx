@@ -22,6 +22,7 @@ import { aiFailure } from '@/lib/ai-feedback'
 import { resolveRouteId } from '@/lib/route-params'
 import { PageHeader } from '@/components/ui/page-header'
 import { SourceAlignment, type LessonProvenance } from '@/components/source-alignment'
+import { rubricEvidenceText } from '@/lib/lesson-rubric'
 
 /** Canonical main-learning activity (PART X): never flattened to raw JSON. */
 interface MainActivity {
@@ -91,7 +92,7 @@ interface LessonData {
     task: string
     criteria: { criterion: string; descriptors: { level: string; descriptor: string; points: number }[] }[]
     total_points?: number
-    evidence_to_award?: string[]
+    evidence_to_award?: string | string[]
     authority_note?: string
   } | null
   conclusion: string | null
@@ -990,12 +991,16 @@ export default function LessonDetailPage() {
                   </tbody>
                 </table>
               </div>
-              {(lesson.assessment_rubric.evidence_to_award?.length ?? 0) > 0 && (
-                <p className="mt-2 text-xs text-slate-500">
-                  <span className="font-medium text-slate-600">Evidence to award points:</span>{' '}
-                  {lesson.assessment_rubric.evidence_to_award!.join('; ')}
-                </p>
-              )}
+              {(() => {
+                const evidence = rubricEvidenceText(lesson.assessment_rubric?.evidence_to_award)
+                if (!evidence) return null
+                return (
+                  <p className="mt-2 text-xs text-slate-500">
+                    <span className="font-medium text-slate-600">Evidence to award points:</span>{' '}
+                    {evidence}
+                  </p>
+                )
+              })()}
             </section>
           )}
 
