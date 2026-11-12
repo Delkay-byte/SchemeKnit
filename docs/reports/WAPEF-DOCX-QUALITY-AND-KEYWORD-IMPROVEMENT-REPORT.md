@@ -4,7 +4,7 @@
 `91828f0` for the release)  
 **Reproduction document:** `Lesson_Plans_BASIC_7_TERM_1.docx` (Basic 7 Mathematics, 110 pages)  
 **GES visual reference:** `Lesson_Plans_Basic_6_Computing_Deterministic.docx`  
-**Date:** 10 November 2026
+**Date:** 12 November 2026 (production acceptance P1–P4 complete)
 
 ---
 
@@ -420,19 +420,23 @@ topology. The regression test asserts `1A365D` on that row directly.
 Official frontend: `https://schemeknit.bloomcoretech.com` (HTTP 200).  
 Production backend: `https://schemeknit-api.onrender.com` (health HTTP 200).  
 Deployed application version: `1.0.5`.  
-Final deployed commit: `efb7df8` (documentation commit; the production code
-commit is `820ebaf`, `fix: display Computing instead of internal ICT label`).
+Final deployed commit: `7497408` (`fix: render string rubric evidence in lesson
+workspace`; the earlier production code commit in this work is `820ebaf`).
 
 The branded domain was used for all UI testing. The old
 `schemeknit-frontend.onrender.com` hostname is not treated as a production
 failure; its Render subdomain remains blocked and was not re-enabled.
 
-Render deployments completed for both services at `820ebaf`:
+Render deployments completed for both services at `7497408`:
 
 ```text
-schemeknit-api      dep-dbpqgc0u01pc738t9jt0  LIVE  commit efb7df8
-schemeknit-frontend dep-dbpqgcd6e07s73b67ca0  LIVE  commit efb7df8
+schemeknit-api      dep-dbqhtd5g1s2s73ed2lv0  LIVE  commit 7497408
+schemeknit-frontend dep-dbqhtcjbc2fs73defp60  LIVE  commit 7497408
 ```
+
+CI run `43136437596` on `main` passed (7m42s) before the deploy was triggered.
+Both services have auto-deploy disabled, so the deploys were started explicitly
+for the tested commit.
 
 Smoke checks after deployment:
 
@@ -448,13 +452,22 @@ The frontend network log confirms all runtime API calls target
 ## K. Production authentication
 
 Authentication through the branded UI succeeded. The normal production
-registration flow was used with the authorised pilot invitation and the live
-Turnstile widget; the challenge completed and the account was created normally.
-No security control was disabled, bypassed or weakened. Credentials, tokens,
+registration flow was used with an authorised invitation and the live Turnstile
+widget; the challenge completed and the account was created normally. No
+security control was disabled, bypassed or weakened. Credentials, tokens,
 cookies and invitation values are deliberately not recorded here.
 
-The account is a normal Free Tier teacher account with **2 lesson-plan credits
-for the calendar month**.
+Two production QA accounts were used across the run:
+
+- P1–P3: one Free Tier teacher account created 2026-11-10 through the normal
+  invitation flow.
+- P4: one Free Tier teacher account created 2026-11-12 through the normal
+  public signup flow.
+
+Both were normal Free Tier teacher accounts with **2 lesson-plan credits for the
+calendar month** at creation. P4 was created solely because the P1–P3 account
+had exhausted its allowance; it was not used to exceed the per-account
+allowance, and no credit was purchased, granted or manipulated.
 
 ## L. Production generation results
 
@@ -463,12 +476,13 @@ for the calendar month**.
 | P1 WAPEF Basic 7 Mathematics | Yes | Yes | Yes | Yes | **PASS** |
 | P2 WAPEF Basic 1–3 weekly | Yes | Yes | Yes | Yes | **PASS** |
 | P3 GES Basic 6 Computing | Yes | Yes | Yes | Yes | **PASS** |
-| P4 GES Mathematics | No | No | — | — | **BLOCKED: 0 of 2 credits remaining** |
+| P4 GES Basic 7 Mathematics | Yes | Yes | Yes | Yes | **PASS** |
 
 Artifacts (local secure acceptance folder, no personal data):
 `temp/production-acceptance/P1_WAPEF_Basic7_Mathematics.docx`,
-`P2_WAPEF_Basic1_Weekly.docx`, `P3_GES_Basic6_Computing.docx`, with PDF page
-renders used for visual inspection.
+`P2_WAPEF_Basic1_Weekly.docx`, `P3_GES_Basic6_Computing.docx`,
+`P4_GES_Basic7_Mathematics.docx`, with PDF page renders used for visual
+inspection.
 
 ### P1 — WAPEF Basic 7 Mathematics
 
@@ -506,15 +520,37 @@ renders used for visual inspection.
 - Sentences complete; no resource names in the vocabulary list.
 - 4 pages inspected; repeated table headers, headings and page breaks render.
 
-### P4 — GES Mathematics (not generated)
+### P4 — GES Basic 7 Mathematics
 
-The Free Tier account had exactly two lesson-plan credits. P1 consumed one and
-P3 consumed one; P2 (weekly plan) consumed none. The dashboard then reported
-`0 of 2` remaining. P4 therefore could not be generated. No purchase, credit
-top-up or account-privilege change was made, and no second account was created
-to evade the allowance. This is an account-allowance limitation, not an
-application defect. The local GES Mathematics sample remains local evidence
-only and is not counted as production acceptance.
+Scope: GES Basic 7 Mathematics, First Term, Week 1, indicator `B7.1.1.1.1`
+(“Model number quantities more than 1,000,000,000 …”), generated from the normal
+upload → detect → configure → generate flow on the branded domain.
+
+- Scheme uploaded through the UI and extracted as Mathematics, Basic 7, First
+  Term, 1 week. The GES default template was saved with school name, class size
+  30, 60-minute lessons, 1 lesson per week and Monday teaching.
+- Exactly one generation click produced job `c0d9e562…` (completed) and one
+  saved lesson plan; the Free Tier allowance moved from 2 to 1, and the
+  `usage_periods.units_used` value is `1`.
+- DOCX downloaded from the production Export DOCX control (40,815 bytes) and
+  converted to PDF for visual inspection; 5 pages inspected.
+- Approved GES structure preserved: strand NUMBERS, correct sub-strand, content
+  standard and indicator; phases 10/40/10 with the recorded 60-minute duration.
+- `1,000,000,000` appears intact 25 times; no split numeric groups, no broken
+  dash line breaks, no double spaces, no unbalanced quotes.
+- Keywords are `significant figures, base ten numerals, decimal places, place
+  value, rounding`; no resource name appears in the vocabulary list.
+- Resources are `isometric paper, multi-base materials, Graph sheets`; no
+  malformed fragments or duplicated headings.
+- The first open of the saved lesson workspace exposed a genuine frontend
+  defect (see section M, item 5). After the fix and production deploy, the same
+  lesson page loads correctly with no console or page errors.
+
+Observed but not failing: the indicator phrase repeats heavily in the generated
+prose (25 occurrences of the phrase, matching the 25 occurrences of the quantity
+string), and continuation rows of a phase table can carry an empty phase label
+across a page break. The assessment appendix on pages 4–5 matches the
+established product behaviour seen in P3.
 
 ## M. Defects found and fixed during production acceptance
 
@@ -531,39 +567,90 @@ only and is not counted as production acceptance.
 4. **Computing printed as ICT** in GES output. Added canonical subject display
    mapping (`Subject.ICT` → `Computing`) across renderers; existing contract
    tests updated to the new user-facing label; regression test added.
+5. **Saved lesson workspace crashed on every generated lesson** with
+   `TypeError: assessment_rubric.evidence_to_award.join is not a function`.
+   The backend stores `evidence_to_award` as one paragraph string
+   (`models.py`, `assessment_design.py`), and the DOCX/PDF exporters render it
+   verbatim, but the lesson detail page typed it as `string[]` and called
+   `.join('; ')`. The error boundary replaced the page with “This page could not
+   load”. Reproduced twice on production against the P4 lesson. Fixed in the
+   frontend only: new `frontend/src/lib/lesson-rubric.ts` normalises string and
+   legacy array shapes, the page renders through it, and
+   `frontend/tests/ux/lesson-rubric.test.ts` covers both shapes plus the
+   regression. No backend or data migration was required. Fixed in `7497408`,
+   deployed, and retested on the production lesson page.
 
 ## N. Quality gates after the production fixes
 
 ```text
 Backend full suite: 3362 passed, 27 skipped, 5 deselected, 0 failed
 Discovered: 3394 tests
-Frontend: TypeScript clean, lint clean, 14 DOCX tests passed,
-          87 UX tests passed, production build succeeded
+Frontend after the P4 lesson-workspace fix: TypeScript clean, lint clean,
+  DOCX tests 14 passed, UX tests 91 passed, production build succeeded
 ```
 
 The full backend suite was rerun after each backend change; no tests were
-deleted, skipped or weakened to obtain a pass. Targeted WAPEF/GES suites also
-passed after every fix.
+deleted, skipped or weakened to obtain a pass. The P4 fix was frontend-only, so
+the backend suite was not rerun for it. Targeted WAPEF/GES suites passed after
+every fix. CI run `43136437596` passed on `main` for `7497408`.
 
 Remaining known limitations:
 
-- P4 production generation requires a teacher account with at least one
-  available lesson-plan credit (or a paid package). The current authorised Free
-  Tier account is exhausted for this calendar month.
 - Custom free-text WAPEF prose was verified by automated tests and local
   rendering, but the production P1 run used approved teacher-selected values;
-  custom prose should be rechecked in the P4 or follow-up production run.
+  custom prose should be rechecked in a follow-up production run.
 - School vision remains configuration-driven and is intentionally not printed
   until a school vision field exists.
 - WAPEF suggestions remain deterministic, not provider-generated.
+- Generated prose repeats the indicator phrase more often than a teacher would
+  write it by hand (P4 observed 25 occurrences). This is a quality observation,
+  not a defect against the acceptance criteria.
 
-## O. Final status
+## O. Test data cleanup
 
-**AMBER — Production acceptance incomplete by account allowance.**
+Two QA accounts and one older pilot test account were removed after acceptance.
+All three were verified test-only before deletion: `.test` email domain under
+`schemeknit.test`, no payment, audit or financial rows, no school membership,
+and no shared records with a real teacher.
 
-P1, P2 and P3 were generated by the official production application, downloaded
-and inspected successfully. The deployed commit contains the tested fixes, and
-production smoke checks pass. P4 could not be generated because the authorised
-Free Tier account has 0 of 2 lesson-plan credits remaining. No application,
-security or document-formatting defect remains open from the three completed
-cases.
+| Account | Masked ID | Verified test-only basis |
+|---|---|---|
+| P1–P3 acceptance | `fa217de3…` | test-domain email, 3 schemes, 2 lesson plans, creation timestamp 2026-11-10 |
+| P4 acceptance | `64bb1047…` | test-domain email, 1 scheme, 1 lesson plan, creation timestamp 2026-11-12 |
+| Pilot (2026-10-31) | `9b241572…` | test-domain email, 1 scheme, 1 lesson plan, no payments |
+
+Deletion was a single transaction over exact primary keys only; no `LIKE`
+pattern, no cascade, no bulk user delete. 72 rows across 17 tables were removed
+in children-first order: storage counters, sessions, lesson plans, export
+events, generation jobs, weeks, AI usage, entitlements, schemes, weekly plans,
+referral codes, credit reservations, storage ledger, AI periods, usage units,
+usage periods, users. Every delete was checked against its expected row count.
+
+Post-cleanup verification, run in a separate read-only connection:
+
+```text
+users remaining: 3 (platform admin + 2 real teachers) — unchanged
+residual rows matching any deleted user ID: none
+foreign-key constraints checked: 68, orphan rows: 0
+lesson plans still present for real users: 23
+GET /api/health: 200 {"status":"healthy","service":"SchemeKnit","version":"1.0.5"}
+GET /login/: 200
+```
+
+Full user IDs, the pre-delete row snapshot and the private cleanup log are kept
+outside the report in the gitignored `temp/` folder. No credentials, tokens or
+personal data are recorded here.
+
+## P. Final status
+
+**GREEN — Production acceptance complete for P1–P4.**
+
+P1, P2, P3 and P4 were each generated by the official production application,
+downloaded and inspected. P4 used one Free Tier lesson credit on a dedicated
+account; the allowance moved from 2 to 1 and the usage ledger recorded the
+generation. The single genuine P4 defect was fixed in `7497408`, passed CI and
+frontend checks, was deployed to both Render services, and the affected lesson
+page now loads without errors on production. Test-only accounts and their
+records were removed and integrity was verified. No security control was
+bypassed, no credit was purchased or manipulated, and no application defect
+remains open from the four completed cases.
