@@ -4424,6 +4424,38 @@ def _unique_text_items(values) -> list:
     return out
 
 
+def _normalize_references(value) -> list:
+    """References keep their internal commas ("Curriculum, p. 12").
+
+    ``normalize_text_items`` deliberately splits legacy comma-joined lists,
+    which is right for keywords/TLRs but corrupts a citation. A list is
+    normalized item-by-item; a plain string is one reference unless it is a
+    serialized JSON list.
+    """
+    import json as _json
+    if value is None:
+        return []
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return []
+        if text[0] == "[":
+            try:
+                value = _json.loads(text)
+            except ValueError:
+                return [text]
+        else:
+            return [text]
+    if not isinstance(value, (list, tuple)):
+        return [str(value).strip()] if str(value).strip() else []
+    out = []
+    for item in value:
+        text = str(item or "").strip()
+        if text:
+            out.append(text)
+    return out
+
+
 def _db_to_lesson_model(lp) -> LessonPlan:
     from ..database import LessonPlanDB
     from ..models import TeachingActivity, LearningObjective
@@ -4445,7 +4477,7 @@ def _db_to_lesson_model(lp) -> LessonPlan:
     # A teacher who filled only the structured reference fields must still see
     # a REFERENCE value in the exported header. Compose display text from the
     # stored fields only — blank page/author are omitted, never invented.
-    references = _unique_text_items(normalize_text_items(lp.references))
+    references = _unique_text_items(_normalize_references(lp.references))
     seen_references = {r.lower() for r in references}
     for entry in structured_references:
         label = ", ".join(part for part in (
