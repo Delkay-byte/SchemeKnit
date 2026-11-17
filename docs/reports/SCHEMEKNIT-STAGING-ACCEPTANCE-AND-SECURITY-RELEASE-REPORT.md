@@ -291,10 +291,14 @@ Read-only verification:
   teacher keeps their paid entitlement
 - no second internal account exists
 
-### Status
+## 12. picomatch follow-up
 
-Overall **GREEN**. Password verification, the production Super Admin MFA
-sign-in, the teacher account and the single internal entitlement are all
-verified. The only residual item is the documented dev-only `picomatch`
-advisory, which has no published fix.
+The remaining dev/build-only `picomatch` advisory is now covered by a focused
+remediation: `docs/reports/PICOMATCH-CVE-2026-112366-REMEDIATION-REPORT.md`.
+Status: **REMEDIATED** for all installed copies (2.3.2, 4.0.7 and Next's bundled
+copy), with the npm scanner limitation documented. No change to the historical
+release evidence above.
+
+Overall production release remains **GREEN**: authentication, MFA, rubric
+workflow, DOCX export and the single internal teacher entitlement were verified.
 
