@@ -54,20 +54,17 @@ class TestUploadOneAction:
         # Nothing is generated from the upload page itself.
         assert "api.generateLessonPlans" not in src
 
-    def test_confirm_path_also_hands_to_autopilot(self):
-        """Backlog item 5: after the teacher resolves the one genuine
-        ambiguity (subject/class), the confirm path records the same intent
-        and hands off to Autopilot — no dead-end at /review."""
+    def test_confirm_path_routes_to_generate_without_autofire(self):
+        """After the teacher resolves the one genuine ambiguity (subject/class),
+        the confirm path hands off to the generate page. No intent flag starts
+        a run: the teacher completes configuration and clicks Generate."""
         src = _upload()
-        # The confirm handler must set the intent flag…
-        assert "schemeknit.autopilot_intent" in src
-        # …and route to /generate (not /review) after a successful confirm.
+        assert "schemeknit.autopilot_intent" not in src
         # handleConfirmSubject is the only place confirmSubjectSection is
         # called; its success branch must push to /generate.
         i = src.index("handleConfirmSubject")
         handler = src[i:i + 1400]
         assert "confirmSubjectSection" in handler
-        assert "schemeknit.autopilot_intent" in handler
         assert "router.push(`/generate/" in handler
         assert "router.push(`/review/" not in handler
 
@@ -102,12 +99,13 @@ class TestGenerateAutopilotCard:
 
     def test_plain_visits_never_auto_generate(self):
         src = _page()
-        # Auto-fire only after the upload page's intent flag; a plain visit
-        # merely loads the plan (§17 quota never spent without a click).
-        assert "autopilotIntent.current = true" in src
-        assert "schemeknit.autopilot_intent" in src
-        assert "autopilotIntent.current = false" in src
-        assert "autopilotFired.current = true" in src
+        # No upload intent flag exists and the autopilot effect only displays
+        # the server plan; a run always needs the teacher's explicit click.
+        assert "autopilotIntent" not in src
+        assert "schemeknit.autopilot_intent" not in src
+        assert "autopilotFired" not in src
+        effect = src[src.index("Autopilot plan"):src.index("Generate actions")]
+        assert "runGeneration(" not in effect
 
     def test_blocker_codes_render_with_smallest_interrupt(self):
         src = _page()
