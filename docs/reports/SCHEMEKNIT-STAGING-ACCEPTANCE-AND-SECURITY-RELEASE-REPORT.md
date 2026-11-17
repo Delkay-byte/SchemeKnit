@@ -9,24 +9,17 @@
 
 ## Status
 
-**BLOCKED** — staging acceptance passed, the security release is merged and
-autodeployed, and production is healthy. Two owner-only checks remain: the
-production Super Admin sign-in must be completed with the owner's authenticator
-or recovery code, and the production internal test account has not been
-provisioned.
+**GREEN** — the security release is merged and autodeployed, staging acceptance
+passed, the production Super Admin signed in successfully with MFA, and exactly
+one internal teacher test entitlement is provisioned and verified.
 
-The production platform-admin account itself is healthy:
+Production account facts:
 
-- email `bloomcoretechnologies@gmail.com`
-- role `platform_admin`
-- active, `is_admin = true`
-- `mfa_enabled = true`
-- bcrypt hash present (`$2b$12$`, length 60)
-- no account-level lockout table rows
-
-The generic `Invalid email or password` response is also the response for a
-missing/invalid MFA code. The account state therefore points to the MFA gate (or
-using the teacher entry page), not a missing account or a wrong role.
+- `bloomcoretechnologies@gmail.com` — role `platform_admin`, active, MFA enabled
+- password verification restored through an owner-authorised controlled reset
+- owner confirmed a successful browser sign-in, including MFA
+- `amegayiesaviour@gmail.com` — normal teacher, active, exactly one internal
+  entitlement, unlimited application generation and AI
 
 ## 1. Pull requests and main
 
@@ -199,8 +192,7 @@ structure, not by opening Word visually.
 
 ## 9. Remaining limitations
 
-- Production Super Admin password verification is fixed; the final browser MFA
-  sign-in awaits the owner's authenticator/recovery code.
+- Production Super Admin sign-in verified by the owner, including MFA.
 - Production internal test account is provisioned for one normal teacher.
 - `picomatch` remains a High-severity **dev/build-only** advisory until upstream
   publishes a patched release.
@@ -208,6 +200,9 @@ structure, not by opening Word visually.
   not possible without owner credentials.
 
 ## 10. Owner actions
+
+None remaining. The owner confirmed both production logins (Super Admin with
+MFA, dedicated teacher) and the internal entitlement is provisioned.
 
 ## 11. Production owner checks (2026-11-17, post-release)
 
@@ -225,7 +220,7 @@ structure, not by opening Word visually.
 | Migration v055 | Present on `main`; applied in production |
 | Entitlement implementation | Present in `src/entitlements.py` |
 
-### Super Admin login — BLOCKED (password verification)
+### Super Admin login — PASS
 
 Recent production backend logs show:
 
@@ -263,10 +258,10 @@ subsequent login attempt reached the MFA gate:
 event=mfa_failed
 ```
 
-That proves password verification now succeeds; MFA is the only remaining gate.
-No password, hash or secret was printed. MFA settings were not changed. The
-owner must complete the sign-in in the browser with their existing authenticator
-or an unused recovery code.
+That proves password verification succeeds. The owner then completed the browser
+sign-in with the existing authenticator and confirmed it succeeded; the protected
+platform-admin page opened with the expected role. No password, hash or secret
+was printed. MFA settings and role were not changed.
 
 ### Internal teacher test account — PROVISIONED
 
@@ -298,8 +293,8 @@ Read-only verification:
 
 ### Status
 
-Overall remains **BLOCKED** only until the owner completes the browser
-Super Admin sign-in with their existing authenticator/recovery code and
-confirms it succeeded. Password verification and the internal entitlement are
-complete.
+Overall **GREEN**. Password verification, the production Super Admin MFA
+sign-in, the teacher account and the single internal entitlement are all
+verified. The only residual item is the documented dev-only `picomatch`
+advisory, which has no published fix.
 
