@@ -620,10 +620,9 @@ def build_rubric(
     if not criteria:
         return None
 
-    task_action = "reviewed" if action == "assess" else action
-    task = (f"The learner's work for {_short(focus, 60)}") \
-        if (focus or "").strip().lower().startswith(task_action + " ") \
-        else (f"The learner's {task_action} work for {_short(focus, 60)}")
+    # Never bolt a bare verb onto "work": "The learner's explain work for ..."
+    # is not English. One neutral frame reads correctly for every action.
+    task = f"The learner's work for the lesson task on {_short(focus, 60)}"
     return dict(
         task=task,
         criteria=criteria,

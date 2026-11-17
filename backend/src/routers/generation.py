@@ -4411,6 +4411,19 @@ def parse_assessment_rubric(raw):
     return None
 
 
+def _unique_text_items(values) -> list:
+    """Order-preserving, case-insensitive de-duplication for display lists."""
+    out = []
+    seen = set()
+    for value in values or []:
+        text = str(value or "").strip()
+        key = text.lower()
+        if text and key not in seen:
+            seen.add(key)
+            out.append(text)
+    return out
+
+
 def _db_to_lesson_model(lp) -> LessonPlan:
     from ..database import LessonPlanDB
     from ..models import TeachingActivity, LearningObjective
@@ -4432,7 +4445,7 @@ def _db_to_lesson_model(lp) -> LessonPlan:
     # A teacher who filled only the structured reference fields must still see
     # a REFERENCE value in the exported header. Compose display text from the
     # stored fields only — blank page/author are omitted, never invented.
-    references = normalize_text_items(lp.references)
+    references = _unique_text_items(normalize_text_items(lp.references))
     seen_references = {r.lower() for r in references}
     for entry in structured_references:
         label = ", ".join(part for part in (
