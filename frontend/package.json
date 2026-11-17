@@ -29,7 +29,10 @@
     "e2e:responsive-a11y": "node e2e/responsive-accessibility.js",
     "e2e:keyboard": "node e2e/accessibility-keyboard.js",
     "postinstall": "node scripts/patch-picomatch.cjs",
-    "test:security": "node --test tests/security/*.test.ts"
+    "test:security": "node --test tests/security/*.test.ts",
+    "prebuild": "node scripts/verify-picomatch.cjs",
+    "prebuild:web": "node scripts/verify-picomatch.cjs",
+    "prebuild:desktop": "node scripts/verify-picomatch.cjs"
   },
   "keywords": [],
   "author": "",
