@@ -27,6 +27,34 @@ test('401 asks the teacher to sign in again', () => {
   assert.equal(normalized.canRetry, false)
 })
 
+// Production P0: the sign-in form showed "Your session has expired" for a
+// rejected credential. A 401 on login is NOT a dead session.
+test('401 rejected credentials show the credential message, not session expiry', () => {
+  const normalized = normalizeError(apiError('Invalid email or password', 401))
+  assert.equal(normalized.category, 'validation')
+  assert.equal(normalized.message, 'Invalid email or password')
+  assert.doesNotMatch(normalized.message, /session has expired/i)
+})
+
+test('401 wrong current password keeps the actionable message', () => {
+  const normalized = normalizeError(apiError('Current password is incorrect', 401))
+  assert.equal(normalized.message, 'Current password is incorrect')
+  assert.doesNotMatch(normalized.message, /session has expired/i)
+})
+
+test('401 explicit session outcome keeps the backend wording', () => {
+  const normalized = normalizeError(
+    apiError('Your session expired after inactivity. Please sign in again.', 401),
+  )
+  assert.equal(normalized.category, 'auth')
+  assert.match(normalized.message, /inactivity/i)
+})
+
+test('401 opaque token detail does not leak to the teacher', () => {
+  const normalized = normalizeError(apiError('Invalid or expired token', 401))
+  assert.equal(normalized.message, 'Your session has expired. Please sign in again.')
+})
+
 test('403 entitlement is classified before generic permission', () => {
   const normalized = normalizeError(apiError('Generation limit reached', 403, 'entitlement_limit'))
   assert.equal(normalized.category, 'entitlement')

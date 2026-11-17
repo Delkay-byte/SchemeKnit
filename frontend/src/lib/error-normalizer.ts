@@ -60,6 +60,24 @@ const FRIENDLY_MESSAGES: Record<ErrorCategory, string> = {
 const INTERNAL_MARKERS =
   /(traceback|psycopg|sqlalchemy|stack trace|exception at|internal server|sqlstate|select .* from|insert into)/i
 
+/**
+ * A 401 does not always mean "your session expired". The sign-in endpoint and
+ * the in-session credential actions (password change, MFA disable) also answer
+ * 401 when the submitted credential is wrong. Those details are safe and must
+ * reach the form, or the teacher is told to sign in again when the real
+ * problem is the password they just typed.
+ */
+const CREDENTIAL_401_DETAIL =
+  /(invalid email or password|invalid credentials|current password is incorrect|incorrect password)/i
+
+/**
+ * Explicit session outcomes the backend already phrases for the person. They
+ * are shown verbatim so "signed out", "session ended" and "expired after
+ * inactivity" are not collapsed into one vague line.
+ */
+const SESSION_401_DETAIL =
+  /(session (?:has )?(?:expired|ended)|signed out|sign in again|session expired)/i
+
 function safeDetail(error: unknown): string | null {
   const candidate =
     typeof error === 'string'
@@ -178,6 +196,14 @@ export function normalizeError(error: unknown): NormalizedError {
   }
 
   if (status === 401) {
+    const detail = safeDetail(api) || safeDetail(body?.detail)
+    if (detail && CREDENTIAL_401_DETAIL.test(detail)) {
+      // The person can fix this on the form; it is not a dead session.
+      return { ...base, category: 'validation', message: detail, canRetry: false, showBanner: false }
+    }
+    if (detail && SESSION_401_DETAIL.test(detail)) {
+      return { ...base, category: 'auth', message: detail, canRetry: false, showBanner: false }
+    }
     return { ...base, category: 'auth', message: FRIENDLY_MESSAGES.auth, canRetry: false, showBanner: false }
   }
 

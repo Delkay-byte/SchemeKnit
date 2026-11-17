@@ -1,6 +1,7 @@
 // SchemeKnit API Service
 
 import { DEV_TOOLS_ENABLED } from './dev-tools'
+import { isCredential401 } from './auth-401'
 import type { ExportModel } from './docx/types'
 import type {
   LessonConfigResponse,
@@ -74,12 +75,21 @@ class ApiService {
     })
 
     if (!response.ok) {
+      const error = await response.json().catch(() => ({
+        detail: 'An error occurred'
+      }))
+      const failureCode = typeof error?.code === 'string'
+        ? error.code
+        : typeof error?.detail?.code === 'string' ? error.detail.code : ''
+      const credentialFailure = isCredential401(endpoint, failureCode)
+
       // Expired/invalid sessions: drop the stale token and return to login
       // instead of stranding the user on error banners. 403 (forbidden but
-      // authenticated, e.g. role boundaries) must NOT log out.
-      if (response.status === 401 && typeof window !== 'undefined'
-          && !endpoint.startsWith('/api/auth/login')
-          && !endpoint.startsWith('/api/auth/setup')) {
+      // authenticated, e.g. role boundaries) must NOT log out. A credential
+      // failure keeps the session: the user is still signed in, only the
+      // submitted value was wrong.
+      if (response.status === 401 && !credentialFailure
+          && typeof window !== 'undefined') {
         this.authToken = null
         try {
           // Clear ONLY this tab's session (sessionStorage is tab-scoped), so an
@@ -93,9 +103,6 @@ class ApiService {
           // storage may be unavailable; the error below still surfaces
         }
       }
-      const error = await response.json().catch(() => ({
-        detail: 'An error occurred'
-      }))
       throw errorFromDetail(error?.detail, {
         status: response.status,
         requestId: response.headers.get('x-request-id'),
