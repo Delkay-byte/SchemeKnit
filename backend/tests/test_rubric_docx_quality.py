@@ -126,6 +126,23 @@ def test_indicator_phrase_is_not_spliced_after_a_noun_verb():
     assert "shows they can discuss the fourth-generation computers" in text
 
 
+def test_rubric_task_reads_as_english():
+    from src.curriculum.assessment_design import build_rubric
+    rubric = build_rubric(indicator="B7.1.1.1.1 Explain the nature of God",
+                          focus="the nature of God", class_level="Basic 7")
+    assert rubric is not None
+    assert "explain work" not in rubric["task"]
+    assert "discuss work" not in rubric["task"]
+    assert rubric["task"].startswith("The learner's work for the lesson task on")
+
+
+def test_reference_dedupe_is_order_preserving_and_case_insensitive():
+    from src.routers.generation import _unique_text_items
+    assert _unique_text_items(
+        ["RME Curriculum, p. 12", "rme curriculum, P. 12", "Bible", "Bible"]
+    ) == ["RME Curriculum, p. 12", "Bible"]
+
+
 def test_context_follow_up_is_a_complete_sentence():
     items = build_assessment_items(
         indicator="B7.1.1.1.2 Use input devices",
