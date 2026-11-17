@@ -203,7 +203,7 @@ Single, testable rule for what a 401 means:
 
 **BLOCKED.** This environment has no Render API key, no Render dashboard session, and no repository deploy workflow (`.github/workflows` contains no deployment job). Production cannot be updated from here.
 
-Deployment commit: the fix commit on branch `fix/auth-401-session-classification` (see the Git history attached to this report). It is not on `main` and not deployed.
+Deployment commit: `01b149b` (`fix: classify 401s truthfully and stop signing out on credential errors`) on branch `fix/auth-401-session-classification`. It is not on `main` and not deployed.
 
 ### 7.2 Production verification
 
