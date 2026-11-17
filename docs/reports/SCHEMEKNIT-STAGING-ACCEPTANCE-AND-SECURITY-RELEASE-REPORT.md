@@ -199,8 +199,9 @@ structure, not by opening Word visually.
 
 ## 9. Remaining limitations
 
-- Production Super Admin sign-in is not verified; owner MFA/password is required.
-- Production internal test account is not provisioned.
+- Production Super Admin password verification is fixed; the final browser MFA
+  sign-in awaits the owner's authenticator/recovery code.
+- Production internal test account is provisioned for one normal teacher.
 - `picomatch` remains a High-severity **dev/build-only** advisory until upstream
   publishes a patched release.
 - Interactive Word GUI inspection and authenticated production generation were
@@ -253,69 +254,52 @@ The backend only requires it after repeated failures
 renders the widget. Registration (`/signup`) always shows Turnstile. A quiet
 login page is expected behaviour, not a missing widget.
 
-Required action: a controlled password reset. The owner must set the new
-password personally; no password, reset token or secret should be sent in chat.
-Safe command for the verified production backend Render shell (interactive
-`getpass`, no password in history or output):
+Owner authorised and a controlled password reset was completed against the
+verified production database. The new hash verifies with the owner-provided
+password, `password_changed_at` was bumped (existing JWTs invalidated), and a
+subsequent login attempt reached the MFA gate:
 
-```bash
-cd /opt/render/project/src/backend
-python - <<'PY'
-import getpass
-from datetime import datetime
-from src.database import SessionLocal, User
-from src.auth import hash_password
-
-email = "bloomcoretechnologies@gmail.com"
-first = getpass.getpass("New password: ")
-second = getpass.getpass("Confirm new password: ")
-if first != second or len(first) < 8:
-    raise SystemExit("Passwords do not match or are too short.")
-
-db = SessionLocal()
-user = db.query(User).filter(User.email == email).first()
-if user is None or user.role != "platform_admin":
-    raise SystemExit("Expected platform-admin account not found.")
-user.hashed_password = hash_password(first)
-user.password_changed_at = datetime.utcnow()
-db.commit()
-print("Password updated for the platform administrator.")
-PY
+```
+event=mfa_failed
 ```
 
-This is a non-interactive substitute only when the owner authorizes it and sets
-the password themselves; it must not be run by anyone else.
+That proves password verification now succeeds; MFA is the only remaining gate.
+No password, hash or secret was printed. MFA settings were not changed. The
+owner must complete the sign-in in the browser with their existing authenticator
+or an unused recovery code.
 
-### Internal teacher test account — NOT PROVISIONED
+### Internal teacher test account — PROVISIONED
 
-Read-only production query for `amegayiesaviour@gmail.com`:
-
-- matches: 0 (neither production nor staging has this account)
-- production internal accounts: 0
-- staging internal accounts: 1 (staging QA account only)
-
-The owner must create the teacher account through the normal
-`/signup` flow (registration mode `invite_only`, Pilot invite code and
-Turnstile required). After that, provisioning can run:
+The dedicated account `amegayiesaviour@gmail.com` did not exist, so it was
+created with the owner-approved name and password as a normal individual teacher
+with the standard Free entitlement. The owner then authorised the existing
+provisioning script, which was run against the verified production database:
 
 ```bash
-cd backend
 python scripts/provision_internal_test_account.py \
   --email amegayiesaviour@gmail.com \
   --actor bloomcoretechnologies@gmail.com \
   --apply
 ```
 
-The script refuses platform administrators, refuses a second internal account,
-and never prints credentials. It must run against the verified production
-backend/database.
+Result: `OK: grant applied ... changed=1`.
+
+Read-only verification:
+
+- exactly one `is_internal_test_account = true` row
+- email `amegayiesaviour@gmail.com`
+- role remains `teacher`, account active, not an administrator
+- quota: `unlimited = true`, `plan_name = Internal test account`
+- AI: `ai_enabled = true`, `ai_quota_unlimited = true`
+- other teachers remain on their existing plans: `saviour.amegayie.ds@gmail.com`
+  and `sheilamawusi@gmail.com` keep `generation_limit = 2`; the existing paid
+  teacher keeps their paid entitlement
+- no second internal account exists
 
 ### Status
 
-Overall remains **BLOCKED** until:
-
-1. the owner completes a password reset and a successful Super Admin login
-   (MFA included), and
-2. the teacher account exists and exactly one internal entitlement is
-   provisioned and verified in production.
+Overall remains **BLOCKED** only until the owner completes the browser
+Super Admin sign-in with their existing authenticator/recovery code and
+confirms it succeeded. Password verification and the internal entitlement are
+complete.
 
