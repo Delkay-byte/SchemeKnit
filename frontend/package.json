@@ -27,7 +27,9 @@
     "e2e:electron": "node e2e/electron-runtime.js",
     "e2e:teacher-admin": "node e2e/teacher-activation-admin.js",
     "e2e:responsive-a11y": "node e2e/responsive-accessibility.js",
-    "e2e:keyboard": "node e2e/accessibility-keyboard.js"
+    "e2e:keyboard": "node e2e/accessibility-keyboard.js",
+    "postinstall": "node scripts/patch-picomatch.cjs",
+    "test:security": "node --test tests/security/*.test.ts"
   },
   "keywords": [],
   "author": "",

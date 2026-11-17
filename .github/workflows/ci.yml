@@ -63,6 +63,8 @@ jobs:
         run: npm run lint
       - name: UX unit tests
         run: npm run test:ux
+      - name: Security regression tests
+        run: npm run test:security
       - run: npx tsc --noEmit
       - run: npm run build
       - name: Dependency audit (high and critical)
