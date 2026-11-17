@@ -137,10 +137,17 @@ def test_rubric_task_reads_as_english():
 
 
 def test_reference_dedupe_is_order_preserving_and_case_insensitive():
-    from src.routers.generation import _unique_text_items
+    from src.routers.generation import _normalize_references, _unique_text_items
     assert _unique_text_items(
         ["RME Curriculum, p. 12", "rme curriculum, P. 12", "Bible", "Bible"]
     ) == ["RME Curriculum, p. 12", "Bible"]
+    # A citation's internal comma is not a list separator.
+    assert _normalize_references(["RME Curriculum, p. 12"]) == [
+        "RME Curriculum, p. 12"]
+    assert _normalize_references("RME Curriculum, p. 12") == [
+        "RME Curriculum, p. 12"]
+    assert _normalize_references('["Bible", "Curriculum, p. 12"]') == [
+        "Bible", "Curriculum, p. 12"]
 
 
 def test_context_follow_up_is_a_complete_sentence():
