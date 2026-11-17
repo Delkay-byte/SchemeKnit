@@ -13,6 +13,7 @@ from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Re
 from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from typing import Optional
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import (
@@ -52,6 +53,22 @@ MIN_SETUP_PASSWORD_LEN = 8
 #: role after the password check; a mismatch returns the same generic 401 as
 #: bad credentials (no account-role oracle).
 VALID_LOGIN_ENTRIES = frozenset({"teacher", "school_admin", "platform_admin"})
+
+
+def _find_user_for_login(db: Session, lookup: str) -> Optional[User]:
+    """Resolve the account for a normalized login identifier.
+
+    The exact match is the indexed, normal path. Rows written before email
+    normalization (surrounding whitespace, mixed case) are still matched by a
+    case/whitespace-insensitive comparison, so a legacy account cannot lock its
+    owner out. The fallback returns at most one row because email is unique.
+    """
+    user = db.query(User).filter(User.email == lookup).first()
+    if user is None and lookup:
+        user = db.query(User).filter(
+            func.lower(func.trim(User.email)) == lookup
+        ).first()
+    return user
 
 
 def _entry_matches_role(user: User, entry: str) -> bool:
@@ -629,7 +646,7 @@ async def login(req: LoginRequest, db: Session = Depends(get_db),
             remote_ip=client_ip(request) if request is not None else None,
         )
 
-    user = db.query(User).filter(User.email == lookup).first()
+    user = _find_user_for_login(db, lookup)
     password_ok = bool(user) and verify_password(
         req.password, user.hashed_password)
     if not user:
