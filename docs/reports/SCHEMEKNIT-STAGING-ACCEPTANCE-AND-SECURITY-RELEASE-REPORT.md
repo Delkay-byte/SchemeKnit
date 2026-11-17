@@ -208,19 +208,114 @@ structure, not by opening Word visually.
 
 ## 10. Owner actions
 
-1. Sign in as Super Admin at `/login/platform-admin/` with
-   `bloomcoretechnologies@gmail.com` and the current authenticator code, or an
-   unused recovery code. If both are lost, authorize a controlled MFA reset.
-2. Provision the production internal test account after choosing the dedicated
-   normal teacher address:
+## 11. Production owner checks (2026-11-17, post-release)
 
-   ```bash
-   cd backend
-   python scripts/provision_internal_test_account.py \
-     --email <dedicated-owner-teacher-email> \
-     --actor bloomcoretechnologies@gmail.com \
-     --apply
-   ```
+### Environment identity (read-only)
 
-   The script refuses a platform admin and refuses a second internal account.
-3. Re-check the production login and the internal entitlement after those steps.
+| Item | Evidence |
+| --- | --- |
+| Repository `main` | `1a97a28406e7b0cba35da7c0cef17855c3e85907` |
+| Production frontend | `schemeknit-frontend`, live `3f6875f` |
+| Production API | `schemeknit-api`, live `5a88a35` (docs-only difference from `1a97a28`) |
+| Production database | Neon database `neondb` |
+| Staging database | Neon database `schemeknit_staging` |
+| Separation | Different databases; staging frontend env points at `https://schemeknit-staging-api.onrender.com` |
+| Provisioning script | Present on `main` and in the live backend image |
+| Migration v055 | Present on `main`; applied in production |
+| Entitlement implementation | Present in `src/entitlements.py` |
+
+### Super Admin login — BLOCKED (password verification)
+
+Recent production backend logs show:
+
+```
+event=login_failed reason=bad_credentials
+POST /api/auth/login 401 Unauthorized
+```
+
+The account-key hashes map the attempts:
+
+- `00040604…` = `bloomcoretechnologies@gmail.com` — three failed password checks
+  at 19:56:45, 19:57:06 and 19:57:21 UTC.
+- `38970480…` = `amegayiesaviour@gmail.com` — one failed check at 20:02:32 UTC.
+  This account does not exist yet, so any password fails.
+
+The account row is healthy: `bloomcoretechnologies@gmail.com`, role
+`platform_admin`, active, `is_admin = true`, MFA enabled, valid bcrypt hash
+shape, no lockout. Because the failure is `bad_credentials`, the password did
+not verify; MFA was never reached. The app returns the same generic 401 for a
+wrong password and for a wrong MFA code, so logs are the distinguishing
+evidence.
+
+Turnstile: login pages intentionally do **not** show the widget on first load.
+The backend only requires it after repeated failures
+(`LOGIN_TURNSTILE_AFTER_FAILURES`, default 3) and returns a machine code that
+renders the widget. Registration (`/signup`) always shows Turnstile. A quiet
+login page is expected behaviour, not a missing widget.
+
+Required action: a controlled password reset. The owner must set the new
+password personally; no password, reset token or secret should be sent in chat.
+Safe command for the verified production backend Render shell (interactive
+`getpass`, no password in history or output):
+
+```bash
+cd /opt/render/project/src/backend
+python - <<'PY'
+import getpass
+from datetime import datetime
+from src.database import SessionLocal, User
+from src.auth import hash_password
+
+email = "bloomcoretechnologies@gmail.com"
+first = getpass.getpass("New password: ")
+second = getpass.getpass("Confirm new password: ")
+if first != second or len(first) < 8:
+    raise SystemExit("Passwords do not match or are too short.")
+
+db = SessionLocal()
+user = db.query(User).filter(User.email == email).first()
+if user is None or user.role != "platform_admin":
+    raise SystemExit("Expected platform-admin account not found.")
+user.hashed_password = hash_password(first)
+user.password_changed_at = datetime.utcnow()
+db.commit()
+print("Password updated for the platform administrator.")
+PY
+```
+
+This is a non-interactive substitute only when the owner authorizes it and sets
+the password themselves; it must not be run by anyone else.
+
+### Internal teacher test account — NOT PROVISIONED
+
+Read-only production query for `amegayiesaviour@gmail.com`:
+
+- matches: 0 (neither production nor staging has this account)
+- production internal accounts: 0
+- staging internal accounts: 1 (staging QA account only)
+
+The owner must create the teacher account through the normal
+`/signup` flow (registration mode `invite_only`, Pilot invite code and
+Turnstile required). After that, provisioning can run:
+
+```bash
+cd backend
+python scripts/provision_internal_test_account.py \
+  --email amegayiesaviour@gmail.com \
+  --actor bloomcoretechnologies@gmail.com \
+  --apply
+```
+
+The script refuses platform administrators, refuses a second internal account,
+and never prints credentials. It must run against the verified production
+backend/database.
+
+### Status
+
+Overall remains **BLOCKED** until:
+
+1. the owner completes a password reset and a successful Super Admin login
+   (MFA included), and
+2. the teacher account exists and exactly one internal entitlement is
+   provisioned and verified in production.
+
