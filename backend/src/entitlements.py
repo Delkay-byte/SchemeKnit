@@ -247,7 +247,49 @@ def resolve_entitlement(db: Session, user: User) -> Dict[str, Any]:
         "expires_at": None,
         "is_active": True,
         "school_name": None,
+        "is_internal_test_account": False,
     }
+
+    # ── Owner-only internal test account ───────────────────────────────────
+    # One explicitly entitled server-side account gets unlimited APPLICATION
+    # generation/AI. It is a normal teacher (never a Super Admin), stays subject
+    # to authentication, tenant isolation, rate limits and every external AI
+    # provider limit, and is labelled internal so its usage never counts as
+    # customer billing or revenue.
+    if bool(getattr(user, "is_internal_test_account", False)):
+        result.update({
+            "source": "internal",
+            "edition": "internal",
+            "subscription_type": None,
+            "plan_name": "Internal test account",
+            "generation_limit": 0,
+            "generations_used": 0,
+            "lesson_quota_unlimited": True,
+            "lesson_quota_limit": 0,
+            "lesson_quota_remaining": None,
+            "lesson_quota_period": PERIOD_TYPE_CALENDAR_MONTH,
+            "lesson_quota_period_key": current_period_key(),
+            "batch_generation": True,
+            "zip_export": True,
+            "pdf_export": True,
+            "custom_template_limit": 100,
+            "history_limit": 1000,
+            "ai_enabled": True,
+            "ai_credits": 0,
+            "ai_credits_used": 0,
+            "ai_quota_unlimited": True,
+            "ai_quota_limit": 0,
+            "ai_quota_used": 0,
+            "ai_quota_remaining": None,
+            "ai_quota_period": PERIOD_TYPE_CALENDAR_MONTH,
+            "ai_quota_period_key": current_period_key(),
+            "plan": PLAN_PRO,
+            "status": PLAN_STATUS_ACTIVE,
+            "plan_source": "internal_test_account",
+            "is_internal_test_account": True,
+            "internal_test_label": "Internal test account — excluded from billing",
+        })
+        return result
 
     # Apply individual teacher entitlement
     if has_individual:
@@ -418,6 +460,7 @@ def lesson_quota_status(db: Session, user: User, resolved: Optional[Dict[str, An
             "period_key": period_key,
             "unit": "lesson_plan",
             "credits": state,
+            "internal_test_account": bool(resolved.get("is_internal_test_account")),
         }
     limit = int(state["free"]["limit"]) + paid_total
     used = int(state["free"]["used"])
@@ -434,6 +477,7 @@ def lesson_quota_status(db: Session, user: User, resolved: Optional[Dict[str, An
         "period_key": period_key,
         "unit": "lesson_plan",
         "credits": state,
+        "internal_test_account": bool(resolved.get("is_internal_test_account")),
     }
 
 
@@ -576,6 +620,8 @@ def ai_entitlement(user: User, db: Session) -> Tuple[bool, str]:
     Precedence: an active school license grants unlimited AI and is NEVER
     monthly-limited. Otherwise the individual entitlement decides.
     """
+    if bool(getattr(user, "is_internal_test_account", False)):
+        return True, "internal_test_account"
     school_id = getattr(user, "school_id", None)
     if school_id:
         license = db.query(SchoolLicenseDB).filter(
@@ -637,6 +683,9 @@ def consume_ai_generation(user: User, db: Session, request_id: Optional[str] = N
     ``request_id`` so a duplicate frontend submission cannot double-consume
     the same successful generation request.
     """
+    # Internal test account: unlimited application usage, consume nothing.
+    if bool(getattr(user, "is_internal_test_account", False)):
+        return -1
     # School license → unlimited; nothing to consume.
     school_id = getattr(user, "school_id", None)
     if school_id:

@@ -95,6 +95,10 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
     role = Column(String, default="teacher")  # platform_admin, school_admin, teacher
+    #: Exactly one owner-controlled internal QA account. Checked server-side by
+    #: entitlements.resolve_entitlement/ai_entitlement; no client input can set
+    #: it. Internal usage is labelled and excluded from customer billing.
+    is_internal_test_account = Column(Boolean, default=False, nullable=False)
     school_id = Column(String, ForeignKey("schools.id"), nullable=True)
     subscription_type = Column(String, nullable=True)  # individual | school | null
     # Session invalidation: bumped on every password change/reset. The JWT
