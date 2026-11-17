@@ -75,11 +75,22 @@ export interface FormPlan {
   title_pattern: string | null
 }
 
-export interface AppendixBlock {
+export interface AppendixTextBlock {
+  kind?: 'paragraph'
   text: string
-  bold: boolean
-  page_break_before: boolean
+  bold?: boolean
+  page_break_before?: boolean
 }
+
+/** A criteria × levels matrix rendered as a real Word table. */
+export interface AppendixTableBlock {
+  kind: 'table'
+  headers: string[]
+  rows: string[][]
+  page_break_before?: boolean
+}
+
+export type AppendixBlock = AppendixTextBlock | AppendixTableBlock
 
 export interface ExportDocument {
   lesson_id: string | null

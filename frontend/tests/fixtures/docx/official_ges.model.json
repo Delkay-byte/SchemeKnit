@@ -125,18 +125,23 @@
           "page_break_before": false
         },
         {
-          "text": "Criterion: Correct setup",
-          "bold": false,
-          "page_break_before": false
-        },
-        {
-          "text": "  4 — exceeds the standard: Funnel and paper seated correctly. (4 pt)",
-          "bold": false,
-          "page_break_before": false
-        },
-        {
-          "text": "  3 — meets the standard: Minor spillage only. (3 pt)",
-          "bold": false,
+          "kind": "table",
+          "headers": [
+            "Criterion",
+            "4 — exceeds the standard",
+            "3 — meets the standard",
+            "2 — developing",
+            "1 — needs support"
+          ],
+          "rows": [
+            [
+              "Correct setup",
+              "Funnel and paper seated correctly.",
+              "Minor spillage only.",
+              "",
+              ""
+            ]
+          ],
           "page_break_before": false
         },
         {
@@ -264,18 +269,23 @@
           "page_break_before": false
         },
         {
-          "text": "Criterion: Correct setup",
-          "bold": false,
-          "page_break_before": false
-        },
-        {
-          "text": "  4 — exceeds the standard: Funnel and paper seated correctly. (4 pt)",
-          "bold": false,
-          "page_break_before": false
-        },
-        {
-          "text": "  3 — meets the standard: Minor spillage only. (3 pt)",
-          "bold": false,
+          "kind": "table",
+          "headers": [
+            "Criterion",
+            "4 — exceeds the standard",
+            "3 — meets the standard",
+            "2 — developing",
+            "1 — needs support"
+          ],
+          "rows": [
+            [
+              "Correct setup",
+              "Funnel and paper seated correctly.",
+              "Minor spillage only.",
+              "",
+              ""
+            ]
+          ],
           "page_break_before": false
         },
         {
@@ -403,18 +413,23 @@
           "page_break_before": false
         },
         {
-          "text": "Criterion: Correct setup",
-          "bold": false,
-          "page_break_before": false
-        },
-        {
-          "text": "  4 — exceeds the standard: Funnel and paper seated correctly. (4 pt)",
-          "bold": false,
-          "page_break_before": false
-        },
-        {
-          "text": "  3 — meets the standard: Minor spillage only. (3 pt)",
-          "bold": false,
+          "kind": "table",
+          "headers": [
+            "Criterion",
+            "4 — exceeds the standard",
+            "3 — meets the standard",
+            "2 — developing",
+            "1 — needs support"
+          ],
+          "rows": [
+            [
+              "Correct setup",
+              "Funnel and paper seated correctly.",
+              "Minor spillage only.",
+              "",
+              ""
+            ]
+          ],
           "page_break_before": false
         },
         {
@@ -498,18 +513,23 @@
         "page_break_before": false
       },
       {
-        "text": "Criterion: Correct setup",
-        "bold": false,
-        "page_break_before": false
-      },
-      {
-        "text": "  4 — exceeds the standard: Funnel and paper seated correctly. (4 pt)",
-        "bold": false,
-        "page_break_before": false
-      },
-      {
-        "text": "  3 — meets the standard: Minor spillage only. (3 pt)",
-        "bold": false,
+        "kind": "table",
+        "headers": [
+          "Criterion",
+          "4 — exceeds the standard",
+          "3 — meets the standard",
+          "2 — developing",
+          "1 — needs support"
+        ],
+        "rows": [
+          [
+            "Correct setup",
+            "Funnel and paper seated correctly.",
+            "Minor spillage only.",
+            "",
+            ""
+          ]
+        ],
         "page_break_before": false
       },
       {
@@ -590,18 +610,23 @@
         "page_break_before": false
       },
       {
-        "text": "Criterion: Correct setup",
-        "bold": false,
-        "page_break_before": false
-      },
-      {
-        "text": "  4 — exceeds the standard: Funnel and paper seated correctly. (4 pt)",
-        "bold": false,
-        "page_break_before": false
-      },
-      {
-        "text": "  3 — meets the standard: Minor spillage only. (3 pt)",
-        "bold": false,
+        "kind": "table",
+        "headers": [
+          "Criterion",
+          "4 — exceeds the standard",
+          "3 — meets the standard",
+          "2 — developing",
+          "1 — needs support"
+        ],
+        "rows": [
+          [
+            "Correct setup",
+            "Funnel and paper seated correctly.",
+            "Minor spillage only.",
+            "",
+            ""
+          ]
+        ],
         "page_break_before": false
       },
       {
@@ -682,18 +707,23 @@
         "page_break_before": false
       },
       {
-        "text": "Criterion: Correct setup",
-        "bold": false,
-        "page_break_before": false
-      },
-      {
-        "text": "  4 — exceeds the standard: Funnel and paper seated correctly. (4 pt)",
-        "bold": false,
-        "page_break_before": false
-      },
-      {
-        "text": "  3 — meets the standard: Minor spillage only. (3 pt)",
-        "bold": false,
+        "kind": "table",
+        "headers": [
+          "Criterion",
+          "4 — exceeds the standard",
+          "3 — meets the standard",
+          "2 — developing",
+          "1 — needs support"
+        ],
+        "rows": [
+          [
+            "Correct setup",
+            "Funnel and paper seated correctly.",
+            "Minor spillage only.",
+            "",
+            ""
+          ]
+        ],
         "page_break_before": false
       },
       {

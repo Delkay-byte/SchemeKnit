@@ -288,10 +288,14 @@ def build_assessment_items(
     ))
 
     # 2 — the indicator-action check (carries the lesson's real evidence).
+    # The fallback must read as a complete instruction. "demonstrates discuss
+    # on ..." (and "demonstrates {focus}") was produced by slotting the raw
+    # indicator phrase after a noun-taking verb; "shows they can {phrase}"
+    # accepts both the bare action and the full indicator phrase.
     verb_check = activity_library.assessment_for_verb(action, _short(f)) or (
-        (f"Each learner demonstrates {f} once, to the agreed criteria.")
+        (f"Each learner shows they can {f} once, to the agreed criteria.")
         if focus_starts_with_action else
-        (f"Each learner demonstrates {action} on {f} once, to the agreed "
+        (f"Each learner shows they can {action} {f} once, to the agreed "
          "criteria."))
     items.append(dict(
         prompt=_capital(verb_check.rstrip(".")) + ".",
@@ -337,9 +341,13 @@ def build_assessment_items(
                               "creative beyond that earns full credit."),
             misconception=("Learners copy the classroom example instead of "
                            "building one from the stated context."),
-            follow_up=("Acknowledge the classroom copy, then ask 'what would "
-                       "change in {ctx}?' and let the learner adapt one "
-                       "feature.".format(ctx=hint.split(",")[0].strip().rstrip("."))),
+            # Never splice the context sentence into this prompt: the context
+            # bank is written as a standalone instruction ("Frame the task
+            # around ..."), so embedding it produced "what would change in
+            # Frame the task around ...". The question stands on its own.
+            follow_up=("Acknowledge the classroom copy, then ask 'What would "
+                       "change if this example came from a different place or "
+                       "person?' and let the learner adapt one feature."),
         ))
 
     return items
@@ -581,10 +589,11 @@ def build_rubric(
 ) -> Optional[dict]:
     """An analytic marking rubric for THIS lesson's product/performance.
 
-    Returns None when the assessment does not genuinely mark a learner-created
-    product, performance, investigation or extended response — a short
-    oral/written check gets marking guidance in the items only (no rubric
-    theatre).
+    Every non-early-years lesson gets a matrix: the downloaded plan must show
+    the saved rubric criteria and levels in the assessment section, and a
+    lesson that quietly omits it produces a misleading document. The criteria
+    come from the action's own category, so the matrix never claims an
+    authority the task does not have.
     """
     if _is_early_years(class_level):
         return None
@@ -592,15 +601,6 @@ def build_rubric(
     if not action:
         return None
     category = _bloom_category(action)
-    productish = (
-        category in ("create", "evaluate", "analyse", "practice")
-        or action in ("write", "present", "perform", "construct", "install",
-                      "build", "make", "draw", "sketch", "compose", "sing",
-                      "design", "dramatize", "dramatise", "produce", "publish",
-                      "record", "model", "assemble")
-    )
-    if not productish:
-        return None
 
     criteria: List[dict] = []
     total = 0

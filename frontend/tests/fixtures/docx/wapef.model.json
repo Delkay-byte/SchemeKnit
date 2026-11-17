@@ -34,13 +34,13 @@
           "SUB_STRAND": "Mixtures",
           "CONTENT_STANDARD": "B7.2.1 Demonstrate understanding of mixtures and separation.",
           "LEARNING_INDICATOR": "B7.2.1.1 Describe mixtures\nB7.2.1.2 Separate mixtures",
-          "PERFORMANCE_INDICATOR": "Explain filtration using a diagram\nSeparate a sand-and-water mixture",
+          "PERFORMANCE_INDICATOR": "Explain filtration using a diagram.\nSeparate a sand-and-water mixture.",
           "CORE_COMPETENCIES": "Critical thinking, Collaboration",
           "KEY_WORDS": "filtration, filtrate, residue",
-          "THROUGH_LINE": "",
-          "GODS_STORY": "",
-          "DEEP_HOPE": "",
-          "STORYLINE": "",
+          "THROUGH_LINE": "Creation enjoyer. Learners practise receiving creation with wonder while working with mixtures.",
+          "GODS_STORY": "Creation — God made living things with remarkable variety and order, and he delights in what he has made. Psalm 104:24 celebrates the earth being full of God's creatures and works; careful observation is a way of attending to that goodness. In this lesson, learners work with mixtures, and the teacher helps them see that life is a gift with order, value and interdependence. Reference: Psalm 104:24.",
+          "DEEP_HOPE": "That learners will grow in reverence, curiosity and care for living things, so that they practise observing carefully before drawing conclusions and use science to serve God and their neighbours.",
+          "STORYLINE": "God's story tells of creation, human failure, redemption and restoration. In this lesson, learners work with mixtures. They discover that life is a gift with order, value and interdependence, and they are invited to observe and care for living things so that their community and environment can thrive.",
           "PHASE_1_STARTER": "- Show muddy water and ask how it can be made clear.\n- Predict what happens to muddy water in a funnel.",
           "PHASE_1_RESOURCES": "",
           "PHASE_2_MAIN": "- Learners filter their own sample in pairs.\n- Demonstrate folding filter paper and pouring the mixture.\n- Class Assignment: Draw and label the filtration setup.",
@@ -125,18 +125,23 @@
           "page_break_before": false
         },
         {
-          "text": "Criterion: Correct setup",
-          "bold": false,
-          "page_break_before": false
-        },
-        {
-          "text": "  4 — exceeds the standard: Funnel and paper seated correctly. (4 pt)",
-          "bold": false,
-          "page_break_before": false
-        },
-        {
-          "text": "  3 — meets the standard: Minor spillage only. (3 pt)",
-          "bold": false,
+          "kind": "table",
+          "headers": [
+            "Criterion",
+            "4 — exceeds the standard",
+            "3 — meets the standard",
+            "2 — developing",
+            "1 — needs support"
+          ],
+          "rows": [
+            [
+              "Correct setup",
+              "Funnel and paper seated correctly.",
+              "Minor spillage only.",
+              "",
+              ""
+            ]
+          ],
           "page_break_before": false
         },
         {
@@ -175,13 +180,13 @@
           "SUB_STRAND": "Mixtures",
           "CONTENT_STANDARD": "B7.2.1 Demonstrate understanding of mixtures and separation.",
           "LEARNING_INDICATOR": "B7.2.1.1 Describe mixtures\nB7.2.1.2 Separate mixtures",
-          "PERFORMANCE_INDICATOR": "Explain filtration using a diagram\nSeparate a sand-and-water mixture",
+          "PERFORMANCE_INDICATOR": "Explain filtration using a diagram.\nSeparate a sand-and-water mixture.",
           "CORE_COMPETENCIES": "Critical thinking, Collaboration",
           "KEY_WORDS": "filtration, filtrate, residue",
-          "THROUGH_LINE": "",
-          "GODS_STORY": "",
-          "DEEP_HOPE": "",
-          "STORYLINE": "",
+          "THROUGH_LINE": "Creation enjoyer. Learners practise receiving creation with wonder while working with mixtures.",
+          "GODS_STORY": "Creation — God made living things with remarkable variety and order, and he delights in what he has made. Psalm 104:24 celebrates the earth being full of God's creatures and works; careful observation is a way of attending to that goodness. In this lesson, learners work with mixtures, and the teacher helps them see that life is a gift with order, value and interdependence. Reference: Psalm 104:24.",
+          "DEEP_HOPE": "That learners will grow in reverence, curiosity and care for living things, so that they practise observing carefully before drawing conclusions and use science to serve God and their neighbours.",
+          "STORYLINE": "God's story tells of creation, human failure, redemption and restoration. In this lesson, learners work with mixtures. They discover that life is a gift with order, value and interdependence, and they are invited to observe and care for living things so that their community and environment can thrive.",
           "PHASE_1_STARTER": "- Show muddy water and ask how it can be made clear.\n- Predict what happens to muddy water in a funnel.",
           "PHASE_1_RESOURCES": "",
           "PHASE_2_MAIN": "- Learners filter their own sample in pairs.\n- Demonstrate folding filter paper and pouring the mixture.\n- Class Assignment: Draw and label the filtration setup.",
@@ -266,18 +271,23 @@
           "page_break_before": false
         },
         {
-          "text": "Criterion: Correct setup",
-          "bold": false,
-          "page_break_before": false
-        },
-        {
-          "text": "  4 — exceeds the standard: Funnel and paper seated correctly. (4 pt)",
-          "bold": false,
-          "page_break_before": false
-        },
-        {
-          "text": "  3 — meets the standard: Minor spillage only. (3 pt)",
-          "bold": false,
+          "kind": "table",
+          "headers": [
+            "Criterion",
+            "4 — exceeds the standard",
+            "3 — meets the standard",
+            "2 — developing",
+            "1 — needs support"
+          ],
+          "rows": [
+            [
+              "Correct setup",
+              "Funnel and paper seated correctly.",
+              "Minor spillage only.",
+              "",
+              ""
+            ]
+          ],
           "page_break_before": false
         },
         {
@@ -316,13 +326,13 @@
           "SUB_STRAND": "Mixtures",
           "CONTENT_STANDARD": "B7.2.1 Demonstrate understanding of mixtures and separation.",
           "LEARNING_INDICATOR": "B7.2.1.1 Describe mixtures\nB7.2.1.2 Separate mixtures",
-          "PERFORMANCE_INDICATOR": "Explain filtration using a diagram\nSeparate a sand-and-water mixture",
+          "PERFORMANCE_INDICATOR": "Explain filtration using a diagram.\nSeparate a sand-and-water mixture.",
           "CORE_COMPETENCIES": "Critical thinking, Collaboration",
           "KEY_WORDS": "filtration, filtrate, residue",
-          "THROUGH_LINE": "",
-          "GODS_STORY": "",
-          "DEEP_HOPE": "",
-          "STORYLINE": "",
+          "THROUGH_LINE": "Creation enjoyer. Learners practise receiving creation with wonder while working with mixtures.",
+          "GODS_STORY": "Creation — God made living things with remarkable variety and order, and he delights in what he has made. Psalm 104:24 celebrates the earth being full of God's creatures and works; careful observation is a way of attending to that goodness. In this lesson, learners work with mixtures, and the teacher helps them see that life is a gift with order, value and interdependence. Reference: Psalm 104:24.",
+          "DEEP_HOPE": "That learners will grow in reverence, curiosity and care for living things, so that they practise observing carefully before drawing conclusions and use science to serve God and their neighbours.",
+          "STORYLINE": "God's story tells of creation, human failure, redemption and restoration. In this lesson, learners work with mixtures. They discover that life is a gift with order, value and interdependence, and they are invited to observe and care for living things so that their community and environment can thrive.",
           "PHASE_1_STARTER": "- Show muddy water and ask how it can be made clear.\n- Predict what happens to muddy water in a funnel.",
           "PHASE_1_RESOURCES": "",
           "PHASE_2_MAIN": "- Learners filter their own sample in pairs.\n- Demonstrate folding filter paper and pouring the mixture.\n- Class Assignment: Draw and label the filtration setup.",
@@ -407,18 +417,23 @@
           "page_break_before": false
         },
         {
-          "text": "Criterion: Correct setup",
-          "bold": false,
-          "page_break_before": false
-        },
-        {
-          "text": "  4 — exceeds the standard: Funnel and paper seated correctly. (4 pt)",
-          "bold": false,
-          "page_break_before": false
-        },
-        {
-          "text": "  3 — meets the standard: Minor spillage only. (3 pt)",
-          "bold": false,
+          "kind": "table",
+          "headers": [
+            "Criterion",
+            "4 — exceeds the standard",
+            "3 — meets the standard",
+            "2 — developing",
+            "1 — needs support"
+          ],
+          "rows": [
+            [
+              "Correct setup",
+              "Funnel and paper seated correctly.",
+              "Minor spillage only.",
+              "",
+              ""
+            ]
+          ],
           "page_break_before": false
         },
         {
@@ -502,18 +517,23 @@
         "page_break_before": false
       },
       {
-        "text": "Criterion: Correct setup",
-        "bold": false,
-        "page_break_before": false
-      },
-      {
-        "text": "  4 — exceeds the standard: Funnel and paper seated correctly. (4 pt)",
-        "bold": false,
-        "page_break_before": false
-      },
-      {
-        "text": "  3 — meets the standard: Minor spillage only. (3 pt)",
-        "bold": false,
+        "kind": "table",
+        "headers": [
+          "Criterion",
+          "4 — exceeds the standard",
+          "3 — meets the standard",
+          "2 — developing",
+          "1 — needs support"
+        ],
+        "rows": [
+          [
+            "Correct setup",
+            "Funnel and paper seated correctly.",
+            "Minor spillage only.",
+            "",
+            ""
+          ]
+        ],
         "page_break_before": false
       },
       {
@@ -594,18 +614,23 @@
         "page_break_before": false
       },
       {
-        "text": "Criterion: Correct setup",
-        "bold": false,
-        "page_break_before": false
-      },
-      {
-        "text": "  4 — exceeds the standard: Funnel and paper seated correctly. (4 pt)",
-        "bold": false,
-        "page_break_before": false
-      },
-      {
-        "text": "  3 — meets the standard: Minor spillage only. (3 pt)",
-        "bold": false,
+        "kind": "table",
+        "headers": [
+          "Criterion",
+          "4 — exceeds the standard",
+          "3 — meets the standard",
+          "2 — developing",
+          "1 — needs support"
+        ],
+        "rows": [
+          [
+            "Correct setup",
+            "Funnel and paper seated correctly.",
+            "Minor spillage only.",
+            "",
+            ""
+          ]
+        ],
         "page_break_before": false
       },
       {
@@ -686,18 +711,23 @@
         "page_break_before": false
       },
       {
-        "text": "Criterion: Correct setup",
-        "bold": false,
-        "page_break_before": false
-      },
-      {
-        "text": "  4 — exceeds the standard: Funnel and paper seated correctly. (4 pt)",
-        "bold": false,
-        "page_break_before": false
-      },
-      {
-        "text": "  3 — meets the standard: Minor spillage only. (3 pt)",
-        "bold": false,
+        "kind": "table",
+        "headers": [
+          "Criterion",
+          "4 — exceeds the standard",
+          "3 — meets the standard",
+          "2 — developing",
+          "1 — needs support"
+        ],
+        "rows": [
+          [
+            "Correct setup",
+            "Funnel and paper seated correctly.",
+            "Minor spillage only.",
+            "",
+            ""
+          ]
+        ],
         "page_break_before": false
       },
       {

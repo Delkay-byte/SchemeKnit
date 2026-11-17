@@ -34,6 +34,7 @@ from .docx_export import (
     _day_row_value,
     _lesson_field_value,
     default_template_for_lessons,
+    rubric_matrix_rows,
 )
 from .official_ges_levels import spec_for_template_id
 from .official_ges_template import (
@@ -237,17 +238,20 @@ def _assessment_blocks(lp: LessonPlan) -> List[Dict[str, Any]]:
         blocks.append(_heading("Marking Rubric for the Learner Task", 3))
         if rubric.task:
             blocks.append(_paragraph(_runs((rubric.task, False))))
-        for criterion in rubric.criteria:
-            blocks.append(_paragraph(_runs(
-                (f"Criterion: {criterion.criterion}", False))))
-            for descriptor in criterion.descriptors:
-                points = (descriptor.get("points") or "").strip()
-                label = dict(zip(("4", "3", "2", "1"),
-                                 _RUBRIC_LEVEL_NAMES)).get(
-                                     points, f"{points} points")
-                blocks.append(_paragraph(_runs(
-                    (f"  {label}: {descriptor.get('descriptor', '')} "
-                     f"({points} pt)", False))))
+        matrix_rows = rubric_matrix_rows(rubric)
+        cells = [
+            {"r": 0, "c": 0, "text": "Criterion", "bold": True},
+            *[{"r": 0, "c": index + 1, "text": name, "bold": True}
+              for index, name in enumerate(_RUBRIC_LEVEL_NAMES)],
+        ]
+        for row_index, values in enumerate(matrix_rows, start=1):
+            for column_index, value in enumerate(values):
+                cells.append({
+                    "r": row_index,
+                    "c": column_index,
+                    "text": value,
+                })
+        blocks.append(_table(len(matrix_rows) + 1, 5, cells))
         blocks.append(_paragraph(_runs(
             (f"Total marks: {rubric.total_points}", False))))
         if rubric.evidence_to_award:
@@ -491,6 +495,14 @@ def _assessment_appendix(lp: LessonPlan) -> List[Dict[str, Any]]:
     def paragraph(text: str) -> None:
         blocks.append({"text": text, "bold": False, "page_break_before": False})
 
+    def rubric_table(rubric) -> None:
+        blocks.append({
+            "kind": "table",
+            "headers": ["Criterion", *_RUBRIC_LEVEL_NAMES],
+            "rows": rubric_matrix_rows(rubric),
+            "page_break_before": False,
+        })
+
     heading(f"Assessment Structure — Week {lp.week_number} "
             f"(Lesson {lp.lesson_sequence})", page_break_before=True)
     if class_task or home_task:
@@ -515,15 +527,7 @@ def _assessment_appendix(lp: LessonPlan) -> List[Dict[str, Any]]:
         heading("Marking Rubric for the Learner Task")
         if rubric.task:
             paragraph(rubric.task)
-        for criterion in rubric.criteria:
-            paragraph(f"Criterion: {criterion.criterion}")
-            for descriptor in criterion.descriptors:
-                points = (descriptor.get("points") or "").strip()
-                label = dict(zip(("4", "3", "2", "1"),
-                                 _RUBRIC_LEVEL_NAMES)).get(
-                                     points, f"{points} points")
-                paragraph(f"  {label}: {descriptor.get('descriptor', '')} "
-                          f"({points} pt)")
+        rubric_table(rubric)
         paragraph(f"Total marks: {rubric.total_points}")
         if rubric.evidence_to_award:
             paragraph(rubric.evidence_to_award)
@@ -617,7 +621,7 @@ def build_docx_model(
     if structure and structure.get("tables"):
         model["renderer"] = "blocks"
         model["structure"] = structure
-        model["documents"] = [
+        custom_documents = [
             {
                 **_document_header(lp, index),
                 "blocks": structure_blocks(
@@ -625,6 +629,13 @@ def build_docx_model(
             }
             for index, lp in enumerate(lessons)
         ]
+        # Teacher-built structures carry the same assessment structure as the
+        # approved forms; omitting it silently dropped every rubric.
+        for document, lp in zip(custom_documents, lessons):
+            document["appendix"] = _assessment_appendix(lp)
+        model["documents"] = custom_documents
+        model["appendices"] = [document["appendix"]
+                               for document in custom_documents]
         return model
 
     form_documents = []

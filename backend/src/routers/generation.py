@@ -504,9 +504,7 @@ def _render_context(db, user_id: str, job, scheme_db, lp_models) -> Dict:
     return {
         "term": scheme_db.term if scheme_db and scheme_db.term else None,
         "academic_term": snapshot.get("term") if snapshot else None,
-        "period": (prefs.default_period if prefs else "")
-                  or snapshot.get("period", "")
-                  or (lp_models[0].period if lp_models else ""),
+        "period": (snapshot.get("period", "") if snapshot else ""),
         "teaching_days": day_names,
     }
 
@@ -2971,6 +2969,22 @@ async def get_curriculum_coverage(
     }
 
 
+def _require_export_rubrics(lp_models) -> None:
+    """Stop an export that would silently omit a required scoring matrix."""
+    from ..engines.docx_export import required_rubric_missing
+    missing = required_rubric_missing(lp_models)
+    if missing:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "This export is missing the saved marking rubric for "
+                + ", ".join(missing)
+                + ". Regenerate those lesson plans so the rubric matrix is "
+                  "saved, then export again."
+            ),
+        )
+
+
 @router.post("/{job_id}/export/docx")
 async def export_docx(
     job_id: str,
@@ -2989,6 +3003,7 @@ async def export_docx(
         raise HTTPException(status_code=404, detail="No lesson plans found")
 
     lp_models = [_db_to_lesson_model(lp) for lp in lessons]
+    _require_export_rubrics(lp_models)
     tt = TemplateType(template_type) if template_type in [t.value for t in TemplateType] else TemplateType.GES_STYLE
 
     scheme_db = data_service.get_scheme(db, job.scheme_id, user.id)
@@ -3081,6 +3096,7 @@ async def get_export_model(
     from ..engines.docx_export import default_template_for_lessons
 
     lp_models = [_db_to_lesson_model(lp) for lp in lessons]
+    _require_export_rubrics(lp_models)
     tt = (TemplateType(template_type)
           if template_type in [t.value for t in TemplateType]
           else TemplateType.GES_STYLE)
@@ -3198,6 +3214,7 @@ async def export_pdf(
         raise HTTPException(status_code=404, detail="No lesson plans found")
 
     lp_models = [_db_to_lesson_model(lp) for lp in lessons]
+    _require_export_rubrics(lp_models)
     tt = TemplateType(template_type) if template_type in [t.value for t in TemplateType] else TemplateType.GES_STYLE
 
     scheme_db = data_service.get_scheme(db, job.scheme_id, user.id)
@@ -3459,6 +3476,7 @@ async def export_zip(
         raise HTTPException(status_code=403, detail=reason)
 
     lp_models = [_db_to_lesson_model(lp) for lp in lessons]
+    _require_export_rubrics(lp_models)
     tt = TemplateType(template_type) if template_type in [t.value for t in TemplateType] else TemplateType.GES_STYLE
 
     zip_path = Path(f"exports/{user.id}/{job_id}/lesson_plans.zip")
@@ -4402,6 +4420,32 @@ def _db_to_lesson_model(lp) -> LessonPlan:
     # is the load path for review AND every export, so a repair here fixes
     # both without touching the stored rows (teacher edits stay untouched).
     from ..ai_resource_text import normalize_text_items
+    structured_references = [
+        entry
+        for entry in (
+            _reference_entry(entry)
+            for entry in normalize_structured_references(
+                getattr(lp, "structured_references", None))
+        )
+        if entry is not None
+    ]
+    # A teacher who filled only the structured reference fields must still see
+    # a REFERENCE value in the exported header. Compose display text from the
+    # stored fields only — blank page/author are omitted, never invented.
+    references = normalize_text_items(lp.references)
+    seen_references = {r.lower() for r in references}
+    for entry in structured_references:
+        label = ", ".join(part for part in (
+            entry.title.strip(),
+            entry.author_publisher.strip(),
+        ) if part)
+        if entry.page.strip():
+            label = f"{label} — p. {entry.page.strip()}" if label else f"p. {entry.page.strip()}"
+        if entry.notes.strip():
+            label = f"{label} ({entry.notes.strip()})" if label else entry.notes.strip()
+        if label and label.lower() not in seen_references:
+            references.append(label)
+            seen_references.add(label.lower())
     return LessonPlan(
         id=lp.id,
         scheme_of_work_id=lp.scheme_id,
@@ -4455,16 +4499,8 @@ def _db_to_lesson_model(lp) -> LessonPlan:
         assessment_rubric=parse_assessment_rubric(
             getattr(lp, "assessment_rubric", None)),
         conclusion=lp.conclusion,
-        references=normalize_text_items(lp.references),
-        structured_references=[
-            entry
-            for entry in (
-                _reference_entry(entry)
-                for entry in normalize_structured_references(
-                    getattr(lp, "structured_references", None))
-            )
-            if entry is not None
-        ],
+        references=references,
+        structured_references=structured_references,
         keywords=normalize_text_items(lp.keywords),
         homework=getattr(lp, "homework", "") or "",
         class_assignment=getattr(lp, "class_assignment", "") or "",

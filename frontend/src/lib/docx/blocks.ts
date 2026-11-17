@@ -83,6 +83,8 @@ function gridTable(block: Extract<DocxBlock, { kind: 'table' | 'customTable' }>)
       .sort((a, b) => a.c - b.c)
     rows.push(
       new TableRow({
+        tableHeader: r === 0,
+        cantSplit: true,
         children: cells.map((cell) => new TableCell({
           children: cellParagraphs(cell),
           columnSpan: cell.colspan && cell.colspan > 1 ? cell.colspan : undefined,
@@ -113,6 +115,7 @@ export function blockToDocx(block: DocxBlock): Paragraph | Table {
           }),
         ],
         spacing: { before: 120, after: 80 },
+        keepNext: true,
       })
     case 'paragraph':
       return paragraphFromRuns(block.runs, block.style === 'List Bullet')
@@ -126,14 +129,51 @@ export function blockToDocx(block: DocxBlock): Paragraph | Table {
   }
 }
 
+function appendixBlockToDocx(block: import('./types').AppendixBlock): Paragraph | Table {
+  if (block.kind === 'table') {
+    const rows = [block.headers || [], ...(block.rows || [])].map((values, index) =>
+      new TableRow({
+        tableHeader: index === 0,
+        cantSplit: true,
+        children: values.map((value) => new TableCell({
+          children: [new Paragraph({
+            children: [new TextRun({
+              text: value || '',
+              bold: index === 0,
+              size: 16,
+              font: BODY_FONT,
+            })],
+            spacing: { after: 0 },
+          })],
+        })),
+      }),
+    )
+    return new Table({
+      rows,
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      borders: TABLE_BORDER,
+    })
+  }
+  return new Paragraph({
+    children: [new TextRun({ text: block.text || '', bold: Boolean(block.bold), font: BODY_FONT })],
+    pageBreakBefore: Boolean(block.page_break_before),
+  })
+}
+
 export function buildBlocksDocument(
   documents: ExportDocument[],
   structure?: ExportStructure,
+  appendices?: import('./types').AppendixBlock[][],
 ): Document {
   const children: (Paragraph | Table)[] = []
-  for (const document of documents) {
+  documents.forEach((document) => {
     for (const block of document.blocks || []) {
       children.push(blockToDocx(block))
+    }
+  })
+  for (const appendix of appendices || []) {
+    for (const block of appendix || []) {
+      children.push(appendixBlockToDocx(block))
     }
   }
   if (!children.length) children.push(new Paragraph({}))
@@ -160,6 +200,7 @@ export function buildBlocksDocument(
 export async function packBlocksDocument(
   documents: ExportDocument[],
   structure?: ExportStructure,
+  appendices?: import('./types').AppendixBlock[][],
 ): Promise<Blob> {
-  return Packer.toBlob(buildBlocksDocument(documents, structure))
+  return Packer.toBlob(buildBlocksDocument(documents, structure, appendices))
 }

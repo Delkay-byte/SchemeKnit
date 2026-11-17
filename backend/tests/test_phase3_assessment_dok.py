@@ -186,12 +186,15 @@ def test_no_invented_official_grading_claims():
     assert "official" not in blob
 
 
-def test_ordinary_check_lesson_gets_no_rubric():
-    assert build_rubric(
+def test_ordinary_check_lesson_still_gets_scoring_matrix():
+    """Every JHS lesson exports a criteria × levels matrix (no silent omission)."""
+    rubric = build_rubric(
         indicator="B7.1.1.1.1 Identify hardware components",
-        focus="hardware components", class_level="Basic 7") is None
-    assert build_rubric(indicator="B6.1.1.1.6 Skip count in 5,000s",
-                        focus="skip counting", class_level="Basic 6") is None
+        focus="hardware components", class_level="Basic 7")
+    assert rubric is not None and rubric["criteria"]
+    rubric = build_rubric(indicator="B6.1.1.1.6 Skip count in 5,000s",
+                          focus="skip counting", class_level="Basic 6")
+    assert rubric is not None and rubric["criteria"]
 
 
 def test_early_years_get_no_rubric():
@@ -212,11 +215,17 @@ def test_generation_attaches_structure_matching_demand():
     assert lp.assessment_rubric.criteria
 
 
-def test_generation_no_rubric_for_simple_check():
+def test_generation_always_has_rubric_for_jhs_check():
+    """A short-check lesson still needs the exported scoring matrix.
+
+    The DOCX must show criteria and levels for every non-early-years lesson;
+    silently omitting the matrix was the production defect.
+    """
     lp = _generate(*_b(level=B7, code="B7.1.1.1.1", subject=Subject.ICT,
                        indicator="B7.1.1.1.1 Identify hardware components"))
     assert lp.assessment_items, "items still required for a check lesson"
-    assert lp.assessment_rubric is None              # short check → no rubric
+    assert lp.assessment_rubric is not None
+    assert lp.assessment_rubric.criteria
 
 
 def test_dok_spread_not_forced():

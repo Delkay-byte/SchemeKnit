@@ -141,6 +141,12 @@ function pageBreakParagraph(doc: Document): Element {
 function appendAppendix(doc: Document, body: Element, sectPr: Element | null,
   blocks: import('./types').AppendixBlock[]): void {
   for (const block of blocks || []) {
+    if (block.kind === 'table') {
+      const table = appendixTable(doc, block)
+      if (sectPr) body.insertBefore(table, sectPr)
+      else body.appendChild(table)
+      continue
+    }
     const paragraph = makeEl(doc, 'p')
     if (block.page_break_before) {
       const pPr = makeEl(doc, 'pPr')
@@ -158,6 +164,71 @@ function appendAppendix(doc: Document, body: Element, sectPr: Element | null,
     if (sectPr) body.insertBefore(paragraph, sectPr)
     else body.appendChild(paragraph)
   }
+}
+
+function borderSet(doc: Document): Element {
+  const borders = makeEl(doc, 'tblBorders')
+  for (const side of ['top', 'left', 'bottom', 'right', 'insideH', 'insideV']) {
+    const border = makeEl(doc, side)
+    border.setAttributeNS(W_NS, 'w:val', 'single')
+    border.setAttributeNS(W_NS, 'w:sz', '4')
+    border.setAttributeNS(W_NS, 'w:space', '0')
+    border.setAttributeNS(W_NS, 'w:color', '808080')
+    borders.appendChild(border)
+  }
+  return borders
+}
+
+/** Build the rubric matrix table: header row repeats on every page. */
+function appendixTable(doc: Document,
+  block: import('./types').AppendixTableBlock): Element {
+  const table = makeEl(doc, 'tbl')
+  const props = makeEl(doc, 'tblPr')
+  const width = makeEl(doc, 'tblW')
+  width.setAttributeNS(W_NS, 'w:type', 'pct')
+  width.setAttributeNS(W_NS, 'w:w', '5000')
+  props.appendChild(width)
+  props.appendChild(borderSet(doc))
+  table.appendChild(props)
+
+  const addRow = (values: string[], header: boolean) => {
+    const row = makeEl(doc, 'tr')
+    if (header) {
+      const trPr = makeEl(doc, 'trPr')
+      trPr.appendChild(makeEl(doc, 'tblHeader'))
+      row.appendChild(trPr)
+    }
+    for (const value of values) {
+      const cell = makeEl(doc, 'tc')
+      const cellProps = makeEl(doc, 'tcPr')
+      const cellWidth = makeEl(doc, 'tcW')
+      cellWidth.setAttributeNS(W_NS, 'w:type', 'pct')
+      cellWidth.setAttributeNS(W_NS, 'w:w', header ? '20' : '20')
+      cellProps.appendChild(cellWidth)
+      const shade = makeEl(doc, 'shd')
+      shade.setAttributeNS(W_NS, 'w:val', 'clear')
+      shade.setAttributeNS(W_NS, 'w:fill', header ? 'E7EEF5' : 'FFFFFF')
+      cellProps.appendChild(shade)
+      cell.appendChild(cellProps)
+      const paragraph = makeEl(doc, 'p')
+      const run = makeEl(doc, 'r')
+      const runProps = makeEl(doc, 'rPr')
+      if (header) runProps.appendChild(makeEl(doc, 'b'))
+      const size = makeEl(doc, 'sz')
+      size.setAttributeNS(W_NS, 'w:val', '16')
+      runProps.appendChild(size)
+      run.appendChild(runProps)
+      run.appendChild(makeText(doc, value || ''))
+      paragraph.appendChild(run)
+      cell.appendChild(paragraph)
+      row.appendChild(cell)
+    }
+    table.appendChild(row)
+  }
+
+  addRow(block.headers || [], true)
+  for (const values of block.rows || []) addRow(values, false)
+  return table
 }
 
 function topLevelParagraphs(roots: Element[]): Element[] {
@@ -310,6 +381,46 @@ function styleWapefPagination(doc: Document): void {
   }
 }
 
+function styleFormPagination(doc: Document): void {
+  // GES forms: repeat the delivery-grid header on continuation pages and keep
+  // short rows whole. Only header-looking first rows are marked, so a metadata
+  // row is never duplicated at the top of a page.
+  const headerWords = /PHASE|CRITERION|ASSESSMENT|WEEK|ACTIVIT/i
+  for (const table of elements(doc, 'tbl')) {
+    const rows = directChildren(table, 'tr')
+    if (rows.length < 2) continue
+    const firstRowText = directChildren(rows[0], 'tc')
+      .map((cell) => paragraphsWithin([cell]).map((p) => paragraphText(p)).join(''))
+      .join(' ')
+    if (!headerWords.test(firstRowText)) continue
+    const headerPr = directChildren(rows[0], 'trPr')[0] || (() => {
+      const pr = makeEl(doc, 'trPr')
+      rows[0].insertBefore(pr, rows[0].firstChild)
+      return pr
+    })()
+    if (!directChildren(headerPr, 'tblHeader').length) {
+      headerPr.appendChild(makeEl(doc, 'tblHeader'))
+    }
+    for (let i = 1; i < rows.length; i += 1) {
+      const row = rows[i]
+      const textLength = directChildren(row, 'tc')
+        .map((cell) => paragraphsWithin([cell]).map((p) => paragraphText(p)).join(''))
+        .join('').length
+      const rowPr = directChildren(row, 'trPr')[0] || (() => {
+        const pr = makeEl(doc, 'trPr')
+        row.insertBefore(pr, row.firstChild)
+        return pr
+      })()
+      const split = directChildren(rowPr, 'cantSplit')[0]
+      if (textLength < 1800 && !split) {
+        rowPr.appendChild(makeEl(doc, 'cantSplit'))
+      } else if (textLength >= 1800 && split) {
+        rowPr.removeChild(split)
+      }
+    }
+  }
+}
+
 export function fillFormDocument(
   templateBytes: Uint8Array,
   plans: FormPlan[],
@@ -352,6 +463,7 @@ export function fillFormDocument(
   }
 
   if (plans[0]?.kind === 'wapef') styleWapefPagination(doc)
+  else styleFormPagination(doc)
 
   files['word/document.xml'] = strToU8(xml.serialize(doc))
   return zipSync(files, { level: 6 })

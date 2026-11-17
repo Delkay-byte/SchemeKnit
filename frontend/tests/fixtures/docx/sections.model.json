@@ -407,34 +407,67 @@
           "style": null
         },
         {
-          "kind": "paragraph",
-          "runs": [
+          "kind": "table",
+          "style": "Table Grid",
+          "rows": 2,
+          "cols": 5,
+          "cells": [
             {
-              "text": "Criterion: Correct setup",
-              "bold": false
-            }
-          ],
-          "style": null
-        },
-        {
-          "kind": "paragraph",
-          "runs": [
+              "r": 0,
+              "c": 0,
+              "text": "Criterion",
+              "bold": true
+            },
             {
-              "text": "  4 — exceeds the standard: Funnel and paper seated correctly. (4 pt)",
-              "bold": false
-            }
-          ],
-          "style": null
-        },
-        {
-          "kind": "paragraph",
-          "runs": [
+              "r": 0,
+              "c": 1,
+              "text": "4 — exceeds the standard",
+              "bold": true
+            },
             {
-              "text": "  3 — meets the standard: Minor spillage only. (3 pt)",
-              "bold": false
+              "r": 0,
+              "c": 2,
+              "text": "3 — meets the standard",
+              "bold": true
+            },
+            {
+              "r": 0,
+              "c": 3,
+              "text": "2 — developing",
+              "bold": true
+            },
+            {
+              "r": 0,
+              "c": 4,
+              "text": "1 — needs support",
+              "bold": true
+            },
+            {
+              "r": 1,
+              "c": 0,
+              "text": "Correct setup"
+            },
+            {
+              "r": 1,
+              "c": 1,
+              "text": "Funnel and paper seated correctly."
+            },
+            {
+              "r": 1,
+              "c": 2,
+              "text": "Minor spillage only."
+            },
+            {
+              "r": 1,
+              "c": 3,
+              "text": ""
+            },
+            {
+              "r": 1,
+              "c": 4,
+              "text": ""
             }
-          ],
-          "style": null
+          ]
         },
         {
           "kind": "paragraph",
@@ -879,34 +912,67 @@
           "style": null
         },
         {
-          "kind": "paragraph",
-          "runs": [
+          "kind": "table",
+          "style": "Table Grid",
+          "rows": 2,
+          "cols": 5,
+          "cells": [
             {
-              "text": "Criterion: Correct setup",
-              "bold": false
-            }
-          ],
-          "style": null
-        },
-        {
-          "kind": "paragraph",
-          "runs": [
+              "r": 0,
+              "c": 0,
+              "text": "Criterion",
+              "bold": true
+            },
             {
-              "text": "  4 — exceeds the standard: Funnel and paper seated correctly. (4 pt)",
-              "bold": false
-            }
-          ],
-          "style": null
-        },
-        {
-          "kind": "paragraph",
-          "runs": [
+              "r": 0,
+              "c": 1,
+              "text": "4 — exceeds the standard",
+              "bold": true
+            },
             {
-              "text": "  3 — meets the standard: Minor spillage only. (3 pt)",
-              "bold": false
+              "r": 0,
+              "c": 2,
+              "text": "3 — meets the standard",
+              "bold": true
+            },
+            {
+              "r": 0,
+              "c": 3,
+              "text": "2 — developing",
+              "bold": true
+            },
+            {
+              "r": 0,
+              "c": 4,
+              "text": "1 — needs support",
+              "bold": true
+            },
+            {
+              "r": 1,
+              "c": 0,
+              "text": "Correct setup"
+            },
+            {
+              "r": 1,
+              "c": 1,
+              "text": "Funnel and paper seated correctly."
+            },
+            {
+              "r": 1,
+              "c": 2,
+              "text": "Minor spillage only."
+            },
+            {
+              "r": 1,
+              "c": 3,
+              "text": ""
+            },
+            {
+              "r": 1,
+              "c": 4,
+              "text": ""
             }
-          ],
-          "style": null
+          ]
         },
         {
           "kind": "paragraph",
@@ -1351,34 +1417,67 @@
           "style": null
         },
         {
-          "kind": "paragraph",
-          "runs": [
+          "kind": "table",
+          "style": "Table Grid",
+          "rows": 2,
+          "cols": 5,
+          "cells": [
             {
-              "text": "Criterion: Correct setup",
-              "bold": false
-            }
-          ],
-          "style": null
-        },
-        {
-          "kind": "paragraph",
-          "runs": [
+              "r": 0,
+              "c": 0,
+              "text": "Criterion",
+              "bold": true
+            },
             {
-              "text": "  4 — exceeds the standard: Funnel and paper seated correctly. (4 pt)",
-              "bold": false
-            }
-          ],
-          "style": null
-        },
-        {
-          "kind": "paragraph",
-          "runs": [
+              "r": 0,
+              "c": 1,
+              "text": "4 — exceeds the standard",
+              "bold": true
+            },
             {
-              "text": "  3 — meets the standard: Minor spillage only. (3 pt)",
-              "bold": false
+              "r": 0,
+              "c": 2,
+              "text": "3 — meets the standard",
+              "bold": true
+            },
+            {
+              "r": 0,
+              "c": 3,
+              "text": "2 — developing",
+              "bold": true
+            },
+            {
+              "r": 0,
+              "c": 4,
+              "text": "1 — needs support",
+              "bold": true
+            },
+            {
+              "r": 1,
+              "c": 0,
+              "text": "Correct setup"
+            },
+            {
+              "r": 1,
+              "c": 1,
+              "text": "Funnel and paper seated correctly."
+            },
+            {
+              "r": 1,
+              "c": 2,
+              "text": "Minor spillage only."
+            },
+            {
+              "r": 1,
+              "c": 3,
+              "text": ""
+            },
+            {
+              "r": 1,
+              "c": 4,
+              "text": ""
             }
-          ],
-          "style": null
+          ]
         },
         {
           "kind": "paragraph",

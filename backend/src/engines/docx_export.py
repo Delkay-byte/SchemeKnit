@@ -39,6 +39,113 @@ from .wapef_template import (
     render_document as render_wapef_document,
 )
 
+_RUBRIC_LEVEL_NAMES = (
+    "4 — exceeds the standard",
+    "3 — meets the standard",
+    "2 — developing",
+    "1 — needs support",
+)
+
+
+def rubric_matrix_rows(rubric) -> List[List[str]]:
+    """Criterion × level cells, in the stored descriptor order.
+
+    One row per criterion; each level cell carries the stored descriptor and
+    its points. Nothing is invented and no saved descriptor is dropped.
+    """
+    rows: List[List[str]] = []
+    levels = ("4", "3", "2", "1")
+    for criterion in getattr(rubric, "criteria", []) or []:
+        by_level = {}
+        for descriptor in criterion.descriptors or []:
+            points = (descriptor.get("points") or "").strip()
+            by_level[points] = descriptor.get("descriptor", "")
+        rows.append([
+            criterion.criterion,
+            *[by_level.get(level, "") for level in levels],
+        ])
+    return rows
+
+
+def add_rubric_table(document, rubric, font_size: int = 8) -> None:
+    """Render the saved rubric as a real criteria × levels matrix table.
+
+    The matrix must be visible as a scoring grid, not buried in prose. The
+    header row repeats across pages and rows never split mid-cell.
+    """
+    rows = rubric_matrix_rows(rubric)
+    if not rows:
+        return
+    table = document.add_table(rows=1, cols=5)
+    try:
+        table.style = "Table Grid"
+    except Exception:  # bundled forms may not carry the style
+        pass
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    header = table.rows[0]
+    for index, text in enumerate(("Criterion", *_RUBRIC_LEVEL_NAMES)):
+        cell = header.cells[index]
+        cell.text = ""
+        run = cell.paragraphs[0].add_run(text)
+        run.bold = True
+        run.font.size = Pt(font_size)
+    # Repeat the header on every page the table spans.
+    tr_pr = header._tr.get_or_add_trPr()
+    header_flag = tr_pr.makeelement(qn("w:tblHeader"), {})
+    tr_pr.append(header_flag)
+    for values in rows:
+        row = table.add_row()
+        row._tr.get_or_add_trPr().append(
+            row._tr.get_or_add_trPr().makeelement(qn("w:cantSplit"), {}))
+        for index, text in enumerate(values):
+            cell = row.cells[index]
+            cell.text = ""
+            run = cell.paragraphs[0].add_run(text or "")
+            run.font.size = Pt(font_size)
+    total = getattr(rubric, "total_points", None)
+    if total is not None:
+        paragraph = document.add_paragraph()
+        run = paragraph.add_run(f"Total marks: {total}")
+        run.bold = True
+
+
+def required_rubric_missing(lesson_plans) -> List[str]:
+    """Lessons whose assessment needs a saved rubric matrix but has none.
+
+    A non-early-years lesson with assessment prompts must export the scoring
+    matrix. Generating a document that silently omits it is a misleading
+    incomplete document, so the export stops with an actionable message.
+    """
+    missing: List[str] = []
+    for lp in lesson_plans or []:
+        items = [i for i in (getattr(lp, "assessment_items", None) or [])
+                 if (getattr(i, "prompt", "") or "").strip()]
+        if not items:
+            continue
+        class_level = getattr(lp, "class_level", "") or ""
+        class_level = getattr(class_level, "value", None) or str(class_level)
+        if class_level.startswith(("Nursery", "KG", "Kindergarten")):
+            continue
+        rubric = getattr(lp, "assessment_rubric", None)
+        if rubric is None or not (getattr(rubric, "criteria", None) or []):
+            missing.append(
+                f"Week {getattr(lp, 'week_number', '?')} "
+                f"(Lesson {getattr(lp, 'lesson_sequence', '?')})")
+    return missing
+
+
+def _pagination_ready(document) -> None:
+    """Keep headings with their content; never strand a heading at a page foot."""
+    for paragraph in document.paragraphs:
+        text = (paragraph.text or "").strip()
+        if not text:
+            continue
+        if text.startswith(("Assessment Structure",
+                            "Assessment Questions / Checks",
+                            "Marking Rubric for the Learner Task",
+                            "Assignments")):
+            paragraph.paragraph_format.keep_with_next = True
+
 
 class DOCXExportEngine:
     """Production DOCX generation for lesson plans."""
@@ -109,6 +216,7 @@ class DOCXExportEngine:
         self._setup_styles(doc)
         self._apply_custom_layout(doc, structure.get("layout", {}))
         render_custom_template(doc, lesson_plan, structure, context)
+        _append_assessment_structure(doc, [lesson_plan])
         if output_path is None:
             output_path = Path(f"lesson_plan_{lesson_plan.id}.docx")
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -131,6 +239,7 @@ class DOCXExportEngine:
                 doc.add_page_break()
             render_custom_template(doc, lp, structure, context,
                                    first_lesson=(index == 0))
+        _append_assessment_structure(doc, lesson_plans)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         doc.save(str(output_path))
         return output_path
@@ -429,21 +538,7 @@ class DOCXExportEngine:
             doc.add_heading('Marking Rubric for the Learner Task', level=3)
             if rubric.task:
                 doc.add_paragraph(rubric.task)
-            # Emitted as text lines, not a table: an extra rubric TABLE breaks
-            # the approved-source topology contract (generated table count must
-            # be an exact multiple of the source's — docx_structure_compare).
-            level_names = ("4 — exceeds the standard",
-                           "3 — meets the standard", "2 — developing",
-                           "1 — needs support")
-            for c in rubric.criteria:
-                doc.add_paragraph(f"Criterion: {c.criterion}")
-                for d in c.descriptors:
-                    pts = (d.get("points") or "").strip()
-                    label = {p: n for p, n in zip(("4", "3", "2", "1"), level_names)}.get(
-                        pts, f"{pts} points")
-                    doc.add_paragraph(
-                        f"  {label}: {d.get('descriptor', '')} ({pts} pt)")
-            doc.add_paragraph(f"Total marks: {rubric.total_points}")
+            add_rubric_table(doc, rubric)
             if rubric.evidence_to_award:
                 doc.add_paragraph(rubric.evidence_to_award)
             if rubric.authority_note:
@@ -562,25 +657,12 @@ def _append_assessment_structure(document, lessons) -> None:
             _heading(document, 'Marking Rubric for the Learner Task')
             if rubric.task:
                 document.add_paragraph(rubric.task)
-            # Text lines, never a table: bundled forms must keep the source's
-            # table topology exactly (extra tables fail the approved-source
-            # compare — generated count must be an exact multiple of source).
-            level_names = ("4 — exceeds the standard",
-                           "3 — meets the standard", "2 — developing",
-                           "1 — needs support")
-            for c in rubric.criteria:
-                document.add_paragraph(f"Criterion: {c.criterion}")
-                for d in c.descriptors:
-                    pts = (d.get("points") or "").strip()
-                    label = {p: n for p, n in zip(("4", "3", "2", "1"), level_names)}.get(
-                        pts, f"{pts} points")
-                    document.add_paragraph(
-                        f"  {label}: {d.get('descriptor', '')} ({pts} pt)")
-            document.add_paragraph(f"Total marks: {rubric.total_points}")
+            add_rubric_table(document, rubric)
             if rubric.evidence_to_award:
                 document.add_paragraph(rubric.evidence_to_award)
             if rubric.authority_note:
                 document.add_paragraph(rubric.authority_note)
+    _pagination_ready(document)
 
 
 def default_template_for_lessons(lesson_plans, template_type: TemplateType = None) -> Template:

@@ -8,7 +8,7 @@ for (const name of ['sections', 'custom_structure']) {
   test(`${name}: browser blocks preserve the server text`, async () => {
     const { model, backendText } = fixture(name)
     assert.equal(model.renderer, 'blocks')
-    const blob = await packBlocksDocument(model.documents, model.structure)
+    const blob = await packBlocksDocument(model.documents, model.structure, model.appendices)
     const bytes = new Uint8Array(await blob.arrayBuffer())
     const text = extractDocxText(bytes, xmldomAdapter)
     assertSameLines(text, backendText, name)

@@ -66,7 +66,7 @@ export async function buildSingleDocx(
   options: ExportOptions = {},
 ): Promise<Uint8Array> {
   if (model.renderer === 'form') return renderSingleForm(model, options)
-  const blob = await packBlocksDocument(model.documents, model.structure)
+  const blob = await packBlocksDocument(model.documents, model.structure, model.appendices)
   report(options, {
     phase: 'rendering',
     completed: model.documents.length,
@@ -92,7 +92,9 @@ export async function buildLessonDocx(
       appendices: document.appendix ? [document.appendix] : [],
     })
   }
-  const blob = await packBlocksDocument([document], model.structure)
+  const blob = await packBlocksDocument(
+    [document], model.structure, document.appendix ? [document.appendix] : [],
+  )
   return new Uint8Array(await blob.arrayBuffer())
 }
 
