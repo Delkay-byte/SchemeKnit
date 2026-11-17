@@ -239,7 +239,7 @@ export function LessonConfigModal({
         template_id: draft.template_id || null,
         indicator_resources: draft.indicator_resources || {},
         competency_selections: draft.competency_selections || {},
-        reference: null,
+        reference: (draft.reference || '').trim() || null,
       })
       const savedConfig = resp.config || draft
       rememberExplicitBlanks(savedConfig)
@@ -388,6 +388,12 @@ export function LessonConfigModal({
                 <Input id="lcfg-period" value={draft.period || ''}
                   placeholder="e.g. 1st & 2nd — leave blank if not applicable"
                   onChange={(e) => setDraft({ ...draft, period: e.target.value })} />
+              </Field>
+              <Field label="Reference (plan header)" htmlFor="lcfg-reference"
+                hint="Optional. Leave blank if the scheme states none">
+                <Input id="lcfg-reference" value={draft.reference || ''}
+                  placeholder="e.g. Computing Curriculum, p. 12"
+                  onChange={(e) => setDraft({ ...draft, reference: e.target.value })} />
               </Field>
             </div>
             <div>

@@ -142,9 +142,7 @@ export default function GeneratePage() {
   // interruptions. The browser never counts or ranks anything itself.
   const [autopilot, setAutopilot] = useState<any | null>(null)
   const [autopilotChecking, setAutopilotChecking] = useState(false)
-  // Intent recorded by the upload page's single action — consumed exactly once.
-  const autopilotIntent = useRef(false)
-  const autopilotFired = useRef(false)
+  // Generation is always explicit on this page; no intent flag may auto-fire a run.
   // The ordered work list shown while a run is in flight (never a fake
   // per-item completion — the POST is one synchronous run).
   const [progressRows, setProgressRows] = useState<
@@ -180,8 +178,9 @@ export default function GeneratePage() {
   // Guided configuration (Phase 2): the shared modal persists the plan's
   // lesson details; this page mirrors the saved values into the generation
   // payload and refreshes the allocation preview.
-  const handleLessonConfigSaved = async (saved: LessonRubricConfig) => {
+  const handleLessonConfigSaved = async (saved: LessonRubricConfig, missing: string[] = []) => {
     setLessonConfig(saved)
+    setLessonConfigMissing(missing)
     setConfigSavedAt(new Date().toLocaleTimeString())
     setConfig(prev => ({
       ...prev,
@@ -253,13 +252,9 @@ export default function GeneratePage() {
       if (!queryMethod && (savedMethod === 'zeli' || savedMethod === 'standard')) {
         setConfig(prev => ({ ...prev, generation_method: savedMethod }))
       }
-      // Autopilot intent (§17): the upload page's ONE explicit action records
-      // it here; a plain visit never auto-generates, so quota is never spent
-      // without a teacher click.
-      if (window.sessionStorage.getItem('schemeknit.autopilot_intent') === '1') {
-        autopilotIntent.current = true
-        window.sessionStorage.removeItem('schemeknit.autopilot_intent')
-      }
+      // Generation is always an explicit teacher action on this page. No
+      // upload/review/save/bookmark path may start a run before the lesson
+      // configuration has been completed and saved.
     } catch { /* storage unavailable */ }
     loadData()
     // WAPEF dropdown options are canonical; a failure just means the WAPEF
@@ -582,29 +577,13 @@ export default function GeneratePage() {
   // Autopilot plan (Priority 3.1): one plan per visit, re-planned whenever an
   // input that can change it changes (class / subject / template — the three
   // things that change blockers), so the card never shows a stale plan.
-  // When the upload page's ONE explicit action recorded intent, this page
-  // STARTS the run with no further teacher input; a plain visit only loads
-  // the plan for the card — quota is never spent without that click.
+  // It only DISPLAYS the plan; starting a run always needs the teacher's
+  // explicit Generate click on this page.
   useEffect(() => {
     if (loading || !scheme || jobId) return
     let cancelled = false
     ;(async () => {
-      const plan = await refreshAutopilot()
-      if (!plan || cancelled) return
-      if (autopilotIntent.current) {
-        autopilotIntent.current = false
-        if (plan.ready && !autopilotFired.current) {
-          autopilotFired.current = true
-          await runGeneration(
-            {
-              codes: plan.selected_indicator_codes || [],
-              occurrences: plan.selected_occurrence_ids || [],
-            },
-            plan.selected_rows || [],
-            plan,
-          )
-        }
-      }
+      await refreshAutopilot()
     })()
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1516,6 +1495,12 @@ export default function GeneratePage() {
                   Lesson settings last saved at {configSavedAt}.
                 </p>
               )}
+              {configSavedAt && schemeLessons.length > 0 && (
+                <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900" role="status">
+                  These plans were generated before your latest settings were saved.
+                  Regenerate a lesson to apply the saved rubric and references.
+                </p>
+              )}
             </SurfaceCard>
 
             {/* Autopilot (Priority 3.1): ONE explicit action + the smallest
@@ -2415,7 +2400,6 @@ export default function GeneratePage() {
                       // Autopilot results belong to the run that just ended.
                       setAutopilotResult(null);
                       setAutopilotOutcome(null);
-                      autopilotFired.current = false;
                     }}
                     className="w-full"
                     variant="outline"
