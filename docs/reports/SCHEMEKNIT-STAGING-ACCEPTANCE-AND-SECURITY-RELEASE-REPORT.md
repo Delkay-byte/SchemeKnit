@@ -296,8 +296,12 @@ Read-only verification:
 The remaining dev/build-only `picomatch` advisory is now covered by a focused
 remediation: `docs/reports/PICOMATCH-CVE-2026-112366-REMEDIATION-REPORT.md`.
 Status: **REMEDIATED** for all installed copies (2.3.2, 4.0.7 and Next's bundled
-copy), with the npm scanner limitation documented. No change to the historical
-release evidence above.
+copy), including capture-mode fallback, with dynamic discovery and fail-closed
+install/build guards. Merged in PR #17 (`93a73e6`) and deployed by the existing
+frontend autodeploy (`live 2026-11-17T22:26:14Z`); production smoke tests passed.
+The full npm audit still reports the advisory because the published versions are
+unchanged; that scanner limitation is documented. No historical release
+evidence above was rewritten.
 
 Overall production release remains **GREEN**: authentication, MFA, rubric
 workflow, DOCX export and the single internal teacher entitlement were verified.
