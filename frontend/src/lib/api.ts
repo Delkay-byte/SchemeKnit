@@ -6,6 +6,7 @@ import type { ExportModel } from './docx/types'
 import type {
   LessonConfigResponse,
   LessonRubricConfig,
+  WapefAnnualProfile,
   WapefOptions,
   WeeklyClassPlan,
   WeeklyDayOption,
@@ -548,6 +549,22 @@ class ApiService {
   // Approved WAPEF Plan option lists (teacher-selected structured fields)
   async getWapefOptions(): Promise<WapefOptions> {
     return this.request('/api/generation/wapef/options')
+  }
+
+  // WAPEF academic-year profile (Deep Hope + Storyline). Keyed by the scheme's
+  // academic year on the server, never by the browser.
+  async getWapefAnnual(schemeId: string): Promise<WapefAnnualProfile> {
+    return this.request(`/api/generation/${schemeId}/wapef-annual`)
+  }
+
+  async saveWapefAnnual(
+    schemeId: string,
+    values: { deep_hope: string; storyline: string },
+  ): Promise<WapefAnnualProfile> {
+    return this.request(`/api/generation/${schemeId}/wapef-annual`, {
+      method: 'PUT',
+      body: JSON.stringify(values),
+    })
   }
 
   // Generation API

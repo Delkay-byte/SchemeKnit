@@ -1051,8 +1051,8 @@ export function LessonWorkspace({
             <Button variant="outline" onClick={() => onExport('docx')} disabled={exporting === 'docx'}>
               {exporting === 'docx' ? 'Exporting…' : 'Export DOCX'}
             </Button>
-            <Button variant="outline" onClick={() => onExport('pdf')} disabled={exporting === 'pdf'}>
-              {exporting === 'pdf' ? 'Exporting…' : 'Export PDF'}
+            <Button variant="outline" disabled>
+              PDF Option Coming Soon
             </Button>
           </div>
         </SurfaceCard>

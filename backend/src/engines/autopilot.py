@@ -43,13 +43,15 @@ _WAPEF_DRAFT_KEYS = (
 def wapef_autopilot_state(
     template_id: Optional[str],
     drafts: Optional[Dict[str, Any]],
+    annual: Optional[Dict[str, Any]] = None,
+    topic_selections: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """WAPEF readiness for one scheme (spec §9, cases A/B/C).
 
     * Not the WAPEF template → nothing is required (``required=False``).
-    * WAPEF template + any saved reusable value in this scheme's review
-      drafts (case A: fully configured, case B: previously saved values) →
-      ``saved=True``, autopilot proceeds.
+    * WAPEF template + a configured annual profile (Deep Hope + Storyline) and
+      at least one topic selection, or any saved value in this scheme's review
+      drafts → ``saved=True``, autopilot proceeds.
     * WAPEF template + no saved values (case C) → ``saved=False``; the caller
       interrupts for the smallest necessary WAPEF input. Deep Hope,
       Storyline, Through lines and God's Story are never invented.
@@ -59,6 +61,22 @@ def wapef_autopilot_state(
         return {"required": False, "saved": True, "template_id": template_id or ""}
 
     saved = False
+    # The configuration dialog now owns the annual + topic selections, so the
+    # review drafts are no longer the only place a choice can live.
+    if isinstance(annual, dict) and annual.get("configured"):
+        saved = True
+    if not saved and isinstance(topic_selections, dict):
+        for entry in topic_selections.values():
+            if not isinstance(entry, dict):
+                continue
+            lines = entry.get("through_lines")
+            if isinstance(lines, (list, tuple)) and any(
+                    str(item).strip() for item in lines):
+                saved = True
+                break
+            if str(entry.get("gods_story") or "").strip():
+                saved = True
+                break
     for value in (drafts or {}).values():
         if not isinstance(value, dict):
             continue

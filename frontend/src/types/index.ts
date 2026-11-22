@@ -19,6 +19,23 @@ export interface WapefSelection {
   remarks?: string
 }
 
+/**
+ * Academic-year WAPEF values. Deep Hope and Storyline are chosen once for the
+ * year and reused on every WAPEF plan; a new year starts empty.
+ */
+export interface WapefAnnualProfile {
+  academic_year: string
+  deep_hope: string
+  storyline: string
+  configured: boolean
+  missing: string[]
+  updated_at?: string | null
+  options?: {
+    deep_hopes: string[]
+    storylines: string[]
+  }
+}
+
 export type EducationalLevel = 'Early Childhood' | 'Primary' | 'Junior High School' | 'Senior High School'
 
 export type ClassLevel =
@@ -141,6 +158,8 @@ export interface LessonRubricConfig {
   competency_selections?: Record<string, string[]>
   /** Canonical source occurrence id -> teacher key words / new vocabulary. */
   indicator_keywords?: Record<string, string[]>
+  /** Canonical source occurrence id -> WAPEF topic choices. */
+  indicator_wapef?: Record<string, { through_lines?: string[]; gods_story?: string }>
 }
 
 export interface LessonConfigResponse {

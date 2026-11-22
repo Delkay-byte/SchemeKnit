@@ -208,6 +208,28 @@ DATE_DASH_PATTERN = re.compile(r'(\d{1,2})-(\d{1,2})-(\d{2,4})')
 INDICATOR_CODE_PATTERN = re.compile(r'[BbKk]?\d+\.\d+\.\d+\.\d+(\.\d+)?')
 CONTENT_STANDARD_CODE_PATTERN = re.compile(r'[BbKk]?\d+\.\d+\.\d+\.\d+')
 
+#: Some sources typeset a code with spaces around its separators
+#: ("B4. 1.1.1.1-2", "B 4 . 1.1.1"). Rejoin them BEFORE matching so the
+#: curriculum prefix and the code stay one token; otherwise the pattern finds
+#: only the numeric tail and the prefix leaks into the description.
+_CODE_INNER_SPACE = re.compile(r'(?<=\d)\s*\.\s*(?=\d)')
+_CODE_RANGE_SPACE = re.compile(r'(?<=\d)\s*-\s*(?=\d)')
+_CODE_PREFIX_SPACE = re.compile(r'\b([BbKk])\s+(?=\d)')
+
+
+def canonicalize_code_spacing(text: str) -> str:
+    """Rejoin spaces a source printed inside a curriculum code.
+
+    The code itself is unchanged; only separator whitespace is removed, so
+    "B4. 1.1.1.1-2" becomes "B4.1.1.1.1-2" and matches the canonical pattern.
+    """
+    if not text:
+        return ""
+    out = _CODE_PREFIX_SPACE.sub(r'\1', text)
+    out = _CODE_INNER_SPACE.sub('.', out)
+    out = _CODE_RANGE_SPACE.sub('-', out)
+    return out
+
 #: Month name → number (full and common abbreviations), lowercased keys.
 _MONTHS = {
     "january": 1, "jan": 1, "february": 2, "feb": 2, "march": 3, "mar": 3,
@@ -942,7 +964,12 @@ class DOCXParser:
         return None
 
     def _normalize_header_text(self, text: str) -> str:
-        return text.strip().lower().replace('-', ' ').replace('_', ' ').strip()
+        # Collapse every run of whitespace (including the source's line breaks
+        # inside a wrapped label such as "CONTENT \nSTANDARD") before matching
+        # the alias table. Without this, a wrapped header never matches and the
+        # whole column is silently dropped.
+        collapsed = " ".join((text or "").split())
+        return collapsed.lower().replace('-', ' ').replace('_', ' ').strip()
 
     def _normalize_row(self, row: List[str], header_map: Dict[str, int]) -> Dict[str, str]:
         """Map cells to canonical field names using header_map: field_name -> column_index."""
@@ -1259,7 +1286,7 @@ class DOCXParser:
         all_resources: set = set()
 
         for row in teaching_rows:
-            cs_text = row.get("content_standard", "")
+            cs_text = canonicalize_code_spacing(row.get("content_standard", ""))
             if cs_text:
                 cs_code = self._extract_code(cs_text, CONTENT_STANDARD_CODE_PATTERN)
                 cs_desc = self._clean_description(cs_text, cs_code)
@@ -1272,7 +1299,7 @@ class DOCXParser:
                         description=(cs_desc or "").strip()
                     ))
 
-            ind_text = row.get("indicators", "")
+            ind_text = canonicalize_code_spacing(row.get("indicators", ""))
             if ind_text:
                 # A special-period row prints its label in the Indicator cell
                 # too ("END OF TERM ASSESSMENT"). The label has NO indicator

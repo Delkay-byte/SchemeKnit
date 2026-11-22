@@ -132,9 +132,9 @@ export default function TermsPage() {
 
       <LegalSection title="12. Exports">
         <p>
-          SchemeKnit supports DOCX and PDF export, and XLSX or ZIP export where
-          the relevant feature is available to your account. Download links are
-          short-lived and single-use. Export files are generated from your
+          SchemeKnit supports DOCX export (PDF export is coming soon), and XLSX
+          or ZIP export where the relevant feature is available to your account.
+          Download links are short-lived and single-use. Export files are generated from your
           persisted lesson data.
         </p>
       </LegalSection>

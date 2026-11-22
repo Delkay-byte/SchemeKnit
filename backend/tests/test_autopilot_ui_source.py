@@ -37,7 +37,7 @@ class TestUploadOneAction:
     def test_both_generation_methods_are_offered(self):
         src = _upload()
         assert "data-generate-standard" in src
-        assert "Generate my lesson plans" in src
+        assert "Generate without Zeli" in src
         assert "data-generate-zeli" in src
         assert "Generate with Zeli" in src
 
@@ -83,10 +83,11 @@ class TestGenerateAutopilotCard:
             "data-autopilot-blocker",
             "data-autopilot-review",
             "data-autopilot-action",
-            "data-autopilot-manual",
-            "data-autopilot-settings",
         ):
             assert attr in src, f"missing {attr}"
+        # One generation surface: the redundant secondary buttons are gone.
+        assert "data-autopilot-manual" not in src
+        assert "data-autopilot-settings" not in src
 
     def test_one_click_handler_posts_the_server_plan(self):
         src = _page()
@@ -122,8 +123,8 @@ class TestGenerateAutopilotCard:
 
     def test_capped_label_shows_the_exact_count(self):
         src = _page()
-        assert "quota_skipped_count > 0" in src
-        assert "`Generate ${autopilot.counts?.selected_count ?? 0} lesson plans`" in src
+        assert "autopilot?.counts?.selected_count" in src
+        assert "lesson plan${autopilot.counts.selected_count === 1 ? '' : 's'}" in src
 
 
 class TestHonestProgressAndResults:
@@ -246,10 +247,16 @@ class TestManualFlowUntouched:
         for attr in (
             "data-generate-config",
             "data-allocation-preview",
-            "data-wapef-setup",
             "data-generate-summary",
         ):
             assert attr in src, f"missing {attr}"
+        # WAPEF topic fields live in the configuration dialog, not a second
+        # always-visible card on the generate page.
+        assert "data-wapef-setup" not in src
+        modal = (FRONTEND / "src" / "components" / "lesson-config-modal.tsx").read_text(
+            encoding="utf-8")
+        assert "data-wapef-annual" in modal
+        assert "data-wapef-throughline" in modal
         # The redundant standalone review surface is gone; its WAPEF-only
         # fields remain in the compact card.
         assert "data-lesson-review" not in src
@@ -259,12 +266,15 @@ class TestManualFlowUntouched:
         assert "quotaLine" in src
 
     def test_review_page_label_is_unchanged(self):
-        assert "Approve & Configure" in REVIEW.read_text(encoding="utf-8")
+        assert "Approve & Proceed" in REVIEW.read_text(encoding="utf-8")
 
     def test_term_dates_are_seeded_from_the_scheme_not_hardcoded(self):
         src = _page()
-        assert "weekStarts[0] || prev.term_start_date" in src
-        assert "weekEnds[weekEnds.length - 1] || prev.term_end_date" in src
+        # The teacher's saved configuration is authoritative; the scheme's own
+        # span fills the field only when nothing was saved.
+        assert "savedConfig?.config?.term_start_date || weekStarts[0]" in src
+        assert "savedConfig?.config?.term_end_date" in src
+        assert "|| weekEnds[weekEnds.length - 1]" in src
 
     def test_committed_run_finalization_warning_is_surfaced(self):
         """A committed run with a finalization warning must not look clean.

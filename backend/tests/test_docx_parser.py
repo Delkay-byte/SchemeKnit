@@ -591,3 +591,21 @@ class TestSubjectDetection:
 
     def test_detect_none(self, parser):
         assert parser._extract_subject_from_text("Random text") is None
+
+
+class TestWapefSourceLayout:
+    """The supplied WAPEF scheme's wrapped header and spaced codes."""
+
+    def test_wrapped_content_standard_header_is_detected(self, parser):
+        header = parser._detect_header([
+            "WEEKS ", "STRAND ", "SUB STRANDS ", "CONTENT \nSTANDARD ",
+            "INDICATORS ", "RESOURCES ",
+        ])
+        assert header is not None
+        assert header["content_standard"] == 3
+        assert header["indicators"] == 4
+
+    def test_spaced_codes_are_rejoined(self):
+        from src.parsers.docx_parser import canonicalize_code_spacing
+        assert canonicalize_code_spacing("B4. 1.1.1.1-2") == "B4.1.1.1.1-2"
+        assert canonicalize_code_spacing("B 4 . 1.1.1") == "B4.1.1.1"

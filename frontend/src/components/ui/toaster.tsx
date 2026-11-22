@@ -109,10 +109,11 @@ export function Toaster() {
 
   return (
     <div
-      className="pointer-events-none fixed inset-x-3 bottom-3 z-50 flex flex-col gap-2 sm:left-auto sm:right-4 sm:w-full sm:max-w-sm"
+      className="pointer-events-none fixed inset-x-0 top-4 z-[100] mx-auto flex w-full max-w-md flex-col gap-2 px-3"
       aria-live="polite"
       aria-relevant="additions"
       data-toaster
+      data-toast-position="center-top"
     >
       {toasts.map((item) => {
         const variant = item.variant || 'default'

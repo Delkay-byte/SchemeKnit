@@ -859,6 +859,78 @@ async def get_wapef_options(
     return wapef_options()
 
 
+class WapefAnnualRequest(BaseModel):
+    """The two academic-year WAPEF fields (teacher-owned)."""
+
+    deep_hope: Optional[str] = None
+    storyline: Optional[str] = None
+
+
+def _scheme_academic_year(scheme_db) -> str:
+    return " ".join(str(getattr(scheme_db, "academic_year", "") or "").split())
+
+
+@router.get("/{scheme_id}/wapef-annual")
+def get_wapef_annual(
+    scheme_id: str,
+    user: User = Depends(require_teacher_workflow),
+    db: Session = Depends(get_db),
+):
+    """This teacher's Deep Hope + Storyline for the scheme's academic year.
+
+    The profile is keyed by (teacher, academic year), not by scheme: every
+    WAPEF lesson plan in the year reuses the same two values, and a new year
+    starts empty rather than inheriting the previous year's choices.
+    """
+    scheme_db = data_service.get_scheme(db, scheme_id, user.id)
+    if not scheme_db:
+        raise HTTPException(status_code=404, detail="Scheme not found")
+    from .. import wapef_annual
+
+    profile = wapef_annual.get_profile(
+        db, user.id, _scheme_academic_year(scheme_db))
+    profile["options"] = wapef_annual.annual_options()
+    return profile
+
+
+@router.put("/{scheme_id}/wapef-annual")
+def put_wapef_annual(
+    scheme_id: str,
+    payload: WapefAnnualRequest,
+    user: User = Depends(require_teacher_workflow),
+    db: Session = Depends(get_db),
+):
+    """Save ONE academic year's Deep Hope + Storyline (teacher edit only)."""
+    scheme_db = data_service.get_scheme(db, scheme_id, user.id)
+    if not scheme_db:
+        raise HTTPException(status_code=404, detail="Scheme not found")
+    from .. import wapef_annual
+
+    year = _scheme_academic_year(scheme_db)
+    if not year:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "This scheme does not state an academic year. Set the academic "
+                "year on the scheme before configuring WAPEF values."
+            ),
+        )
+    for label, value in (("Deep Hope", payload.deep_hope),
+                         ("Storyline", payload.storyline)):
+        if value and len(str(value).strip()) > wapef_annual.ANNUAL_TEXT_MAX:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"{label} is too long (max "
+                    f"{wapef_annual.ANNUAL_TEXT_MAX} characters)."
+                ),
+            )
+    profile = wapef_annual.save_profile(
+        db, user.id, year, payload.deep_hope, payload.storyline)
+    profile["options"] = wapef_annual.annual_options()
+    return profile
+
+
 # ── Guided lesson configuration (Phase 2) ────────────────────────────────────
 
 #: Fields the GES template requires before a plan can be generated. A field
@@ -897,6 +969,9 @@ class LessonConfigRequest(BaseModel):
     #: Canonical occurrence id -> teacher key words / new vocabulary. Optional;
     #: suggestions are generated automatically when this is absent.
     indicator_keywords: Optional[Dict[str, List[str]]] = None
+    #: Canonical occurrence id -> teacher-selected WAPEF topic fields:
+    #: {"through_lines": [...], "gods_story": "..."}.
+    indicator_wapef: Optional[Dict[str, Dict[str, Any]]] = None
 
 
 def _normalize_lesson_config(payload: LessonConfigRequest) -> dict:
@@ -1038,6 +1113,35 @@ def _normalize_lesson_config(payload: LessonConfigRequest) -> dict:
                         cleaned_terms.append(term)
                 selected[text] = cleaned_terms
             out["indicator_keywords"] = selected
+
+    if payload.indicator_wapef is not None:
+        from ..engines.wapef_fields import (
+            normalize_gods_story, normalize_through_lines,
+        )
+
+        if len(payload.indicator_wapef) > 500:
+            errors.append("Too many per-lesson WAPEF entries.")
+        else:
+            picked: Dict[str, Dict[str, Any]] = {}
+            for key, entry in payload.indicator_wapef.items():
+                text = str(key or "").strip()
+                parts = text.split(":", 2)
+                if (not text.startswith("week") or len(parts) != 3
+                        or not parts[0][4:].isdigit()
+                        or not parts[1].isdigit() or len(text) > 160):
+                    errors.append(f"Invalid WAPEF lesson key: {text[:40]}")
+                    continue
+                if not isinstance(entry, dict):
+                    errors.append(f"Invalid WAPEF entry: {text[:40]}")
+                    continue
+                through = normalize_through_lines(entry.get("through_lines"))
+                gods = normalize_gods_story(entry.get("gods_story"))
+                if through or gods:
+                    picked[text] = {
+                        "through_lines": through,
+                        "gods_story": gods,
+                    }
+            out["indicator_wapef"] = picked
 
     cs = payload.class_size
     if cs is not None:
@@ -1336,7 +1440,15 @@ async def autopilot_selection(
         indicatorless=indicatorless,
     )
 
-    wapef = wapef_autopilot_state(config.template_id, scheme_db.lesson_review_drafts or {})
+    from .. import wapef_annual
+    _annual = wapef_annual.get_profile(db, user.id, _scheme_academic_year(scheme_db))
+    _saved_cfg = _saved_lesson_config(scheme_db)
+    wapef = wapef_autopilot_state(
+        config.template_id,
+        scheme_db.lesson_review_drafts or {},
+        annual=_annual,
+        topic_selections=_saved_cfg.get("indicator_wapef") or {},
+    )
     blockers = selection_blockers(
         detection_status=detection_status,
         subject=scheme_db.subject,
@@ -1511,10 +1623,61 @@ def _generate_lesson_plans(
     _apply_saved_lesson_config(db, scheme_db, config, user)
     _require_lesson_config(config)
 
+    # ── WAPEF academic-year values (Deep Hope + Storyline) ───────────────
+    # These two fields are chosen once per academic year and reused on every
+    # WAPEF plan. A WAPEF run never invents them, never inherits last year's
+    # values and never lets AI replace them: without the year's profile the
+    # run stops here, before any quota or provider work.
+    annual_profile: Optional[dict] = None
+    from ..engines.wapef_template import is_wapef_template
+    if is_wapef_template(config.template_id):
+        from .. import wapef_annual
+        try:
+            annual_profile = wapef_annual.require_profile(
+                db, user.id, _scheme_academic_year(scheme_db))
+        except wapef_annual.WapefAnnualProfileMissing as exc:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"Set {', '.join(exc.missing)} for "
+                    f"{exc.academic_year or 'this academic year'} before "
+                    "generating a WAPEF lesson plan. Open Configure lesson "
+                    "rubrics and save the annual WAPEF values."
+                ),
+            )
+
     # ── AI commercial gate (checked BEFORE any generation work) ──────────
     # Commercial entitlement is enforced before any provider is constructed: an
     # installed local provider (e.g. Ollama) never grants access by itself. AI
     # OFF still generates a full deterministic lesson plan.
+    # Zeli consumes ONE AI generation per successful run. Check the SAME
+    # calendar-month ledger the dashboard shows BEFORE the generic entitlement
+    # gate so the teacher sees the exact exhausted allowance (and the lesson
+    # credit state too when both are empty).
+    if config.generation_method == GenerationMethod.ZELI:
+        from ..ai_quota import ai_quota_status
+        from ..entitlements import resolve_entitlement, lesson_quota_status
+        _resolved = resolve_entitlement(db, user)
+        _ai_q = ai_quota_status(
+            db, user.id, int(_resolved.get("ai_credits") or 0))
+        if _ai_q.get("enforced") and int(_ai_q.get("remaining") or 0) <= 0:
+            _lesson_q = lesson_quota_status(db, user, _resolved)
+            _msg = (
+                f"You've used all {_ai_q.get('limit')} AI generations for this "
+                "month, so Generate with Zeli cannot run. Use Generate without "
+                "Zeli, wait for next month's AI allowance, or upgrade for more "
+                "AI generations."
+            )
+            if (_lesson_q.get("enforced")
+                    and not _lesson_q.get("unlimited")
+                    and int(_lesson_q.get("remaining") or 0) <= 0):
+                _msg += (
+                    f" You have also used all {_lesson_q.get('limit')} "
+                    "lesson-plan credits for this month; buy a package to "
+                    "generate more plans."
+                )
+            raise HTTPException(status_code=403, detail=_msg)
+
     if config.ai_mode != AIMode.OFF:
         require_ai_entitlement(user, db)
 
@@ -1528,9 +1691,9 @@ def _generate_lesson_plans(
             raise HTTPException(
                 status_code=503,
                 detail=(
-                    "Generate with Zeli is not available right now. No lesson "
-                    "plans were saved and no lesson-plan quota was used. "
-                    "Choose Standard generation, or try again later."
+                    "Zeli's AI provider is not available right now. No lesson "
+                    "plans were saved and no lesson-plan credit was used. "
+                    "Use Generate without Zeli, or try again later."
                 ),
             )
 
@@ -1969,7 +2132,8 @@ def _generate_lesson_plans(
             # review state — never a stale in-memory copy.
             drafts = data_service.get_lesson_review_drafts(db, scheme_id, user.id) or {}
             for lp in job._lesson_plans:
-                _apply_lesson_review_draft(lp, drafts, config)
+                _apply_lesson_review_draft(lp, drafts, config,
+                                           annual=annual_profile)
                 _ensure_resources_used(lp)
 
             # ── Priority 4: the deterministic quality gate ────────────────
@@ -1985,6 +2149,7 @@ def _generate_lesson_plans(
             gate_report = _run_quality_gate(
                 job, config, scheme_id, drafts,
                 allow_rebuild=config.generation_method != GenerationMethod.ZELI,
+                annual=annual_profile,
             )
             accepted = gate_report["accepted"]
             gate_metrics = gate_report["metrics"]
@@ -2006,6 +2171,7 @@ def _generate_lesson_plans(
                 )
                 gate_report = _run_quality_gate(
                     job, config, scheme_id, drafts, allow_rebuild=False,
+                    annual=annual_profile,
                 )
                 accepted = gate_report["accepted"]
                 gate_metrics = gate_report["metrics"]
@@ -2017,12 +2183,13 @@ def _generate_lesson_plans(
                     hard_rejections=gate_metrics["hard_rejections"],
                 )
                 raise HTTPException(
-                    status_code=500,
+                    status_code=422,
                     detail=(
-                        "Generation failed: the lesson quality gate rejected "
+                        "Generation stopped: the lesson quality gate rejected "
                         "every lesson in this run, so nothing was saved and no "
-                        "lesson-plan quota was consumed. Re-run generation or "
-                        "adjust the source scheme. Rejections: "
+                        "lesson-plan quota was consumed. The source scheme is "
+                        "missing detail the plan needs; review the scheme, or "
+                        "retry with a different selection. Rejections: "
                         f"{gate_metrics['hard_rejections'] or gate_metrics['soft_rejections']}."
                     ),
                 )
@@ -3672,6 +3839,8 @@ def _apply_saved_lesson_config(db: Session, scheme_db, config: TermConfig,
         config.indicator_resources = saved["indicator_resources"]
     if isinstance(saved.get("competency_selections"), dict):
         config.competency_selections = saved["competency_selections"]
+    if isinstance(saved.get("indicator_wapef"), dict):
+        config.indicator_wapef = saved["indicator_wapef"]
     if saved.get("reference"):
         config.references = [saved["reference"]]
 
@@ -3875,7 +4044,8 @@ def _validate_resources(lp) -> list:
     return problems
 
 
-def _apply_lesson_review_draft(lp, drafts: dict, config=None) -> None:
+def _apply_lesson_review_draft(lp, drafts: dict, config=None,
+                               annual: Optional[dict] = None) -> None:
     """Apply teacher-saved pre-generation review fields onto a built lesson.
 
     The four editable review fields plus the four WAPEF teacher-selected
@@ -3884,6 +4054,10 @@ def _apply_lesson_review_draft(lp, drafts: dict, config=None) -> None:
     from the source document (Section P authority). WAPEF selections are
     normalized through the approved option lists; a teacher's own connection
     text is preserved verbatim.
+
+    ``annual`` is the teacher's academic-year WAPEF profile. When supplied it
+    is the ONLY source of Deep Hope and Storyline: a review draft, an AI
+    suggestion or a previous year's value can never replace them.
     """
     draft = {}
     if drafts:
@@ -4012,6 +4186,35 @@ def _apply_lesson_review_draft(lp, drafts: dict, config=None) -> None:
             from ..curriculum.competencies import normalize_competencies
             lp.core_competencies = normalize_competencies(active)
 
+    # Per-lesson WAPEF topic choices from the configuration dialog. Deep Hope
+    # and Storyline stay annual; Through lines and God's Story are selected per
+    # indicator and are applied after the draft (the dialog is explicit input).
+    if config is not None:
+        occurrence_key = (
+            getattr(lp, "source_occurrence_id", "")
+            or f"week{getattr(lp, 'week_number', 0)}:0:"
+               f"{(lp.indicator_codes[0] if lp.indicator_codes else '')}"
+        )
+        chosen = (getattr(config, "indicator_wapef", None) or {}).get(
+            occurrence_key)
+        if isinstance(chosen, dict):
+            from ..engines.wapef_fields import (
+                normalize_gods_story, normalize_through_lines,
+            )
+            through = normalize_through_lines(chosen.get("through_lines"))
+            gods = normalize_gods_story(chosen.get("gods_story"))
+            if through:
+                lp.wapef_through_lines = through
+            if gods:
+                lp.wapef_gods_story = gods
+
+    # ANNUAL WAPEF FIELDS WIN — the last word, after drafts, config and any AI
+    # path. Deep Hope and Storyline belong to the academic year, so even a
+    # stale draft that still carries per-lesson values cannot replace them.
+    if annual:
+        lp.wapef_deep_hope = str(annual.get("deep_hope") or "")
+        lp.wapef_storyline = str(annual.get("storyline") or "")
+
 
 #: Lesson fields the allocation loop (not the builder) assigns, which a rebuilt
 #: candidate must inherit from the original so drafts, replacement keys,
@@ -4024,7 +4227,8 @@ _REBUILD_METADATA_FIELDS = (
 )
 
 
-def _run_quality_gate(job, config, scheme_id, drafts, allow_rebuild: bool = True):
+def _run_quality_gate(job, config, scheme_id, drafts, allow_rebuild: bool = True,
+                      annual: Optional[dict] = None):
     """Priority 4 — validate every built lesson BEFORE any row is written.
 
     ``allow_rebuild=False`` is used for the "Generate with Zeli" method: the
@@ -4083,7 +4287,29 @@ def _run_quality_gate(job, config, scheme_id, drafts, allow_rebuild: bool = True
                 "wapef_deep_hope", "wapef_storyline",
                 "wapef_through_lines", "wapef_gods_story")):
             return None
-        return normalize_wapef_payload(draft, allow_custom=True)
+        canonical = normalize_wapef_payload(draft, allow_custom=True)
+        # Deep Hope and Storyline are annual, so compare against the annual
+        # profile - never an old per-lesson draft that predates the contract.
+        if annual:
+            canonical["deep_hope"] = str(annual.get("deep_hope") or "")
+            canonical["storyline"] = str(annual.get("storyline") or "")
+        # Topic fields may also have been chosen in the configuration dialog;
+        # that explicit selection is what the lesson actually carries.
+        occurrence = (
+            getattr(lp, "source_occurrence_id", "")
+            or f"week{getattr(lp, 'week_number', 0)}:0:"
+               f"{(lp.indicator_codes[0] if lp.indicator_codes else '')}"
+        )
+        chosen = (getattr(config, "indicator_wapef", None) or {}).get(occurrence)
+        if isinstance(chosen, dict):
+            from ..engines.wapef_fields import (
+                normalize_gods_story, normalize_through_lines,
+            )
+            canonical["through_lines"] = normalize_through_lines(
+                chosen.get("through_lines"))
+            canonical["gods_story"] = normalize_gods_story(
+                chosen.get("gods_story"))
+        return canonical
 
     lessons = list(getattr(job, "_lesson_plans", None) or [])
     ledger = getattr(job, "_build_ledger", None)
@@ -4145,7 +4371,8 @@ def _run_quality_gate(job, config, scheme_id, drafts, allow_rebuild: bool = True
                 # re-applies the teacher's saved review/WAPEF selections.
                 for field_name in _REBUILD_METADATA_FIELDS:
                     setattr(rebuilt, field_name, getattr(lp, field_name))
-                _apply_lesson_review_draft(rebuilt, drafts, config)
+                _apply_lesson_review_draft(rebuilt, drafts, config,
+                                           annual=annual)
                 _ensure_resources_used(rebuilt)
                 rebuilt_outcome = evaluate(
                     rebuilt, build_entry(ctx.alloc, rebuilt),

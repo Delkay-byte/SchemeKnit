@@ -630,6 +630,11 @@ class TermConfig(BaseModel):
     #: an approved list. An empty entry is authoritative (teacher removed all
     #: suggestions for that lesson).
     indicator_keywords: Dict[str, List[str]] = {}
+    #: Per-lesson WAPEF topic choices keyed by the canonical source occurrence
+    #: id: ``{"through_lines": [...], "gods_story": "..."}``. Deep Hope and
+    #: Storyline are NOT here - they are academic-year values owned by
+    #: ``wapef_annual`` and reused on every lesson.
+    indicator_wapef: Dict[str, Dict[str, Any]] = {}
     created_date: datetime = Field(default_factory=datetime.now)
 
     @field_validator("term_start_date", "term_end_date", mode="before")

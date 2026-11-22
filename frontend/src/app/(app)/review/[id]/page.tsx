@@ -12,7 +12,8 @@ import { DetailPageSkeleton } from '@/components/ui/skeleton'
 import { ArrowLeft, ArrowRight, CheckCircle, AlertCircle, Info, SlidersHorizontal } from 'lucide-react'
 import { api } from '@/lib/api'
 import { LessonConfigModal } from '@/components/lesson-config-modal'
-import type { LessonRubricConfig } from '@/types'
+import { toast } from '@/components/ui/toaster'
+import type { LessonRubricConfig, WapefAnnualProfile } from '@/types'
 import { resolveRouteId } from '@/lib/route-params'
 import { normalizeError } from '@/lib/error-normalizer'
 
@@ -96,6 +97,7 @@ export default function ReviewPage() {
   const [lessonConfig, setLessonConfig] = useState<LessonRubricConfig>({})
   const [lessonConfigMissing, setLessonConfigMissing] = useState<string[]>([])
   const [configModalOpen, setConfigModalOpen] = useState(false)
+  const [wapefAnnual, setWapefAnnual] = useState<WapefAnnualProfile | null>(null)
 
   useEffect(() => {
     loadSchemeData()
@@ -138,12 +140,71 @@ export default function ReviewPage() {
   const handleApprove = async () => {
     try {
       setApproving(true)
+      setError(null)
+      // Validate + persist BEFORE approving: the approved plan is the one the
+      // backend will generate from, so missing required detail opens the
+      // configuration dialog instead of approving an unusable plan.
+      const saved = await api.getLessonConfig(schemeId)
+      if (saved?.config) {
+        setLessonConfig(saved.config)
+        setLessonConfigMissing(saved.missing || [])
+      }
+      if (!saved?.ready) {
+        setConfigModalOpen(true)
+        setError(
+          'Complete the lesson configuration before approving: '
+          + (saved?.missing || []).join(', ')
+          + '. Your values are saved as you type.',
+        )
+        return
+      }
+      const isWapef = (saved.config.template_id || '').startsWith('tpl-wapef')
+      if (isWapef) {
+        const annual = await api.getWapefAnnual(schemeId)
+        setWapefAnnual(annual)
+        if (!annual.configured) {
+          setConfigModalOpen(true)
+          setError(
+            `Set Deep Hope and Storyline for ${annual.academic_year || 'this academic year'} before approving this WAPEF plan.`,
+          )
+          return
+        }
+      }
       await api.approveScheme(schemeId)
+      toast({
+        title: 'Scheme approved.',
+        description: 'Your configuration is saved. Opening lesson plans by week…',
+        variant: 'success',
+        key: `scheme-approved:${schemeId}`,
+      })
       router.push(`/generate/${schemeId}`)
     } catch (err) {
       setError(normalizeError(err).message)
     } finally {
       setApproving(false)
+    }
+  }
+
+  const handleChooseMethod = async (method: 'standard' | 'zeli') => {
+    try {
+      const next = { ...lessonConfig, generation_method: method, ai_mode: 'OFF' as const }
+      const saved = await api.saveLessonConfig(schemeId, next)
+      if (saved?.config) setLessonConfig(saved.config)
+      toast({
+        title: method === 'zeli'
+          ? 'Zeli AI selected for this plan.'
+          : 'Deterministic Engine selected for this plan.',
+        description: 'The choice is saved and will be used when you generate.',
+        variant: 'success',
+        key: `generation-method:${schemeId}`,
+      })
+    } catch (err) {
+      toast({
+        title: 'Generation method was not saved',
+        description: normalizeError(err).message,
+        variant: 'error',
+        key: `generation-method-error:${schemeId}`,
+      })
     }
   }
 
@@ -260,9 +321,9 @@ export default function ReviewPage() {
                 <SlidersHorizontal className="mr-2 h-4 w-4" aria-hidden="true" />
                 Configure lesson rubrics
               </Button>
-              <Button size="lg" onClick={handleApprove} disabled={approving}>
+              <Button size="lg" onClick={handleApprove} disabled={approving} data-approve-scheme>
                 <CheckCircle className="mr-2 h-4 w-4" />
-                {approving ? 'Approving...' : 'Approve & Configure'}
+                {approving ? 'Approving...' : 'Approve & Proceed'}
               </Button>
             </>
           }
@@ -719,7 +780,7 @@ export default function ReviewPage() {
                   </div>
                   <Button onClick={handleApprove} disabled={approving} size="lg">
                     <CheckCircle className="mr-2 h-4 w-4" />
-                    {approving ? 'Approving...' : 'Approve & Configure'}
+                    {approving ? 'Approving...' : 'Approve & Proceed'}
                   </Button>
                 </div>
               </>

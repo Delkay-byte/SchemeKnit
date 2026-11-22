@@ -6,8 +6,6 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { SurfaceCard } from '@/components/ui/surface-card'
 import { Banner } from '@/components/ui/banner'
-import { Select } from '@/components/ui/select'
-import { Field, TextArea } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Download, Settings, Play, CheckCircle, FileText, FileArchive, Loader2, Eye, ChevronDown, ChevronRight } from 'lucide-react'
 import { api, sanitizeTermConfig } from '@/lib/api'
@@ -18,25 +16,18 @@ import { normalizeError } from '@/lib/error-normalizer'
 import { resolveRouteId } from '@/lib/route-params'
 import {
   buildWeekPlans,
-  distinctInOrder,
   formatWeekCounts,
   fullSelection,
-  generatableRowsForWeek,
   planCountLabel,
   quotaFitForRows,
   quotaLine,
   WeekPlan,
-  WeekRow,
 } from '@/lib/generate-coverage'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatusPill } from '@/components/ui/badge'
 import { LessonWorkspace } from '@/components/lesson-workspace'
 import { LessonConfigModal } from '@/components/lesson-config-modal'
-import { SchemeOfWork, TermConfig, CurriculumCoverage, Template, CurriculumProfile, WapefOptions, LessonRubricConfig } from '@/types'
-
-// The Approved WAPEF Plan is one shared form for Nursery/KG/Basic/JHS; its
-// four structured fields are teacher-selected from approved option lists.
-const WAPEF_TEMPLATE_ID = 'tpl-wapef-approved-plan'
+import { SchemeOfWork, TermConfig, CurriculumCoverage, Template, CurriculumProfile, LessonRubricConfig } from '@/types'
 
 /** The fields this page edits on a per-lesson WAPEF row. */
 interface WapefReviewRow {
@@ -105,11 +96,13 @@ export default function GeneratePage() {
   const [lessonReview, setLessonReview] = useState<any[]>([])
   const [reviewSaving, setReviewSaving] = useState(false)
   const [reviewSaved, setReviewSaved] = useState(false)
+  const [reviewDirty, setReviewDirty] = useState(false)
+  const reviewAutosaveSeq = useRef(0)
   // Approved WAPEF option lists (Deep Hope / Storyline / Through lines /
   // God's Story). Dropdown-only: the teacher picks, never free text, never AI.
-  const [wapefOptions, setWapefOptions] = useState<WapefOptions | null>(null)
+  // Academic-year Deep Hope + Storyline: chosen once, reused on every lesson,
+  // never AI-generated and never edited per lesson.
   const [keywordInputs, setKeywordInputs] = useState<Record<number, string>>({})
-  const [throughlineInputs, setThroughlineInputs] = useState<Record<number, string>>({})
   // Guided lesson configuration (Phase 2): the seven plan-wide fields the
   // teacher confirms AFTER extraction and BEFORE generation, through the ONE
   // "Configure lesson rubrics" modal. Saved on the scheme; readiness comes
@@ -118,22 +111,11 @@ export default function GeneratePage() {
   const [lessonConfigMissing, setLessonConfigMissing] = useState<string[]>([])
   const [configModalOpen, setConfigModalOpen] = useState(false)
   const [configSavedAt, setConfigSavedAt] = useState<string | null>(null)
-  // Actual AI resolution (mode/provider/available) reported by the backend —
-  // so the UI never shows a mode that disagrees with real behaviour.
-  const [aiStatus, setAiStatus] = useState<{
-    mode: string; active: boolean; provider: string | null; state: string;
-    reason: string | null; provider_label?: string | null;
-  } | null>(null)
   // "Generate with Zeli" availability, reported by the backend for the Zeli
   // method specifically. It drives an honest disabled state and an explicit
   // message — never a silent disable or a fake success.
   const [zeliStatus, setZeliStatus] = useState<{
     active: boolean; state: string; reason: string | null;
-  } | null>(null)
-  const [aiResult, setAiResult] = useState<{
-    mode: string; active: boolean; provider: string | null;
-    generation_method?: string;
-    lessons_ai: number; lessons_deterministic: number; reason: string | null;
   } | null>(null)
 
   // ── Autopilot (Priority 3.1 — zero-decision generation) ─────────────────
@@ -259,9 +241,6 @@ export default function GeneratePage() {
     loadData()
     // WAPEF dropdown options are canonical; a failure just means the WAPEF
     // selects stay hidden (non-WAPEF templates never show them anyway).
-    api.getWapefOptions()
-      .then(setWapefOptions)
-      .catch(() => setWapefOptions(null))
   }, [schemeId])
 
   // The displayed AI status must always reflect what the backend will actually
@@ -271,7 +250,6 @@ export default function GeneratePage() {
     api.getAiStatus(config.ai_mode || 'OFF', config.generation_method || 'standard')
       .then((s) => {
         if (cancelled) return
-        setAiStatus(s)
         setZeliStatus(
           config.generation_method === 'zeli'
             ? { active: s.active, state: s.state, reason: s.reason }
@@ -280,7 +258,6 @@ export default function GeneratePage() {
       })
       .catch(() => {
         if (cancelled) return
-        setAiStatus(null)
         setZeliStatus(null)
       })
     return () => { cancelled = true }
@@ -437,10 +414,12 @@ export default function GeneratePage() {
       setConfig(prev => ({
         ...prev,
         scheme_of_work_id: schemeId,
-        template_id: restoredTemplate?.id || defaultTemplate?.id || prev.template_id || '',
+        // The teacher's SAVED template wins over the level default. A reload
+        // must reopen the WAPEF/GES form they chose, not silently switch to GES.
+        template_id: restoredTemplate?.id || prev.template_id || defaultTemplate?.id || '',
         // The backend requires these fields; seed them from the parsed scheme.
         academic_year: schemeData.academic_year || prev.academic_year,
-        term: schemeData.term || prev.term,
+        term: savedConfig?.config?.term || schemeData.term || prev.term,
         // Prefer the scheme's own identity; only keep a previous value when
         // the scheme field is missing — never substitute a default level.
         // PART 3: a scheme that does not state its class must be confirmed by
@@ -458,12 +437,21 @@ export default function GeneratePage() {
           const value = canonical || schemeData.subject
           return value && value !== 'Unknown' ? value : ''
         })(),
-        term_start_date: weekStarts[0] || prev.term_start_date,
-        term_end_date: weekEnds[weekEnds.length - 1] || prev.term_end_date,
+        // Saved configuration is authoritative; the scheme/preferences only
+        // fill fields the teacher never configured.
+        term_start_date:
+          savedConfig?.config?.term_start_date || weekStarts[0] || prev.term_start_date,
+        term_end_date:
+          savedConfig?.config?.term_end_date
+          || weekEnds[weekEnds.length - 1]
+          || prev.term_end_date,
         lesson_duration_minutes:
-          (prefs && Number(prefs.default_lesson_duration)) || prev.lesson_duration_minutes,
+          savedConfig?.config?.lesson_duration_minutes
+          ?? ((prefs && Number(prefs.default_lesson_duration)) || prev.lesson_duration_minutes),
         lessons_per_week:
-          (prefs && Number(prefs.default_lessons_per_week)) || prev.lessons_per_week,
+          savedConfig?.config?.lessons_per_week
+          ?? savedConfig?.config?.periods_per_week
+          ?? ((prefs && Number(prefs.default_lessons_per_week)) || prev.lessons_per_week),
       }))
     } catch (err) {
       setError(normalizeError(err).message)
@@ -581,11 +569,7 @@ export default function GeneratePage() {
   // explicit Generate click on this page.
   useEffect(() => {
     if (loading || !scheme || jobId) return
-    let cancelled = false
-    ;(async () => {
-      await refreshAutopilot()
-    })()
-    return () => { cancelled = true }
+    void refreshAutopilot()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, scheme, jobId, config.class_level, config.subject, config.template_id])
 
@@ -629,7 +613,6 @@ export default function GeneratePage() {
       const response = await api.generateLessonPlans(schemeId, body)
       setJobRecovery(null)
       setJobId(response.job_id)
-      setAiResult(response.ai || null)
       setFinalizationWarning(response.warning || null)
       // The backend now names exactly which occurrences were accepted and
       // which the quality gate refused. Only accepted rows may be shown as
@@ -732,7 +715,6 @@ export default function GeneratePage() {
       setGenProgress('Resuming the pending lesson plans…')
       const response = await api.resumeGeneration(schemeId, resumeJobId)
       setJobId(response.job_id)
-      setAiResult(response.ai || null)
       setFinalizationWarning(response.warning || null)
 
       const generatedIds: string[] = Array.isArray(response.generated_occurrence_ids)
@@ -834,37 +816,6 @@ export default function GeneratePage() {
     return runGeneration({ codes: selection.codes, occurrences: [] }, rows)
   }
 
-  // One whole week: exactly that week's timetable occurrences.
-  const handleGenerateWeek = (week: WeekPlan) => {
-    const rows = generatableRowsForWeek(week, allocationPreview?.lesson_quota)
-    if (!rows.length) return Promise.resolve()
-    return runGeneration(
-      {
-        codes: distinctInOrder(rows.map((r) => (r.indicator_code || '').trim())),
-        occurrences: rows.map((r) => r.source_occurrence_id).filter(Boolean),
-      },
-      rows.map((r) => ({
-        source_occurrence_id: r.source_occurrence_id,
-        week_number: r.source_week,
-        topic: (r.sub_strand || r.strand || r.indicator_description || '').slice(0, 120),
-      })),
-    )
-  }
-
-  // One single lesson occurrence — even when its indicator code repeats in
-  // other weeks (codes alone cannot say "only week 5's copy").
-  const handleGenerateRow = (row: WeekRow) => {
-    if (!row.source_occurrence_id) return Promise.resolve()
-    return runGeneration(
-      { codes: row.indicator_code ? [row.indicator_code] : [], occurrences: [row.source_occurrence_id] },
-      [{
-        source_occurrence_id: row.source_occurrence_id,
-        week_number: row.source_week,
-        topic: (row.sub_strand || row.strand || row.indicator_description || '').slice(0, 120),
-      }],
-    )
-  }
-
   // ── Autopilot (Priority 3.1) ─────────────────────────────────────────────
   // Fetch the server's plan for one click: pending + safe + quota-fitting
   // occurrences, in source order, with the smallest genuine interruptions.
@@ -903,19 +854,13 @@ export default function GeneratePage() {
     document.querySelector(selector)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  const chooseManually = async () => {
-    if (!allocationPreview) {
-      await handlePreviewAllocation()
-    }
-    setTimeout(() => scrollTo('[data-allocation-preview]'), 120)
-  }
-
-  // Smallest WAPEF interruption (§9 case C): show ONLY the WAPEF inputs.
+  // Smallest WAPEF interruption (§9 case C): open the configuration dialog,
+  // which owns the annual and per-indicator WAPEF fields.
   const focusWapef = async () => {
     if (!allocationPreview) {
       await handlePreviewAllocation()
     }
-    setTimeout(() => scrollTo('[data-wapef-setup]'), 120)
+    setConfigModalOpen(true)
   }
 
   // Canonical WAPEF draft shape for ONE review row: built from the CURRENT
@@ -991,6 +936,7 @@ export default function GeneratePage() {
       // generation may read it — this await IS the save boundary.
       await api.saveLessonReview(schemeId, drafts)
       setReviewSaved(true)
+      setReviewDirty(false)
     } catch (err) {
       setError(normalizeError(err).message)
       throw err
@@ -999,8 +945,25 @@ export default function GeneratePage() {
     }
   }
 
-  const updateLessonReviewRow = (seq: number, patch: Partial<any>) => {
-    // Functional update: the patch is applied to the LATEST row state, never
+  // Debounced autosave for the per-lesson review rows (period, keywords,
+  // throughline, God's Story, references). A stale response can never mark a
+  // newer edit saved: each run carries a sequence number.
+  useEffect(() => {
+    if (!reviewDirty || jobId || generating || lessonReview.length === 0) return
+    const seq = ++reviewAutosaveSeq.current
+    const timer = setTimeout(async () => {
+      try {
+        await saveLessonReviewDrafts(lessonReview)
+        if (seq !== reviewAutosaveSeq.current) return
+      } catch {
+        if (seq !== reviewAutosaveSeq.current) return
+      }
+    }, 1500)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reviewDirty, lessonReview, jobId, generating])
+
+  const updateLessonReviewRow = (seq: number, patch: Partial<any>) => {    // Functional update: the patch is applied to the LATEST row state, never
     // a closure-captured copy. (A stale closure here was the WAPEF race: two
     // quick edits — or an edit immediately followed by Generate lesson plans —
     // built the save payload from a pre-edit row and silently dropped the
@@ -1011,6 +974,7 @@ export default function GeneratePage() {
       return { ...r, ...patch }
     }))
     setReviewSaved(false)
+    setReviewDirty(true)
   }
 
   const handleExport = async (format: string) => {
@@ -1087,12 +1051,6 @@ export default function GeneratePage() {
     return profiles.find(p => p.educational_level === scheme.educational_level) || null
   }
 
-  // PART A: the teacher must see EVERY ACTIVE template the system offers —
-  // never a level-limited slice that hides valid forms (the old client-side
-  // educational_level filter was exactly why only two templates appeared).
-  // The backend already enforces verified/active visibility per teacher.
-  const getTemplatesForScheme = () => templates
-
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -1127,7 +1085,6 @@ export default function GeneratePage() {
     )
   }
 
-  const filteredTemplates = getTemplatesForScheme()
   const currentProfile = getProfileForScheme()
   // PART 27: the summary names the REAL selected template (not just "2/week ·
   // 60 min"), so a teacher can see the WAPEF/GES form they are about to use.
@@ -1139,7 +1096,6 @@ export default function GeneratePage() {
     !config.class_level || config.class_level === 'Unknown'
   // The WAPEF structured fields belong to the Approved WAPEF Plan only; they
   // appear in the per-lesson review when that template is the chosen form.
-  const isWapefSelected = config.template_id === WAPEF_TEMPLATE_ID
 
   // ── The week-centric view model (Priority 3) ──────────────────────────
   const weekPlans: WeekPlan[] = buildWeekPlans(allocationPreview, schemeLessons)
@@ -1517,7 +1473,7 @@ export default function GeneratePage() {
                 <div className="flex items-center">
                   <Play className="mr-2 h-5 w-5 text-[#035f7c]" aria-hidden="true" />
                   <div>
-                    <h2 className="text-lg font-semibold text-[#102A43]">Generate my lesson plans</h2>
+                    <h2 className="text-lg font-semibold text-[#102A43]">Generation readiness</h2>
                     <p className="text-sm text-muted-foreground">
                       One action generates what is ready this month, in your scheme&apos;s own order.
                     </p>
@@ -1587,314 +1543,19 @@ export default function GeneratePage() {
                       </div>
                     ))}
 
-                    <div className="mt-4">
-                      <Button
-                        data-autopilot-action
-                        size="lg"
-                        className="w-full bg-gradient-to-r from-[#102A43] to-[#04769B] text-white hover:from-[#0d2136] hover:to-[#04698a]"
-                        disabled={!autopilot.ready || generating || autopilotChecking}
-                        onClick={handleAutopilot}
-                      >
-                        {generating ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Generating…
-                          </>
-                        ) : (
-                          <>
-                            <Play className="mr-2 h-4 w-4" aria-hidden="true" />
-                            {autopilot.counts?.quota_skipped_count > 0 &&
-                            (autopilot.counts?.selected_count ?? 0) > 0
-                              ? `Generate ${autopilot.counts?.selected_count ?? 0} lesson plans`
-                              : 'Generate my lesson plans'}
-                          </>
-                        )}
-                      </Button>
-                      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                        <Button
-                          data-autopilot-manual
-                          variant="outline"
-                          className="flex-1"
-                          disabled={generating}
-                          onClick={chooseManually}
-                        >
-                          Choose manually
-                        </Button>
-                        <Button
-                          data-autopilot-settings
-                          variant="outline"
-                          className="flex-1"
-                          disabled={generating}
-                          onClick={() => setConfigModalOpen(true)}
-                        >
-                          Change settings
-                        </Button>
-                      </div>
-                    </div>
+                    {!autopilot.ready && (
+                      <p className="mt-3 text-xs text-amber-800" role="status">
+                        Resolve the notices above to enable generation.
+                      </p>
+                    )}
                   </>
                 )}
               </SurfaceCard>
             )}
 
-            {/* Approved WAPEF Plan fields. These teacher selections belong to
-                that form only, so they stay when the WAPEF template is chosen —
-                without bringing back the removed standalone review table. */}
-            {!jobId && isWapefSelected && wapefOptions && lessonReview.length > 0 && (
-              <SurfaceCard data-wapef-setup className="px-5 py-5 sm:px-6">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <h2 className="text-base font-semibold text-[#102A43]">
-                      Approved WAPEF Plan fields
-                    </h2>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Teacher-selected for each lesson — the AI never changes
-                      these. Required before a WAPEF lesson can be generated.
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {reviewSaved && (
-                      <span className="text-xs text-green-700" role="status">Saved</span>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => saveLessonReviewDrafts()}
-                      disabled={reviewSaving}
-                    >
-                      {reviewSaving ? (
-                        <><Loader2 className="mr-1 h-3 w-3 animate-spin" aria-hidden="true" />Saving…</>
-                      ) : 'Save WAPEF fields'}
-                    </Button>
-                  </div>
-                </div>
-                <div className="mt-4 max-h-96 space-y-3 overflow-y-auto pr-1">
-                  {lessonReview.filter((row: WapefReviewRow) => !row.is_special_period).map((row: WapefReviewRow) => (
-                    <div key={row.lesson_sequence} className="rounded-lg border border-slate-200 p-3">
-                      <p className="text-xs font-semibold text-[#102A43]">
-                        Week {row.week_number}{row.indicator_code ? ` · ${row.indicator_code}` : ''}
-                      </p>
-                      <div className="mt-2 grid gap-2.5 sm:grid-cols-2">
-                        <Field
-                          label="Deep Hope"
-                          htmlFor={`wapef-deep-hope-${row.lesson_sequence}`}
-                          hint="Formation, not the lesson objective. Edit freely."
-                        >
-                          <TextArea
-                            id={`wapef-deep-hope-${row.lesson_sequence}`}
-                            value={row.wapef_deep_hope || ''}
-                            onChange={(e) => updateLessonReviewRow(row.lesson_sequence, { wapef_deep_hope: e.target.value })}
-                            placeholder={row.suggested_wapef?.deep_hope || 'Write an enduring hope for your learners'}
-                            rows={2}
-                          />
-                          <div className="mt-1 flex flex-wrap gap-1.5">
-                            {row.suggested_wapef?.deep_hope && (
-                              <button type="button" className="text-xs font-medium text-[#035f7c] underline"
-                                onClick={() => updateLessonReviewRow(row.lesson_sequence, { wapef_deep_hope: row.suggested_wapef?.deep_hope || '' })}>
-                                Use suggested Deep Hope
-                              </button>
-                            )}
-                            {wapefOptions.deep_hopes.map((option) => (
-                              <button key={option} type="button" className="text-xs text-muted-foreground underline"
-                                onClick={() => updateLessonReviewRow(row.lesson_sequence, { wapef_deep_hope: option })}>
-                                Use approved wording
-                              </button>
-                            ))}
-                          </div>
-                        </Field>
-                        <Field
-                          label="Storyline"
-                          htmlFor={`wapef-storyline-${row.lesson_sequence}`}
-                          hint="Where this lesson sits in God's story."
-                        >
-                          <TextArea
-                            id={`wapef-storyline-${row.lesson_sequence}`}
-                            value={row.wapef_storyline || ''}
-                            onChange={(e) => updateLessonReviewRow(row.lesson_sequence, { wapef_storyline: e.target.value })}
-                            placeholder={row.suggested_wapef?.storyline || 'Connect the learning to God’s story'}
-                            rows={2}
-                          />
-                          {row.suggested_wapef?.storyline && (
-                            <button type="button" className="mt-1 text-xs font-medium text-[#035f7c] underline"
-                              onClick={() => updateLessonReviewRow(row.lesson_sequence, { wapef_storyline: row.suggested_wapef?.storyline || '' })}>
-                              Use suggested Storyline
-                            </button>
-                          )}
-                        </Field>
-                      </div>
-                      <div className="mt-2.5">
-                        <p className="mb-1 text-xs font-medium text-muted-foreground">
-                          Through lines (select all that apply)
-                        </p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {wapefOptions.through_lines.map((option) => {
-                            const selected = (row.wapef_through_lines || []).includes(option)
-                            return (
-                              <button
-                                key={option}
-                                type="button"
-                                aria-pressed={selected}
-                                onClick={() => {
-                                  const current = row.wapef_through_lines || []
-                                  const next = selected
-                                    ? current.filter((item: string) => item !== option)
-                                    : [...current, option]
-                                  updateLessonReviewRow(row.lesson_sequence, { wapef_through_lines: next })
-                                }}
-                                className={`rounded border px-2 py-0.5 text-xs ${
-                                  selected
-                                    ? 'border-[#102A43] bg-[#102A43] text-white'
-                                    : 'bg-background text-muted-foreground'
-                                }`}
-                              >
-                                {option}
-                              </button>
-                            )
-                          })}
-                          {(row.wapef_through_lines || [])
-                            .filter((item: string) => !wapefOptions.through_lines.includes(item))
-                            .map((item: string) => (
-                              <button key={item} type="button" aria-pressed="true"
-                                onClick={() => updateLessonReviewRow(row.lesson_sequence, {
-                                  wapef_through_lines: (row.wapef_through_lines || []).filter((entry: string) => entry !== item),
-                                })}
-                                className="rounded border border-[#102A43] bg-[#102A43] px-2 py-0.5 text-xs text-white">
-                                {item} ×
-                              </button>
-                            ))}
-                        </div>
-                        <div className="mt-1.5 flex gap-2">
-                          <Input
-                            aria-label={`Add a through line for lesson ${row.lesson_sequence}`}
-                            value={throughlineInputs[row.lesson_sequence] || ''}
-                            onChange={(e) => setThroughlineInputs((current) => ({ ...current, [row.lesson_sequence]: e.target.value }))}
-                            placeholder="Add your own through line"
-                            className="h-8 text-xs"
-                            onKeyDown={(e) => {
-                              if (e.key !== 'Enter') return
-                              e.preventDefault()
-                              const value = (throughlineInputs[row.lesson_sequence] || '').trim()
-                              if (!value) return
-                              const next = [...(row.wapef_through_lines || []), value]
-                              updateLessonReviewRow(row.lesson_sequence, { wapef_through_lines: next })
-                              setThroughlineInputs((current) => ({ ...current, [row.lesson_sequence]: '' }))
-                            }}
-                          />
-                          <Button type="button" size="sm" variant="outline"
-                            onClick={() => {
-                              const value = (throughlineInputs[row.lesson_sequence] || '').trim()
-                              if (!value) return
-                              updateLessonReviewRow(row.lesson_sequence, {
-                                wapef_through_lines: [...(row.wapef_through_lines || []), value],
-                              })
-                              setThroughlineInputs((current) => ({ ...current, [row.lesson_sequence]: '' }))
-                            }}>
-                            Add
-                          </Button>
-                        </div>
-                        {row.suggested_wapef?.through_lines?.length ? (
-                          <button type="button" className="mt-1 text-xs font-medium text-[#035f7c] underline"
-                            onClick={() => updateLessonReviewRow(row.lesson_sequence, { wapef_through_lines: row.suggested_wapef?.through_lines || [] })}>
-                            Use suggested through line
-                          </button>
-                        ) : null}
-                      </div>
-                      <div className="mt-2.5 grid gap-2.5 sm:grid-cols-2">
-                        <Field
-                          label="God's Story"
-                          htmlFor={`wapef-gods-story-${row.lesson_sequence}`}
-                          hint="A truthful Biblical connection with its reference."
-                        >
-                          <TextArea
-                            id={`wapef-gods-story-${row.lesson_sequence}`}
-                            value={row.wapef_gods_story || ''}
-                            onChange={(e) => updateLessonReviewRow(row.lesson_sequence, { wapef_gods_story: e.target.value })}
-                            placeholder={row.suggested_wapef?.gods_story || 'Write the Biblical connection'}
-                            rows={3}
-                          />
-                          <div className="mt-1 flex flex-wrap gap-1.5">
-                            {row.suggested_wapef?.gods_story && (
-                              <button type="button" className="text-xs font-medium text-[#035f7c] underline"
-                                onClick={() => updateLessonReviewRow(row.lesson_sequence, { wapef_gods_story: row.suggested_wapef?.gods_story || '' })}>
-                                Use suggested God’s Story
-                              </button>
-                            )}
-                            {wapefOptions.gods_story.map((option) => (
-                              <button key={option} type="button" className="text-xs text-muted-foreground underline"
-                                onClick={() => updateLessonReviewRow(row.lesson_sequence, { wapef_gods_story: option })}>
-                                {option}
-                              </button>
-                            ))}
-                          </div>
-                        </Field>
-                        <Field label="Remarks" htmlFor={`wapef-remarks-${row.lesson_sequence}`}>
-                          <TextArea
-                            id={`wapef-remarks-${row.lesson_sequence}`}
-                            value={row.remarks || ''}
-                            onChange={(e) => updateLessonReviewRow(row.lesson_sequence, { remarks: e.target.value })}
-                            placeholder="Your reflection (printed in REMARKS)"
-                            rows={2}
-                          />
-                        </Field>
-                      </div>
-                      <div className="mt-2.5 rounded-md bg-slate-50 p-2.5">
-                        <p className="text-xs font-medium text-[#102A43]">Key Words / New Vocabulary</p>
-                        <p className="text-[11px] text-muted-foreground">
-                          Suggestions come from this indicator. Remove what you will not teach, or add your own terms.
-                        </p>
-                        <div className="mt-1.5 flex flex-wrap gap-1.5">
-                          {activeKeywords(row).map((term: string) => (
-                            <span key={term} className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs">
-                              {term}
-                              <button type="button" aria-label={`Remove ${term}`}
-                                onClick={() => setRowKeywords(row, activeKeywords(row).filter((item) => item !== term))}>
-                                ×
-                              </button>
-                            </span>
-                          ))}
-                          {(row.suggested_keywords || [])
-                            .filter((term: string) => !activeKeywords(row).some((item) => item.toLowerCase() === term.toLowerCase()))
-                            .map((term: string) => (
-                              <button key={term} type="button"
-                                className="rounded-full border border-dashed border-slate-300 px-2 py-0.5 text-xs text-muted-foreground"
-                                onClick={() => setRowKeywords(row, [...activeKeywords(row), term])}>
-                                + {term}
-                              </button>
-                            ))}
-                        </div>
-                        <div className="mt-1.5 flex gap-2">
-                          <Input
-                            aria-label={`Add a key word for lesson ${row.lesson_sequence}`}
-                            value={keywordInputs[row.lesson_sequence] || ''}
-                            onChange={(e) => setKeywordInputs((current) => ({ ...current, [row.lesson_sequence]: e.target.value }))}
-                            placeholder="Add a word or phrase"
-                            className="h-8 text-xs"
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault()
-                                addRowKeyword(row)
-                              }
-                            }}
-                          />
-                          <Button type="button" size="sm" variant="outline" onClick={() => addRowKeyword(row)}>
-                            Add
-                          </Button>
-                          {(row.suggested_keywords || []).length > 0 && (
-                            <Button type="button" size="sm" variant="ghost"
-                              onClick={() => setRowKeywords(row, row.suggested_keywords || [], false)}>
-                              Use suggestions
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </SurfaceCard>
-            )}
-
-            {/* Key Words / New Vocabulary — shared by GES and custom templates.
-                WAPEF has its own editor inside the WAPEF card above. */}
-            {!jobId && !isWapefSelected && lessonReview.length > 0 && (
+            {/* Key Words / New Vocabulary — shared by every template. WAPEF
+                topic fields live in Configure lesson rubrics. */}
+            {!jobId && lessonReview.length > 0 && (
               <SurfaceCard className="px-5 py-5 sm:px-6">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
@@ -2039,11 +1700,6 @@ export default function GeneratePage() {
                     {weekPlans.map((week) => {
                       const collapsed = collapsedWeeks.includes(week.weekNumber)
                       const fit = quotaFitForRows(week.rows, quota)
-                      const weekRows = generatableRowsForWeek(week, quota)
-                      const weekBlocked =
-                        generating ||
-                        generateIsBlocked ||
-                        (quota?.enforced && weekRows.length === 0)
                       return (
                         <div
                           key={`week-${week.weekNumber}`}
@@ -2077,17 +1733,6 @@ export default function GeneratePage() {
                               </StatusPill>
                             ) : null}
                             <span className="flex-1" />
-                            {week.pendingCount > 0 && (
-                              <Button
-                                data-generate-week
-                                size="sm"
-                                className="h-7 rounded-md px-2.5 text-xs"
-                                disabled={weekBlocked}
-                                onClick={() => handleGenerateWeek(week)}
-                              >
-                                Generate week
-                              </Button>
-                            )}
                           </div>
                           {/* Counts line — the teacher's weekly fit answer, in
                               plain words (e2e: data-week-coverage). */}
@@ -2106,11 +1751,6 @@ export default function GeneratePage() {
                           {!collapsed && (
                             <div className="divide-y">
                               {week.rows.map((row) => {
-                                const rowFit = quotaFitForRows([row], quota)
-                                const rowDisabled =
-                                  generating ||
-                                  generateIsBlocked ||
-                                  (!!rowFit && rowFit.rowsGeneratable === 0)
                                 const lesson = row.generatedLesson
                                 return (
                                   <div
@@ -2137,53 +1777,27 @@ export default function GeneratePage() {
                                       {row.indicator_description}
                                     </span>
                                     {row.generated ? (
-                                      <>
-                                        <StatusPill tone={lesson?.teacher_edited ? 'info' : 'success'}>
-                                          {lesson?.teacher_edited ? 'Updated' : 'Generated'}
-                                        </StatusPill>
-                                        <a
-                                          href="#lesson-workspace"
-                                          className="rounded-md border px-1.5 py-0.5 text-[11px] text-[#035f7c] hover:bg-slate-50"
-                                          onClick={(e) => {
-                                            e.preventDefault()
-                                            document
-                                              .querySelector('[data-lesson-workspace]')
-                                              ?.scrollIntoView({ behavior: 'smooth' })
-                                          }}
-                                        >
-                                          Open in workspace
-                                        </a>
-                                        {/* An already-generated lesson can still be
-                                            re-run on its own — same occurrence, same
-                                            quota identity (the backend dedupes it). */}
-                                        <Button
-                                          data-generate-lesson
-                                          size="sm"
-                                          variant="outline"
-                                          className="h-6 rounded-md px-2 text-[11px]"
-                                          disabled={rowDisabled || !row.source_occurrence_id || row.needs_review}
-                                          onClick={() => handleGenerateRow(row)}
-                                        >
-                                          Regenerate
-                                        </Button>
-                                      </>
+                                      <StatusPill tone={lesson?.teacher_edited ? 'info' : 'success'}>
+                                        {lesson?.teacher_edited ? 'Updated' : 'Generated'}
+                                      </StatusPill>
+                                    ) : row.needs_review ? (
+                                      <StatusPill tone="warning">Needs review</StatusPill>
                                     ) : (
-                                      <>
-                                        {row.needs_review ? (
-                                          <StatusPill tone="warning">Needs review</StatusPill>
-                                        ) : (
-                                          <StatusPill tone="neutral">Ready to generate</StatusPill>
-                                        )}
-                                        <Button
-                                          data-generate-lesson
-                                          size="sm"
-                                          className="h-6 rounded-md px-2 text-[11px]"
-                                          disabled={rowDisabled || !row.source_occurrence_id || row.needs_review}
-                                          onClick={() => handleGenerateRow(row)}
-                                        >
-                                          Generate
-                                        </Button>
-                                      </>
+                                      <StatusPill tone="neutral">Ready to generate</StatusPill>
+                                    )}
+                                    {row.generated && (
+                                      <a
+                                        href="#lesson-workspace"
+                                        className="rounded-md border px-1.5 py-0.5 text-[11px] text-[#035f7c] hover:bg-slate-50"
+                                        onClick={(e) => {
+                                          e.preventDefault()
+                                          document
+                                            .querySelector('[data-lesson-workspace]')
+                                            ?.scrollIntoView({ behavior: 'smooth' })
+                                        }}
+                                      >
+                                        Open in workspace
+                                      </a>
                                     )}
                                     {/* §6: where this row came from, kept in
                                         secondary disclosure — never an audit
@@ -2309,8 +1923,10 @@ export default function GeneratePage() {
                   )}
 
                   <Button
-                    onClick={handleGenerateAll}
-                    disabled={generating || generateIsBlocked || !allocationPreview}
+                    data-autopilot-action
+                    data-generate-all
+                    onClick={autopilot ? handleAutopilot : handleGenerateAll}
+                    disabled={generating || (autopilot ? !autopilot.ready : generateIsBlocked) || !allocationPreview}
                     className="mt-3 w-full bg-gradient-to-r from-[#102A43] to-[#04769B] text-white hover:from-[#0d2136] hover:to-[#04698a]"
                     size="lg"
                   >
@@ -2322,7 +1938,9 @@ export default function GeneratePage() {
                     ) : (
                       <>
                         <Play className="mr-2 h-4 w-4" />
-                        Generate
+                        {autopilot?.counts?.selected_count
+                          ? `Generate ${autopilot.counts.selected_count} lesson plan${autopilot.counts.selected_count === 1 ? '' : 's'}`
+                          : 'Generate lesson plans'}
                       </>
                     )}
                   </Button>
@@ -2374,9 +1992,9 @@ export default function GeneratePage() {
                     <FileText className="mr-2 h-4 w-4" />
                     {exporting === 'docx' ? 'Exporting...' : 'Download DOCX'}
                   </Button>
-                  <Button onClick={() => handleExport('pdf')} disabled={exporting === 'pdf'} className="w-full" variant="outline">
+                  <Button disabled className="w-full" variant="outline">
                     <Download className="mr-2 h-4 w-4" />
-                    {exporting === 'pdf' ? 'Exporting...' : 'Download PDF'}
+                    PDF Option Coming Soon
                   </Button>
                   <Button onClick={() => handleExport('zip')} disabled={exporting === 'zip'} className="w-full" variant="outline">
                     <FileArchive className="mr-2 h-4 w-4" />

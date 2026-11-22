@@ -28,6 +28,12 @@ const nextConfig = {
     } catch {
       apiOrigin = ''
     }
+    // Local development talks to the backend on :8000. Without this the CSP
+    // blocks every API call (the login screen never leaves "checking your
+    // session"). Production builds keep the strict origin list.
+    const localApiOrigins = process.env.NODE_ENV === 'production'
+      ? ''
+      : ' http://localhost:8000 http://127.0.0.1:8000'
     const csp = [
       "default-src 'self'",
       // Next.js injects inline bootstrap scripts; dynamic code execution is not allowed.
@@ -35,7 +41,7 @@ const nextConfig = {
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
-      `connect-src 'self' https://schemeknit-api.onrender.com https://api.paystack.co https://checkout.paystack.com https://challenges.cloudflare.com${apiOrigin ? ` ${apiOrigin}` : ''}`,
+      `connect-src 'self' https://schemeknit-api.onrender.com https://api.paystack.co https://checkout.paystack.com https://challenges.cloudflare.com${apiOrigin ? ` ${apiOrigin}` : ''}${localApiOrigins}`,
       "frame-src 'self' https://checkout.paystack.com https://challenges.cloudflare.com",
       "frame-ancestors 'self'",
       "base-uri 'self'",

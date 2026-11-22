@@ -15,7 +15,7 @@ const FEATURES: Feature[] = [
   { label: 'Configure lessons', free: true, pro: true },
   { label: 'Generate indicator-level plans', free: '2 per month', pro: '20–480 credits' },
   { label: 'Multiple plans from one scheme week', free: true, pro: true },
-  { label: 'Download individual DOCX / PDF', free: true, pro: true },
+  { label: 'Download individual DOCX (PDF coming soon)', free: true, pro: true },
   { label: 'Batch generation within credits', free: 'Within 2 credits', pro: 'Within package credits' },
   { label: 'Flexible credits that never expire', free: false, pro: 'GH₵12 pack' },
   { label: 'Saved work after package ends', free: true, pro: true },

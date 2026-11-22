@@ -545,27 +545,28 @@ export default function UploadPage() {
                     which plans and starts the run — no configuration screen
                     in between. Review stays a secondary path (§19). */}
                 <div className="mt-6 space-y-3">
-                  <Button
-                    size="lg"
-                    className="w-full bg-gradient-to-r from-[#102A43] to-[#04769B] text-white hover:from-[#0d2136] hover:to-[#04698a]"
-                    data-generate-standard
-                    disabled={openingSetup}
-                    onClick={() => { void openSetup('standard') }}
-                  >
-                    <Play className="mr-2 h-4 w-4" aria-hidden="true" />
-                    Generate my lesson plans
-                  </Button>
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    className="w-full"
-                    data-generate-zeli
-                    disabled={openingSetup}
-                    onClick={() => { void openSetup('zeli') }}
-                  >
-                    <Sparkles className="mr-2 h-4 w-4" aria-hidden="true" />
-                    Generate with Zeli
-                  </Button>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Button
+                      size="lg"
+                      className="w-full bg-gradient-to-r from-[#102A43] to-[#04769B] text-white hover:from-[#0d2136] hover:to-[#04698a]"
+                      data-generate-standard
+                      disabled={openingSetup}
+                      onClick={() => { void openSetup('standard') }}
+                    >
+                      <Play className="mr-2 h-4 w-4" aria-hidden="true" />
+                      Generate without Zeli
+                    </Button>
+                    <Button
+                      size="lg"
+                      className="w-full bg-gradient-to-r from-[#04A9CE] to-[#0389a8] text-white hover:from-[#0389a8] hover:to-[#026f8a]"
+                      data-generate-zeli
+                      disabled={openingSetup}
+                      onClick={() => { void openSetup('zeli') }}
+                    >
+                      <Sparkles className="mr-2 h-4 w-4" aria-hidden="true" />
+                      Generate with Zeli
+                    </Button>
+                  </div>
                   <div className="flex flex-col gap-3 sm:flex-row">
                     <Button variant="outline" className="flex-1" onClick={() => router.push(`/review/${result.scheme_id}`)}>
                       Review Curriculum

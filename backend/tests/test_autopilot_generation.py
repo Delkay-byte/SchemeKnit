@@ -293,6 +293,37 @@ def _jobs(client):
     return resp.json()
 
 
+def test_autopilot_continues_in_scheme_order_across_runs(db):
+    """2 credits: first week's first two; next credit continues after them."""
+    from src.engines.autopilot import select_autopilot_rows
+
+    rows = [
+        _row(1, "B7.1.1.1.1", occ="week1:0:A"),
+        _row(1, "B7.1.1.1.2", occ="week1:1:B"),
+        _row(1, "B7.1.1.1.3", occ="week1:2:C"),
+        _row(2, "B7.1.1.2.1", occ="week2:0:D"),
+    ]
+    first = select_autopilot_rows(
+        rows, generated_ids=[], quota_remaining=2,
+        quota_unlimited=False, quota_enforced=True, indicatorless=False)
+    assert [r["source_occurrence_id"] for r in first["selected"]] == [
+        "week1:0:A", "week1:1:B"]
+    assert first["quota_skipped"][0]["source_occurrence_id"] == "week1:2:C"
+
+    second = select_autopilot_rows(
+        rows, generated_ids=["week1:0:A", "week1:1:B"], quota_remaining=1,
+        quota_unlimited=False, quota_enforced=True, indicatorless=False)
+    assert [r["source_occurrence_id"] for r in second["selected"]] == [
+        "week1:2:C"]
+
+    third = select_autopilot_rows(
+        rows, generated_ids=["week1:0:A", "week1:1:B", "week1:2:C"],
+        quota_remaining=1, quota_unlimited=False, quota_enforced=True,
+        indicatorless=False)
+    assert [r["source_occurrence_id"] for r in third["selected"]] == [
+        "week2:0:D"]
+
+
 class TestAutopilotApi:
     def test_matrix_a_all_detected_is_one_click_ready(self, db):
         from fastapi.testclient import TestClient

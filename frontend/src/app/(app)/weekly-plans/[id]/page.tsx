@@ -296,12 +296,11 @@ export default function WeeklyPlanDetailPage() {
             </Button>
             <Button
               variant="outline"
-              onClick={() => handleExport('pdf')}
-              disabled={exporting !== null}
+              disabled
               data-weekly-export-pdf
             >
               <FileText className="h-4 w-4" aria-hidden="true" />
-              {exporting === 'pdf' ? 'Exporting…' : 'Export PDF'}
+              PDF Option Coming Soon
             </Button>
           </div>
         }
@@ -566,19 +565,8 @@ export default function WeeklyPlanDetailPage() {
               <FileDown className="h-4 w-4" aria-hidden="true" />
               {exporting === 'docx' ? 'Exporting…' : 'Export DOCX'}
             </Button>
-            <Button
-              className="w-full"
-              variant="outline"
-              onClick={() => handleExport('pdf')}
-              disabled={exporting !== null}
-              data-weekly-export-pdf
-            >
-              <FileText className="h-4 w-4" aria-hidden="true" />
-              {exporting === 'pdf' ? 'Exporting…' : 'Export PDF'}
-            </Button>
             <p className="text-xs text-muted-foreground">
-              DOCX and PDF come from the same canonical weekly document — one
-              file holding every subject section.
+              DOCX comes from the canonical weekly document. PDF export is coming soon.
             </p>
           </SurfaceCard>
         </div>

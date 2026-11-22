@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Field } from '@/components/ui/field'
+import { Field, TextArea } from '@/components/ui/field'
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
@@ -31,7 +31,7 @@ import {
   CORE_COMPETENCY_LABELS, TERMS, WEEK_DAYS, firstLessonConfigProblem, indicatorCode,
   sourceOccurrenceId, toggleCompetency, validateLessonConfig, weekOccurrences,
 } from '@/lib/lesson-config'
-import { LessonRubricConfig } from '@/types'
+import { LessonRubricConfig, WapefAnnualProfile, WapefOptions } from '@/types'
 
 interface SchemeWeek {
   week_number: number
@@ -65,6 +65,14 @@ export function LessonConfigModal({
   const [weeks, setWeeks] = useState<SchemeWeek[]>([])
   const [templates, setTemplates] = useState<{ id: string; name: string }[]>([])
   const [zeliStatus, setZeliStatus] = useState<{ active: boolean; reason?: string | null } | null>(null)
+  const [annual, setAnnual] = useState<WapefAnnualProfile | null>(null)
+  const [annualOptions, setAnnualOptions] = useState<WapefOptions | null>(null)
+  const [wapefOptions, setWapefOptions] = useState<WapefOptions | null>(null)
+  const [annualDirty, setAnnualDirty] = useState(false)
+  const [annualEditing, setAnnualEditing] = useState(false)
+  const [autoStatus, setAutoStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [autoSavedAt, setAutoSavedAt] = useState<Date | null>(null)
+  const autoSeq = useRef(0)
 
   const [clearedFields, setClearedFields] = useState<string[]>([])
   const prefill = useMemo<LessonRubricConfig>(
@@ -119,6 +127,27 @@ export function LessonConfigModal({
     api.listTemplates()
       .then((data) => setTemplates(data.templates || []))
       .catch(() => setTemplates([]))
+    // WAPEF annual values (Deep Hope + Storyline) are keyed by the scheme's
+    // academic year on the server. Loading them here means reopening the
+    // dialog or switching to GES and back never loses the year's choices.
+    api.getWapefAnnual(schemeId)
+      .then((profile) => {
+        setAnnual(profile)
+        setAnnualDirty(false)
+        setAnnualEditing(false)
+        if (profile.options) {
+          setAnnualOptions({
+            deep_hopes: profile.options.deep_hopes || [],
+            storylines: profile.options.storylines || [],
+            through_lines: [],
+            gods_story: [],
+          })
+        }
+      })
+      .catch(() => setAnnual(null))
+    api.getWapefOptions()
+      .then((options) => setWapefOptions(options))
+      .catch(() => setWapefOptions(null))
     // Only opening the dialog starts a fresh draft.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
@@ -168,8 +197,22 @@ export function LessonConfigModal({
     setClearedFields(Array.from(readClearedFields(overrideIdentity)))
   }
 
-  const setIndicatorValue = (key: string, field: 'references' | 'tlrs', entries: string[]) => {
-    setDraft((current) => {
+  const indicatorWapefValue = (key: string) => draft.indicator_wapef?.[key] || {}
+
+  const setIndicatorWapef = (
+    key: string,
+    patch: { through_lines?: string[]; gods_story?: string },
+  ) => {
+    setDraft((current) => ({
+      ...current,
+      indicator_wapef: {
+        ...(current.indicator_wapef || {}),
+        [key]: { ...(current.indicator_wapef?.[key] || {}), ...patch },
+      },
+    }))
+  }
+
+  const setIndicatorValue = (key: string, field: 'references' | 'tlrs', entries: string[]) => {    setDraft((current) => {
       const resources = { ...(current.indicator_resources || {}) }
       const entry = resources[key] || { references: [], tlrs: [] }
       resources[key] = { ...entry, [field]: entries }
@@ -207,6 +250,77 @@ export function LessonConfigModal({
     zeliReason: zeliStatus?.reason,
   })
 
+  // The approved WAPEF plan is the only template that owns the annual fields.
+  const isWapefTemplate = (draft.template_id || '').startsWith('tpl-wapef')
+  const annualReady = Boolean(annual?.deep_hope && annual?.storyline)
+
+  const configPayload = () => ({
+    ...draft,
+    school_name: (draft.school_name || '').trim() || null,
+    teacher_name: (draft.teacher_name || '').trim() || null,
+    term: draft.term || null,
+    term_start_date: draft.term_start_date || null,
+    term_end_date: draft.term_end_date || null,
+    periods_per_week: draft.lessons_per_week ?? null,
+    lessons_per_week: draft.lessons_per_week ?? null,
+    generation_method: draft.generation_method || 'standard',
+    ai_mode: draft.ai_mode || 'OFF',
+    template_id: draft.template_id || null,
+    indicator_resources: draft.indicator_resources || {},
+    competency_selections: draft.competency_selections || {},
+    reference: (draft.reference || '').trim() || null,
+  })
+
+  const setAnnualField = (field: 'deep_hope' | 'storyline', value: string) => {
+    setAnnual((current) => current ? { ...current, [field]: value } : current)
+    setAnnualDirty(true)
+    setAutoStatus('idle')
+  }
+
+  const saveAnnualValues = async () => {
+    if (!annual) return
+    const hope = (annual.deep_hope || '').trim()
+    const story = (annual.storyline || '').trim()
+    if (!hope || !story) {
+      setError('Enter both Deep Hope and Storyline before saving them.')
+      return
+    }
+    try {
+      const saved = await api.saveWapefAnnual(schemeId, {
+        deep_hope: hope,
+        storyline: story,
+      })
+      setAnnual(saved)
+      setAnnualDirty(false)
+      setAnnualEditing(false)
+      setError(null)
+    } catch (err) {
+      const normalized = normalizeError(err)
+      setError(normalized.message)
+    }
+  }
+
+  const persistSchoolName = async () => {
+    const value = (draft.school_name || '').trim()
+    if (!value || value === (user?.school_name || '').trim()) return
+    try {
+      await api.updateProfile({ school_name: value })
+    } catch {
+      // The plan config still carries the school name; the profile sync is a
+      // convenience and must never block saving the configuration.
+    }
+  }
+
+  // Option list fallback: if the annual-profile request failed, still load the
+  // approved lists so the teacher is never shown an empty WAPEF selector.
+  useEffect(() => {
+    if (!open || !isWapefTemplate || annualOptions) return
+    api.getWapefOptions()
+      .then((options) => setAnnualOptions(options))
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, isWapefTemplate, annualOptions])
+
   const handleSave = async () => {
     if (savingRef.current) return
     setShowProblems(true)
@@ -218,29 +332,25 @@ export function LessonConfigModal({
     savingRef.current = true
     setSaving(true)
     setError(null)
-    toast({
-      title: 'Saving lesson settings…',
-      variant: 'info',
-      duration: 4000,
-      key: `lesson-config-saving:${schemeId}`,
-    })
+    if (isWapefTemplate && !annualReady) {
+      savingRef.current = false
+      setSaving(false)
+      setError(
+        `Select Deep Hope and Storyline for ${annual?.academic_year || 'this academic year'} before saving the WAPEF plan.`,
+      )
+      setShowProblems(true)
+      return
+    }
     try {
-      const resp = await api.saveLessonConfig(schemeId, {
-        ...draft,
-        school_name: (draft.school_name || '').trim() || null,
-        teacher_name: (draft.teacher_name || '').trim() || null,
-        term: draft.term || null,
-        term_start_date: draft.term_start_date || null,
-        term_end_date: draft.term_end_date || null,
-        periods_per_week: draft.lessons_per_week ?? null,
-        lessons_per_week: draft.lessons_per_week ?? null,
-        generation_method: draft.generation_method || 'standard',
-        ai_mode: draft.ai_mode || 'OFF',
-        template_id: draft.template_id || null,
-        indicator_resources: draft.indicator_resources || {},
-        competency_selections: draft.competency_selections || {},
-        reference: (draft.reference || '').trim() || null,
-      })
+      if (isWapefTemplate && annual) {
+        await api.saveWapefAnnual(schemeId, {
+          deep_hope: annual.deep_hope || '',
+          storyline: annual.storyline || '',
+        })
+        setAnnualDirty(false)
+      }
+      const resp = await api.saveLessonConfig(schemeId, configPayload())
+      await persistSchoolName()
       const savedConfig = resp.config || draft
       rememberExplicitBlanks(savedConfig)
       draftStore.clear()
@@ -254,18 +364,47 @@ export function LessonConfigModal({
     } catch (err) {
       const normalized = normalizeError(err)
       setError(normalized.message)
-      toast({
-        title: 'Lesson settings were not saved',
-        description: normalized.message,
-        variant: 'error',
-        key: `lesson-config-error:${schemeId}`,
-        action: { label: 'Try again', onClick: () => { void handleSave() } },
-      })
     } finally {
       savingRef.current = false
       setSaving(false)
     }
   }
+
+  // ── Autosave (debounced) ─────────────────────────────────────────────
+  // Every teacher input persists through the same endpoints as "Save", so a
+  // refresh or navigation never loses work. The explicit Save stays for
+  // validation and for the "I am done" moment; autosave keeps the draft.
+  useEffect(() => {
+    if (!open) return
+    const wapef = (draft.template_id || '').startsWith('tpl-wapef')
+    const annualChanged = wapef && annualDirty && !annualEditing && Boolean(
+      annual?.deep_hope && annual?.storyline)
+    if (!dirty && !annualChanged) return
+    const seq = ++autoSeq.current
+    const timer = setTimeout(async () => {
+      setAutoStatus('saving')
+      try {
+        if (annualChanged && annual) {
+          await api.saveWapefAnnual(schemeId, {
+            deep_hope: annual.deep_hope || '',
+            storyline: annual.storyline || '',
+          })
+          if (seq === autoSeq.current) setAnnualDirty(false)
+        }
+        await api.saveLessonConfig(schemeId, configPayload())
+        await persistSchoolName()
+        if (seq !== autoSeq.current) return
+        setAutoStatus('saved')
+        setAutoSavedAt(new Date())
+        setBaseline(draft)
+      } catch {
+        if (seq !== autoSeq.current) return
+        setAutoStatus('error')
+      }
+    }, 1200)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft, baseline, annualDirty, annual?.deep_hope, annual?.storyline, open, schemeId, annualEditing])
 
   const applyRecovered = () => {
     const recovered = draftStore.accept()
@@ -430,15 +569,21 @@ export function LessonConfigModal({
                 data-generation-method="standard"
                 onClick={() => setDraft({ ...draft, generation_method: 'standard', ai_mode: 'OFF' })}
                 className={`rounded-xl border p-3 text-left ${activeMethod === 'standard' ? 'border-[#04A9CE] bg-[#04A9CE]/5' : 'border-slate-200'}`}>
-                <span className="block font-semibold">Standard</span>
-                <span className="text-xs text-muted-foreground">Deterministic lesson plans from your scheme.</span>
+                <span className="block font-semibold">Generate with Deterministic Engine</span>
+                <span className="text-xs text-muted-foreground">
+                  Builds complete plans from your scheme without AI. Fast,
+                  predictable, and uses no AI credit.
+                </span>
               </button>
               <button type="button" aria-pressed={activeMethod === 'zeli'}
                 data-generation-method="zeli"
                 onClick={() => setDraft({ ...draft, generation_method: 'zeli', ai_mode: 'OFF' })}
                 className={`rounded-xl border p-3 text-left ${activeMethod === 'zeli' ? 'border-[#04A9CE] bg-[#04A9CE]/5' : 'border-slate-200'}`}>
-                <span className="block font-semibold">Generate with Zeli</span>
-                <span className="text-xs text-muted-foreground">Zeli writes each whole lesson plan.</span>
+                <span className="block font-semibold">Generate with Zeli AI</span>
+                <span className="text-xs text-muted-foreground">
+                  Zeli writes each whole lesson plan from your scheme. Richer
+                  wording, slower, and uses an AI credit.
+                </span>
               </button>
             </div>
             {activeMethod === 'zeli' && zeliStatus && (
@@ -455,7 +600,20 @@ export function LessonConfigModal({
               <Field label="Template" htmlFor="lcfg-template">
                 <select id="lcfg-template" className="h-10 w-full rounded-md border border-input bg-white px-3 text-sm"
                   value={draft.template_id || ''}
-                  onChange={(e) => setDraft({ ...draft, template_id: e.target.value })}>
+                  onChange={(e) => {
+                    const templateId = e.target.value
+                    setDraft({ ...draft, template_id: templateId })
+                    if (!templateId.startsWith('tpl-wapef')) setAnnualEditing(false)
+                    if (templateId.startsWith('tpl-wapef') && !annual) {
+                      setAnnual({
+                        academic_year: scheme?.academic_year || '',
+                        deep_hope: '',
+                        storyline: '',
+                        configured: false,
+                        missing: ['Deep Hope', 'Storyline'],
+                      })
+                    }
+                  }}>
                   <option value="">Approved GES Plan (Default)</option>
                   {templates.map((template) => (
                     <option key={template.id} value={template.id}>{template.name}</option>
@@ -463,6 +621,103 @@ export function LessonConfigModal({
                 </select>
               </Field>
             </div>
+
+            {isWapefTemplate && (
+              <div className="space-y-3 rounded-xl border border-[#04A9CE]/30 bg-[#04A9CE]/5 p-3" data-wapef-annual>
+                <div>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <h4 className="text-sm font-semibold text-[#102A43]">WAPEF — this academic year</h4>
+                    {!annualEditing ? (
+                      <Button type="button" size="sm" variant="outline"
+                        data-edit-wapef-annual
+                        onClick={() => setAnnualEditing(true)}>
+                        Edit
+                      </Button>
+                    ) : (
+                      <span className="text-xs font-medium text-[#035f7c]" role="status">
+                        Editing — save to lock for the year
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Deep Hope and Storyline apply to every WAPEF lesson in{' '}
+                    {annual?.academic_year || scheme?.academic_year || 'this academic year'}.
+                    They stay locked for the year unless you click Edit again. A
+                    new academic year starts empty and never inherits these values.
+                  </p>
+                </div>
+                {!annualEditing ? (
+                  <dl className="grid gap-3 text-sm sm:grid-cols-2" data-wapef-annual-read>
+                    <div className="rounded-lg border border-slate-200 bg-white p-2.5">
+                      <dt className="text-xs font-medium text-muted-foreground">Deep Hope</dt>
+                      <dd className="mt-0.5 text-[#102A43]">
+                        {annual?.deep_hope || 'Not set yet — click Edit.'}
+                      </dd>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-white p-2.5">
+                      <dt className="text-xs font-medium text-muted-foreground">Storyline</dt>
+                      <dd className="mt-0.5 text-[#102A43]">
+                        {annual?.storyline || 'Not set yet — click Edit.'}
+                      </dd>
+                    </div>
+                  </dl>
+                ) : (
+                  <>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Field label="Deep Hope" htmlFor="lcfg-deep-hope" required
+                        error={showProblems && !annual?.deep_hope ? 'Enter the Deep Hope for this academic year.' : undefined}>
+                        <TextArea id="lcfg-deep-hope" rows={3}
+                          value={annual?.deep_hope || ''}
+                          placeholder="Write the enduring hope for this year's learners"
+                          onChange={(e) => setAnnualField('deep_hope', e.target.value)} />
+                        {(annualOptions?.deep_hopes || []).map((option) => (
+                          <button key={option} type="button"
+                            className="mt-1 text-left text-xs font-medium text-[#035f7c] underline"
+                            onClick={() => setAnnualField('deep_hope', option)}>
+                            Use approved wording
+                          </button>
+                        ))}
+                      </Field>
+                      <Field label="Storyline" htmlFor="lcfg-storyline" required
+                        error={showProblems && !annual?.storyline ? 'Enter the Storyline for this academic year.' : undefined}>
+                        <TextArea id="lcfg-storyline" rows={3}
+                          value={annual?.storyline || ''}
+                          placeholder="Write the storyline that frames this year"
+                          onChange={(e) => setAnnualField('storyline', e.target.value)} />
+                        {(annualOptions?.storylines || []).map((option) => (
+                          <button key={option} type="button"
+                            className="mt-1 text-left text-xs font-medium text-[#035f7c] underline"
+                            onClick={() => setAnnualField('storyline', option)}>
+                            Use approved wording
+                          </button>
+                        ))}
+                      </Field>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" size="sm" onClick={() => { void saveAnnualValues() }}
+                        data-save-wapef-annual>
+                        Save &amp; lock for the year
+                      </Button>
+                      <Button type="button" size="sm" variant="outline"
+                        onClick={() => {
+                          setAnnualEditing(false)
+                          setAnnualDirty(false)
+                          // Reload the stored values so Cancel never leaves a
+                          // half-typed edit on screen.
+                          api.getWapefAnnual(schemeId).then(setAnnual).catch(() => {})
+                        }}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Throughline and God&apos;s Story are topic-level: choose them
+                  for each lesson during review. AI may suggest those two, but
+                  you keep the final choice.
+                </p>
+              </div>
+            )}
           </section>
 
           <section aria-labelledby="per-lesson-heading" className="space-y-3 border-t pt-4">
@@ -549,6 +804,68 @@ export function LessonConfigModal({
                                 })}
                               </div>
                             </fieldset>
+                            {isWapefTemplate && wapefOptions && (
+                              <div className="space-y-2 rounded-lg border border-[#04A9CE]/30 bg-[#04A9CE]/5 p-2.5">
+                                <p className="text-xs font-semibold text-[#102A43]">
+                                  WAPEF topic connection
+                                </p>
+                                <p className="text-[11px] text-muted-foreground">
+                                  Deep Hope and Storyline come from the academic
+                                  year above. Choose this lesson&apos;s Through
+                                  lines and God&apos;s Story here.
+                                </p>
+                                <Field
+                                  label="God's Story"
+                                  htmlFor={`wapef-gods-story-${key}`}
+                                  hint="A truthful Biblical connection for this indicator."
+                                >
+                                  <select
+                                    id={`wapef-gods-story-${key}`}
+                                    className="h-9 w-full rounded-md border border-input bg-white px-2 text-sm"
+                                    value={indicatorWapefValue(key).gods_story || ''}
+                                    onChange={(e) => setIndicatorWapef(key, { gods_story: e.target.value })}
+                                  >
+                                    <option value="">Not selected</option>
+                                    {wapefOptions.gods_story.map((option) => (
+                                      <option key={option} value={option}>{option}</option>
+                                    ))}
+                                  </select>
+                                </Field>
+                                <div>
+                                  <p className="mb-1 text-xs font-medium text-[#102A43]">
+                                    Through lines
+                                  </p>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {wapefOptions.through_lines.map((option) => {
+                                      const selected = (indicatorWapefValue(key).through_lines || []).includes(option)
+                                      return (
+                                        <button
+                                          key={option}
+                                          type="button"
+                                          aria-pressed={selected}
+                                          data-wapef-throughline={option}
+                                          onClick={() => {
+                                            const current = indicatorWapefValue(key).through_lines || []
+                                            setIndicatorWapef(key, {
+                                              through_lines: selected
+                                                ? current.filter((item) => item !== option)
+                                                : [...current, option],
+                                            })
+                                          }}
+                                          className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                                            selected
+                                              ? 'border-[#102A43] bg-[#102A43] text-white'
+                                              : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                          }`}
+                                        >
+                                          {option}
+                                        </button>
+                                      )
+                                    })}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                             <Field
                               label="Key words / New vocabulary"
                               htmlFor={`keywords-${key}`}
@@ -585,7 +902,16 @@ export function LessonConfigModal({
         </div>
 
         <DialogFooter className="sm:items-center sm:justify-between">
-          <DraftSaveStatus status={draftStore.status} savedAt={draftStore.savedAt} />
+          <div className="flex flex-col gap-1">
+            <DraftSaveStatus status={draftStore.status} savedAt={draftStore.savedAt} />
+            <span className="text-[11px] text-muted-foreground" role="status" aria-live="polite">
+              {autoStatus === 'saving' && 'Saving your changes…'}
+              {autoStatus === 'saved' && autoSavedAt
+                && `All changes saved ${autoSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`}
+              {autoStatus === 'error' && 'Autosave failed — changes are still on this screen.'}
+              {autoStatus === 'idle' && dirty && 'Unsaved changes — autosave starts shortly.'}
+            </span>
+          </div>
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="ghost" asChild>
               <Link href="/settings"><Settings className="mr-1.5 h-4 w-4" />Settings</Link>

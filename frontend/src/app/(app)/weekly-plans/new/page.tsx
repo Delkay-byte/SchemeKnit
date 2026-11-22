@@ -673,7 +673,7 @@ export default function NewWeeklyPlanPage() {
             </Button>
             <p className="text-xs text-muted-foreground">
               <CalendarDays className="mr-1 inline h-3.5 w-3.5" aria-hidden="true" />
-              Saved plans reopen for review, editing and DOCX/PDF export.
+              Saved plans reopen for review, editing and DOCX export. PDF export is coming soon.
             </p>
           </SurfaceCard>
         </div>

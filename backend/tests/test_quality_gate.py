@@ -765,7 +765,7 @@ class TestEndpointGate:
                 f"/api/generation/{scheme.id}/generate",
                 json=_gen_config(scheme).model_dump(mode="json"),
             )
-            assert response.status_code == 500
+            assert response.status_code == 422
             assert "quality gate rejected" in response.json()["detail"]
             # Incident invariants B + H: a failed run releases every reserved
             # unit — no lesson rows, no ledger rows, quota endpoint at zero.

@@ -118,8 +118,9 @@ export default function LicenseSubscriptionPage() {
       <LegalSection title="7. Storage and exports">
         <p>
           Uploaded schemes and generated lessons are stored in access-controlled
-          storage. Exports may be generated on demand in DOCX, PDF, XLSX or ZIP
-          where supported. Download links are short-lived and single-use.
+          storage. Exports may be generated on demand in DOCX, XLSX or ZIP where
+          supported (PDF export is coming soon). Download links are short-lived
+          and single-use.
           Retention of stored files is described in the{' '}
           <a href="/data-retention" className="text-brand-cyan underline">
             Data Retention Policy

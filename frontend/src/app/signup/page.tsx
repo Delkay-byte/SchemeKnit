@@ -333,8 +333,8 @@ export default function IndividualSignupPage() {
 
       <div className="mt-5 rounded-xl border border-border bg-[#F4F7FA] p-4 shadow-sm">
         <p className="text-xs leading-relaxed text-muted-foreground text-center">
-          Free plan: 2 indicator-level lesson plans per calendar month, individual DOCX and
-          PDF export, and no payment information required. Paid packages are prepaid by
+          Free plan: 2 indicator-level lesson plans per calendar month, individual DOCX
+          export (PDF coming soon), and no payment information required. Paid packages are prepaid by
           Bank Transfer or Mobile Money.
         </p>
       </div>

@@ -77,6 +77,18 @@ def _wapef_scheme(db, owner_id, weeks=2):
             resources=["Keyboard"],
         ))
     db.commit()
+    # WAPEF generation requires the academic-year Deep Hope + Storyline. Seed
+    # the same approved values the legacy per-lesson selections use, so these
+    # save-boundary tests keep exercising the per-lesson topic fields while the
+    # annual contract is satisfied.
+    from src import wapef_annual
+    from src.engines.wapef_fields import wapef_options
+    opts = wapef_options()
+    wapef_annual.save_profile(
+        db, owner_id, scheme.academic_year,
+        (opts["deep_hopes"] or [""])[0],
+        (opts["storylines"] or [""])[0],
+    )
     return scheme
 
 
@@ -410,10 +422,13 @@ class TestGEmptyStateSemantics:
             lessons = client.get(f"/api/generation/{job_id}/lessons").json()["lesson_plans"]
 
         assert lessons
+        from src.engines.wapef_fields import wapef_options
+        opts = wapef_options()
         for lp in lessons:
-            # No selection → genuinely empty, never an invented default.
-            assert lp["wapef_deep_hope"] == ""
-            assert lp["wapef_storyline"] == ""
+            # Annual Deep Hope/Storyline are always present for a WAPEF plan.
+            assert lp["wapef_deep_hope"] == (opts["deep_hopes"] or [""])[0]
+            assert lp["wapef_storyline"] == (opts["storylines"] or [""])[0]
+            # No per-lesson topic selection -> genuinely empty, never invented.
             assert lp["wapef_gods_story"] == ""
             assert lp["wapef_through_lines"] == []
             # The non-WAPEF draft field still applied (drafts still work).

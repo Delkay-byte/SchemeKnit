@@ -52,12 +52,13 @@ class TestWeekCentricSurface:
             "data-week-number",
             "data-week-row",
             "data-occurrence-id",
-            "data-generate-week",
-            "data-generate-lesson",
             "data-week-coverage",
             "data-generate-total",
         ):
             assert attr in src, f"missing {attr}"
+        # One generation action only; weekly/per-lesson duplicates removed.
+        assert "data-generate-week" not in src
+        assert "data-generate-lesson" not in src
 
     def test_surfaces_keep_their_e2e_attributes(self):
         src = _page()
@@ -65,20 +66,22 @@ class TestWeekCentricSurface:
             "data-generate-summary",
             "data-generate-config",
             "data-generate-action",
-            "data-wapef-setup",
             "data-coverage",
         ):
             assert attr in src, f"missing {attr}"
+        # WAPEF fields moved into Configure lesson rubrics.
+        assert "data-wapef-setup" not in src
         # The competing Quick Generate / Build with me selector was removed.
         assert "data-generate-mode" not in src
 
-    def test_primary_actions_are_per_week_and_per_lesson(self):
+    def test_one_primary_generation_action(self):
         src = _page()
-        # One action per week and one per occurrence — never a single batch
-        # with no way back into a single lesson (R7/R9).
-        assert "handleGenerateWeek" in src
-        assert "handleGenerateRow" in src
+        # UX-fatigue contract: ONE primary generation action. Weekly and
+        # per-lesson duplicate CTAs were removed.
+        assert "handleAutopilot" in src
         assert "handleGenerateAll" in src
+        assert "handleGenerateWeek" not in src
+        assert "handleGenerateRow" not in src
         assert "selected_occurrence_ids" in src
 
 
@@ -137,9 +140,14 @@ class TestStateSplit:
         cfg_card = src.find("data-generate-config")
         assert 0 < cfg_gate < cfg_card or cfg_gate != -1
 
-    def test_wapef_card_is_gated_and_numbered_from_lesson_sequence(self):
+    def test_wapef_fields_live_in_the_configuration_dialog(self):
         src = _page()
-        assert "{!jobId && isWapefSelected && wapefOptions && lessonReview.length > 0 && (" in src
+        # The separate always-visible WAPEF card is gone (less UX fatigue).
+        assert "data-wapef-setup" not in src
+        modal = (FRONTEND / "src" / "components" / "lesson-config-modal.tsx").read_text(
+            encoding="utf-8")
+        assert "data-wapef-annual" in modal
+        assert "data-wapef-throughline" in modal
         # lesson_sequence is 1-based — the display must not add another +1.
         assert "row.lesson_sequence + 1" not in src
 

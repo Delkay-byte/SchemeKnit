@@ -71,6 +71,16 @@ def _wapef_scheme(db, owner_id, weeks=2):
             resources=["Keyboard"],
         ))
     db.commit()
+    # Annual WAPEF contract: Deep Hope + Storyline are year-level and must be
+    # configured before a WAPEF run; seed the approved defaults.
+    from src import wapef_annual
+    from src.engines.wapef_fields import wapef_options
+    opts = wapef_options()
+    wapef_annual.save_profile(
+        db, owner_id, "2026/2027",
+        (opts["deep_hopes"] or [""])[0],
+        (opts["storylines"] or [""])[0],
+    )
     return scheme
 
 

@@ -215,7 +215,7 @@ export function normalizeError(error: unknown): NormalizedError {
       code?.startsWith('entitlement') ||
       code?.startsWith('plan_') ||
       code === 'generation_limit' ||
-      /(generation limit|entitlement|current plan|upgrade)/i.test(`${code || ''} ${detail || ''}`)
+      /(generation limit|entitlement|current plan|upgrade|ai generation|lesson.?plan credit|buy a package|allowance)/i.test(`${code || ''} ${detail || ''}`)
     if (entitlement) {
       return {
         ...base,
