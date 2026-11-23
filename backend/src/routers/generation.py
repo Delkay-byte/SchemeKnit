@@ -1235,15 +1235,20 @@ class LessonConfigRequest(BaseModel):
     indicator_wapef: Optional[Dict[str, Dict[str, Any]]] = None
 
 
-def _normalize_lesson_config(payload: LessonConfigRequest) -> dict:
+def _normalize_lesson_config(payload: LessonConfigRequest) -> tuple[dict, set[str]]:
     """Validate and normalize the configuration the teacher submitted.
 
-    Raises 422 with a field-specific message on nonsense values; blanks stay
-    blank (an optional field may legitimately be empty) and nothing is ever
-    invented to make the form look complete.
+    Raises 422 with a field-specific message on nonsense values. The returned
+    fields set distinguishes a field the teacher sent from one left untouched.
+    A sent blank stays blank; nothing is ever invented to make the form look
+    complete.
     """
     errors = []
     out: dict = {}
+    fields = set(payload.model_fields_set)
+
+    def _present(name: str) -> bool:
+        return name in fields
 
     def _clean_str(name, value, max_len=200):
         if value is None:
@@ -1273,28 +1278,37 @@ def _normalize_lesson_config(payload: LessonConfigRequest) -> dict:
     out["term"] = _clean_str("Academic term", payload.term, max_len=40)
     out["template_id"] = _clean_str("Template", payload.template_id, max_len=80)
 
-    if payload.generation_method is not None:
-        out["generation_method"] = payload.generation_method.value
-    if payload.ai_mode is not None:
-        out["ai_mode"] = payload.ai_mode.value
+    if _present("generation_method"):
+        value = payload.generation_method
+        out["generation_method"] = value.value if value is not None else None
+    if _present("ai_mode"):
+        value = payload.ai_mode
+        out["ai_mode"] = value.value if value is not None else None
 
-    if payload.term_start_date is not None:
-        out["term_start_date"] = payload.term_start_date.isoformat()
-    if payload.term_end_date is not None:
-        out["term_end_date"] = payload.term_end_date.isoformat()
+    if _present("term_start_date"):
+        value = payload.term_start_date
+        out["term_start_date"] = value.isoformat() if value is not None else None
+    if _present("term_end_date"):
+        value = payload.term_end_date
+        out["term_end_date"] = value.isoformat() if value is not None else None
     if payload.term_start_date and payload.term_end_date:
         if payload.term_end_date < payload.term_start_date:
             errors.append("Term end date cannot be before the term start date.")
 
-    lpweek = payload.lessons_per_week
-    if lpweek is not None:
-        if not isinstance(lpweek, int) or isinstance(lpweek, bool) or not 1 <= lpweek <= 15:
+    if _present("lessons_per_week"):
+        lpweek = payload.lessons_per_week
+        if lpweek is not None and (
+            not isinstance(lpweek, int) or isinstance(lpweek, bool)
+            or not 1 <= lpweek <= 15
+        ):
             errors.append("Lessons per week must be a whole number between 1 and 15.")
         else:
             out["lessons_per_week"] = lpweek
 
-    if payload.indicator_resources is not None:
-        if len(payload.indicator_resources) > 500:
+    if _present("indicator_resources"):
+        if payload.indicator_resources is None:
+            out["indicator_resources"] = None
+        elif len(payload.indicator_resources) > 500:
             errors.append("Too many per-lesson resource entries.")
         else:
             cleaned: Dict[str, Dict[str, List[str]]] = {}
@@ -1330,10 +1344,12 @@ def _normalize_lesson_config(payload: LessonConfigRequest) -> dict:
                 }
             out["indicator_resources"] = cleaned
 
-    if payload.competency_selections is not None:
+    if _present("competency_selections"):
         from ..curriculum.competencies import normalize_competencies
 
-        if len(payload.competency_selections) > 500:
+        if payload.competency_selections is None:
+            out["competency_selections"] = None
+        elif len(payload.competency_selections) > 500:
             errors.append("Too many per-lesson competency entries.")
         else:
             selected: Dict[str, List[str]] = {}
@@ -1351,8 +1367,10 @@ def _normalize_lesson_config(payload: LessonConfigRequest) -> dict:
                 selected[text] = normalize_competencies(values)
             out["competency_selections"] = selected
 
-    if payload.indicator_keywords is not None:
-        if len(payload.indicator_keywords) > 500:
+    if _present("indicator_keywords"):
+        if payload.indicator_keywords is None:
+            out["indicator_keywords"] = None
+        elif len(payload.indicator_keywords) > 500:
             errors.append("Too many per-lesson vocabulary entries.")
         else:
             selected: Dict[str, List[str]] = {}
@@ -1380,14 +1398,16 @@ def _normalize_lesson_config(payload: LessonConfigRequest) -> dict:
                 selected[text] = cleaned_terms
             out["indicator_keywords"] = selected
 
-    if payload.indicator_wapef is not None:
-        from ..engines.wapef_fields import (
-            normalize_gods_story, normalize_through_lines,
-        )
-
-        if len(payload.indicator_wapef) > 500:
+    if _present("indicator_wapef"):
+        if payload.indicator_wapef is None:
+            out["indicator_wapef"] = None
+        elif len(payload.indicator_wapef) > 500:
             errors.append("Too many per-lesson WAPEF entries.")
         else:
+            from ..engines.wapef_fields import (
+                normalize_gods_story, normalize_through_lines,
+            )
+
             picked: Dict[str, Dict[str, Any]] = {}
             for key, entry in payload.indicator_wapef.items():
                 text = str(key or "").strip()
@@ -1409,40 +1429,51 @@ def _normalize_lesson_config(payload: LessonConfigRequest) -> dict:
                     }
             out["indicator_wapef"] = picked
 
-    cs = payload.class_size
-    if cs is not None:
-        if not isinstance(cs, int) or isinstance(cs, bool) or cs < 1 or cs > 500:
+    if _present("class_size"):
+        cs = payload.class_size
+        if cs is not None and (
+            not isinstance(cs, int) or isinstance(cs, bool) or cs < 1 or cs > 500
+        ):
             errors.append("Class size must be a whole number between 1 and 500.")
         else:
             out["class_size"] = cs
 
-    dur = payload.lesson_duration_minutes
-    if dur is not None:
-        if not isinstance(dur, int) or isinstance(dur, bool) or dur < 20 or dur > 240:
+    if _present("lesson_duration_minutes"):
+        dur = payload.lesson_duration_minutes
+        if dur is not None and (
+            not isinstance(dur, int) or isinstance(dur, bool)
+            or dur < 20 or dur > 240
+        ):
             errors.append("Lesson duration must be a whole number between 20 and 240 minutes.")
         else:
             out["lesson_duration_minutes"] = dur
 
-    ppw = payload.periods_per_week
-    if ppw is not None:
-        if not isinstance(ppw, int) or isinstance(ppw, bool) or ppw < 1 or ppw > 15:
+    if _present("periods_per_week"):
+        ppw = payload.periods_per_week
+        if ppw is not None and (
+            not isinstance(ppw, int) or isinstance(ppw, bool)
+            or ppw < 1 or ppw > 15
+        ):
             errors.append("Periods per week must be a whole number between 1 and 15.")
         else:
             out["periods_per_week"] = ppw
 
-    if payload.teaching_days is not None:
+    if _present("teaching_days"):
         days = payload.teaching_days
-        bad = [d for d in days
-               if not isinstance(d, int) or isinstance(d, bool)
-               or d not in _ALLOWED_TEACHING_DAYS]
-        if bad:
-            errors.append("Teaching days must be weekdays (Monday-Friday).")
+        if days is None:
+            out["teaching_days"] = None
         else:
-            out["teaching_days"] = sorted(set(days))
+            bad = [d for d in days
+                   if not isinstance(d, int) or isinstance(d, bool)
+                   or d not in _ALLOWED_TEACHING_DAYS]
+            if bad:
+                errors.append("Teaching days must be weekdays (Monday-Friday).")
+            else:
+                out["teaching_days"] = sorted(set(days))
 
     if errors:
         raise HTTPException(status_code=422, detail="; ".join(errors))
-    return {k: v for k, v in out.items() if v is not None}
+    return {k: v for k, v in out.items() if v is not None or k in fields}, fields
 
 
 def _saved_lesson_config(scheme_db) -> dict:
@@ -1450,20 +1481,22 @@ def _saved_lesson_config(scheme_db) -> dict:
     return dict(saved) if isinstance(saved, dict) else {}
 
 
-def _merge_saved_lesson_config(existing: dict, updates: dict) -> dict:
+def _merge_saved_lesson_config(
+    existing: dict, updates: dict, sent_fields: Optional[set[str]] = None,
+) -> dict:
     """Merge one teacher save into the plan's authoritative snapshot.
 
-    An absent field (``None`` in the request model) means "not sent" and keeps
-    the saved value. An explicit ``{}`` means the teacher removed every entry
-    from that per-lesson map and is saved as such. The modal refetches the
-    authoritative snapshot on open, so its draft always knows which maps are
-    loaded before it sends anything.
+    A field absent from the request keeps its saved value. A field the teacher
+    sent is authoritative, including ``None`` and ``{}``. The modal refetches
+    the snapshot on open, so its draft knows which fields are loaded before it
+    sends anything.
     """
     merged = dict(existing or {})
+    sent = sent_fields or set()
+    derived = {"teacher_name_cleared"}
     for key, value in (updates or {}).items():
-        if value is None:
-            continue
-        merged[key] = value
+        if key in sent or key in derived or value is not None:
+            merged[key] = value
     return merged
 
 
@@ -1538,12 +1571,12 @@ async def put_lesson_config(
     scheme_db = data_service.get_scheme(db, scheme_id, user.id)
     if not scheme_db:
         raise HTTPException(status_code=404, detail="Scheme not found")
-    updates = _normalize_lesson_config(payload)
+    updates, sent_fields = _normalize_lesson_config(payload)
     # Every save writes one authoritative snapshot. The merge keeps fields the
     # modal did not carry (including per-lesson maps) instead of replacing them
     # with an empty draft. Only values actually submitted may change.
     config = _merge_saved_lesson_config(
-        _saved_lesson_config(scheme_db), updates)
+        _saved_lesson_config(scheme_db), updates, sent_fields)
     scheme_db.lesson_config = config
     db.commit()
     readiness = _lesson_config_readiness(config)

@@ -279,6 +279,47 @@ class TestExtendedLessonConfiguration:
         body = http.get(f"/api/generation/{scheme.id}/lesson-config").json()["config"]
         assert body["teacher_name"] == "Restored Teacher"
 
+    def test_explicit_text_and_date_clears_are_authoritative(self, http):
+        """Blank is a teacher edit, not a missing value to fall back from."""
+        scheme = http.scheme_factory()
+        saved = {
+            **FULL_CONFIG,
+            "school_name": "Kpogede Community School",
+            "reference": "NaCCA p.19",
+            "period": "3rd & 4th",
+            "term": "First Term",
+            "template_id": "tpl-wapef-maths-b4",
+            "term_start_date": "2027-01-05",
+            "term_end_date": "2027-04-01",
+        }
+        assert http.put(
+            f"/api/generation/{scheme.id}/lesson-config", json=saved,
+        ).status_code == 200
+
+        cleared = {
+            **FULL_CONFIG,
+            "school_name": "",
+            "reference": "",
+            "period": "",
+            "term": "",
+            "template_id": "",
+            "term_start_date": None,
+            "term_end_date": None,
+            "teaching_days": [],
+        }
+        response = http.put(
+            f"/api/generation/{scheme.id}/lesson-config", json=cleared,
+        )
+        assert response.status_code == 200
+        for field in ("school_name", "reference", "period", "term",
+                      "template_id", "term_start_date", "term_end_date"):
+            assert response.json()["config"].get(field) in ("", None), field
+        body = http.get(f"/api/generation/{scheme.id}/lesson-config").json()["config"]
+        for field in ("school_name", "reference", "period", "term",
+                      "template_id", "term_start_date", "term_end_date"):
+            assert body.get(field) in ("", None), field
+        assert body["teaching_days"] == []
+
     def test_teacher_name_defaults_to_the_profile_when_not_saved(self, http):
         scheme = http.scheme_factory()
         payload = {k: v for k, v in FULL_CONFIG.items() if k != "teacher_name"}

@@ -174,7 +174,7 @@ def test_configuration_dialog_topic_choices_reach_the_lesson(db):
 
 
 def test_indicator_wapef_is_normalized_and_validated():
-    normalized = _normalize_lesson_config(LessonConfigRequest(
+    normalized, _sent_fields = _normalize_lesson_config(LessonConfigRequest(
         indicator_wapef={
             "week2:0:B4.1.1.1.3": {
                 "through_lines": ["Justice seeker", "not approved"],

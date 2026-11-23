@@ -16,9 +16,14 @@
 7. [x] Fix generate/review copy to use real subject/class/term.
 8. [x] Keep production QA artefacts intact; no production DB mutation without live verification.
 9. [x] Run focused backend + frontend tests; inspect representative DOCX output.
-10. [ ] Confirm broader backend suite result.
-11. [ ] One commit, one push to `main`, one CI run, Render auto-deploy only.
+10. [x] Confirm broader backend suite result.
+11. [ ] Final corrective push to `main`; Render auto-deploy only.
 12. [ ] Final report with mandated headings only.
+
+## Deployment record
+- `9764967`: consolidated fix; first CI failed on cleared teacher name.
+- `949e24b`: preserve explicitly cleared teacher name; CI passed; Render live.
+- Final push: authoritative clears for every sent config field.
 
 ## Safety
 - No reset, discard, force-push, destructive cleanup or MaaCash changes.

@@ -264,7 +264,7 @@ class TestContentGeneration:
             },
             generation_method=GenerationMethod.STANDARD,
         )
-        normalized = _normalize_lesson_config(payload)
+        normalized, _sent_fields = _normalize_lesson_config(payload)
         assert normalized["indicator_keywords"] == {
             "week1:0:B7.1.1.1.1": ["billions", "place value"],
         }
