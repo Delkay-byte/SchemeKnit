@@ -7,6 +7,8 @@ Validated Scheme → Term Config → Calendar → Allocation → Lesson Plans �
 
 import logging
 import inspect
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from pathlib import Path
@@ -49,6 +51,7 @@ from .zeli_generation import (
     ZeliGenerationError,
     generate_zeli_content,
     generate_zeli_with_fallback,
+    generate_gods_story_note,
     get_zeli_fallback_provider,
     get_zeli_provider,
     zeli_lesson_context,
@@ -180,8 +183,11 @@ class GenerationPipeline:
         template_id: Optional[str] = None,
         db=None,
         owner_id: Optional[str] = None,
+        unit_progress=None,
     ) -> GenerationJob:
         """Run the full generation pipeline."""
+        started = time.perf_counter()
+        stages: Dict[str, float] = {}
         job = GenerationJob(
             scheme_of_work_id=scheme.id,
             config=config,
@@ -191,17 +197,21 @@ class GenerationPipeline:
         lesson_plans: List[LessonPlan] = []
 
         try:
+            _t = time.perf_counter()
             calendar = self.calendar_engine.build_calendar(
                 config, scheme.weeks, config.holidays
             )
+            stages["calendar_seconds"] = round(time.perf_counter() - _t, 4)
 
             weeks_to_use = scheme.weeks
             if selected_weeks:
                 weeks_to_use = [w for w in scheme.weeks if w.week_number in selected_weeks]
 
+            _t = time.perf_counter()
             coverage = self.allocation_engine.allocate(
                 weeks_to_use, calendar, config, include_special_weeks
             )
+            stages["allocation_seconds"] = round(time.perf_counter() - _t, 4)
 
             # Stable lesson numbering (Priority 3): stamp each allocation with
             # its 1-based ordinal over the FULL scheme (curriculum order,
@@ -266,9 +276,11 @@ class GenerationPipeline:
 
             from ..engines.allocation_engine import BuildLedger
             build_ledger = BuildLedger()
+            _t = time.perf_counter()
             lesson_plans = self.allocation_engine.generate_lesson_plans(
                 coverage, config, scheme.id, ledger=build_ledger,
             )
+            stages["lesson_build_seconds"] = round(time.perf_counter() - _t, 4)
             job._build_ledger = build_ledger
 
             educational_level = CLASS_LEVEL_TO_EDUCATIONAL_LEVEL.get(
@@ -293,8 +305,14 @@ class GenerationPipeline:
                 # There is no deterministic substitute — a failure marks the job
                 # failed and the router reports it truthfully, so a teacher can
                 # never be shown deterministic prose labelled "Zeli".
-                self._generate_with_zeli(lesson_plans, config, job, db=db)
+                _t = time.perf_counter()
+                self._generate_with_zeli(
+                    lesson_plans, config, job, db=db,
+                    unit_progress=unit_progress,
+                )
+                stages["provider_seconds"] = round(time.perf_counter() - _t, 4)
             elif config.ai_mode != AIMode.OFF:
+                _t = time.perf_counter()
                 try:
                     self._enrich_with_ai(lesson_plans, config, job, db=db)
                 except Exception as e:
@@ -306,10 +324,13 @@ class GenerationPipeline:
                         f"AI enrichment could not be completed. "
                         f"Your lessons were generated using the standard lesson engine."
                     )
+                stages["provider_seconds"] = round(time.perf_counter() - _t, 4)
             job.progress = 80
 
+            _t = time.perf_counter()
             for lp in lesson_plans:
                 lp.status = LessonStatus.GENERATED
+            stages["postprocess_seconds"] = round(time.perf_counter() - _t, 4)
 
             job.lesson_plan_ids = [lp.id for lp in lesson_plans]
             job.completed_lessons = len(lesson_plans)
@@ -322,8 +343,13 @@ class GenerationPipeline:
             job._coverage = coverage
             job._calendar = calendar
             job._validation_issues = validation_issues
+            stages["total_seconds"] = round(time.perf_counter() - started, 4)
+            job._timings = stages
+            job._lesson_timings = list(getattr(job, "_lesson_timings", []) or [])
 
         except Exception as e:
+            stages["total_seconds"] = round(time.perf_counter() - started, 4)
+            job._timings = stages
             job.status = JobStatus.FAILED
             job.error_message = str(e)
             # Preserve the classified, teacher-safe Zeli failure so the HTTP
@@ -680,6 +706,7 @@ class GenerationPipeline:
         config: TermConfig,
         job: GenerationJob,
         db=None,
+        unit_progress=None,
     ):
         """Generate whole lesson content with Zeli (the 'Generate with Zeli' method).
 
@@ -690,12 +717,25 @@ class GenerationPipeline:
         ``_apply_v2_content``, so curriculum authority, Ghanaian context,
         assessment structure and differentiation are preserved.
 
+        Independent lessons are processed by a BOUNDED worker pool. The pool
+        size is the smallest of ``GENERATION_MAX_CONCURRENCY``, the selected
+        provider's ceiling and the shared per-teacher AI cap, so parallel work
+        can never trip the spend ledger's concurrency guard. Each worker owns
+        its provider instances and its own database session: provider clients
+        keep mutable last-error/usage state and a SQLAlchemy Session is not
+        thread-safe.
+
         Unlike the optional enrichment path, a failure NEVER silently falls
         back to deterministic content: it raises ``ZeliGenerationError`` and the
         whole run fails with a teacher-safe reason, leaving existing lessons and
         quota untouched. A special period (no instructional content) is skipped,
         exactly as in the enrichment path.
         """
+        from .generation_concurrency import (
+            configured_max_concurrency,
+            effective_worker_count,
+        )
+
         provider = get_zeli_provider()
         fallback = get_zeli_fallback_provider()
         primary_name = provider.get_name() if hasattr(provider, "get_name") else "zeli"
@@ -717,10 +757,7 @@ class GenerationPipeline:
         job._zeli_cache_hits = 0
 
         sorted_plans = sorted(lesson_plans, key=lambda lp: lp.lesson_sequence)
-        failed_ids: set = set()
-        failures: list = []
-        last_error: Optional[ZeliGenerationError] = None
-
+        work: List[tuple] = []
         for idx, lp in enumerate(sorted_plans):
             if bool(getattr(lp, "special_period_label", "") or ""):
                 logger.info(
@@ -728,128 +765,113 @@ class GenerationPipeline:
                     lp.id, lp.special_period_label,
                 )
                 continue
+            prev_context = None
+            next_context = None
+            if idx > 0:
+                prev_lp = sorted_plans[idx - 1]
+                prev_context = (
+                    f"Previous lesson: {prev_lp.strand} - {prev_lp.sub_strand}. "
+                    f"Indicator: {prev_lp.indicators[0] if prev_lp.indicators else 'N/A'}"
+                )
+            if idx < len(sorted_plans) - 1:
+                next_lp = sorted_plans[idx + 1]
+                next_context = (
+                    f"Next lesson: {next_lp.strand} - {next_lp.sub_strand}. "
+                    f"Indicator: {next_lp.indicators[0] if next_lp.indicators else 'N/A'}"
+                )
+            work.append((idx, lp, prev_context, next_context))
 
+        workers = effective_worker_count(
+            configured_max_concurrency(), primary_name)
+        # In-memory/StaticPool SQLite exposes ONE connection for the whole
+        # process. Concurrent sessions on it would corrupt each other, so such
+        # a database keeps the sequential path even when a larger pool is
+        # configured. Production PostgreSQL and file SQLite are unaffected.
+        if db is not None:
             try:
-                prev_context = None
-                next_context = None
-                if idx > 0:
-                    prev_lp = sorted_plans[idx - 1]
-                    prev_context = (
-                        f"Previous lesson: {prev_lp.strand} - {prev_lp.sub_strand}. "
-                        f"Indicator: {prev_lp.indicators[0] if prev_lp.indicators else 'N/A'}"
-                    )
-                if idx < len(sorted_plans) - 1:
-                    next_lp = sorted_plans[idx + 1]
-                    next_context = (
-                        f"Next lesson: {next_lp.strand} - {next_lp.sub_strand}. "
-                        f"Indicator: {next_lp.indicators[0] if next_lp.indicators else 'N/A'}"
-                    )
+                from sqlalchemy.pool import StaticPool
+                if isinstance(db.get_bind().pool, StaticPool):
+                    workers = 1
+            except Exception:
+                pass
+        job._generation_workers = workers
+        logger.info(
+            "Zeli generation starting: %d unit(s), %d worker(s), provider=%s",
+            len(work), workers, primary_name,
+        )
 
-                context = zeli_lesson_context(
-                    lp, config,
-                    previous_lesson_context=prev_context,
-                    next_lesson_context=next_context,
-                )
-                job.ai_enrichment_total_attempted += 1
+        results: List[Optional[dict]] = [None] * len(work)
+        scheduled_at = time.perf_counter()
 
-                def _generate(ctx):
-                    return generate_zeli_with_fallback(
-                        primary=provider, fallback=fallback, context=ctx, db=db,
-                        user_id=getattr(job, "owner_id", None), request_id=job.id)
+        def _run(item):
+            idx, lp, prev_context, next_context = item
+            return self._generate_one_zeli_lesson(
+                lp,
+                config=config,
+                prev_context=prev_context,
+                next_context=next_context,
+                job_id=job.id,
+                owner_id=getattr(job, "owner_id", None),
+                db_bind=(db.get_bind() if db is not None else None),
+                primary_name=primary_name,
+                primary_model=primary_model,
+                scheduled_at=scheduled_at,
+            )
 
-                content, meta = _generate(context)
-                self._record_zeli_meta(job, meta, primary_name, primary_model)
-                provider_name = meta.get("provider") or primary_name
-                model = meta.get("model") or primary_model
-
-                # Apply the validated whole-lesson content. Curriculum fields
-                # and teacher-owned metadata are protected inside
-                # _apply_v2_content; whole_lesson=True lets the provider's own
-                # teaching moves, materials and prior knowledge replace the
-                # deterministic scaffold.
-                self._apply_v2_content(lp, content, config, whole_lesson=True)
-
-                # Content check: a provider phase that repeats the previous
-                # phase is not a lesson that progresses. Give the provider ONE
-                # bounded correction attempt before any mechanical clean-up.
-                if self._phase_repetition_score(lp) >= 0.75:
-                    revision_context = dict(context)
-                    revision_context["previous_lesson_context"] = (
-                        (prev_context or "")
-                        + "\nREVISION REQUIRED: The previous attempt repeated the "
-                          "starter or an earlier main-learning phase inside a "
-                          "later phase. Rewrite each phase so it begins from the "
-                          "outcome of the preceding phase, introduces a new "
-                          "learner action, and never restates a completed activity."
-                    )
+        if workers <= 1:
+            for pos, item in enumerate(work):
+                record = _run(item)
+                results[pos] = record
+                self._emit_unit_progress(unit_progress, record)
+        else:
+            with ThreadPoolExecutor(
+                max_workers=workers, thread_name_prefix="lesson-gen"
+            ) as pool:
+                futures = {pool.submit(_run, item): pos
+                           for pos, item in enumerate(work)}
+                for future in as_completed(futures):
+                    pos = futures[future]
                     try:
-                        retry_content, retry_meta = _generate(revision_context)
-                        self._record_zeli_meta(
-                            job, retry_meta, primary_name, primary_model)
-                        provider_name = retry_meta.get("provider") or provider_name
-                        model = retry_meta.get("model") or model
-                        self._apply_v2_content(
-                            lp, retry_content, config, whole_lesson=True)
-                        content = retry_content
-                    except ZeliGenerationError:
-                        # Keep the original valid lesson and clean exact
-                        # duplication below; the quality gate remains the
-                        # final authority.
-                        pass
+                        record = future.result()
+                    except Exception as exc:  # defensive: helper already catches
+                        lp = work[pos][1]
+                        record = self._failed_lesson_record(
+                            lp, exc, primary_name, primary_model)
+                    results[pos] = record
+                    self._emit_unit_progress(unit_progress, record)
 
-                self._strip_cross_phase_repetition(lp)
-                self._complete_zeli_timeline(lp, content)
+        failed_ids: set = set()
+        failures: list = []
+        last_error: Optional[ZeliGenerationError] = None
+        lesson_timings: list = list(getattr(job, "_lesson_timings", []) or [])
 
-                lp.ai_generated = True
-                lp.generation_method = "zeli"
-                lp.ai_provider = provider_name
-                lp.ai_model = model
+        # Merge in CURRICULUM order, never completion order. Provider calls ran
+        # concurrently; the resulting lesson collection keeps the allocation's
+        # stable sequence.
+        for record in results:
+            if record is None:
+                continue
+            job.ai_enrichment_total_attempted += 1
+            lesson_timings.append(record["timing"])
+            for meta in record.get("metas") or []:
+                self._record_zeli_meta(job, meta, primary_name, primary_model)
+            if record["success"]:
                 job.ai_enrichment_succeeded += 1
-            except ZeliGenerationError as exc:
-                # One lesson's provider failure must not discard other lessons
-                # the teacher asked for. This occurrence stays pending and
-                # uncharged; the router reports it and supports a true retry.
-                last_error = exc
-                failed_ids.add(lp.id)
-                failures.append({
-                    "source_occurrence_id": getattr(lp, "source_occurrence_id", "") or "",
-                    "lesson_sequence": getattr(lp, "lesson_sequence", None),
-                    "indicator_code": (
-                        lp.indicator_codes[0] if lp.indicator_codes else ""),
-                    "category": (
-                        "provider_busy" if exc.status_code == 429
-                        else "provider_timeout" if exc.status_code == 504
-                        else "provider_unavailable" if exc.status_code == 503
-                        else "provider_content"
-                    ),
-                    "message": exc.message,
-                    "status_code": exc.status_code,
-                })
-                logger.warning(
-                    "Zeli lesson %s failed (status=%s); leaving it pending: %s",
-                    lp.id, exc.status_code, exc.message,
-                )
-            except Exception as exc:
-                last_error = ZeliGenerationError(
-                    "Zeli could not generate this lesson plan. No lesson plan "
-                    "was saved for it and no lesson-quota credit was used. "
-                    "Please retry it, or choose Standard generation.",
-                    502,
-                )
-                failed_ids.add(lp.id)
-                failures.append({
-                    "source_occurrence_id": getattr(lp, "source_occurrence_id", "") or "",
-                    "lesson_sequence": getattr(lp, "lesson_sequence", None),
-                    "indicator_code": (
-                        lp.indicator_codes[0] if lp.indicator_codes else ""),
-                    "category": "unexpected",
-                    "message": last_error.message,
-                    "status_code": last_error.status_code,
-                })
-                logger.error(
-                    "Unexpected Zeli lesson failure for %s: %s: %s",
-                    lp.id, type(exc).__name__, exc,
-                )
+                continue
+            failure = record["failure"]
+            lp = record["lesson"]
+            last_error = failure.pop("_error", None) or ZeliGenerationError(
+                failure.get("message") or "This lesson unit did not complete.",
+                int(failure.get("status_code") or 502),
+            )
+            failed_ids.add(lp.id)
+            failures.append(failure)
+            logger.warning(
+                "Zeli lesson %s failed (status=%s); leaving it pending: %s",
+                lp.id, failure.get("status_code"), failure.get("message"),
+            )
+
+        job._lesson_timings = lesson_timings
 
         if failed_ids:
             job._generation_failures = failures
@@ -868,10 +890,333 @@ class GenerationPipeline:
 
         logger.info(
             "Zeli generated %d lesson(s), %d pending, with provider=%s "
-            "fallback_used=%s for job %s",
+            "fallback_used=%s workers=%d for job %s",
             job.ai_enrichment_succeeded, len(failures), primary_name,
-            job._zeli_fallback_used, job.id,
+            job._zeli_fallback_used, workers, job.id,
         )
+
+    @staticmethod
+    def _emit_unit_progress(callback, record: Optional[dict]) -> None:
+        """Best-effort live progress. A progress write never fails a lesson."""
+        if callback is None or record is None:
+            return
+        try:
+            callback({
+                "source_occurrence_id": record.get("source_occurrence_id") or "",
+                "week_number": record.get("week_number"),
+                "lesson_sequence": record.get("lesson_sequence"),
+                "indicator_code": record.get("indicator_code") or "",
+                "success": bool(record.get("success")),
+                "category": (record.get("failure") or {}).get("category") or "",
+                "message": (record.get("failure") or {}).get("message") or "",
+                "duration_seconds": (record.get("timing") or {}).get(
+                    "total_seconds"),
+            })
+        except Exception:
+            logger.debug("unit progress callback failed", exc_info=True)
+
+    def _generate_one_zeli_lesson(
+        self,
+        lp: LessonPlan,
+        *,
+        config: TermConfig,
+        prev_context: Optional[str],
+        next_context: Optional[str],
+        job_id: str,
+        owner_id: Optional[str],
+        primary_name: str,
+        primary_model: str,
+        scheduled_at: float,
+        db_bind=None,
+    ) -> dict:
+        """Generate, validate and apply ONE lesson. Runs inside a worker.
+
+        Every mutable dependency is owned by this call: provider instances,
+        fallback instance and database session. Only ``lp`` itself is mutated,
+        and no two workers ever receive the same lesson.
+        """
+        started_at = datetime.utcnow()
+        started = time.perf_counter()
+        queue_seconds = max(0.0, started - scheduled_at)
+        timing: Dict[str, Any] = {
+            "lesson_id": lp.id,
+            "source_occurrence_id": getattr(lp, "source_occurrence_id", "") or "",
+            "week_number": getattr(lp, "week_number", None),
+            "lesson_sequence": getattr(lp, "lesson_sequence", None),
+            "indicator_code": (
+                lp.indicator_codes[0] if lp.indicator_codes else ""),
+            "started_at": started_at.isoformat(),
+            "queue_seconds": round(queue_seconds, 4),
+            "prompt_seconds": 0.0,
+            "provider_seconds": 0.0,
+            "apply_seconds": 0.0,
+            "gods_story_seconds": 0.0,
+            "persistence_seconds": 0.0,
+            "retry_count": 0,
+            "provider_calls": 0,
+        }
+        worker_db = None
+        try:
+            if db_bind is not None:
+                from sqlalchemy.orm import Session
+                worker_db = Session(bind=db_bind)
+            provider = get_zeli_provider()
+            fallback = get_zeli_fallback_provider()
+            if provider is None:
+                raise ZeliGenerationError(
+                    "Zeli is unavailable right now. No lesson plan was saved "
+                    "for this unit and no lesson-plan credit was used.",
+                    503,
+                )
+
+            _t = time.perf_counter()
+            context = zeli_lesson_context(
+                lp, config,
+                previous_lesson_context=prev_context,
+                next_lesson_context=next_context,
+            )
+            timing["prompt_seconds"] = round(time.perf_counter() - _t, 4)
+
+            metas: list = []
+            retries = 0
+
+            def _generate(ctx):
+                nonlocal retries
+                from ..config import get_settings
+                try:
+                    wait_seconds = max(5, int(
+                        getattr(get_settings(),
+                                "GENERATION_CONCURRENCY_WAIT_SECONDS", 120)))
+                except Exception:
+                    wait_seconds = 120
+                deadline = time.monotonic() + wait_seconds
+                provider_429 = 0
+                while True:
+                    _call = time.perf_counter()
+                    try:
+                        result = generate_zeli_with_fallback(
+                            primary=provider, fallback=fallback, context=ctx,
+                            db=worker_db, user_id=owner_id, request_id=job_id)
+                        timing["provider_seconds"] = round(
+                            timing["provider_seconds"]
+                            + (time.perf_counter() - _call), 4)
+                        timing["provider_calls"] += 1
+                        return result
+                    except ZeliGenerationError as exc:
+                        timing["provider_seconds"] = round(
+                            timing["provider_seconds"]
+                            + (time.perf_counter() - _call), 4)
+                        timing["provider_calls"] += 1
+                        # A shared concurrency permit belongs to another job.
+                        # Queue here (bounded) instead of failing the lesson or
+                        # bypassing the provider/user ceiling with a new pool.
+                        if (exc.code == "ai_concurrency_limited"
+                                and time.monotonic() < deadline):
+                            retries += 1
+                            time.sleep(min(2.0, 0.25 * (2 ** min(
+                                retries, 4))))
+                            continue
+                        # A provider 429 is a refusal BEFORE generation, so
+                        # retrying it cannot duplicate a billable lesson. Only
+                        # two bounded retries: a persistently busy provider
+                        # leaves the unit pending for an explicit resume.
+                        # Timeouts are NOT retried: the provider may already
+                        # have produced a response, and the cached/stable
+                        # request identity is the only safe recovery path.
+                        if exc.status_code == 429 and provider_429 < 2:
+                            provider_429 += 1
+                            retries += 1
+                            time.sleep(0.5 * (2 ** (provider_429 - 1)))
+                            continue
+                        raise
+
+            content, meta = _generate(context)
+            metas.append(meta)
+            provider_name = meta.get("provider") or primary_name
+            model = meta.get("model") or primary_model
+
+            _t = time.perf_counter()
+            # Apply the validated whole-lesson content. Curriculum fields and
+            # teacher-owned metadata are protected inside _apply_v2_content;
+            # whole_lesson=True lets the provider's own teaching moves,
+            # materials and prior knowledge replace the deterministic scaffold.
+            self._apply_v2_content(lp, content, config, whole_lesson=True)
+            timing["apply_seconds"] = round(time.perf_counter() - _t, 4)
+
+            # Content check: a provider phase that repeats the previous phase
+            # is not a lesson that progresses. Give the provider ONE bounded
+            # correction attempt before any mechanical clean-up.
+            if self._phase_repetition_score(lp) >= 0.75:
+                revision_context = dict(context)
+                revision_context["previous_lesson_context"] = (
+                    (prev_context or "")
+                    + "\nREVISION REQUIRED: The previous attempt repeated the "
+                      "starter or an earlier main-learning phase inside a "
+                      "later phase. Rewrite each phase so it begins from the "
+                      "outcome of the preceding phase, introduces a new "
+                      "learner action, and never restates a completed activity."
+                )
+                try:
+                    _t = time.perf_counter()
+                    retry_content, retry_meta = _generate(revision_context)
+                    timing["apply_seconds"] = round(
+                        timing["apply_seconds"]
+                        + (time.perf_counter() - _t), 4)
+                    metas.append(retry_meta)
+                    provider_name = retry_meta.get("provider") or provider_name
+                    model = retry_meta.get("model") or model
+                    self._apply_v2_content(
+                        lp, retry_content, config, whole_lesson=True)
+                    content = retry_content
+                except ZeliGenerationError:
+                    # Keep the original valid lesson and clean exact
+                    # duplication below; the quality gate remains the final
+                    # authority.
+                    pass
+
+            _t = time.perf_counter()
+            self._strip_cross_phase_repetition(lp)
+            self._complete_zeli_timeline(lp, content)
+            timing["apply_seconds"] = round(
+                timing["apply_seconds"] + (time.perf_counter() - _t), 4)
+
+            # God's Story only: Zeli appends a brief teacher-facing note and
+            # one supporting Bible reference. The other WAPEF fields are never
+            # part of this request. Deterministic generation never calls this.
+            gods_label = (getattr(lp, "wapef_gods_story", "") or "").strip()
+            if gods_label:
+                _t = time.perf_counter()
+                lp.wapef_gods_story = generate_gods_story_note(
+                    provider=provider,
+                    fallback=fallback,
+                    label=gods_label,
+                    subject=str(getattr(lp, "subject", "") or ""),
+                    class_level=str(getattr(lp, "class_level", "") or ""),
+                    strand=str(getattr(lp, "strand", "") or ""),
+                    sub_strand=str(getattr(lp, "sub_strand", "") or ""),
+                    indicator_text=" ".join(
+                        str(item or "") for item in (lp.indicators or [])),
+                )
+                timing["gods_story_seconds"] = round(
+                    time.perf_counter() - _t, 4)
+
+            lp.ai_generated = True
+            lp.generation_method = "zeli"
+            lp.ai_provider = provider_name
+            lp.ai_model = model
+            timing["retry_count"] = retries
+            timing["finished_at"] = datetime.utcnow().isoformat()
+            timing["total_seconds"] = round(time.perf_counter() - started, 4)
+            return {
+                "lesson": lp,
+                "success": True,
+                "metas": metas,
+                "failure": None,
+                "source_occurrence_id": timing["source_occurrence_id"],
+                "week_number": timing["week_number"],
+                "lesson_sequence": timing["lesson_sequence"],
+                "indicator_code": timing["indicator_code"],
+                "timing": timing,
+            }
+        except ZeliGenerationError as exc:
+            return self._failed_lesson_record(
+                lp, exc, primary_name, primary_model,
+                timing=timing, started=started,
+            )
+        except Exception as exc:
+            logger.error(
+                "Unexpected Zeli lesson failure for %s: %s: %s",
+                lp.id, type(exc).__name__, exc,
+            )
+            wrapped = ZeliGenerationError(
+                "Zeli could not generate this lesson plan. No lesson plan "
+                "was saved for it and no lesson-quota credit was used. "
+                "Please retry it, or choose Standard generation.",
+                502,
+            )
+            return self._failed_lesson_record(
+                lp, wrapped, primary_name, primary_model,
+                timing=timing, started=started, unexpected=True,
+            )
+        finally:
+            if worker_db is not None:
+                try:
+                    worker_db.close()
+                except Exception:
+                    pass
+
+    def _failed_lesson_record(
+        self,
+        lp: LessonPlan,
+        exc: Exception,
+        primary_name: str,
+        primary_model: str,
+        *,
+        timing: Optional[dict] = None,
+        started: Optional[float] = None,
+        unexpected: bool = False,
+    ) -> dict:
+        """One failed unit in the same shape as a successful worker record."""
+        if isinstance(exc, ZeliGenerationError):
+            status_code = exc.status_code
+            message = exc.message
+            category = (
+                "concurrency_limited" if exc.code == "ai_concurrency_limited"
+                else "provider_busy" if status_code == 429
+                else "provider_timeout" if status_code == 504
+                else "provider_unavailable" if status_code == 503
+                else "provider_content"
+            )
+            error = exc
+        else:
+            status_code = 502
+            message = (
+                "Zeli could not generate this lesson plan. No lesson plan was "
+                "saved for it and no lesson-quota credit was used. Please "
+                "retry it, or choose Standard generation."
+            )
+            category = "unexpected"
+            error = ZeliGenerationError(message, status_code)
+        timing = timing or {
+            "lesson_id": lp.id,
+            "source_occurrence_id": getattr(lp, "source_occurrence_id", "") or "",
+            "week_number": getattr(lp, "week_number", None),
+            "lesson_sequence": getattr(lp, "lesson_sequence", None),
+            "indicator_code": (
+                lp.indicator_codes[0] if lp.indicator_codes else ""),
+            "started_at": datetime.utcnow().isoformat(),
+            "queue_seconds": 0.0,
+            "prompt_seconds": 0.0,
+            "provider_seconds": 0.0,
+            "apply_seconds": 0.0,
+            "gods_story_seconds": 0.0,
+            "persistence_seconds": 0.0,
+            "retry_count": 0,
+            "provider_calls": 0,
+        }
+        timing["success"] = False
+        timing["finished_at"] = datetime.utcnow().isoformat()
+        if started is not None:
+            timing["total_seconds"] = round(time.perf_counter() - started, 4)
+        return {
+            "lesson": lp,
+            "success": False,
+            "metas": [],
+            "failure": {
+                "source_occurrence_id": timing["source_occurrence_id"],
+                "lesson_sequence": timing["lesson_sequence"],
+                "indicator_code": timing["indicator_code"],
+                "category": category,
+                "message": message,
+                "status_code": status_code,
+                "_error": error,
+            },
+            "source_occurrence_id": timing["source_occurrence_id"],
+            "week_number": timing["week_number"],
+            "lesson_sequence": timing["lesson_sequence"],
+            "indicator_code": timing["indicator_code"],
+            "timing": timing,
+        }
 
     def regenerate_zeli_with_fallback(
         self,

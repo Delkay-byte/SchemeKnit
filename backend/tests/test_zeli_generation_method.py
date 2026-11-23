@@ -45,6 +45,46 @@ from src.engines import zeli_generation as zg  # noqa: E402
 from tests.conftest import make_user  # noqa: E402
 
 
+# ── God's Story Zeli note ───────────────────────────────────────────────────
+
+def test_gods_story_note_is_brief_and_has_a_bible_reference():
+    class NoteProvider:
+        def is_available(self):
+            return True
+
+        def generate_structured(self, prompt, schema=None):
+            assert "Selected God's Story category: Creation" in prompt
+            return {
+                "note": "Every living thing belongs to God's good design and care.",
+                "verse": "Genesis 1:27",
+            }
+
+    value = zg.generate_gods_story_note(
+        provider=NoteProvider(), label="Creation",
+        subject="Science", class_level="Basic 4",
+        strand="Diversity of Matter", sub_strand="Living things",
+        indicator_text="Identify living and non-living things",
+    )
+    assert value.startswith("Creation - ")
+    assert value.endswith("Genesis 1:27")
+    assert "Creation - Creation" not in value
+    assert "belongs to God's good design" in value
+
+
+def test_gods_story_note_falls_back_to_the_teacher_label_when_invalid():
+    class BadProvider:
+        def is_available(self):
+            return True
+
+        def generate_structured(self, prompt, schema=None):
+            return {"note": "", "verse": "not a reference"}
+
+    assert zg.generate_gods_story_note(
+        provider=BadProvider(), label="Redemption",
+        subject="Mathematics", class_level="Basic 4",
+    ) == "Redemption"
+
+
 # ── Fixtures / helpers ──────────────────────────────────────────────────────
 
 def _seed_scheme(db, owner_id, weeks=2):
@@ -364,6 +404,18 @@ def test_pipeline_runs_zeli_even_when_ai_mode_is_off(db, monkeypatch):
     job, _ = _run_pipeline(db, monkeypatch, provider, method="zeli", weeks=1)
     assert job.status.value == "completed"
     assert len(provider.calls) == 1
+
+
+def test_pipeline_standard_path_never_calls_gods_story_note(db, monkeypatch):
+    def _forbidden(**_kwargs):
+        raise AssertionError("deterministic generation must not request a Zeli note")
+
+    monkeypatch.setattr(
+        "src.engines.generation_pipeline.generate_gods_story_note", _forbidden)
+    provider = FakeZeliProvider()
+    job, _ = _run_pipeline(db, monkeypatch, provider, method="standard", weeks=1)
+    assert job.status.value == "completed"
+    assert job._lesson_plans[0].ai_generated is not True
 
 
 def test_pipeline_never_silently_falls_back_when_zeli_fails(db, monkeypatch):

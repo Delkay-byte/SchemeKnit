@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import time
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
@@ -39,6 +40,15 @@ ZELI_PROVIDER_KEY = "deepseek"
 ZELI_METHOD = "zeli"
 #: Bump when the prompt/contract changes enough to invalidate cached output.
 ZELI_PROMPT_VERSION = "zeli-generation-v6"
+
+#: God's Story note contract. This is a SEPARATE, tiny provider request after
+#: the whole lesson succeeds. It enriches ONLY the teacher-selected God's Story
+#: label; no other WAPEF field is ever sent or changed.
+GODS_STORY_NOTE_PROMPT_VERSION = "gods-story-note-v1"
+_GODS_STORY_VERSE_RE = re.compile(
+    r"^[1-3]?\s?[A-Za-z][A-Za-z ]{2,32}\s\d{1,3}:\d{1,3}(?:\s?[-–]\s?\d{1,3})?$"
+)
+
 
 #: The canonical V2 sections a whole Zeli lesson must carry. A partial object
 #: is rejected before any of it is applied to the deterministic scaffold.
@@ -70,10 +80,12 @@ class ZeliGenerationError(RuntimeError):
     502) without exposing provider diagnostics. ``message`` is safe to show.
     """
 
-    def __init__(self, message: str, status_code: int = 502):
+    def __init__(self, message: str, status_code: int = 502,
+                 code: str = ""):
         super().__init__(message)
         self.message = message
         self.status_code = int(status_code)
+        self.code = code
         #: Sanitized provider-attempt diagnostics for the job/response layer.
         self.attempts: list[dict] = []
 
@@ -463,10 +475,18 @@ def read_zeli_cache(
     except Exception:
         db.rollback()
         return None
-    if row is None or not (row.content or "").strip():
+    raw_content = row.content if row is not None else None
+    # End the read transaction before the caller waits on the provider. SQLite
+    # cannot upgrade a long-held read transaction to a write; parallel workers
+    # would otherwise collide with "database is locked".
+    try:
+        db.rollback()
+    except Exception:
+        pass
+    if row is None or not (raw_content or "").strip():
         return None
     try:
-        value = json.loads(row.content)
+        value = json.loads(raw_content)
     except Exception:
         return None
     return value if isinstance(value, dict) else None
@@ -507,6 +527,86 @@ def write_zeli_cache(
         db.commit()
     except Exception:
         db.rollback()
+
+
+def generate_gods_story_note(
+    *,
+    provider,
+    fallback=None,
+    label: str,
+    subject: str = "",
+    class_level: str = "",
+    strand: str = "",
+    sub_strand: str = "",
+    indicator_text: str = "",
+) -> str:
+    """Zeli-only brief note + Bible reference for the selected God's Story.
+
+    Returns the teacher's label unchanged when no valid note can be produced,
+    so a whole-lesson Zeli success is never discarded by this optional
+    enrichment. Only ``wapef_gods_story`` is affected; Deep Hope, Storyline and
+    Through lines never enter this prompt.
+    """
+    from .wapef_fields import normalize_gods_story
+
+    canonical = normalize_gods_story(label)
+    if not canonical:
+        return str(label or "").strip()
+
+    focus = " · ".join(
+        part.strip() for part in (strand, sub_strand, indicator_text)
+        if str(part or "").strip()
+    )
+    prompt = (
+        "Write the WAPEF God's Story connection for one lesson.\n"
+        f"Selected God's Story category: {canonical}\n"
+        f"Subject: {subject or 'the subject'}\n"
+        f"Class: {class_level or 'the class'}\n"
+        f"Lesson focus: {focus or 'the lesson topic'}\n\n"
+        "Requirements:\n"
+        "- ONE brief sentence, at most 22 words, showing a truthful connection "
+        "between the selected category and the lesson.\n"
+        "- Then ONE Bible verse reference that directly supports that category. "
+        "Give only the reference (for example John 1:3), not the verse text.\n"
+        "- Do not invent a quotation. Do not add any other WAPEF field.\n"
+        '- Return JSON only: {"note":"...", "verse":"Book chapter:verse"}'
+    )
+    schema = {
+        "type": "object",
+        "properties": {
+            "note": {"type": "string"},
+            "verse": {"type": "string"},
+        },
+        "required": ["note", "verse"],
+        "additionalProperties": False,
+    }
+
+    def _clean(value) -> str:
+        text = " ".join(str(value or "").split()).strip().strip('"“”')
+        if len(text) > 260:
+            cut = text[:260]
+            end = cut.rfind(". ")
+            text = cut[:end + 1] if end >= 80 else cut.rstrip(" ,;") + "."
+        return text
+
+    for candidate in (provider, fallback):
+        if candidate is None or not getattr(
+                candidate, "is_available", lambda: False)():
+            continue
+        try:
+            data = candidate.generate_structured(prompt, schema)
+        except Exception:
+            continue
+        if not isinstance(data, dict):
+            continue
+        note = _clean(data.get("note"))
+        verse = _clean(data.get("verse")).rstrip(".")
+        if not note or not _GODS_STORY_VERSE_RE.match(verse):
+            continue
+        separator = "" if note.endswith((".", "!", "?")) else "."
+        return f"{canonical} - {note}{separator} {verse}"
+
+    return canonical
 
 
 def generate_zeli_content(
@@ -556,7 +656,8 @@ def generate_zeli_content(
             serialized_context + (" " * 8000)
         ) - 8000
     except ai_spend.AISpendError as exc:
-        err = ZeliGenerationError(exc.message, exc.status_code)
+        err = ZeliGenerationError(
+            exc.message, exc.status_code, code=getattr(exc, "code", ""))
         err.budget_blocked = True
         raise err from exc
 
@@ -575,7 +676,8 @@ def generate_zeli_content(
             request_id=request_id,
         )
     except ai_spend.AISpendError as exc:
-        err = ZeliGenerationError(exc.message, exc.status_code)
+        err = ZeliGenerationError(
+            exc.message, exc.status_code, code=getattr(exc, "code", ""))
         err.budget_blocked = True
         raise err from exc
 

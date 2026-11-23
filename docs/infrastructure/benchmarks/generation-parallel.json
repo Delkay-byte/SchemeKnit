@@ -1,0 +1,135 @@
+{
+  "workload": {
+    "lessons": 15,
+    "subject": "Mathematics",
+    "class": "Basic 4",
+    "template": "tpl-wapef-approved-plan",
+    "mock_provider_latency_seconds": 0.25,
+    "provider_calls_per_lesson": 1
+  },
+  "concurrency": [
+    {
+      "method": "zeli",
+      "workers": 1,
+      "expected": 15,
+      "generated": 15,
+      "failures": 0,
+      "total_seconds": 4.1173,
+      "avg_lesson_seconds": 0.2548,
+      "median_lesson_seconds": 0.2538,
+      "p95_lesson_seconds": 0.2578,
+      "peak_simultaneous_provider_calls": 1,
+      "provider_calls": 15,
+      "stages": {
+        "calendar_seconds": 0.0004,
+        "allocation_seconds": 0.0101,
+        "lesson_build_seconds": 0.2836,
+        "provider_seconds": 3.8224,
+        "postprocess_seconds": 0.0,
+        "total_seconds": 4.117
+      },
+      "duplicate_lesson_ids": 0,
+      "curriculum_order_kept": true,
+      "improvement_vs_sequential": 1.0,
+      "saved_seconds_vs_sequential": 0.0
+    },
+    {
+      "method": "zeli",
+      "workers": 2,
+      "expected": 15,
+      "generated": 15,
+      "failures": 0,
+      "total_seconds": 2.415,
+      "avg_lesson_seconds": 0.2529,
+      "median_lesson_seconds": 0.2526,
+      "p95_lesson_seconds": 0.2541,
+      "peak_simultaneous_provider_calls": 2,
+      "provider_calls": 15,
+      "stages": {
+        "calendar_seconds": 0.001,
+        "allocation_seconds": 0.0021,
+        "lesson_build_seconds": 0.3873,
+        "provider_seconds": 2.0234,
+        "postprocess_seconds": 0.0,
+        "total_seconds": 2.4144
+      },
+      "duplicate_lesson_ids": 0,
+      "curriculum_order_kept": true,
+      "improvement_vs_sequential": 1.7,
+      "saved_seconds_vs_sequential": 1.7023
+    },
+    {
+      "method": "zeli",
+      "workers": 3,
+      "expected": 15,
+      "generated": 15,
+      "failures": 0,
+      "total_seconds": 1.6946,
+      "avg_lesson_seconds": 0.2541,
+      "median_lesson_seconds": 0.253,
+      "p95_lesson_seconds": 0.257,
+      "peak_simultaneous_provider_calls": 3,
+      "provider_calls": 15,
+      "stages": {
+        "calendar_seconds": 0.0007,
+        "allocation_seconds": 0.0023,
+        "lesson_build_seconds": 0.4146,
+        "provider_seconds": 1.2758,
+        "postprocess_seconds": 0.0,
+        "total_seconds": 1.694
+      },
+      "duplicate_lesson_ids": 0,
+      "curriculum_order_kept": true,
+      "improvement_vs_sequential": 2.43,
+      "saved_seconds_vs_sequential": 2.4227
+    },
+    {
+      "method": "zeli",
+      "workers": 4,
+      "expected": 15,
+      "generated": 15,
+      "failures": 0,
+      "total_seconds": 1.4051,
+      "avg_lesson_seconds": 0.2541,
+      "median_lesson_seconds": 0.2534,
+      "p95_lesson_seconds": 0.259,
+      "peak_simultaneous_provider_calls": 4,
+      "provider_calls": 15,
+      "stages": {
+        "calendar_seconds": 0.0008,
+        "allocation_seconds": 0.0019,
+        "lesson_build_seconds": 0.3821,
+        "provider_seconds": 1.0193,
+        "postprocess_seconds": 0.0,
+        "total_seconds": 1.4046
+      },
+      "duplicate_lesson_ids": 0,
+      "curriculum_order_kept": true,
+      "improvement_vs_sequential": 2.93,
+      "saved_seconds_vs_sequential": 2.7122
+    }
+  ],
+  "deterministic": {
+    "method": "standard",
+    "workers": 1,
+    "expected": 15,
+    "generated": 15,
+    "failures": 0,
+    "total_seconds": 0.3704,
+    "avg_lesson_seconds": 0,
+    "median_lesson_seconds": 0,
+    "p95_lesson_seconds": 0.0,
+    "peak_simultaneous_provider_calls": 0,
+    "provider_calls": 0,
+    "stages": {
+      "calendar_seconds": 0.0006,
+      "allocation_seconds": 0.0018,
+      "lesson_build_seconds": 0.367,
+      "postprocess_seconds": 0.0,
+      "total_seconds": 0.37
+    },
+    "duplicate_lesson_ids": 0,
+    "curriculum_order_kept": true
+  },
+  "persistence_probe_seconds": 0.0137
+}

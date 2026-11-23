@@ -161,6 +161,10 @@ def test_two_concurrent_generate_requests_start_exactly_one_run(
     assert statuses == [200, 409], (
         "exactly one concurrent request may run; got "
         f"{[(r.status_code, r.text[:120]) for r in results]}")
+    blocked = next(r for r in results if r.status_code == 409)
+    body = blocked.json()
+    assert body["detail"]["code"] == "generation_in_progress"
+    assert body["detail"].get("message")
 
     check = Session()
     try:

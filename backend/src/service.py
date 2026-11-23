@@ -549,7 +549,7 @@ class DataService:
         Policy
         ------
         A job is orphaned only when its last activity is STRICTLY older than
-        ``GENERATION_STALE_MINUTES`` (default 60). Last activity is
+        ``GENERATION_STALE_MINUTES`` (default 5). Last activity is
         ``heartbeat_at`` when present, else ``created_at`` for legacy rows and
         jobs that never started. A running worker refreshes the heartbeat
         every ``GENERATION_HEARTBEAT_SECONDS`` (default 30), so a legitimate
@@ -759,10 +759,15 @@ class DataService:
                 "through_lines": normalized.get("wapef_through_lines", lp.wapef_through_lines),
                 "gods_story": normalized.get("wapef_gods_story", lp.wapef_gods_story),
             })
+            # God's Story alone may carry the Zeli note + Bible reference.
+            # Preserve that value verbatim when saving another WAPEF field.
+            gods_story = normalize_wapef_payload({
+                "gods_story": normalized.get("wapef_gods_story", lp.wapef_gods_story),
+            }, allow_custom=True)["gods_story"]
             lp.wapef_deep_hope = canonical["deep_hope"]
             lp.wapef_storyline = canonical["storyline"]
             lp.wapef_through_lines = canonical["through_lines"]
-            lp.wapef_gods_story = canonical["gods_story"]
+            lp.wapef_gods_story = gods_story
 
         lp.teacher_edited = True
         lp.status = "edited"

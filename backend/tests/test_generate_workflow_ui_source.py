@@ -151,6 +151,20 @@ class TestStateSplit:
         # lesson_sequence is 1-based — the display must not add another +1.
         assert "row.lesson_sequence + 1" not in src
 
+    def test_vocabulary_card_is_removed_but_backend_keywords_remain(self):
+        src = _page()
+        assert "Key Words / New Vocabulary" not in src
+        # The backend keyword/vocabulary pipeline is untouched.
+        assert "suggested_keywords" in src
+        assert "keywords" in src
+
+    def test_generation_recovery_handles_long_running_jobs(self):
+        src = _page()
+        assert "recoverActiveGeneration" in src
+        assert "generation_in_progress" in src
+        assert "getGenerationStatus" in src
+        assert "Generation is still running" in src
+
     def test_auto_preview_and_debounced_refresh_exist(self):
         src = _page()
         assert "Reading your weeks…" in src

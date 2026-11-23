@@ -44,6 +44,7 @@ export default function UpgradePage() {
   const { user, loading: authLoading } = useAuth()
   const [plans, setPlans] = useState<CataloguePlan[]>([])
   const [credits, setCredits] = useState<CreditStatus | null>(null)
+  const [accountPlan, setAccountPlan] = useState<{ lesson_quota_unlimited?: boolean } | null>(null)
   const [selected, setSelected] = useState('')
   const [method, setMethod] = useState<'bank_transfer' | 'mobile_money'>('bank_transfer')
   const [phone, setPhone] = useState('')
@@ -103,6 +104,7 @@ export default function UpgradePage() {
       })
       .catch(() => setError('Packages could not be loaded. No payment can be started.'))
     api.getCredits().then(setCredits).catch(() => {})
+    api.getMyPlan().then(setAccountPlan).catch(() => {})
     // Restore a still-pending prepaid charge after a refresh/return so the
     // customer does not lose the account details or create a second purchase.
     api.getMySubscription()
@@ -191,6 +193,7 @@ export default function UpgradePage() {
   }
 
   const plan = plans.find((p) => p.slug === selected)
+  const unlimitedLessons = Boolean(accountPlan?.lesson_quota_unlimited)
 
   return (
     <div className="min-h-screen">
@@ -208,7 +211,7 @@ export default function UpgradePage() {
         {credits && (
           <SurfaceCard className="mt-6 px-5 py-4" data-credit-balance>
             <div className="grid gap-3 text-sm sm:grid-cols-4">
-              <div><p className="text-xs uppercase text-slate-500">Free monthly</p><p className="text-xl font-bold text-[#102A43]">{credits.free.remaining}</p></div>
+              <div><p className="text-xs uppercase text-slate-500">Free monthly</p><p className="text-xl font-bold text-[#102A43]">{unlimitedLessons ? 'Unlimited' : credits.free.remaining}</p></div>
               <div><p className="text-xs uppercase text-slate-500">Package</p><p className="text-xl font-bold text-[#102A43]">{credits.package}</p></div>
               <div><p className="text-xs uppercase text-slate-500">Flexible</p><p className="text-xl font-bold text-[#102A43]">{credits.purchased}</p></div>
               <div><p className="text-xs uppercase text-slate-500">Referral</p><p className="text-xl font-bold text-[#102A43]">{credits.referral}</p></div>

@@ -181,8 +181,10 @@ class TestGenerationConfigGate:
             "class_size": None,
         }
         resp = http.post(f"/api/generation/{scheme.id}/generate", json=payload)
-        assert resp.status_code == 409, resp.text
-        assert "lesson configuration" in resp.json()["detail"].lower()
+        assert resp.status_code == 422, resp.text
+        body = resp.json()
+        detail = body.get("detail")
+        assert "lesson configuration" in str(detail).lower()
 
     def test_saved_configuration_survives_reload(self, http):
         """Configuration persists across navigation and reload (Phase 2.3)."""

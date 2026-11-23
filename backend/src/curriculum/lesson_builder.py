@@ -2598,12 +2598,13 @@ def build_lesson(
     # the last one and where it sits in the topic); ``starter_activity`` is the
     # concrete opening activity. Keeping them distinct stops the same sentence
     # being emitted twice into the exported plan.
+    topic_display = " ".join((topic or "").split())
     if prev_short:
         intro = f"This lesson builds on '{prev_short}' and moves the class on to {skill}."
-    elif (topic and topic.strip()
-          and topic.strip().lower() != (skill or "").strip().lower()
-          and (focus_short or "").strip().lower() not in topic.strip().lower()):
-        intro = f"This lesson focuses on {focus_short or skill} within {topic}."
+    elif (topic_display
+          and topic_display.strip().lower() != (skill or "").strip().lower()
+          and (focus_short or "").strip().lower() not in topic_display.lower()):
+        intro = f"This lesson focuses on {focus_short or skill} within {topic_display}."
     else:
         # The topic IS the focus (a code-only scheme filled from the official
         # exemplar corpus): "within {topic}" would repeat the same words twice.
@@ -3077,6 +3078,21 @@ def build_lesson(
     if not early_years:
         try:
             from . import assessment_design as _assessment_design
+            _subject_label = (
+                config.subject.value if isinstance(config.subject, Subject)
+                else str(config.subject or ""))
+            # A code-only scheme (WAPEF prints only "B4.1.1.1.1") still needs a
+            # real assessment and rubric. The indicator's action is absent, so
+            # the lesson's own focus supplies an honest action verb — never a
+            # fabricated curriculum code or a blank assessment section.
+            _assessment_indicator = alloc.indicator_description or ""
+            if (not _assessment_indicator.strip()
+                    or _is_code_only(_assessment_indicator)
+                    or not re.search(r"[A-Za-z]{3,}", _assessment_indicator)):
+                _action = ("apply" if "math" in _subject_label.lower()
+                           else "identify")
+                _assessment_indicator = (
+                    f"{_action} {focus_short or 'the lesson focus'}")
             _ghana_hint = "".join(activity.ghana_context[:1]).strip()
             if not _ghana_hint:
                 # Subject-level fallback (Priority 2 §13): activities that
@@ -3091,7 +3107,7 @@ def build_lesson(
                     _subj_key = str(config.subject or "")
                 _ghana_hint = _gc_for(_subj_key, variant=(alloc.period_index or 1) - 1)
             assessment_items = _assessment_design.build_assessment_items(
-                indicator=alloc.indicator_description or "",
+                indicator=_assessment_indicator,
                 indicator_code=alloc.indicator_code or "",
                 focus=focus_short,
                 subject=(config.subject.value if isinstance(config.subject, Subject)
@@ -3103,7 +3119,7 @@ def build_lesson(
                 is_early_years=bool(early_years),
             )
             rubric_payload = _assessment_design.build_rubric(
-                indicator=alloc.indicator_description or "",
+                indicator=_assessment_indicator,
                 focus=focus_short,
                 assessment_text=assessment,
                 class_level=(config.class_level.value if isinstance(config.class_level, ClassLevel)

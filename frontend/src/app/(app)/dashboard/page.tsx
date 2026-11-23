@@ -226,13 +226,16 @@ export default function Dashboard() {
   }
 
   const termLabel = (activeScheme || schemes[0])?.term?.trim() || '—'
-  const remainingLabel = credits
-    ? String(credits.total)
-    : plan && plan.generation_limit > 0
-      ? String(Math.max(plan.generation_limit - plan.generations_used, 0))
-      : plan
-        ? '0'
-        : '—'
+  const unlimitedLessons = Boolean(plan?.lesson_quota_unlimited)
+  const remainingLabel = unlimitedLessons
+    ? 'Unlimited'
+    : credits
+      ? String(credits.total)
+      : plan && plan.generation_limit > 0
+        ? String(Math.max(plan.generation_limit - plan.generations_used, 0))
+        : plan
+          ? '0'
+          : '—'
   const primaryAction = activeScheme
     ? getNextAction(activeScheme)
     : { label: 'Upload Scheme', href: '/upload', icon: <Upload className="h-4 w-4 mr-1.5" /> }
@@ -309,8 +312,12 @@ export default function Dashboard() {
                 <div className="mt-3 grid grid-cols-2 gap-3 text-sm lg:grid-cols-4">
                   <div>
                     <p className="text-xs uppercase text-slate-500">Free this month</p>
-                    <p className="text-xl font-bold text-[#102A43]">{credits.free.remaining}</p>
-                    <p className="text-xs text-slate-500">of {credits.free.limit}</p>
+                    <p className="text-xl font-bold text-[#102A43]">
+                      {unlimitedLessons ? 'Unlimited' : credits.free.remaining}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {unlimitedLessons ? 'plan allowance' : `of ${credits.free.limit}`}
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs uppercase text-slate-500">Package</p>

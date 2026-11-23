@@ -35,6 +35,8 @@ export default function SubscriptionPage() {
   }
   useEffect(() => { load() }, [])
 
+  const unlimitedLessons = Boolean(data?.entitlement?.lesson_quota_unlimited)
+
   const copy = async (text: string, key: string) => {
     try {
       await navigator.clipboard.writeText(text)
@@ -92,8 +94,14 @@ export default function SubscriptionPage() {
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   <div>
                     <p className="text-xs uppercase text-slate-500">Free monthly</p>
-                    <p className="text-2xl font-bold text-[#102A43]">{credits.free.remaining}</p>
-                    <p className="text-xs text-slate-500">of {credits.free.limit} · resets {credits.free.resets}</p>
+                    <p className="text-2xl font-bold text-[#102A43]">
+                      {unlimitedLessons ? 'Unlimited' : credits.free.remaining}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {unlimitedLessons
+                        ? 'this account has no monthly lesson cap'
+                        : `of ${credits.free.limit} · resets ${credits.free.resets}`}
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs uppercase text-slate-500">Package credits</p>

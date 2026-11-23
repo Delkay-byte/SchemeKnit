@@ -165,6 +165,30 @@ class TestVocabularySelection:
         assert set(keyword.lower() for keyword in place) != set(
             keyword.lower() for keyword in water)
 
+    def test_code_only_indicators_use_the_curriculum_sub_strand(self):
+        counting = suggest_vocabulary(
+            indicator="",
+            content_standard="B4.1.1.1",
+            sub_strand="Counting, Representation & Cardinality",
+            strand="Number",
+            subject="Mathematics",
+        )
+        operations = suggest_vocabulary(
+            indicator="",
+            content_standard="B4.1.2.1",
+            sub_strand="Number Operations",
+            strand="Number",
+            subject="Mathematics",
+        )
+        assert counting, "a code-only WAPEF row must still get topic vocabulary"
+        assert operations, "a code-only WAPEF row must still get topic vocabulary"
+        assert any(term.lower() in {"counting", "representation", "cardinality"}
+                   for term in counting)
+        assert any(term.lower() in {"operations", "operation"}
+                   for term in operations)
+        assert set(term.lower() for term in counting) != set(
+            term.lower() for term in operations)
+
     def test_validate_keywords_flags_resource_and_fragment(self):
         problems = validate_keywords(
             ["graph sheets", "paper-", "the", "place value"],

@@ -11,6 +11,17 @@ test('filename sanitizer keeps the extension and drops unsafe characters', () =>
   assert.equal(safeZipFilename('Lesson Plans: Term 1'), 'Lesson Plans_ Term 1.zip')
 })
 
+test('curriculum-aware server filename survives the browser sanitizer', () => {
+  assert.equal(
+    safeDocxFilename('Term_1_Basic_4_Lesson_Plan_For_Mathematics.docx'),
+    'Term_1_Basic_4_Lesson_Plan_For_Mathematics.docx',
+  )
+  assert.equal(
+    safeDocxFilename('Term_2_KG_2_Lesson_Plan_For_Language_and_Literacy.docx'),
+    'Term_2_KG_2_Lesson_Plan_For_Language_and_Literacy.docx',
+  )
+})
+
 test('duplicate lesson names receive a suffix instead of overwriting', () => {
   const names = uniqueNames([
     'SCIENCE_B7_W01_L01_2026-02-03.docx',

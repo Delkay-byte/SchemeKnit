@@ -63,6 +63,15 @@ class Settings(BaseSettings):
     # than the stale window so a healthy worker always proves liveness before
     # another request could reclaim it. Units: integer seconds.
     GENERATION_HEARTBEAT_SECONDS: int = 30
+    # Maximum lesson units generated in parallel inside one parent run. The
+    # effective value is further capped by the selected provider's own limit
+    # and by AI_MAX_CONCURRENT_PER_TEACHER while AI spend control is enabled.
+    # 1 keeps the original sequential behaviour.
+    GENERATION_MAX_CONCURRENCY: int = 3
+    # How long one lesson worker waits for a shared provider/user concurrency
+    # permit before reporting the unit as pending. This is queueing, not a
+    # retry of a provider request: no billable call is made while waiting.
+    GENERATION_CONCURRENCY_WAIT_SECONDS: int = 120
 
     # Public URLs (production: no localhost)
     PUBLIC_WEB_URL: str = "http://localhost:3000"
@@ -326,6 +335,26 @@ class Settings(BaseSettings):
         if not 5 <= value <= 3600:
             raise ValueError(
                 "GENERATION_HEARTBEAT_SECONDS must be between 5 and 3600 seconds"
+            )
+        return value
+
+    @field_validator("GENERATION_MAX_CONCURRENCY")
+    @classmethod
+    def _validate_generation_concurrency(cls, value: int) -> int:
+        value = int(value)
+        if not 1 <= value <= 8:
+            raise ValueError(
+                "GENERATION_MAX_CONCURRENCY must be between 1 and 8 workers"
+            )
+        return value
+
+    @field_validator("GENERATION_CONCURRENCY_WAIT_SECONDS")
+    @classmethod
+    def _validate_generation_concurrency_wait(cls, value: int) -> int:
+        value = int(value)
+        if not 5 <= value <= 900:
+            raise ValueError(
+                "GENERATION_CONCURRENCY_WAIT_SECONDS must be between 5 and 900"
             )
         return value
 

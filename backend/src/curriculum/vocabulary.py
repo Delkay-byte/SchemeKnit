@@ -30,6 +30,7 @@ __all__ = [
     "suggest_vocabulary",
     "filter_supported_terms",
     "is_malformed_fragment",
+    "is_incomplete_resource",
     "filter_relevant_resources",
     "normalize_numeric_groups",
     "validate_keywords",
@@ -255,6 +256,49 @@ _GLOSSARY_MATERIAL_EXCEPTIONS = frozenset({
     "number line", "number lines", "place value",
 })
 
+#: Topic-level vocabulary for schemes that print ONLY an indicator code.
+#: The sub-strand / strand is then the real curriculum topic, and these are its
+#: established NaCCA terms. They are added only when the topic phrase is
+#: actually present in the lesson's source text, so nothing is invented and an
+#: unrelated topic can never inherit them.
+_TOPIC_VOCABULARY: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
+    "mathematics": (
+        (
+            "counting", "count", "cardinality", "representation",
+            "place value", "base ten",
+        ),
+        ("counting", "cardinality", "number", "numeral", "place value",
+         "base ten"),
+    ),
+    "mathematics:number operations": (
+        ("number operations", "operation", "operations"),
+        ("addition", "subtraction", "sum", "difference", "operation"),
+    ),
+    "mathematics:fractions": (
+        ("fraction", "fractions"),
+        ("fraction", "numerator", "denominator", "whole", "equal parts",
+         "unit fraction"),
+    ),
+}
+
+
+def _topic_terms(subject_key: str, *texts: str) -> List[str]:
+    """Curated topic terms for a code-only scheme, matched on the topic text."""
+    haystack = " ".join(" ".join(str(t or "").split()).lower()
+                        for t in texts)
+    if not haystack:
+        return []
+    chosen: List[str] = []
+    for key, (triggers, terms) in _TOPIC_VOCABULARY.items():
+        if not key.startswith(f"{subject_key}:") and key != subject_key:
+            continue
+        if not any(_contains_phrase(haystack, trigger) for trigger in triggers):
+            continue
+        for term in terms:
+            if term not in chosen:
+                chosen.append(term)
+    return chosen
+
 _WORD_RE = re.compile(r"[A-Za-z][A-Za-z'\-]*")
 
 
@@ -274,6 +318,29 @@ def is_malformed_fragment(text: str) -> bool:
         return True
     letters = re.sub(r"[^A-Za-z]", "", value)
     return len(letters) < 2
+
+
+#: A resource that stops on one of these words is a wrapped/incomplete label.
+_INCOMPLETE_RESOURCE_ENDINGS = frozenset({
+    "from", "of", "with", "and", "or", "to", "for", "in", "on", "at", "by",
+    "using", "through", "into", "over", "under", "between", "made", "the",
+    "a", "an",
+})
+
+
+def is_incomplete_resource(text: str) -> bool:
+    """True when a resource entry ends mid-phrase.
+
+    The source document occasionally wraps a cell ("patterns made from" /
+    "Manila cards"). The parser rejoins those lines; this is the final safety
+    net so an instruction never prints "the teacher uses the patterns made from
+    to model ...".
+    """
+    value = " ".join((text or "").split()).strip(" ,;:")
+    if not value or is_malformed_fragment(value):
+        return True
+    last = re.split(r"\s+", value)[-1].strip(".,;:").lower()
+    return last in _INCOMPLETE_RESOURCE_ENDINGS
 
 
 def normalize_numeric_groups(text: str) -> str:
@@ -390,8 +457,10 @@ def _content_candidates(text: str) -> List[str]:
             continue
         if low in _GENERIC_WORDS or low in _ACTION_WORDS or low in _MATERIAL_WORDS:
             continue
-        if low.endswith(("ed", "ing")) and low not in {"rounding", "grouping"}:
+        if low.endswith(("ed", "ing")) and low not in {"rounding", "grouping", "counting"}:
             # Participles describe the activity ("sorting", "counting").
+            # "Counting" is retained because it is a curriculum topic term in
+            # primary mathematics, not only an activity verb.
             continue
         # Noun-like suffixes and capitalised terms are the safest candidates.
         if (low.endswith(("tion", "sion", "ment", "ness", "ity", "ism",
@@ -501,11 +570,25 @@ def suggest_vocabulary(
     candidates.extend(explicit)
     # 2. Subject terminology present in the lesson's curriculum text.
     candidates.extend(_display_term(t) for t in _glossary_matches(curriculum_text, glossary))
+    # 2b. Topic vocabulary for code-only schemes: the sub-strand / strand is
+    # the only curriculum topic the source supplies, so its established terms
+    # keep each lesson's list specific (counting vs operations vs fractions)
+    # instead of repeating one generic set for the whole term.
+    candidates.extend(
+        _display_term(t) for t in _topic_terms(
+            subject_key, sub_strand or "", strand or "")
+    )
     # 3. Exemplar focus terms (official NaCCA wording).
     candidates.extend(str(t or "").strip() for t in (exemplar_terms or ()))
     # 4. Noun-like words actually present, as a last indicator-specific layer.
     candidates.extend(_display_term(t) for t in _content_candidates(indicator))
     candidates.extend(_display_term(t) for t in _content_candidates(content_standard))
+    # 5. Topic fallback for code-only schemes (e.g. WAPEF prints only an
+    # indicator code): the sub-strand/strand is still real curriculum text and
+    # supplies topic-relevant terms for THAT lesson. Keep it last so precise
+    # indicator/exemplar wording always wins.
+    candidates.extend(_display_term(t) for t in _content_candidates(sub_strand or ""))
+    candidates.extend(_display_term(t) for t in _content_candidates(strand or ""))
     # Teacher suggestions are handled separately below and always survive.
 
     out: List[str] = []

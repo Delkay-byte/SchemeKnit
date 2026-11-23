@@ -519,6 +519,39 @@ class TestHRepeatSaveReload:
         assert store["2"]["wapef_deep_hope"] == sel["wapef_deep_hope"]
         assert store["1"]["wapef_gods_story"] == sel["wapef_gods_story"]
 
+    def test_teacher_owned_keywords_do_not_crash_generation(self, db):
+        """Production regression: LessonPlan lacked ``keywords_teacher_owned``.
+
+        A teacher who edited the (now removed) vocabulary card set
+        ``keywords_touched``; generation then assigned an undeclared Pydantic
+        field and failed after the long run. The field now exists and the run
+        must persist the teacher's exact list.
+        """
+        from fastapi.testclient import TestClient
+
+        user = make_user(db)
+        scheme = _wapef_scheme(db, user.id, weeks=1)
+        config = _config(scheme.id)
+        data_service.save_lesson_review_drafts(db, scheme.id, user.id, {
+            "1": {
+                "keywords": ["place value", "digit"],
+                "keywords_touched": True,
+            },
+        })
+
+        with TestClient(_app(db, user)) as client:
+            gen = client.post(
+                f"/api/generation/{scheme.id}/generate",
+                json=config.model_dump(mode="json"),
+            )
+            assert gen.status_code == 200, gen.text
+            lessons = client.get(
+                f"/api/generation/{gen.json()['job_id']}/lessons"
+            ).json()["lesson_plans"]
+
+        assert lessons
+        assert lessons[0]["keywords"] == ["place value", "digit"]
+
 
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(pytest.main([__file__, "-q"]))

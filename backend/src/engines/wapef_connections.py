@@ -466,6 +466,46 @@ def _choose_theme(lesson: Any) -> _Theme:
     return _THEMES[-1]
 
 
+#: A curriculum code, including the spaced forms sources use ("B4. 1.1.1.1")
+#: and an indicator range tail ("-2"). Matched only at the START of an
+#: indicator cell; the code is metadata, never the lesson's natural-language
+#: focus.
+_FOCUS_CODE_PREFIX_RE = re.compile(
+    r"^[BbKk]?\s*\d+(?:\s*\.\s*\d+)+(?:\s*[\-\u2013]\s*\d+)?\s*"
+)
+_DANGLING_FOCUS_WORDS = {
+    "using", "with", "from", "of", "in", "on", "to", "for", "by",
+    "and", "or", "at", "as", "the", "a", "an",
+}
+
+
+def _natural_focus_fallback(lesson: Any) -> str:
+    """A natural phrase for a code-only indicator.
+
+    WAPEF schemes often print only the indicator code ("B4.1.1.1.1") and place
+    the topic in the strand / sub-strand. Those curriculum words ARE the lesson
+    focus, so they are used verbatim (joined naturally). A bare class code
+    ("B4") is never allowed to become prose.
+    """
+    candidates = (
+        _display(_get(lesson, "sub_strand", "")),
+        _display(_get(lesson, "strand", "")),
+        _display(_get(lesson, "lesson_topic", "")),
+    )
+    for candidate in candidates:
+        value = " ".join(str(candidate or "").replace("\n", " ").split())
+        value = value.strip(" .;:,-")
+        if not value:
+            continue
+        # A candidate that is itself only a code is metadata, not a topic.
+        if _FOCUS_CODE_PREFIX_RE.match(value) and not re.search(
+                r"[A-Za-z]{2,}", _FOCUS_CODE_PREFIX_RE.sub("", value)):
+            continue
+        if re.search(r"[A-Za-z]{2,}", value):
+            return value
+    return "this lesson's focus"
+
+
 def _focus_phrase(lesson: Any) -> str:
     text = ""
     indicators = list(_get(lesson, "indicators", []) or [])
@@ -475,12 +515,17 @@ def _focus_phrase(lesson: Any) -> str:
         text = str(_get(lesson, "lesson_topic", "") or "")
     from ..curriculum.vocabulary import normalize_numeric_groups
     text = normalize_numeric_groups(" ".join(text.split()))
-    # An official indicator often begins with its code ("B1.1.2.1.1 Listen
-    # to ..."). The code is not the lesson focus.
-    text = re.sub(r"^[A-Z]?\d[\d.]*\s+", "", text).strip()
-    text = text.strip(" .;:,")
-    if not text:
-        return "this lesson's focus"
+    # Strip a leading curriculum code in ANY canonical shape, including the
+    # spaced "B4. 1.1.1.1-2" form. A code-only cell leaves no prose, so the
+    # strand/sub-strand supplies the natural focus. This is the defect that
+    # printed "learners work with B4": splitting "B4.1.1.1.1" at the first
+    # period yielded the class prefix.
+    stripped = _FOCUS_CODE_PREFIX_RE.sub("", text).strip()
+    if stripped != text:
+        text = stripped
+    text = text.strip(" .;:,-")
+    if not text or not re.search(r"[A-Za-z]{2,}", text):
+        return _natural_focus_fallback(lesson)
     # Drop a trailing apparatus clause: the resource list is not the topic.
     text = re.split(
         r"\s+(?:using|with the use of|through the use of|by means of|with|through)\s+.+$",
@@ -497,16 +542,16 @@ def _focus_phrase(lesson: Any) -> str:
             "create", "perform", "measure", "construct", "draw", "name",
             "list", "define", "recognise", "recognize", "illustrate"}:
         words = words[1:]
-    dangling = {"using", "with", "from", "of", "in", "on", "to", "for", "by",
-                "and", "or", "at", "as", "the", "a", "an"}
-    while len(words) > 3 and words[-1].lower().strip(".,:;") in dangling:
+    while len(words) > 3 and words[-1].lower().strip(".,:;") in _DANGLING_FOCUS_WORDS:
         words.pop()
     if len(words) > 14:
         words = words[:14]
-        while len(words) > 3 and words[-1].lower().strip(".,:;") in dangling:
+        while len(words) > 3 and words[-1].lower().strip(".,:;") in _DANGLING_FOCUS_WORDS:
             words.pop()
     phrase = " ".join(words).strip(" .;:,")
-    return phrase or "this lesson's focus"
+    if not phrase or not re.search(r"[A-Za-z]{2,}", phrase):
+        return _natural_focus_fallback(lesson)
+    return phrase
 
 
 def throughline_connection(theme: _Theme, focus: str, label: str = "") -> str:

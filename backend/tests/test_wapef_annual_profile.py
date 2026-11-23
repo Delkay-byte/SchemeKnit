@@ -30,6 +30,7 @@ from src.models import LessonPlan  # noqa: E402
 from src.routers.generation import (  # noqa: E402
     LessonConfigRequest, _apply_lesson_review_draft, _normalize_lesson_config,
 )
+from src.engines.lesson_quality_gate import wapef_loss_failures  # noqa: E402
 from tests.conftest import make_user  # noqa: E402
 
 DEEP_HOPE = WAPEF_DEEP_HOPES[0]
@@ -61,6 +62,30 @@ def test_new_academic_year_starts_empty_and_preserves_history(db):
     assert len(rows) == 2
     prior = wapef_annual.get_profile(db, user.id, "2026/2027")
     assert prior["deep_hope"] == DEEP_HOPE
+
+
+def test_zeli_gods_story_note_is_not_a_wapef_loss(db):
+    user = make_user(db, email="wapef.gods.note@test.local")
+    lp = LessonPlan(
+        id="lp-gods-note",
+        scheme_of_work_id="scheme-1",
+        term_config_id="term-config-1",
+        owner_id=user.id,
+        subject="Science",
+        class_level="Basic 4",
+        week_number=1,
+        lesson_sequence=0,
+        lesson_date="2026-09-08",
+        duration_minutes=60,
+        template_id="tpl-wapef-approved-plan",
+        generation_method="zeli",
+        wapef_gods_story="Creation - All life belongs to God's good design. Genesis 1:27",
+    )
+    canonical = {"gods_story": "Creation"}
+    assert wapef_loss_failures(lp, canonical) == []
+
+    lp.generation_method = "standard"
+    assert wapef_loss_failures(lp, canonical) == ["wapef_loss"]
 
 
 def test_teacher_written_annual_values_are_preserved(db):

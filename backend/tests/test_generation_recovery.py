@@ -107,6 +107,48 @@ def test_generate_reclaims_a_stale_pending_job_and_runs(db):
         LessonPlanDB.scheme_id == scheme.id).count() > 0
 
 
+def test_autosave_and_duplicate_click_do_not_steal_a_live_job(db):
+    """An autosave during a live run must not cause a stale conflict."""
+    user = make_user(db)
+    scheme = _scheme(db, user.id)
+    active = GenerationJobDB(
+        id=generate_id(), owner_id=user.id, scheme_id=scheme.id,
+        status="processing", created_at=datetime.utcnow(),
+        heartbeat_at=datetime.utcnow(),
+    )
+    db.add(active)
+    db.commit()
+
+    with TestClient(_app(db, user)) as client:
+        saved = client.put(
+            f"/api/generation/{scheme.id}/lesson-config",
+            json={
+                "school_name": "Autosave School", "class_size": 31,
+                "lesson_duration_minutes": 60, "teaching_days": [0, 2],
+                "term_start_date": "2026-09-07", "term_end_date": "2026-12-18",
+            },
+        )
+        assert saved.status_code == 200, saved.text
+
+        duplicate = client.post(
+            f"/api/generation/{scheme.id}/generate",
+            json=_config(scheme.id).model_dump(mode="json"),
+        )
+        cfg = client.get(f"/api/generation/{scheme.id}/lesson-config").json()["config"]
+
+    assert duplicate.status_code == 409, duplicate.text
+    body = duplicate.json()["detail"]
+    assert body["code"] == "generation_in_progress"
+    assert body["job_id"] == active.id
+    assert body["status"] == "processing"
+
+    db.expire_all()
+    assert cfg["school_name"] == "Autosave School"
+    assert cfg["class_size"] == 31
+    assert db.query(GenerationJobDB).filter(
+        GenerationJobDB.scheme_id == scheme.id).count() == 1
+
+
 def test_status_poll_reports_a_stale_pending_job_as_failed(db):
     user = make_user(db)
     scheme = _scheme(db, user.id)

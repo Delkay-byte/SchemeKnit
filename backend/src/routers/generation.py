@@ -8,6 +8,7 @@ import asyncio
 import hashlib
 import json
 import threading
+import time
 from contextlib import contextmanager
 from datetime import date, datetime
 from fastapi import APIRouter, HTTPException, Depends, Header
@@ -106,10 +107,13 @@ def _generation_guard(db: Session, user_id: str, scheme_id: str):
     if not local_lock.acquire(blocking=False):
         raise HTTPException(
             status_code=409,
-            detail=(
-                "A generation for this scheme is already running. "
-                "Wait for it to finish before starting another."
-            ),
+            detail={
+                "code": "generation_in_progress",
+                "message": (
+                    "A generation for this scheme is already running. "
+                    "Wait for it to finish before starting another."
+                ),
+            },
         )
 
     lock_conn = None
@@ -138,11 +142,14 @@ def _generation_guard(db: Session, user_id: str, scheme_id: str):
             if not lock_held:
                 raise HTTPException(
                     status_code=409,
-                    detail=(
-                        "A generation for this scheme is already running in "
-                        "another process. Wait for it to finish before "
-                        "starting another."
-                    ),
+                    detail={
+                        "code": "generation_in_progress",
+                        "message": (
+                            "A generation for this scheme is already running in "
+                            "another process. Wait for it to finish before "
+                            "starting another."
+                        ),
+                    },
                 )
         yield
     finally:
@@ -214,6 +221,66 @@ def _job_heartbeat(job_id: str):
     finally:
         stop.set()
         thread.join(timeout=2)
+
+
+def _unit_progress_callback(job_id: str, owner_id: str, bind=None):
+    """Durable, best-effort live progress for parallel lesson units.
+
+    Called from the generation thread as each worker finishes. It uses its own
+    short-lived session, records the unit as ``generated`` (provider work done,
+    NOT yet persisted) or ``failed``, and refreshes liveness. ``completed``
+    counters are still written only by the final atomic persistence step, so
+    the teacher never sees a lesson counted as saved before it is saved.
+    """
+    lock = threading.Lock()
+
+    def _callback(event: Dict[str, Any]) -> None:
+        occurrence = str(event.get("source_occurrence_id") or "")
+        if not occurrence:
+            return
+        with lock:
+            session = Session(bind=bind) if bind is not None else SessionLocal()
+            try:
+                job = data_service.get_job(session, job_id, owner_id)
+                if job is None or job.status not in ("pending", "processing"):
+                    return
+                snapshot = dict(job.config_snapshot or {})
+                units = [dict(u) for u in (snapshot.get("lesson_units") or [])]
+                found = False
+                for unit in units:
+                    if unit.get("source_occurrence_id") != occurrence:
+                        continue
+                    found = True
+                    if event.get("success"):
+                        unit["state"] = "generated"
+                        unit["category"] = ""
+                        unit["message"] = ""
+                    else:
+                        unit["state"] = "failed"
+                        unit["category"] = event.get("category") or "generation"
+                        unit["message"] = event.get("message") or ""
+                    unit["last_duration_seconds"] = event.get("duration_seconds")
+                if not found:
+                    return
+                snapshot["lesson_units"] = units
+                progress = _job_unit_progress(snapshot)
+                snapshot["generated_units"] = progress["generated_units"]
+                snapshot["processing_units"] = progress["processing_units"]
+                data_service.update_job(
+                    session, job_id,
+                    config_snapshot=snapshot,
+                    heartbeat_at=datetime.utcnow(),
+                )
+            except Exception as exc:
+                session.rollback()
+                log_error(
+                    "generation_unit_progress_failed", job_id=job_id,
+                    source_occurrence_id=occurrence, error=str(exc),
+                )
+            finally:
+                session.close()
+
+    return _callback
 
 
 def _persist_finalization_warning(db: Session, job_db: GenerationJobDB,
@@ -404,6 +471,135 @@ def _planned_scope(
     return planned, blocked
 
 
+#: Durable per-lesson-unit states stored in a job's config snapshot. The parent
+#: job is only COMPLETED when every planned unit has one of the terminal
+#: success states and a persisted lesson.
+UNIT_PENDING = "pending"
+UNIT_PROCESSING = "processing"
+UNIT_COMPLETED = "completed"
+UNIT_FAILED = "failed"
+UNIT_RETRYING = "retrying"
+UNIT_CANCELLED = "cancelled"
+_TERMINAL_UNIT_STATES = frozenset({UNIT_COMPLETED, UNIT_CANCELLED})
+
+
+def _unit_states(
+    *,
+    planned: List[str],
+    allocations: List[Any],
+    prior_states: Optional[List[dict]] = None,
+    accepted_occurrences: Optional[set] = None,
+    failed_occurrences: Optional[set] = None,
+    rejected_occurrences: Optional[set] = None,
+    existing_occurrences: Optional[set] = None,
+    lesson_by_occurrence: Optional[dict] = None,
+    failures_by_occurrence: Optional[dict] = None,
+    final: bool = False,
+) -> List[dict]:
+    """One explicit state per expected lesson unit.
+
+    Identity is the canonical source occurrence id (scheme week + position +
+    indicator code), never the week alone: a week may carry several distinct
+    indicators. The state is persisted in ``config_snapshot['lesson_units']`` so
+    a reload, status poll, retry or server restart can tell exactly which units
+    completed, failed or are still pending.
+    """
+    by_occ = {
+        getattr(a, "source_occurrence_id", ""): a
+        for a in (allocations or [])
+        if getattr(a, "source_occurrence_id", "")
+    }
+    prior = {
+        str(item.get("source_occurrence_id") or ""): item
+        for item in (prior_states or [])
+        if item.get("source_occurrence_id")
+    }
+    accepted = accepted_occurrences or set()
+    failed = failed_occurrences or set()
+    rejected = rejected_occurrences or set()
+    existing = existing_occurrences or set()
+    lesson_ids = lesson_by_occurrence or {}
+    failure_details = failures_by_occurrence or {}
+
+    units: List[dict] = []
+    for occurrence in planned:
+        prior_item = prior.get(occurrence) or {}
+        alloc = by_occ.get(occurrence)
+        item = {
+            "source_occurrence_id": occurrence,
+            "week_number": getattr(alloc, "week_number", None),
+            "lesson_sequence": getattr(alloc, "lesson_sequence", None),
+            "indicator_code": getattr(alloc, "indicator_code", "") or "",
+            "state": prior_item.get("state") or UNIT_PENDING,
+            "attempts": int(prior_item.get("attempts") or 0),
+            "lesson_id": prior_item.get("lesson_id") or None,
+            "category": prior_item.get("category") or "",
+            "message": prior_item.get("message") or "",
+        }
+        if not final:
+            # A new/resumed run starts every not-yet-completed unit at
+            # PROCESSING. Completed units stay completed so resume never
+            # regenerates or duplicates them.
+            if item["state"] != UNIT_COMPLETED:
+                item.update(state=UNIT_PROCESSING, category="", message="")
+            units.append(item)
+            continue
+
+        if occurrence in accepted:
+            item.update(state=UNIT_COMPLETED,
+                        lesson_id=lesson_ids.get(occurrence))
+        elif occurrence in rejected or occurrence in failed:
+            detail = failure_details.get(occurrence) or {}
+            item.update(
+                state=UNIT_FAILED,
+                category=detail.get("category") or (
+                    "quality_gate" if occurrence in rejected else "generation"),
+                message=detail.get("message") or (
+                    "The lesson quality gate rejected this unit."
+                    if occurrence in rejected else
+                    "This lesson unit did not complete."),
+            )
+        elif occurrence in existing:
+            # A previously persisted plan for this exact occurrence is a valid
+            # completed result; it was intentionally preserved.
+            item.update(state=UNIT_COMPLETED,
+                        lesson_id=lesson_ids.get(occurrence),
+                        category="preserved",
+                        message="Existing lesson plan preserved.")
+        else:
+            item.update(state=UNIT_PENDING, category="not_started",
+                        message="This lesson unit was not generated.")
+        item["attempts"] = int(item.get("attempts") or 0) + (
+            1 if item["state"] in (UNIT_COMPLETED, UNIT_FAILED) else 0)
+        units.append(item)
+    return units
+
+
+def _job_unit_progress(snapshot: dict) -> dict:
+    units = list((snapshot or {}).get("lesson_units") or [])
+    total = len(units)
+    completed = sum(1 for u in units if u.get("state") in _TERMINAL_UNIT_STATES)
+    failed = sum(1 for u in units if u.get("state") == UNIT_FAILED)
+    generated = sum(
+        1 for u in units
+        if u.get("state") == "generated"
+        or u.get("state") in _TERMINAL_UNIT_STATES)
+    processing = sum(1 for u in units if u.get("state") == UNIT_PROCESSING)
+    pending = sum(1 for u in units
+                  if u.get("state") not in _TERMINAL_UNIT_STATES
+                  and u.get("state") != UNIT_FAILED
+                  and u.get("state") != "generated")
+    return {
+        "expected_lessons": total,
+        "completed_units": completed,
+        "failed_units": failed,
+        "generated_units": generated,
+        "processing_units": processing,
+        "pending_units": pending,
+        "progress": (round(100 * completed / total) if total else 0),
+    }
+
+
 def _job_resume_view(db: Session, job: GenerationJobDB, user_id: str) -> Dict[str, Any]:
     """Occurrence-level recovery state for a job, without re-planning it."""
     snapshot = job.config_snapshot or {}
@@ -424,13 +620,78 @@ def _job_resume_view(db: Session, job: GenerationJobDB, user_id: str) -> Dict[st
         "blocked_for_review_occurrence_ids": blocked,
         "resumable_occurrence_ids": resumable,
         "pending_occurrence_ids": resumable,
-        "can_resume": bool(resumable) and job.status in ("failed", "completed"),
+        "can_resume": bool(resumable) and job.status in (
+            "failed", "completed", "partial"),
     }
 
 
 #: Response header carrying the download filename for export endpoints.
 #: Exposed to the browser via CORS `expose_headers` (see main.py).
 X_FILENAME_HEADER = "X-TeachFlow-Filename"
+
+
+#: Ordinal term labels → the term number used in a download filename.
+_TERM_NUMBERS = {
+    "first": 1, "second": 2, "third": 3,
+    "1": 1, "2": 2, "3": 3, "term 1": 1, "term 2": 2, "term 3": 3,
+}
+_SUBJECT_FILENAME_NAMES = {
+    "ict": "Computing",
+    "computing": "Computing",
+    "information and communication technology": "Computing",
+    "pe": "Physical Education",
+    "phe": "Physical Education",
+    "physical education and health": "Physical Education",
+    "rme": "Religious and Moral Education",
+    "religious and moral education": "Religious and Moral Education",
+    "jhs mathematics": "Mathematics",
+    "english language": "English",
+}
+
+
+def _term_number(term: Any) -> Optional[int]:
+    value = " ".join(str(term or "").split()).strip().lower()
+    if not value:
+        return None
+    for label, number in _TERM_NUMBERS.items():
+        if value == label or value.startswith(f"{label} "):
+            return number
+    match = re.search(r"\b([123])\b", value)
+    return int(match.group(1)) if match else None
+
+
+def _filename_part(value: Any, fallback: str) -> str:
+    """Windows-safe filename fragment: no separators, no empty/debug values."""
+    text = " ".join(str(value or "").replace("&", " and ").split())
+    text = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', " ", text)
+    text = re.sub(r"[^A-Za-z0-9]+", "_", text)
+    text = re.sub(r"_+", "_", text).strip("_")
+    if not text or text.lower() in {"none", "null", "undefined", "unknown"}:
+        return fallback
+    return text
+
+
+def lesson_plan_export_filename(scheme_db, extension: str = "docx") -> str:
+    """Curriculum-aware download name built ONLY from saved scheme metadata.
+
+    ``Term_1_Basic_4_Lesson_Plan_For_Mathematics.docx`` — dynamic for every
+    term, class (KG/Basic/JHS/SHS/Nursery) and subject, never a technical id.
+    """
+    extension = (extension or "docx").lstrip(".").lower()
+    term = _term_number(getattr(scheme_db, "term", "")) if scheme_db else None
+    term_part = f"Term_{term}" if term else "Term"
+    class_value = getattr(scheme_db, "class_level", "") if scheme_db else ""
+    class_part = _filename_part(class_value, "Class")
+    subject_value = " ".join(
+        str(getattr(scheme_db, "subject", "") or "").split()) if scheme_db else ""
+    subject_key = subject_value.strip().lower()
+    subject_display = _SUBJECT_FILENAME_NAMES.get(subject_key, subject_value)
+    if subject_display and subject_display.upper() == subject_display:
+        subject_display = subject_display.title()
+    subject_part = _filename_part(subject_display, "Subject")
+    return (
+        f"{term_part}_{class_part}_Lesson_Plan_For_{subject_part}.{extension}"
+    )
 
 
 def _download_response(path, media_type: str, filename: str) -> FileResponse:
@@ -1550,6 +1811,7 @@ def _generate_lesson_plans(
     scheme_db = data_service.get_scheme(db, scheme_id, user.id)
     if not scheme_db:
         raise HTTPException(status_code=404, detail="Scheme not found")
+    _run_started_at = datetime.utcnow()
     if not resume:
         enforce_authenticated_budget(user.id, "generate")
 
@@ -1688,6 +1950,11 @@ def _generate_lesson_plans(
         require_ai_entitlement(user, db)
         zeli_state = zeli_availability()
         if not zeli_state.get("available"):
+            log_event(
+                "zeli_unavailable", user_id=user.id, scheme_id=scheme_id,
+                state=zeli_state.get("state"),
+                reason=zeli_state.get("reason"),
+            )
             raise HTTPException(
                 status_code=503,
                 detail=(
@@ -1888,10 +2155,15 @@ def _generate_lesson_plans(
         if _j.scheme_id == scheme_id and _j.status in ("pending", "processing"):
             raise HTTPException(
                 status_code=409,
-                detail=(
-                    "A generation for this scheme is already running. "
-                    f"Waiting for job {_j.id} to finish."
-                ),
+                detail={
+                    "code": "generation_in_progress",
+                    "message": (
+                        "A generation for this scheme is already running. "
+                        f"Waiting for job {_j.id} to finish."
+                    ),
+                    "job_id": _j.id,
+                    "status": _j.status,
+                },
             )
 
     # ── Already-generated info (backlog item 4) ──────────────────────────
@@ -2034,6 +2306,7 @@ def _generate_lesson_plans(
     _snapshot = dict(config.model_dump(mode="json"))
     _snapshot["planned_occurrence_ids"] = _planned_ids
     _snapshot["blocked_for_review_occurrence_ids"] = _blocked_ids
+    _prior: Dict[str, Any] = {}
     if existing_job is not None:
         _prior = dict(existing_job.config_snapshot or {})
         _snapshot["planned_occurrence_ids"] = sorted(
@@ -2043,6 +2316,14 @@ def _generate_lesson_plans(
             | set(_blocked_ids))
         _snapshot["resumed_at"] = datetime.utcnow().isoformat()
         _snapshot["resume_count"] = int(_prior.get("resume_count") or 0) + 1
+    # Durable per-unit state exists BEFORE generation starts. A hard death can
+    # then be reconciled to exactly the units that never completed.
+    _snapshot["lesson_units"] = _unit_states(
+        planned=list(_snapshot.get("planned_occurrence_ids") or []),
+        allocations=_all_allocations,
+        prior_states=_prior.get("lesson_units"),
+        final=False,
+    )
     data_service.update_job(
         db, job_db.id, status="processing", error_message="",
         config_snapshot=_snapshot,
@@ -2058,6 +2339,9 @@ def _generate_lesson_plans(
     # must never return the reservation (audit defect #2: a late failure used
     # to leave persisted lessons charged zero quota).
     persistence_committed = False
+    run_timings: Dict[str, Any] = {}
+    run_started = datetime.utcnow()
+    _run_clock = time.perf_counter()
 
     try:
         # Keep this job demonstrably alive while the (synchronous) engine
@@ -2069,7 +2353,10 @@ def _generate_lesson_plans(
                 template_id=config.template_id,
                 db=db,
                 owner_id=user.id,
+                unit_progress=_unit_progress_callback(
+                    job_db.id, user.id, db.get_bind()),
             )
+        run_timings.update(getattr(job, "_timings", {}) or {})
 
         # generate_all() records engine errors on the job instead of raising
         # (its historical contract). A swallowed failure must NEVER reach the
@@ -2135,6 +2422,11 @@ def _generate_lesson_plans(
                 _apply_lesson_review_draft(lp, drafts, config,
                                            annual=annual_profile)
                 _ensure_resources_used(lp)
+                from ..engines.lesson_content_quality import (
+                    ensure_distinct_phases, sanitize_resources,
+                )
+                sanitize_resources(lp)
+                ensure_distinct_phases(lp)
 
             # ── Priority 4: the deterministic quality gate ────────────────
             # Every lesson is validated in memory BEFORE any row is written.
@@ -2146,11 +2438,14 @@ def _generate_lesson_plans(
             # the gate rejects the whole run the request fails, the job is
             # marked failed and the reservation is returned in full — a failed
             # generation consumes no quota and leaves no corrupted row.
+            _gate_clock = time.perf_counter()
             gate_report = _run_quality_gate(
                 job, config, scheme_id, drafts,
                 allow_rebuild=config.generation_method != GenerationMethod.ZELI,
                 annual=annual_profile,
             )
+            run_timings["quality_gate_seconds"] = round(
+                time.perf_counter() - _gate_clock, 4)
             accepted = gate_report["accepted"]
             gate_metrics = gate_report["metrics"]
             # Quality-gate rejection is an eligible provider-content failure:
@@ -2247,7 +2542,16 @@ def _generate_lesson_plans(
                     if code_set & set(lp.indicator_codes or [])
                 ]
 
+            # Idempotency: one persisted row per canonical occurrence. A
+            # retry/rebuilt candidate can never insert the same unit twice.
+            _persist_clock = time.perf_counter()
+            _seen_persisted = set()
             for lp in accepted:
+                _occ = getattr(lp, "source_occurrence_id", "")
+                if _occ and _occ in _seen_persisted:
+                    continue
+                if _occ:
+                    _seen_persisted.add(_occ)
                 data_service.create_lesson_plan(
                     db, user.id, job_db.id, scheme_id, lp, commit=False)
 
@@ -2275,6 +2579,86 @@ def _generate_lesson_plans(
                 db, scheme_id, user.id
             )
             _job_snapshot = dict(job_db.config_snapshot or {})
+            # ── Honest per-unit finalization ─────────────────────────────
+            # The parent job reports the units THIS batch expected, not the
+            # scheme's unrelated survivors. A run that generated one selected
+            # lesson must not claim the whole scheme was generated in this run.
+            _batch_planned = list(dict.fromkeys(
+                _job_snapshot.get("planned_occurrence_ids")
+                or _planned_ids))
+            _run_rejected = {
+                getattr(lp, "source_occurrence_id", "")
+                for lp in (getattr(job, "_lesson_plans", None) or [])
+                if getattr(lp, "source_occurrence_id", "")
+            } - accepted_occs
+            _run_failed = set()
+            for _item in (getattr(job, "_generation_failures", None) or []):
+                _occ = str(_item.get("source_occurrence_id") or "")
+                if _occ:
+                    _run_failed.add(_occ)
+            _lesson_by_occ = {
+                getattr(lp, "source_occurrence_id", ""): lp.id
+                for lp in accepted
+                if getattr(lp, "source_occurrence_id", "")
+            }
+            _failures_by_occ = {
+                str(item.get("source_occurrence_id") or ""): item
+                for item in (getattr(job, "_generation_failures", None) or [])
+                if item.get("source_occurrence_id")
+            }
+            _units = _unit_states(
+                planned=_batch_planned,
+                allocations=_all_allocations,
+                prior_states=_job_snapshot.get("lesson_units"),
+                accepted_occurrences=accepted_occs,
+                failed_occurrences=_run_failed,
+                rejected_occurrences=_run_rejected,
+                existing_occurrences=_existing_occ,
+                lesson_by_occurrence=_lesson_by_occ,
+                failures_by_occurrence=_failures_by_occ,
+                final=True,
+            )
+            _job_snapshot["lesson_units"] = _units
+            _unit_progress = _job_unit_progress(_job_snapshot)
+            _run_total = _unit_progress["expected_lessons"]
+            _run_completed = _unit_progress["completed_units"]
+            _run_failed_count = _unit_progress["failed_units"] + _unit_progress["pending_units"]
+            _run_status = (
+                "completed" if _run_total and _run_completed == _run_total
+                else "partial" if _run_completed
+                else "failed"
+            )
+            _job_snapshot["scheme_total_lessons"] = scheme_total
+            _job_snapshot["expected_lessons"] = _run_total
+            _job_snapshot["completed_units"] = _run_completed
+            _job_snapshot["failed_units"] = _unit_progress["failed_units"]
+            _job_snapshot["pending_units"] = _unit_progress["pending_units"]
+            _job_snapshot["generated_units"] = _run_completed
+            _job_snapshot["processing_units"] = 0
+            _job_snapshot["generation_workers"] = int(
+                getattr(job, "_generation_workers", 1) or 1)
+            run_timings["persistence_seconds"] = round(
+                time.perf_counter() - _persist_clock, 4)
+            _job_snapshot["generation_timings"] = {
+                **run_timings,
+                "generation_seconds": round(
+                    time.perf_counter() - _run_clock, 4),
+            }
+            _job_snapshot["lesson_timings"] = list(
+                getattr(job, "_lesson_timings", []) or [])
+            if _run_status == "partial":
+                _missing = [
+                    f"Week {u.get('week_number') or '?'}"
+                    f" ({u.get('indicator_code') or 'indicator'})"
+                    for u in _units
+                    if u.get("state") not in _TERMINAL_UNIT_STATES
+                ]
+                _job_snapshot["partial_error"] = (
+                    f"{_run_completed} of {_run_total} lesson plans were "
+                    "generated. Still pending: " + ", ".join(_missing[:8])
+                    + ("…" if len(_missing) > 8 else "")
+                    + ". Retry the pending units; saved lessons are kept."
+                )
             if config.generation_method == GenerationMethod.ZELI:
                 _job_snapshot["zeli_provider"] = {
                     "primary_provider": getattr(job, "_zeli_primary_provider", None),
@@ -2292,10 +2676,12 @@ def _generate_lesson_plans(
             # completed in a separate earlier commit, so a hard failure during
             # persistence could leave a "completed" job with no lessons.
             data_service.update_job(db, job_db.id,
-                status=job.status.value,
-                total_lessons=scheme_total,
-                completed_lessons=scheme_total,
-                progress=100,
+                status=_run_status,
+                total_lessons=_run_total,
+                completed_lessons=_run_completed,
+                failed_lessons=_run_failed_count,
+                progress=_unit_progress["progress"],
+                error_message=_job_snapshot.get("partial_error", ""),
                 heartbeat_at=datetime.utcnow(),
                 completed_at=datetime.utcnow(),
                 config_snapshot=_job_snapshot,
@@ -2305,6 +2691,9 @@ def _generate_lesson_plans(
             persistence_committed = True
         else:
             scheme_total = actual_lesson_count
+            _run_total = scheme_total
+            _run_completed = scheme_total
+            _run_failed_count = 0
             # Legacy engines without an in-memory lesson list still expose a
             # terminal job, but this update does not make the run's lesson
             # transaction durable; a later failure may still release units.
@@ -2652,12 +3041,21 @@ def _generate_lesson_plans(
             )
             _persist_finalization_warning(db, job_db, warning)
 
+        _response_units = []
+        if "_job_snapshot" in locals():
+            _response_units = list(_job_snapshot.get("lesson_units") or [])
+        if _run_total and _run_completed < _run_total and not warning:
+            warning = _job_snapshot.get("partial_error") if "_job_snapshot" in locals() else None
         return {
             "job_id": job_db.id,
             "request_id": _correlation_id or None,
-            "status": job.status.value,
-            "total_lessons": scheme_total,
-            "completed_lessons": scheme_total,
+            "status": _run_status if "_run_status" in locals() else job.status.value,
+            "total_lessons": _run_total,
+            "completed_lessons": _run_completed,
+            "failed_lessons": _run_failed_count,
+            "expected_lessons": _run_total,
+            "scheme_total_lessons": scheme_total,
+            "lesson_units": _response_units,
             "generated_indicator_codes": requested_codes,
             "generated_occurrence_ids": sorted(_accepted_occurrences),
             "rejected_occurrence_ids": rejected_occurrence_ids,
@@ -2690,7 +3088,7 @@ def _generate_lesson_plans(
             },
         }
 
-    except HTTPException:
+    except HTTPException as exc:
         if not persistence_committed:
             # Clear any failed statement (PostgreSQL aborts the transaction)
             # before returning the reservation in its own transaction.
@@ -2700,6 +3098,17 @@ def _generate_lesson_plans(
             # The job row exists (it is created before the run); never leave
             # it "pending" forever when the run was refused after creation.
             data_service.update_job(db, job_db.id, status="failed")
+        detail = exc.detail if isinstance(exc.detail, dict) else {}
+        log_event(
+            "generation_refused", user_id=user.id, scheme_id=scheme_id,
+            job_id=job_db.id, status_code=exc.status_code,
+            code=detail.get("code") or "generation_refused",
+            method=(config.generation_method.value
+                    if hasattr(config.generation_method, "value")
+                    else str(config.generation_method)),
+            duration_seconds=round(
+                (datetime.utcnow() - _run_started_at).total_seconds(), 2),
+        )
         raise
     except Exception as e:
         # A failed generation must not consume quota — but only when nothing
@@ -2710,8 +3119,16 @@ def _generate_lesson_plans(
             if reservation and reservation.charged:
                 credit_service.release(db, reservation)
             data_service.update_job(db, job_db.id, status="failed", error_message=str(e))
-            log_error("generation_failed", user_id=user.id, scheme_id=scheme_id,
-                      request_id=_correlation_id or None, error=str(e))
+            log_error(
+                "generation_failed", user_id=user.id, scheme_id=scheme_id,
+                request_id=_correlation_id or None, error=str(e),
+                method=(config.generation_method.value
+                        if hasattr(config.generation_method, "value")
+                        else str(config.generation_method)),
+                phase="processing_or_persistence",
+                duration_seconds=round(
+                    (datetime.utcnow() - _run_started_at).total_seconds(), 2),
+            )
             raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
         # The run committed. Any later error is a finalization problem, not a
         # rolled-back generation: recover the truthful result from durable
@@ -2761,10 +3178,15 @@ def _resume_lesson_plans(
         if job.status in ("pending", "processing"):
             raise HTTPException(
                 status_code=409,
-                detail=(
-                    "This generation is still running. Wait for it to finish "
-                    "before resuming."
-                ),
+                detail={
+                    "code": "generation_in_progress",
+                    "message": (
+                        "This generation is still running. Wait for it to finish "
+                        "before resuming."
+                    ),
+                    "job_id": job.id,
+                    "status": job.status,
+                },
             )
 
     snapshot = dict(job.config_snapshot or {})
@@ -2839,24 +3261,34 @@ def _resume_lesson_plans(
 
     if not pending:
         total = data_service.count_lessons_for_scheme(db, scheme_id, user.id)
+        expected_total = len(known)
+        completed_total = len(set(known) & existing)
+        status = (
+            "completed" if expected_total and completed_total == expected_total
+            else "partial" if completed_total else "failed"
+        )
         data_service.update_job(
             db, job.id,
-            status="completed" if total else "failed",
-            total_lessons=total,
-            completed_lessons=total,
-            progress=100 if total else job.progress,
+            status=status,
+            total_lessons=expected_total,
+            completed_lessons=completed_total,
+            failed_lessons=max(expected_total - completed_total, 0),
+            progress=(round(100 * completed_total / expected_total)
+                      if expected_total else 0),
             error_message=(
-                "" if total else
+                "" if status == "completed" else
                 "No planned occurrences can be resumed; review the scheme or "
                 "start a new generation."
             ),
-            completed_at=datetime.utcnow() if total else job.completed_at,
+            completed_at=datetime.utcnow() if status != "failed" else job.completed_at,
         )
         return {
             "job_id": job.id,
-            "status": "completed" if total else "failed",
-            "total_lessons": total,
-            "completed_lessons": total,
+            "status": status,
+            "total_lessons": expected_total,
+            "completed_lessons": completed_total,
+            "failed_lessons": max(expected_total - completed_total, 0),
+            "scheme_total_lessons": total,
             "generated_indicator_codes": [],
             "generated_occurrence_ids": [],
             "rejected_occurrence_ids": [],
@@ -2876,7 +3308,7 @@ def _resume_lesson_plans(
             "quality": None,
             "message": (
                 "No pending lessons remain in this batch."
-                if total else
+                if status == "completed" else
                 "No planned occurrence can be resumed; start a new generation."
             ),
         }
@@ -2908,6 +3340,8 @@ async def get_generation_status(
         data_service.reconcile_stale_generation_jobs(db)
         db.expire(job)
         job = data_service.get_job(db, job_id, user.id)
+    snapshot = dict(job.config_snapshot or {})
+    unit_progress = _job_unit_progress(snapshot)
     return {
         "id": job.id,
         "status": job.status,
@@ -2915,6 +3349,14 @@ async def get_generation_status(
         "total_lessons": job.total_lessons,
         "completed_lessons": job.completed_lessons,
         "failed_lessons": job.failed_lessons,
+        "expected_lessons": unit_progress["expected_lessons"],
+        "pending_lessons": unit_progress["pending_units"],
+        "generated_units": unit_progress["generated_units"],
+        "processing_units": unit_progress["processing_units"],
+        "generation_workers": snapshot.get("generation_workers", 1),
+        "generation_timings": snapshot.get("generation_timings"),
+        "scheme_total_lessons": snapshot.get("scheme_total_lessons"),
+        "lesson_units": list(snapshot.get("lesson_units") or []),
         "error_message": job.error_message,
         # The method that produced (or is producing) this job. Persisted in the
         # snapshot, so a status poll, reload or resume can never disagree.
@@ -3047,6 +3489,10 @@ async def get_latest_job_for_scheme(
                 "total_lessons": job.total_lessons,
                 "completed_lessons": job.completed_lessons,
                 "failed_lessons": job.failed_lessons,
+                "expected_lessons": _job_unit_progress(snapshot)["expected_lessons"],
+                "pending_lessons": _job_unit_progress(snapshot)["pending_units"],
+                "scheme_total_lessons": snapshot.get("scheme_total_lessons"),
+                "lesson_units": list(snapshot.get("lesson_units") or []),
                 "error_message": job.error_message,
                 "finalization_warning": (job.config_snapshot or {}).get(
                     "finalization_warning"),
@@ -3136,6 +3582,35 @@ async def get_curriculum_coverage(
     }
 
 
+def _content_quality_issues(lp_models) -> List[dict]:
+    """Detect accidental class codes and truncated resources before export.
+
+    Dotted curriculum identifiers (``B4.1.1.1``) are not flagged: only a bare
+    class code (``B4``) in ordinary prose is. The check informs the export
+    audit and the response header; it never rewrites teacher-authored text.
+    """
+    from ..engines.lesson_content_quality import validate_lesson_content
+    issues: List[dict] = []
+    for lp in lp_models or []:
+        for problem in validate_lesson_content(lp):
+            issues.append({
+                "week_number": getattr(lp, "week_number", None),
+                "source_occurrence_id": getattr(lp, "source_occurrence_id", ""),
+                "problem": problem,
+            })
+    return issues
+
+
+def _log_content_quality(user_id: str, job_id: str, issues: List[dict]) -> None:
+    if not issues:
+        return
+    try:
+        log_event("docx_content_quality_warning", user_id=user_id,
+                  job_id=job_id, issues=issues[:20], count=len(issues))
+    except Exception:
+        pass
+
+
 def _require_export_rubrics(lp_models) -> None:
     """Stop an export that would silently omit a required scoring matrix."""
     from ..engines.docx_export import required_rubric_missing
@@ -3165,12 +3640,13 @@ async def export_docx(
         raise HTTPException(status_code=404, detail="Job not found")
     enforce_authenticated_budget(user.id, "export")
 
-    lessons = data_service.get_lesson_plans_for_job(db, job_id, user.id)
+    lessons = data_service.get_lesson_plans_for_scheme(db, job.scheme_id, user.id)
     if not lessons:
         raise HTTPException(status_code=404, detail="No lesson plans found")
 
     lp_models = [_db_to_lesson_model(lp) for lp in lessons]
     _require_export_rubrics(lp_models)
+    _log_content_quality(user.id, job_id, _content_quality_issues(lp_models))
     tt = TemplateType(template_type) if template_type in [t.value for t in TemplateType] else TemplateType.GES_STYLE
 
     scheme_db = data_service.get_scheme(db, job.scheme_id, user.id)
@@ -3190,7 +3666,7 @@ async def export_docx(
             Path(f"exports/{user.id}/{job_id}/lesson_plans.docx"),
             render_context,
         )
-        download_name = f"Lesson_Plans_{scheme_label}.docx"
+        download_name = lesson_plan_export_filename(scheme_db, "docx")
     elif len(lp_models) == 1 and not template_id:
         # Single lesson with no template chosen: serve that lesson as its own
         # descriptively named file. When a template IS selected (including the
@@ -3200,7 +3676,7 @@ async def export_docx(
         files = await _run_pipeline(pipeline.export_docx_batch, lp_models, tt, output_dir,
                                     template_id=resolved_template_id)
         out = files[0]
-        download_name = out.name
+        download_name = lesson_plan_export_filename(scheme_db, "docx")
     else:
         # One combined document: all lessons, each starting on a new page
         out = await _run_pipeline(
@@ -3211,7 +3687,7 @@ async def export_docx(
             template_id=resolved_template_id,
             context=render_context,
         )
-        download_name = f"Lesson_Plans_{scheme_label}.docx"
+        download_name = lesson_plan_export_filename(scheme_db, "docx")
 
     data_service.log_export_event(db, job.id, job.scheme_id, user.id, "docx")
     return _download_response(
@@ -3254,7 +3730,7 @@ async def get_export_model(
         if not allowed:
             raise HTTPException(status_code=403, detail=reason)
 
-    lessons = data_service.get_lesson_plans_for_job(db, job_id, user.id)
+    lessons = data_service.get_lesson_plans_for_scheme(db, job.scheme_id, user.id)
     if not lessons:
         raise HTTPException(status_code=404, detail="No lesson plans found")
 
@@ -3264,6 +3740,7 @@ async def get_export_model(
 
     lp_models = [_db_to_lesson_model(lp) for lp in lessons]
     _require_export_rubrics(lp_models)
+    _log_content_quality(user.id, job_id, _content_quality_issues(lp_models))
     tt = (TemplateType(template_type)
           if template_type in [t.value for t in TemplateType]
           else TemplateType.GES_STYLE)
@@ -3283,7 +3760,7 @@ async def get_export_model(
         template_type=tt,
         structure=custom_structure,
         render_context=render_context,
-        filename=f"Lesson_Plans_{scheme_label}.docx",
+        filename=lesson_plan_export_filename(scheme_db, "docx"),
         job_id=job.id,
     )
     data_service.log_export_event(db, job.id, job.scheme_id, user.id,
@@ -3376,12 +3853,13 @@ async def export_pdf(
         raise HTTPException(status_code=404, detail="Job not found")
     enforce_authenticated_budget(user.id, "export")
 
-    lessons = data_service.get_lesson_plans_for_job(db, job_id, user.id)
+    lessons = data_service.get_lesson_plans_for_scheme(db, job.scheme_id, user.id)
     if not lessons:
         raise HTTPException(status_code=404, detail="No lesson plans found")
 
     lp_models = [_db_to_lesson_model(lp) for lp in lessons]
     _require_export_rubrics(lp_models)
+    _log_content_quality(user.id, job_id, _content_quality_issues(lp_models))
     tt = TemplateType(template_type) if template_type in [t.value for t in TemplateType] else TemplateType.GES_STYLE
 
     scheme_db = data_service.get_scheme(db, job.scheme_id, user.id)
@@ -3393,7 +3871,9 @@ async def export_pdf(
         _render_context(db, user.id, job, scheme_db, lp_models))
 
     data_service.log_export_event(db, job.id, job.scheme_id, user.id, "pdf")
-    return _download_response(target, "application/pdf", f"Lesson_Plans_{scheme_label}.pdf")
+    return _download_response(
+        target, "application/pdf",
+        lesson_plan_export_filename(scheme_db, "pdf"))
 
 
 # ── One-time authenticated download URLs (PART 27/28) ─────────────────────────
@@ -3509,7 +3989,7 @@ async def issue_download_url(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     enforce_authenticated_budget(user.id, "export")
-    lessons = data_service.get_lesson_plans_for_job(db, job_id, user.id)
+    lessons = data_service.get_lesson_plans_for_scheme(db, job.scheme_id, user.id)
     if not lessons:
         raise HTTPException(status_code=404, detail="No lesson plans found")
 
@@ -3531,6 +4011,8 @@ async def issue_download_url(
     scheme_stem = Path(scheme_db.filename).stem if scheme_db and scheme_db.filename else ""
     scheme_label = re.sub(r'[^A-Za-z0-9]+', '_', scheme_stem).strip('_') or 'lesson_plans'
     lp_models = [_db_to_lesson_model(lp) for lp in lessons]
+    _require_export_rubrics(lp_models)
+    _log_content_quality(user.id, job_id, _content_quality_issues(lp_models))
     tt = TemplateType(template_type) if template_type in [t.value for t in TemplateType] else TemplateType.GES_STYLE
     resolved_template_id = _resolve_export_template_id(job, lp_models, template_id)
 
@@ -3552,7 +4034,7 @@ async def issue_download_url(
                 context=_render_context(db, user.id, job, scheme_db, lp_models))
         media_type = ("application/vnd.openxmlformats-officedocument"
                       ".wordprocessingml.document")
-        filename = f"Lesson_Plans_{scheme_label}.docx"
+        filename = lesson_plan_export_filename(scheme_db, "docx")
     elif fmt == "zip":
         custom_structure = _custom_structure_for(db, user.id, template_id)
         if custom_structure is not None:
@@ -3564,13 +4046,13 @@ async def issue_download_url(
             template_id=resolved_template_id, structure=custom_structure,
             context=render_context)
         media_type = "application/zip"
-        filename = f"Lesson_Plans_{scheme_label}.zip"
+        filename = lesson_plan_export_filename(scheme_db, "zip")
     else:  # pdf
         out = await _build_export_pdf(
             db, user, job, scheme_label, lp_models, tt, template_id,
             _render_context(db, user.id, job, scheme_db, lp_models))
         media_type = "application/pdf"
-        filename = f"Lesson_Plans_{scheme_label}.pdf"
+        filename = lesson_plan_export_filename(scheme_db, "pdf")
 
     data_service.log_export_event(db, job.id, job.scheme_id, user.id, fmt)
     token = _issue_download_token(db, user.id, job.id, out, media_type, filename)
@@ -3632,7 +4114,7 @@ async def export_zip(
         raise HTTPException(status_code=404, detail="Job not found")
     enforce_authenticated_budget(user.id, "export")
 
-    lessons = data_service.get_lesson_plans_for_job(db, job_id, user.id)
+    lessons = data_service.get_lesson_plans_for_scheme(db, job.scheme_id, user.id)
     if not lessons:
         raise HTTPException(status_code=404, detail="No lesson plans found")
 
@@ -3644,6 +4126,7 @@ async def export_zip(
 
     lp_models = [_db_to_lesson_model(lp) for lp in lessons]
     _require_export_rubrics(lp_models)
+    _log_content_quality(user.id, job_id, _content_quality_issues(lp_models))
     tt = TemplateType(template_type) if template_type in [t.value for t in TemplateType] else TemplateType.GES_STYLE
 
     zip_path = Path(f"exports/{user.id}/{job_id}/lesson_plans.zip")
@@ -3664,7 +4147,8 @@ async def export_zip(
     # application/zip is the content type Chrome/Edge treat as a download, so this
     # endpoint is the one that relied on the disposition fix above.
     return _download_response(
-        zip_path, "application/zip", f"Lesson_Plans_{scheme_label}.zip")
+        zip_path, "application/zip",
+        lesson_plan_export_filename(scheme_db, "zip"))
 
 
 @router.get("/lessons")
@@ -3864,7 +4348,7 @@ def _require_lesson_config(config: TermConfig) -> None:
         missing.append("teaching days")
     if missing:
         raise HTTPException(
-            status_code=409,
+            status_code=422,
             detail=(
                 "Complete the lesson configuration before generating: "
                 + ", ".join(missing)
@@ -4374,6 +4858,11 @@ def _run_quality_gate(job, config, scheme_id, drafts, allow_rebuild: bool = True
                 _apply_lesson_review_draft(rebuilt, drafts, config,
                                            annual=annual)
                 _ensure_resources_used(rebuilt)
+                from ..engines.lesson_content_quality import (
+                    ensure_distinct_phases, sanitize_resources,
+                )
+                sanitize_resources(rebuilt)
+                ensure_distinct_phases(rebuilt)
                 rebuilt_outcome = evaluate(
                     rebuilt, build_entry(ctx.alloc, rebuilt),
                     wapef_canonical=_wapef_canonical_for(rebuilt))

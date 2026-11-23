@@ -242,7 +242,17 @@ export function normalizeError(error: unknown): NormalizedError {
   }
 
   if (status === 409) {
-    return { ...base, category: 'conflict', message: FRIENDLY_MESSAGES.conflict, canRetry: false, showBanner: false }
+    // 409 is NOT automatically a stale edit. Surface the safe server detail
+    // (e.g. generation already running, missing configuration, duplicate
+    // subject) and use the stale-edit wording only when no detail exists.
+    const detail = safeDetail(api) || safeDetail(body?.detail)
+    return {
+      ...base,
+      category: 'conflict',
+      message: detail || FRIENDLY_MESSAGES.conflict,
+      canRetry: false,
+      showBanner: false,
+    }
   }
 
   if (status === 413) {

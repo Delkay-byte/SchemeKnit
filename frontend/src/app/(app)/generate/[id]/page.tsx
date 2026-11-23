@@ -6,7 +6,6 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { SurfaceCard } from '@/components/ui/surface-card'
 import { Banner } from '@/components/ui/banner'
-import { Input } from '@/components/ui/input'
 import { Download, Settings, Play, CheckCircle, FileText, FileArchive, Loader2, Eye, ChevronDown, ChevronRight } from 'lucide-react'
 import { api, sanitizeTermConfig } from '@/lib/api'
 import { exportLessonPlans } from '@/lib/docx'
@@ -29,26 +28,19 @@ import { LessonWorkspace } from '@/components/lesson-workspace'
 import { LessonConfigModal } from '@/components/lesson-config-modal'
 import { SchemeOfWork, TermConfig, CurriculumCoverage, Template, CurriculumProfile, LessonRubricConfig } from '@/types'
 
-/** The fields this page edits on a per-lesson WAPEF row. */
-interface WapefReviewRow {
-  lesson_sequence: number
-  week_number?: number
-  indicator_code?: string
-  is_special_period?: boolean
-  wapef_deep_hope?: string
-  wapef_storyline?: string
-  wapef_through_lines?: string[]
-  wapef_gods_story?: string
-  remarks?: string
-  keywords?: string[]
-  keywords_touched?: boolean
-  suggested_keywords?: string[]
-  suggested_wapef?: {
-    deep_hope?: string
-    storyline?: string
-    through_lines?: string[]
-    gods_story?: string
-  }
+interface GenerationSnapshot {
+  id: string
+  status?: string
+  created_at?: string | null
+  error_message?: string | null
+  resumable_occurrence_ids?: string[]
+  blocked_for_review_occurrence_ids?: string[]
+  completed_lessons?: number
+  total_lessons?: number
+  expected_lessons?: number
+  generated_units?: number
+  processing_units?: number
+  generation_workers?: number
 }
 
 export default function GeneratePage() {
@@ -94,15 +86,10 @@ export default function GeneratePage() {
   // Per-lesson review drafts (keywords / Other TLRs / competencies / refs)
   // edited BEFORE generation and applied when lessons are built.
   const [lessonReview, setLessonReview] = useState<any[]>([])
-  const [reviewSaving, setReviewSaving] = useState(false)
-  const [reviewSaved, setReviewSaved] = useState(false)
   const [reviewDirty, setReviewDirty] = useState(false)
   const reviewAutosaveSeq = useRef(0)
-  // Approved WAPEF option lists (Deep Hope / Storyline / Through lines /
-  // God's Story). Dropdown-only: the teacher picks, never free text, never AI.
-  // Academic-year Deep Hope + Storyline: chosen once, reused on every lesson,
-  // never AI-generated and never edited per lesson.
-  const [keywordInputs, setKeywordInputs] = useState<Record<number, string>>({})
+  const generatingRef = useRef(false)
+  const generationSeq = useRef(0)
   // Guided lesson configuration (Phase 2): the seven plan-wide fields the
   // teacher confirms AFTER extraction and BEFORE generation, through the ONE
   // "Configure lesson rubrics" modal. Saved on the scheme; readiness comes
@@ -128,7 +115,14 @@ export default function GeneratePage() {
   // The ordered work list shown while a run is in flight (never a fake
   // per-item completion — the POST is one synchronous run).
   const [progressRows, setProgressRows] = useState<
-    Array<{ source_occurrence_id?: string; week_number?: number; topic?: string }>
+    Array<{
+      source_occurrence_id?: string
+      week_number?: number
+      topic?: string
+      // Server-authored deterministic suggestions. Kept on the row so the
+      // review screen can prefill them without inventing vocabulary.
+      suggested_keywords?: string[]
+    }>
   >([])
   // Post-Autopilot handoff (§18): "N lesson plans ready" with week/topic/Open.
   const [autopilotResult, setAutopilotResult] = useState<
@@ -513,7 +507,6 @@ export default function GeneratePage() {
           return local ? { ...rr, ...local } : rr
         })
       })
-      setReviewSaved(false)
       // Which occurrences are ALREADY generated (any previous run) — the
       // weeks surface reads this, never a client-side count.
       refreshSchemeLessons()
@@ -573,6 +566,171 @@ export default function GeneratePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, scheme, jobId, config.class_level, config.subject, config.template_id])
 
+  // ── Generation recovery (long request / lost response) ───────────────
+  // A generation can outlive the HTTP response window. The backend persists a
+  // real job row, so the frontend re-attaches to that job instead of treating
+  // the timeout or a duplicate-submit 409 as a stale-edit failure.
+  const recoverActiveGeneration = async (
+    runSeq: number,
+    startedAt: number,
+  ): Promise<'completed' | 'partial' | 'failed' | 'none'> => {
+    let status: GenerationSnapshot | null = null
+    try {
+      status = await api.getGenerationStatusForScheme(schemeId)
+    } catch {
+      return 'none'
+    }
+    if (runSeq !== generationSeq.current || !status?.id) return 'none'
+    const first = status
+    const statusName = String(first.status || '')
+    const createdAt = first.created_at
+      ? new Date(first.created_at).getTime()
+      : 0
+    const recent = createdAt > 0 && createdAt >= startedAt - 5_000
+    if (!recent && !['pending', 'processing'].includes(statusName)) {
+      return 'none'
+    }
+
+    if (statusName === 'completed') {
+      setJobId(first.id)
+      const saved = Number(first.completed_lessons || first.total_lessons || 0)
+      setGenProgress(
+        saved > 0
+          ? `All ${saved} lesson plans have been generated and saved successfully.`
+          : 'Your lesson plans have been generated successfully.',
+      )
+      try {
+        setCoverage(await api.getCurriculumCoverage(first.id))
+      } catch { /* coverage is secondary */ }
+      await refreshSchemeLessons().catch(() => {})
+      return 'completed'
+    }
+
+    if (statusName === 'partial') {
+      const done = Number(first.completed_lessons || 0)
+      const total = Number(first.total_lessons || first.expected_lessons || 0)
+      setJobId(first.id)
+      setGenProgress(
+        `${done} of ${total} lesson plans generated; the rest are still pending.`,
+      )
+      setBatchNotice(
+        first.error_message
+          || `${Math.max(total - done, 0)} lesson plan${Math.max(total - done, 0) === 1 ? '' : 's'} remain pending. Retry them without duplicating the saved lessons.`,
+      )
+      setJobRecovery({
+        error: first.error_message || 'Some lesson plans from this batch are still pending.',
+        jobId: first.id,
+        resumable: first.resumable_occurrence_ids || [],
+        blocked: first.blocked_for_review_occurrence_ids || [],
+      })
+      try {
+        setCoverage(await api.getCurriculumCoverage(first.id))
+      } catch { /* coverage is secondary */ }
+      await refreshSchemeLessons().catch(() => {})
+      return 'partial'
+    }
+
+    if (statusName === 'failed') {
+      setError(
+        first.error_message
+          || "We couldn't complete lesson-plan generation. Your saved configuration is safe. Please try again.",
+      )
+      setJobRecovery({
+        error: first.error_message || 'The last generation stopped before it finished.',
+        jobId: first.id,
+        resumable: first.resumable_occurrence_ids || [],
+        blocked: first.blocked_for_review_occurrence_ids || [],
+      })
+      return 'failed'
+    }
+
+    // Pending / processing: poll the persisted job. No second POST is sent.
+    setGenProgress('Generation is still running. Reconnecting to the saved job…')
+    for (let poll = 0; poll < 200; poll += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+      if (runSeq !== generationSeq.current) return 'none'
+      let next: GenerationSnapshot | null = null
+      try {
+        next = await api.getGenerationStatus(first.id)
+      } catch {
+        continue
+      }
+      if (runSeq !== generationSeq.current) return 'none'
+      if (!next) continue
+      const latest = String(next.status || '')
+      if (latest === 'completed') {
+        setJobId(next.id)
+        const saved = Number(next.completed_lessons || next.total_lessons || 0)
+        setGenProgress(
+          saved > 0
+            ? `All ${saved} lesson plans have been generated and saved successfully.`
+            : 'Your lesson plans have been generated successfully.',
+        )
+        try {
+          setCoverage(await api.getCurriculumCoverage(next.id))
+        } catch { /* coverage is secondary */ }
+        await refreshSchemeLessons().catch(() => {})
+        return 'completed'
+      }
+      if (latest === 'partial') {
+        const done = Number(next.completed_lessons || 0)
+        const total = Number(next.total_lessons || next.expected_lessons || 0)
+        setJobId(next.id)
+        setGenProgress(
+          `${done} of ${total} lesson plans generated; the rest are still pending.`,
+        )
+        setBatchNotice(
+          next.error_message
+            || `${Math.max(total - done, 0)} lesson plan${Math.max(total - done, 0) === 1 ? '' : 's'} remain pending. Retry them without duplicating the saved lessons.`,
+        )
+        setJobRecovery({
+          error: next.error_message || 'Some lesson plans from this batch are still pending.',
+          jobId: next.id,
+          resumable: next.resumable_occurrence_ids || [],
+          blocked: next.blocked_for_review_occurrence_ids || [],
+        })
+        try {
+          setCoverage(await api.getCurriculumCoverage(next.id))
+        } catch { /* coverage is secondary */ }
+        await refreshSchemeLessons().catch(() => {})
+        return 'partial'
+      }
+      if (latest === 'failed') {
+        setError(
+          next.error_message
+            || "We couldn't complete lesson-plan generation. Your saved configuration is safe. Please try again.",
+        )
+        setJobRecovery({
+          error: next.error_message || 'The last generation stopped before it finished.',
+          jobId: next.id,
+          resumable: next.resumable_occurrence_ids || [],
+          blocked: next.blocked_for_review_occurrence_ids || [],
+        })
+        return 'failed'
+      }
+      const done = Number(next.completed_lessons || 0)
+      const total = Number(next.total_lessons || next.expected_lessons || 0)
+      const generated = Number(next.generated_units || 0)
+      const processing = Number(next.processing_units || 0)
+      setGenProgress(
+        total > 0
+          ? done > 0
+            ? `${done} of ${total} lesson plans saved; validating the rest…`
+            : generated > 0
+              ? `${generated} of ${total} lesson plans generated; validating and saving…`
+              : processing > 0
+                ? `Generating lesson plans in parallel: ${processing} in progress, ${total} expected…`
+                : `${total} lesson plans are being prepared…`
+          : 'Generation is still running…',
+      )
+    }
+    setJobRecovery({
+      error: 'Generation is still running. Your saved configuration is safe; reopen this page to reconnect to it.',
+      jobId: first.id,
+    })
+    return 'none'
+  }
+
   // ── Generate actions (Priority 3) ─────────────────────────────────────
   // The teacher acts on WHAT they can see — a week, a single lesson, or the
   // whole scheme. The payload names the exact source occurrences (and their
@@ -586,6 +744,10 @@ export default function GeneratePage() {
     progress: Array<{ source_occurrence_id?: string; week_number?: number; topic?: string }> = [],
     plan: any = null,
   ) => {
+    if (generatingRef.current) return
+    generatingRef.current = true
+    const runSeq = ++generationSeq.current
+    const startedAt = Date.now()
     try {
       setGenerating(true)
       setError(null)
@@ -611,6 +773,7 @@ export default function GeneratePage() {
       }
       setErrorRequestId(body.request_id)
       const response = await api.generateLessonPlans(schemeId, body)
+      if (runSeq !== generationSeq.current) return
       setJobRecovery(null)
       setJobId(response.job_id)
       setFinalizationWarning(response.warning || null)
@@ -676,9 +839,23 @@ export default function GeneratePage() {
           `${readyRows.length} lesson plan${readyRows.length === 1 ? '' : 's'} generated; ` +
           `${failedCount + rejectedCount} remain pending.`,
         )
+      } else if (response.status === 'partial') {
+        const done = Number(response.completed_lessons || 0)
+        const total = Number(response.total_lessons || 0)
+        setBatchNotice(
+          `${Math.max(total - done, 0)} lesson plan${Math.max(total - done, 0) === 1 ? '' : 's'} remain pending. Retry them without duplicating the saved lessons.`,
+        )
+        setGenProgress(
+          `${done} of ${total} lesson plans generated; the rest are still pending.`,
+        )
       } else {
         setBatchNotice(null)
-        setGenProgress('Lesson plans generated successfully!')
+        const saved = Number(response.completed_lessons || response.total_lessons || 0)
+        setGenProgress(
+          saved > 0
+            ? `All ${saved} lesson plans have been generated and saved successfully.`
+            : 'Lesson plans generated successfully!',
+        )
       }
 
       const coverageData = await api.getCurriculumCoverage(response.job_id)
@@ -690,10 +867,21 @@ export default function GeneratePage() {
       setAutopilotResult(readyRows.length > 1 ? { rows: readyRows } : null)
     } catch (err) {
       const normalized = normalizeError(err)
+      if (runSeq !== generationSeq.current) return
+      const recoverable =
+        normalized.status === 0
+        || normalized.status === 502
+        || normalized.status === 504
+        || (normalized.status === 409 && normalized.code === 'generation_in_progress')
+      if (recoverable) {
+        const recovered = await recoverActiveGeneration(runSeq, startedAt)
+        if (recovered !== 'none') return
+      }
       setError(normalized.message)
       setErrorRequestId(normalized.requestId || null)
-      setGenProgress('')
+      setGenProgress('Your saved configuration is safe. Please try again.')
     } finally {
+      generatingRef.current = false
       setGenerating(false)
       setProgressRows([])
     }
@@ -705,7 +893,8 @@ export default function GeneratePage() {
   // lessons, and charges only codes that have not already been paid for.
   const runResume = async () => {
     const resumeJobId = jobRecovery?.jobId
-    if (!resumeJobId) return
+    if (!resumeJobId || generatingRef.current) return
+    generatingRef.current = true
     try {
       setGenerating(true)
       setError(null)
@@ -745,6 +934,11 @@ export default function GeneratePage() {
         setError(
           response.message
             || 'This batch could not continue. Start a new generation instead.',
+        )
+      } else if (response.status === 'partial') {
+        setBatchNotice(
+          response.message
+            || 'Some lesson plans were generated; the remaining units are still pending.',
         )
       }
       if (resumableIds.length > 0) {
@@ -790,6 +984,7 @@ export default function GeneratePage() {
       setErrorRequestId(normalized.requestId || null)
       setGenProgress('')
     } finally {
+      generatingRef.current = false
       setGenerating(false)
       setProgressRows([])
     }
@@ -877,71 +1072,37 @@ export default function GeneratePage() {
     remarks: row.remarks || '',
   })
 
-  // Key words / new vocabulary for one review row. Until the teacher edits,
-  // the curriculum suggestion is shown; the first edit marks the row as
-  // teacher-owned so regeneration never silently replaces the approved list.
-  const activeKeywords = (row: WapefReviewRow): string[] => (
-    row.keywords_touched ? (row.keywords || []) : (row.suggested_keywords || [])
-  )
-
-  const setRowKeywords = (row: WapefReviewRow, terms: string[], touched = true) => {
-    const cleaned: string[] = []
-    for (const term of terms) {
-      const value = String(term || '').replace(/\s+/g, ' ').trim()
-      if (value && !cleaned.some((item) => item.toLowerCase() === value.toLowerCase())) {
-        cleaned.push(value)
-      }
-    }
-    updateLessonReviewRow(row.lesson_sequence, {
-      keywords: cleaned,
-      keywords_touched: touched,
-    })
-  }
-
-  const addRowKeyword = (row: WapefReviewRow) => {
-    const value = (keywordInputs[row.lesson_sequence] || '').trim()
-    if (!value) return
-    setRowKeywords(row, [...activeKeywords(row), value])
-    setKeywordInputs((current) => ({ ...current, [row.lesson_sequence]: '' }))
-  }
-
   // rows param: the CALLER passes the rows to save. runGeneration
   // passes its own in-scope `lessonReview` (the exact state the teacher sees
   // on screen at click time), so the payload can never be built from a stale
-  // render's copy. The Save-review button passes nothing and saves the
-  // current state.
+  // render's copy.
   const saveLessonReviewDrafts = async (rows?: any[]) => {
     const reviewRows = rows && rows.length ? rows : lessonReview
     if (!reviewRows.length) return
-    setReviewSaving(true)
-    setReviewSaved(false)
-    try {
-      const drafts: Record<string, any> = {}
-      for (const row of reviewRows) {
-        drafts[String(row.lesson_sequence)] = {
-          // Teacher-adjusted timetable slot for this lesson (Pattern 1).
-          // Applied to the built lesson; blank is preserved as blank.
-          period: row.period || '',
-          keywords: row.keywords_touched ? (row.keywords || []) : [],
-          keywords_touched: Boolean(row.keywords_touched),
-          other_tlrs: row.other_tlrs || [],
-          core_competencies: row.core_competencies || [],
-          structured_references: row.structured_references || [],
-          // Approved WAPEF Plan teacher-selected fields (dropdown values,
-          // sent as-is; the server normalizes against the approved lists).
-          ...wapefDraftFor(row),
-        }
+    const drafts: Record<string, any> = {}
+    for (const row of reviewRows) {
+      drafts[String(row.lesson_sequence)] = {
+        // Teacher-adjusted timetable slot for this lesson (Pattern 1).
+        // Applied to the built lesson; blank is preserved as blank.
+        period: row.period || '',
+        keywords: row.keywords_touched ? (row.keywords || []) : [],
+        keywords_touched: Boolean(row.keywords_touched),
+        other_tlrs: row.other_tlrs || [],
+        core_competencies: row.core_competencies || [],
+        structured_references: row.structured_references || [],
+        // Approved WAPEF Plan teacher-selected fields (dropdown values,
+        // sent as-is; the server normalizes against the approved lists).
+        ...wapefDraftFor(row),
       }
+    }
+    try {
       // The PUT must have PERSISTED (server echoed the full store) before
       // generation may read it — this await IS the save boundary.
       await api.saveLessonReview(schemeId, drafts)
-      setReviewSaved(true)
       setReviewDirty(false)
     } catch (err) {
       setError(normalizeError(err).message)
       throw err
-    } finally {
-      setReviewSaving(false)
     }
   }
 
@@ -962,20 +1123,6 @@ export default function GeneratePage() {
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reviewDirty, lessonReview, jobId, generating])
-
-  const updateLessonReviewRow = (seq: number, patch: Partial<any>) => {    // Functional update: the patch is applied to the LATEST row state, never
-    // a closure-captured copy. (A stale closure here was the WAPEF race: two
-    // quick edits — or an edit immediately followed by Generate lesson plans —
-    // built the save payload from a pre-edit row and silently dropped the
-    // teacher's latest selections.)
-    setLessonReview(rows => rows.map(r => {
-      if (r.lesson_sequence !== seq) return r
-      if (r.source_occurrence_id) touchedOccurrences.current.add(r.source_occurrence_id)
-      return { ...r, ...patch }
-    }))
-    setReviewSaved(false)
-    setReviewDirty(true)
-  }
 
   const handleExport = async (format: string) => {
     if (!jobId) return
@@ -1550,80 +1697,6 @@ export default function GeneratePage() {
                     )}
                   </>
                 )}
-              </SurfaceCard>
-            )}
-
-            {/* Key Words / New Vocabulary — shared by every template. WAPEF
-                topic fields live in Configure lesson rubrics. */}
-            {!jobId && lessonReview.length > 0 && (
-              <SurfaceCard className="px-5 py-5 sm:px-6">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <h2 className="text-base font-semibold text-[#102A43]">Key Words / New Vocabulary</h2>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Suggested from each learning indicator. Leave untouched to use the suggestions, or edit per lesson.
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {reviewSaved && <span className="text-xs text-green-700" role="status">Saved</span>}
-                    <Button size="sm" variant="outline" onClick={() => saveLessonReviewDrafts()} disabled={reviewSaving}>
-                      {reviewSaving ? <><Loader2 className="mr-1 h-3 w-3 animate-spin" aria-hidden="true" />Saving…</> : 'Save key words'}
-                    </Button>
-                  </div>
-                </div>
-                <div className="mt-4 max-h-96 space-y-3 overflow-y-auto pr-1">
-                  {lessonReview.filter((row: WapefReviewRow) => !row.is_special_period).map((row: WapefReviewRow) => (
-                    <div key={row.lesson_sequence} className="rounded-lg border border-slate-200 p-3">
-                      <p className="text-xs font-semibold text-[#102A43]">
-                        Week {row.week_number}{row.indicator_code ? ` · ${row.indicator_code}` : ''}
-                      </p>
-                      <div className="mt-1.5 flex flex-wrap gap-1.5">
-                        {activeKeywords(row).map((term: string) => (
-                          <span key={term} className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs">
-                            {term}
-                            <button type="button" aria-label={`Remove ${term}`}
-                              onClick={() => setRowKeywords(row, activeKeywords(row).filter((item) => item !== term))}>
-                              ×
-                            </button>
-                          </span>
-                        ))}
-                        {(row.suggested_keywords || [])
-                          .filter((term: string) => !activeKeywords(row).some((item) => item.toLowerCase() === term.toLowerCase()))
-                          .map((term: string) => (
-                            <button key={term} type="button"
-                              className="rounded-full border border-dashed border-slate-300 px-2 py-0.5 text-xs text-muted-foreground"
-                              onClick={() => setRowKeywords(row, [...activeKeywords(row), term])}>
-                              + {term}
-                            </button>
-                          ))}
-                      </div>
-                      <div className="mt-1.5 flex gap-2">
-                        <Input
-                          aria-label={`Add a key word for lesson ${row.lesson_sequence}`}
-                          value={keywordInputs[row.lesson_sequence] || ''}
-                          onChange={(e) => setKeywordInputs((current) => ({ ...current, [row.lesson_sequence]: e.target.value }))}
-                          placeholder="Add a word or phrase"
-                          className="h-8 text-xs"
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault()
-                              addRowKeyword(row)
-                            }
-                          }}
-                        />
-                        <Button type="button" size="sm" variant="outline" onClick={() => addRowKeyword(row)}>
-                          Add
-                        </Button>
-                        {(row.suggested_keywords || []).length > 0 && (
-                          <Button type="button" size="sm" variant="ghost"
-                            onClick={() => setRowKeywords(row, row.suggested_keywords || [], false)}>
-                            Use suggestions
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
               </SurfaceCard>
             )}
 

@@ -379,7 +379,7 @@ class TestPdfEndpointLayers:
         assert isinstance(res, FileResponse)
         assert res.media_type == "application/pdf"
         assert unquote(res.headers[X_FILENAME_HEADER]) == \
-            "Lesson_Plans_Basic_9_Science_Scheme.pdf"
+            "Term_1_Basic_9_Lesson_Plan_For_Science.pdf"
 
 
 class TestDocxEndpointContract:
@@ -408,7 +408,7 @@ class TestDocxEndpointContract:
         assert isinstance(res, FileResponse)
         assert res.media_type == DOCX_MIME
         assert unquote(res.headers[X_FILENAME_HEADER]) == \
-            "Lesson_Plans_Basic_9_Science_Scheme.docx"
+            "Term_1_Basic_9_Lesson_Plan_For_Science.docx"
 
         doc = Document(res.path)
         # The approved topology is repeated once per lesson in a combined export:
@@ -446,7 +446,7 @@ class TestDocxEndpointContract:
         _scheme, job = make_job_with_lessons(db, u, lessons=1)
         res = await gen_router.export_docx(job.id, "GES-style", TEMPLATE_ID, u, db)
         assert unquote(res.headers[X_FILENAME_HEADER]) == \
-            "Lesson_Plans_Basic_9_Science_Scheme.docx"
+            "Term_1_Basic_9_Lesson_Plan_For_Science.docx"
         assert ".docx" in res.headers["content-disposition"]
 
     @pytest.mark.asyncio

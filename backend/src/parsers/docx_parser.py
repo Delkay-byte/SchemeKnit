@@ -230,6 +230,41 @@ def canonicalize_code_spacing(text: str) -> str:
     out = _CODE_RANGE_SPACE.sub('-', out)
     return out
 
+
+#: Words that show a cell line was wrapped mid-phrase, not ended.
+_WRAP_CONNECTORS = frozenset({
+    "from", "of", "with", "and", "or", "to", "for", "in", "on", "at", "by",
+    "using", "through", "into", "over", "under", "between", "made",
+})
+
+
+def merge_wrapped_cell_lines(text: str) -> str:
+    """Rejoin a resource cell that Word wrapped in the middle of a phrase.
+
+    A real source cell prints ``"patterns made from\\nManila cards"``; splitting
+    on every newline produced the truncated resource ``"patterns made from"``,
+    which then reached the lesson as an incomplete instruction. A line is
+    joined to the previous one only when the previous line ends with a
+    connector ("from", "of", "and", ...). Complete list items (including a line
+    ending in a comma) are never merged.
+    """
+    if not text or "\n" not in text.replace("\r", "\n"):
+        return text or ""
+    lines = [line.strip() for line in text.replace("\r", "\n").split("\n")
+             if line.strip()]
+    merged: list[str] = []
+    for line in lines:
+        if merged:
+            previous = merged[-1]
+            last_word = re.split(r"\s+", previous.strip())[-1].strip(
+                ".,;:").lower()
+            if (previous.rstrip()[-1:] not in (",", ";", ":")
+                    and last_word in _WRAP_CONNECTORS):
+                merged[-1] = f"{previous} {line}".strip()
+                continue
+        merged.append(line)
+    return "\n".join(merged)
+
 #: Month name → number (full and common abbreviations), lowercased keys.
 _MONTHS = {
     "january": 1, "jan": 1, "february": 2, "feb": 2, "march": 3, "mar": 3,
@@ -1283,6 +1318,12 @@ class DOCXParser:
 
         all_content_standards: List[ParsedContentStandard] = []
         all_indicators: List[ParsedIndicator] = []
+        # Identity of an indicator is (code, WEEK). The same code may legitimately
+        # repeat in a later source week (a spiral curriculum): that is a distinct
+        # occurrence and must allocate its own lesson. Only a duplicate inside the
+        # SAME week is a source anomaly. A global code check silently dropped
+        # every later occurrence, which is one cause of missing lesson units.
+        seen_indicator_keys: set = set()
         all_resources: set = set()
 
         for row in teaching_rows:
@@ -1362,7 +1403,7 @@ class DOCXParser:
                                 # Adjacent codes have no prose of their own;
                                 # never let the NEXT code become a description.
                                 desc = segments.get(code, "")
-                            if any(i.code == code for i in all_indicators):
+                            if (code, row.get("week_number")) in seen_indicator_keys:
                                 existing = next(
                                     i for i in all_indicators if i.code == code)
                                 if desc and desc != existing.description:
@@ -1376,6 +1417,7 @@ class DOCXParser:
                                         ),
                                     ))
                                 continue
+                            seen_indicator_keys.add((code, row.get("week_number")))
                             all_indicators.append(ParsedIndicator(
                                 code=code,
                                 description=desc
@@ -1385,13 +1427,16 @@ class DOCXParser:
                         # behaviour (first token as code, remainder as text).
                         ind_code = self._extract_code(ind_text, INDICATOR_CODE_PATTERN)
                         ind_desc = self._clean_description(ind_text, ind_code)
-                        if ind_code and ind_desc and not any(i.code == ind_code for i in all_indicators):
+                        if (ind_code and ind_desc
+                                and (ind_code, row.get("week_number")) not in seen_indicator_keys):
+                            seen_indicator_keys.add((ind_code, row.get("week_number")))
                             all_indicators.append(ParsedIndicator(
                                 code=ind_code,
                                 description=ind_desc
                             ))
 
             res = row.get("resources", "")
+            res = merge_wrapped_cell_lines(res)
             if res and res.lower() not in ("", "resources", "resource"):
                 # CANONICAL RESOURCES (PART 6/7): one cell may hold several
                 # resources ("Charts, Pictures, Counters"). Normalize into
@@ -1406,10 +1451,17 @@ class DOCXParser:
                 for item in normalize_text_items(res):
                     if is_special_label_text(item):
                         continue
-                    from ..curriculum.vocabulary import is_malformed_fragment
+                    from ..curriculum.vocabulary import (
+                        is_incomplete_resource, is_malformed_fragment,
+                    )
                     if is_malformed_fragment(item):
                         # A truncated source label ("paper-") is not a usable
                         # resource. Drop it rather than guess the missing word.
+                        continue
+                    if is_incomplete_resource(item):
+                        # A wrapped cell that still ends mid-phrase ("patterns
+                        # made from") is not a complete resource; never print it
+                        # in an instructional sentence.
                         continue
                     all_resources.add(item)
 

@@ -180,16 +180,51 @@ def compare_structure(source_path, generated_path) -> Dict[str, Any]:
     out_tables = generated["tables"]
     n = len(src_tables)
 
-    if len(out_tables) == n:
-        blocks = [out_tables]
-        check("table_count", True, f"source={n} generated={len(out_tables)}")
-    elif n and len(out_tables) % n == 0:
-        blocks = [out_tables[i:i + n] for i in range(0, len(out_tables), n)]
+    def _matches_form(block: List[Dict[str, Any]]) -> bool:
+        return len(block) == n and all(
+            (out["rows"], out["grid_cols"], out["h_merges"], out["v_merges"])
+            == (src["rows"], src["grid_cols"], src["h_merges"], src["v_merges"])
+            for out, src in zip(block, src_tables)
+        )
+
+    # A generated document is the approved form repeated once per lesson,
+    # followed by the additive assessment appendix (one marking-rubric table
+    # per lesson that has a rubric). The appendix is a deliberate product
+    # feature, not part of the approved form, so it must not be folded into
+    # the form block count.
+    blocks: List[List[Dict[str, Any]]] = []
+    pos = 0
+    while pos + n <= len(out_tables):
+        candidate = out_tables[pos:pos + n]
+        if not _matches_form(candidate):
+            break
+        blocks.append(candidate)
+        pos += n
+    appendix = out_tables[pos:]
+
+    forms_complete = bool(blocks) and (len(blocks) * n + len(appendix)
+                                      == len(out_tables))
+    if forms_complete:
         check("table_count", True,
-              f"source={n} generated={len(out_tables)} lessons={len(blocks)}")
+              f"source={n} generated={len(out_tables)} "
+              f"lessons={len(blocks)} appendix={len(appendix)}")
     else:
-        check("table_count", False, f"source={n} generated={len(out_tables)}")
+        # Preserve the precise legacy diagnostic when the form itself is
+        # malformed rather than merely followed by an appendix.
+        check("table_count", False,
+              f"source={n} generated={len(out_tables)}")
         return {"pass": False, "checks": checks}
+
+    def _is_rubric_table(item: Dict[str, Any]) -> bool:
+        grid = item.get("cell_grid") or []
+        if not grid:
+            return False
+        header = [str(c).strip().lower() for c in grid[0]]
+        return bool(header) and header[0].startswith("criterion") and len(header) >= 3
+
+    rubric_flags = [_is_rubric_table(item) for item in appendix]
+    check("assessment_appendix", all(rubric_flags),
+          f"{len(appendix)} appendix table(s); all rubric headers")
 
     for block_index, block in enumerate(blocks):
         prefix = f"L{block_index + 1}:" if len(blocks) > 1 else ""

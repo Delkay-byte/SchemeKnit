@@ -383,10 +383,11 @@ def wapef_loss_failures(lp: LessonPlan, canonical: Optional[Dict[str, Any]]) -> 
     """Hard failure T — a saved WAPEF selection was LOST or rewritten.
 
     The four WAPEF values are the teacher's own selections from the approved
-    lists. They are never composed or AI-changed, so the ONLY defect the gate
-    can catch is LOSS: the teacher saved a selection and the persisted lesson
-    no longer carries exactly it (byte-identical, through the same
-    canonicalization the review draft path uses).
+    lists. They are never composed or AI-changed (the only permitted AI suffix
+    is the explicit Zeli God's Story note, checked separately below), so the
+    ONLY defect the gate can catch is LOSS: the teacher saved a selection and
+    the persisted lesson no longer carries exactly it (byte-identical, through
+    the same canonicalization the review draft path uses).
 
     No selection at all is the documented "empty state" (save-boundary group
     G): genuinely empty fields stay empty and the lesson is still valid — the
@@ -404,6 +405,15 @@ def wapef_loss_failures(lp: LessonPlan, canonical: Optional[Dict[str, Any]]) -> 
         if not saved_norm:
             continue  # no selection for this field — empty is legitimate
         current = _wapef_norm(getattr(lp, field, None))
+        # Zeli is allowed to append a brief note + Bible reference to the
+        # teacher-selected God's Story category. Nothing else may change, and
+        # deterministic generation still requires the exact value.
+        if (key == "gods_story"
+                and str(getattr(lp, "generation_method", "") or "") == "zeli"
+                and isinstance(saved_norm, str)
+                and isinstance(current, str)
+                and current.startswith(f"{saved_norm} - ")):
+            continue
         if current != saved_norm:
             failures.append("wapef_loss")
             break

@@ -74,8 +74,15 @@ test('404 is not retried and explains the missing item', () => {
   assert.equal(normalized.canRetry, false)
 })
 
-test('409 explains a stale edit', () => {
-  const normalized = normalizeError(apiError('Conflict', 409))
+test('409 surfaces the safe server detail, not a blanket stale-edit message', () => {
+  const normalized = normalizeError(apiError('A generation for this scheme is already running.', 409))
+  assert.equal(normalized.category, 'conflict')
+  assert.match(normalized.message, /already running/i)
+  assert.doesNotMatch(normalized.message, /item has changed/i)
+})
+
+test('409 without a detail still explains a stale edit', () => {
+  const normalized = normalizeError(apiError('', 409))
   assert.equal(normalized.category, 'conflict')
   assert.match(normalized.message, /changed since you opened it/i)
 })

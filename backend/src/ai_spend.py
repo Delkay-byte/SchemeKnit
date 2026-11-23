@@ -22,7 +22,9 @@ module's owner summary.
 from __future__ import annotations
 
 import math
+import threading
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Sequence
 
@@ -215,6 +217,22 @@ def _dialect(db: Session) -> str:
     return bind.dialect.name if bind is not None else "sqlite"
 
 
+#: SQLite has one writer. Parallel lesson workers would otherwise collide on
+#: the first insert of a shared counter row ("database is locked"), which is a
+#: storage limitation, not a concurrency-limit decision. PostgreSQL needs no
+#: such lock: its row-level atomic UPDATEs are the real authority.
+_SQLITE_WRITE_LOCK = threading.RLock()
+
+
+@contextmanager
+def _write_guard(db: Session):
+    if _dialect(db) == "sqlite":
+        with _SQLITE_WRITE_LOCK:
+            yield
+    else:
+        yield
+
+
 def _insert_ignore(db: Session, model, values: dict) -> None:
     if _dialect(db) == "postgresql":
         stmt = _pg_insert(model.__table__).values(**values).on_conflict_do_nothing()
@@ -300,7 +318,9 @@ def _reserve_scope(db: Session, scope: dict, amount_micros: int) -> None:
         raise AISpendBudgetExceeded()
 
 
-def _acquire_concurrency(db: Session, user_id: Optional[str]) -> List[dict]:
+def _acquire_concurrency(
+    db: Session, user_id: Optional[str], provider: str = "",
+) -> List[dict]:
     cfg = budget_config()
     now = datetime.utcnow()
     # A crashed process cannot hold a slot forever: the expiry is refreshed by
@@ -308,6 +328,12 @@ def _acquire_concurrency(db: Session, user_id: Optional[str]) -> List[dict]:
     expiry = now + timedelta(
         seconds=max(120, int(getattr(_settings(), "ZELI_READ_TIMEOUT_SECONDS", 90) or 90) + 60)
     )
+    provider_key = (provider or "").strip().lower()
+    try:
+        from .engines.generation_concurrency import provider_concurrency_limit
+        provider_limit = provider_concurrency_limit(provider_key)
+    except Exception:
+        provider_limit = 2
     scopes = [
         {
             "scope": "concurrency_global", "period_key": "global",
@@ -319,9 +345,20 @@ def _acquire_concurrency(db: Session, user_id: Optional[str]) -> List[dict]:
             "provider": "", "limit": cfg["max_concurrent_per_teacher"],
         },
     ]
+    # Provider-wide ceiling is shared by every teacher and every parent job.
+    # It lives in the same leased counters as the global/user ceilings, so a
+    # second process or instance cannot exceed it by owning its own executor.
+    if provider_key:
+        scopes.append({
+            "scope": "concurrency_provider",
+            "period_key": provider_key,
+            "provider": provider_key,
+            "limit": max(1, int(provider_limit)),
+        })
     acquired: List[dict] = []
     for item in scopes:
-        row = _counter_row(db, item["scope"], item["period_key"], "")
+        row = _counter_row(
+            db, item["scope"], item["period_key"], item["provider"])
         result = db.execute(
             text(
                 "UPDATE ai_spend_counters "
@@ -352,11 +389,11 @@ def _release_concurrency_scope(db: Session, item: dict) -> None:
             "UPDATE ai_spend_counters "
             "SET active_requests = CASE WHEN active_requests > 0 "
             "THEN active_requests - 1 ELSE 0 END, updated_at = :now "
-            "WHERE scope = :scope AND period_key = :pk AND provider = ''"
+            "WHERE scope = :scope AND period_key = :pk AND provider = :provider"
         ),
         {
             "now": datetime.utcnow(), "scope": item["scope"],
-            "pk": item["period_key"],
+            "pk": item["period_key"], "provider": item.get("provider", ""),
         },
     )
 
@@ -411,21 +448,23 @@ class SpendAttempt:
             return self.cost_micros
         self._finished = True
         try:
-            self.cost_micros = settle_attempt(
-                self, outcome=outcome, usage=usage, error_code=error_code)
+            with _write_guard(self.db):
+                self.cost_micros = settle_attempt(
+                    self, outcome=outcome, usage=usage, error_code=error_code)
         except Exception as exc:  # accounting must never hide real output
             logger.error("ai_spend_settlement_failed", error=str(exc)[:200])
             self.cost_micros = 0
         finally:
-            for item in self.concurrency_scopes:
+            with _write_guard(self.db):
+                for item in self.concurrency_scopes:
+                    try:
+                        _release_concurrency_scope(self.db, item)
+                    except Exception:
+                        pass
                 try:
-                    _release_concurrency_scope(self.db, item)
+                    self.db.commit()
                 except Exception:
-                    pass
-            try:
-                self.db.commit()
-            except Exception:
-                self.db.rollback()
+                    self.db.rollback()
         return self.cost_micros
 
 
@@ -470,29 +509,30 @@ def begin_attempt(
     reservation_id = generate_id()
 
     try:
-        with db.begin_nested():
-            for scope in scopes:
-                _reserve_scope(db, scope, estimated_micros)
-            concurrency = _acquire_concurrency(db, user_id)
-            db.add(AISpendReservationDB(
-                id=reservation_id,
-                attempt_id=attempt_id,
-                user_id=user_id,
-                request_id=request_id,
-                provider=provider,
-                model=model or "",
-                estimated_micros=estimated_micros,
-                settled_micros=0,
-                status="held",
-                scopes=[
-                    {
-                        "scope": s["scope"], "period_key": s["period_key"],
-                        "provider": s["provider"],
-                    }
-                    for s in scopes
-                ],
-            ))
-        db.commit()
+        with _write_guard(db):
+            with db.begin_nested():
+                for scope in scopes:
+                    _reserve_scope(db, scope, estimated_micros)
+                concurrency = _acquire_concurrency(db, user_id, provider)
+                db.add(AISpendReservationDB(
+                    id=reservation_id,
+                    attempt_id=attempt_id,
+                    user_id=user_id,
+                    request_id=request_id,
+                    provider=provider,
+                    model=model or "",
+                    estimated_micros=estimated_micros,
+                    settled_micros=0,
+                    status="held",
+                    scopes=[
+                        {
+                            "scope": s["scope"], "period_key": s["period_key"],
+                            "provider": s["provider"],
+                        }
+                        for s in scopes
+                    ],
+                ))
+            db.commit()
     except AISpendError:
         db.rollback()
         try:

@@ -5,9 +5,11 @@ The four WAPEF fields (Deep Hope, Storyline, Through lines, God's Story) are
 STRUCTURED curriculum/context selections, not free text and not AI fields:
 
 - the teacher selects them from the approved option lists below;
-- the AI may use them as instructional context but must NEVER choose,
-  rewrite or overwrite them ("Teacher selection wins");
-- the selected values survive create → review → save → reload → generation
+- the AI may use them as instructional context but must NEVER choose or
+  overwrite the selected category ("Teacher selection wins"); the ONE
+  exception is an explicitly requested Zeli God's Story annotation, which may
+  append a brief note and Bible reference AFTER the teacher-selected category;
+- the selected category survives create → review → save → reload → generation
   → preview → DOCX export → PDF export verbatim.
 
 The approved spellings are the source of truth and are preserved exactly

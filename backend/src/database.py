@@ -12,7 +12,7 @@ import uuid
 from sqlalchemy import (
     create_engine, Column, String, Integer, Float, Boolean, DateTime, Date,
     Text, ForeignKey, JSON, Enum as SAEnum, Index, UniqueConstraint, BigInteger,
-    false,
+    false, event,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.declarative import declarative_base
@@ -52,7 +52,7 @@ _database_url = normalize_database_url(settings.DATABASE_URL)
 _is_sqlite = _database_url.startswith("sqlite")
 engine = create_engine(
     _database_url,
-    connect_args={"check_same_thread": False} if _is_sqlite else {},
+    connect_args={"check_same_thread": False, "timeout": 30} if _is_sqlite else {},
     echo=settings.DEBUG,
     # Neon/Render can close idle pooled PostgreSQL connections. Pre-ping
     # replaces a dead connection before use instead of surfacing a 500.
@@ -61,6 +61,23 @@ engine = create_engine(
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+if _is_sqlite:
+    @event.listens_for(engine, "connect")
+    def _sqlite_parallel_pragmas(dbapi_connection, _connection_record):
+        """Let a bounded parallel run coexist with SQLite's single writer.
+
+        WAL allows readers during a write and ``busy_timeout`` makes a losing
+        writer wait for the short counter/cache transaction instead of failing
+        immediately. PostgreSQL uses MVCC and needs none of this.
+        """
+        cursor = dbapi_connection.cursor()
+        try:
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA busy_timeout=30000")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+        finally:
+            cursor.close()
 
 Base = declarative_base()
 

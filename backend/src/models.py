@@ -937,6 +937,10 @@ class LessonPlan(BaseModel):
     #: Lesson-specific vocabulary. Derived from content standard + exact
     #: indicator + activity context; teacher-entered terms are authoritative.
     keywords: List[str] = []
+    #: True when the teacher explicitly edited/approved the key vocabulary.
+    #: Provider enrichment may add terms but must not replace a teacher-owned
+    #: list. Persisted in-memory only; it is not a public API field.
+    keywords_teacher_owned: bool = False
     learning_objectives: List[LearningObjective] = []
     #: Per-lesson multi-select from the official NaCCA taxonomy.
     core_competencies: List[str] = []

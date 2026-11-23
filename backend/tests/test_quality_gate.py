@@ -804,7 +804,10 @@ class TestEndpointGate:
             )
             assert response.status_code == 200, response.text
             body = response.json()
-            assert body["status"] == "completed"
+            assert body["status"] == "partial"
+            assert body["total_lessons"] == 2
+            assert body["completed_lessons"] == 1
+            assert body["failed_lessons"] == 1
             assert body["quality"]["accepted"] == 1
             assert body["quality"]["rejected"] == 1
             # Honest batch semantics: the accepted occurrence is named as

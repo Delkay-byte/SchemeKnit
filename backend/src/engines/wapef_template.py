@@ -504,8 +504,36 @@ def render_document(lesson_plans: List[Any], context: Optional[Dict[str, Any]] =
         render_header(document, lesson, context)
 
     from .wapef_style import style_wapef_document
+    prevent_row_split(document)
     style_wapef_document(document)
     return document
+
+
+def prevent_row_split(document) -> None:
+    """Keep a table row (and its resource cell) on one page.
+
+    The Phase 2 row is long. Without ``w:cantSplit`` Word splits it across the
+    page boundary, so a single resource such as "patterns made from Manila
+    cards" printed as "patterns made from" on page 1 and "Manila cards" on page
+    2 — which reads like an incomplete resource. The header row is also marked
+    to repeat when a table still spans pages.
+    """
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+
+    for table in document.tables:
+        for index, row in enumerate(table.rows):
+            tr_pr = row._tr.get_or_add_trPr()
+            if tr_pr.find(qn("w:cantSplit")) is None:
+                tr_pr.append(OxmlElement("w:cantSplit"))
+            if index == 0 and tr_pr.find(qn("w:tblHeader")) is None:
+                tr_pr.append(OxmlElement("w:tblHeader"))
+            # Never split ONE resource label across a page. The row may still
+            # span pages, but "bundle and loose straws base ten cut square"
+            # stays on one page instead of printing its tail on the next.
+            if row.cells:
+                for paragraph in row.cells[-1].paragraphs:
+                    paragraph.paragraph_format.keep_together = True
 
 
 def validate_rendered_document(document) -> List[str]:

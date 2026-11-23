@@ -698,6 +698,7 @@ async def my_subscription(
     db: Session = Depends(get_db),
 ):
     paystack.expire_overdue(db)
+    from ..entitlements import resolve_entitlement
     sub = db.query(UserSubscriptionDB).filter(
         UserSubscriptionDB.user_id == user.id).first()
     lic = db.query(UserLicenseDB).filter(
@@ -742,11 +743,29 @@ async def my_subscription(
                 "credits_granted", 0) or 0),
             "fulfilment_status": paystack.fulfilment_state(db, t),
         })
+    entitlement = resolve_entitlement(db, user)
     return {
         "subscription": _sub_payload(sub),
         "plan": _plan_payload(plan) if plan else None,
         "licence": _licence_payload(lic),
         "credits": credits.status(db, user.id),
+        # The authoritative entitlement, so the subscription page can show an
+        # internal/unlimited plan as unlimited instead of rendering the free
+        # credit bucket as if it were the account's whole allowance.
+        "entitlement": {
+            "plan": entitlement.get("plan"),
+            "plan_name": entitlement.get("plan_name"),
+            "lesson_quota_unlimited": bool(
+                entitlement.get("lesson_quota_unlimited")),
+            "lesson_quota_limit": entitlement.get("lesson_quota_limit"),
+            "lesson_quota_remaining": entitlement.get("lesson_quota_remaining"),
+            "ai_quota_unlimited": bool(entitlement.get("ai_quota_unlimited")),
+            "ai_quota_limit": entitlement.get("ai_quota_limit"),
+            "ai_quota_remaining": entitlement.get("ai_quota_remaining"),
+            "is_internal_test_account": bool(
+                entitlement.get("is_internal_test_account")),
+            "batch_generation": bool(entitlement.get("batch_generation")),
+        },
         "customer": {"email": user.email, "name": user.full_name},
         "last_purchase": (
             paystack.purchase_payload(db, last_success)
