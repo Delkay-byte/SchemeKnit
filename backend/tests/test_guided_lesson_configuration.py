@@ -254,6 +254,31 @@ class TestExtendedLessonConfiguration:
         body = http.get(f"/api/generation/{scheme.id}/lesson-config").json()["config"]
         assert body["teacher_name"] in ("", None)
 
+    def test_clear_and_restore_name_are_visible_in_the_save_response(self, http):
+        """The UI records cleared intent from the PUT response.
+
+        A stale name there would make the next reopen prefill from the profile
+        again, even though the server GET correctly returns a blank name.
+        """
+        scheme = http.scheme_factory()
+        clear = http.put(
+            f"/api/generation/{scheme.id}/lesson-config",
+            json={**FULL_CONFIG, "teacher_name": ""},
+        )
+        assert clear.status_code == 200
+        assert clear.json()["config"]["teacher_name"] in ("", None)
+        assert clear.json()["config"]["teacher_name_cleared"] is True
+
+        restore = http.put(
+            f"/api/generation/{scheme.id}/lesson-config",
+            json={**FULL_CONFIG, "teacher_name": "Restored Teacher"},
+        )
+        assert restore.status_code == 200
+        assert restore.json()["config"]["teacher_name"] == "Restored Teacher"
+        assert restore.json()["config"].get("teacher_name_cleared") is not True
+        body = http.get(f"/api/generation/{scheme.id}/lesson-config").json()["config"]
+        assert body["teacher_name"] == "Restored Teacher"
+
     def test_teacher_name_defaults_to_the_profile_when_not_saved(self, http):
         scheme = http.scheme_factory()
         payload = {k: v for k, v in FULL_CONFIG.items() if k != "teacher_name"}

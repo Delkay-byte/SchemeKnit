@@ -1257,12 +1257,17 @@ def _normalize_lesson_config(payload: LessonConfigRequest) -> dict:
         return v
 
     out["school_name"] = _clean_str("School name", payload.school_name)
-    out["teacher_name"] = _clean_str("Teacher's name", payload.teacher_name)
     # A teacher who deliberately clears the profile-prefilled name must get a
-    # blank back on reopen, not the profile default again. The flag records
-    # that intent without changing the profile.
-    if "teacher_name" in payload.model_fields_set and not out.get("teacher_name"):
-        out["teacher_name_cleared"] = True
+    # blank back on reopen, not the profile default again. Keep the blank in the
+    # saved response too: the UI records cleared intent from that response.
+    if "teacher_name" in payload.model_fields_set:
+        name = _clean_str("Teacher's name", payload.teacher_name)
+        if name:
+            out["teacher_name"] = name
+            out["teacher_name_cleared"] = False
+        else:
+            out["teacher_name"] = ""
+            out["teacher_name_cleared"] = True
     out["reference"] = _clean_str("Reference", payload.reference, max_len=2000)
     out["period"] = _clean_str("Period", payload.period, max_len=60)
     out["term"] = _clean_str("Academic term", payload.term, max_len=40)
