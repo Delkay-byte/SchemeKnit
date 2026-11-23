@@ -28,7 +28,8 @@ import { useFormDraft } from '@/hooks/use-form-draft'
 import { prefillLessonConfig } from '@/lib/prefill'
 import { readClearedFields, setFieldCleared } from '@/lib/prefill-overrides'
 import {
-  CORE_COMPETENCY_LABELS, TERMS, WEEK_DAYS, firstLessonConfigProblem, indicatorCode,
+  CORE_COMPETENCY_LABELS, TERMS, WEEK_DAYS, firstLessonConfigProblem,
+  indicatorCode, lessonConfigPayload,
   sourceOccurrenceId, toggleCompetency, validateLessonConfig, weekOccurrences,
 } from '@/lib/lesson-config'
 import { LessonRubricConfig, WapefAnnualProfile, WapefOptions } from '@/types'
@@ -47,12 +48,14 @@ export interface LessonConfigModalProps {
   onOpenChange: (open: boolean) => void
   config: LessonRubricConfig
   onSaved: (config: LessonRubricConfig, missing: string[]) => void
+  /** Refreshed server snapshot; parents that generate must use these values. */
+  onLoaded?: (config: LessonRubricConfig, missing: string[]) => void
   /** Method chosen on the upload-success screen. */
   initialMethod?: 'standard' | 'zeli'
 }
 
 export function LessonConfigModal({
-  schemeId, open, onOpenChange, config, onSaved, initialMethod,
+  schemeId, open, onOpenChange, config, onSaved, onLoaded, initialMethod,
 }: LessonConfigModalProps) {
   const { user } = useAuth()
   const [draft, setDraft] = useState<LessonRubricConfig>(config)
@@ -73,6 +76,7 @@ export function LessonConfigModal({
   const [autoStatus, setAutoStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [autoSavedAt, setAutoSavedAt] = useState<Date | null>(null)
   const autoSeq = useRef(0)
+  const configRequestSeq = useRef(0)
 
   const [clearedFields, setClearedFields] = useState<string[]>([])
   const prefill = useMemo<LessonRubricConfig>(
@@ -94,25 +98,43 @@ export function LessonConfigModal({
 
   useEffect(() => {
     if (!open) return
+    const requestSeq = ++configRequestSeq.current
     const cleared = overrideIdentity ? readClearedFields(overrideIdentity) : new Set<string>()
     setClearedFields(Array.from(cleared))
-    const base = prefillLessonConfig(config, user, cleared)
-    const next: LessonRubricConfig = {
-      ...base,
-      generation_method: initialMethod || base.generation_method || 'standard',
-      term: base.term || 'First Term',
-      term_start_date: base.term_start_date || '',
-      term_end_date: base.term_end_date || '',
-      lessons_per_week: base.lessons_per_week ?? base.periods_per_week ?? 3,
-      lesson_duration_minutes: base.lesson_duration_minutes ?? 60,
-      teaching_days: base.teaching_days?.length ? base.teaching_days : [0, 2, 4],
-      indicator_resources: base.indicator_resources || {},
+
+    const buildDraft = (source: LessonRubricConfig): LessonRubricConfig => {
+      const base = prefillLessonConfig(source, user, cleared)
+      return {
+        ...base,
+        generation_method: initialMethod || base.generation_method || 'standard',
+        term: base.term || 'First Term',
+        term_start_date: base.term_start_date || '',
+        term_end_date: base.term_end_date || '',
+        lessons_per_week: base.lessons_per_week ?? base.periods_per_week ?? 3,
+        lesson_duration_minutes: base.lesson_duration_minutes ?? 60,
+        teaching_days: base.teaching_days?.length ? base.teaching_days : [0, 2, 4],
+        indicator_resources: base.indicator_resources || {},
+      }
     }
-    setDraft(next)
-    setBaseline(next)
+
+    const initialDraft = buildDraft(config)
+    setDraft(initialDraft)
+    setBaseline(initialDraft)
     setError(null)
     setShowProblems(false)
     setDiscardArmed(false)
+
+    // Each opening refetches the authoritative snapshot. A page may have been
+    // remounted, navigated away from, or had another tab save since mount;
+    // stale props must never win over the server copy.
+    api.getLessonConfig(schemeId).then((response) => {
+      if (requestSeq !== configRequestSeq.current) return
+      const saved = response.config || {}
+      const authoritative = buildDraft(saved)
+      setDraft(authoritative)
+      setBaseline(authoritative)
+      onLoaded?.(saved, response.missing || [])
+    }).catch(() => { /* opening the dialog still works without the refresh */ })
 
     api.getScheme(schemeId).then((data) => {
       setScheme(data)
@@ -254,22 +276,7 @@ export function LessonConfigModal({
   const isWapefTemplate = (draft.template_id || '').startsWith('tpl-wapef')
   const annualReady = Boolean(annual?.deep_hope && annual?.storyline)
 
-  const configPayload = () => ({
-    ...draft,
-    school_name: (draft.school_name || '').trim() || null,
-    teacher_name: (draft.teacher_name || '').trim() || null,
-    term: draft.term || null,
-    term_start_date: draft.term_start_date || null,
-    term_end_date: draft.term_end_date || null,
-    periods_per_week: draft.lessons_per_week ?? null,
-    lessons_per_week: draft.lessons_per_week ?? null,
-    generation_method: draft.generation_method || 'standard',
-    ai_mode: draft.ai_mode || 'OFF',
-    template_id: draft.template_id || null,
-    indicator_resources: draft.indicator_resources || {},
-    competency_selections: draft.competency_selections || {},
-    reference: (draft.reference || '').trim() || null,
-  })
+  const configPayload = () => lessonConfigPayload(draft)
 
   const setAnnualField = (field: 'deep_hope' | 'storyline', value: string) => {
     setAnnual((current) => current ? { ...current, [field]: value } : current)

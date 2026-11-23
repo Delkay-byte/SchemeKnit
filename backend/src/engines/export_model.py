@@ -161,8 +161,23 @@ def _objectives_block(lp: LessonPlan) -> List[Dict[str, Any]]:
 
 
 def _resources_block(lp: LessonPlan) -> List[Dict[str, Any]]:
-    return [_heading("Teaching & Learning Resources", 2),
-            *_bullets(list(lp.teaching_learning_resources or []))]
+    blocks = [_heading("Teaching & Learning Resources", 2),
+              *_bullets(list(lp.teaching_learning_resources or []))]
+    guidance = getattr(lp, "resource_guidance", None) or {}
+    if isinstance(guidance, dict):
+        lines = []
+        for label, key in (
+            ("Preparation: ", "preparation"),
+            ("Use: ", "use"),
+            ("No-cost alternative: ", "no_cost_alternative"),
+        ):
+            value = str(guidance.get(key) or "").strip()
+            if value:
+                lines.append(label + value)
+        if lines:
+            blocks.append(_heading("Low-Cost Resource Guidance", 3))
+            blocks.extend(_bullets(lines))
+    return blocks
 
 
 def _introduction_block(lp: LessonPlan) -> List[Dict[str, Any]]:
@@ -182,6 +197,22 @@ def _main_activities_block(lp: LessonPlan) -> List[Dict[str, Any]]:
             (text, False),
             (f" ({duration} min)" if duration else None, False),
         )))
+    worked = getattr(lp, "worked_example", None) or {}
+    if isinstance(worked, dict) and worked:
+        blocks.append(_heading("Worked Example", 3))
+        for label, key in (
+            ("Problem: ", "problem"),
+            ("Answer: ", "answer"),
+            ("Reasoning: ", "reasoning"),
+        ):
+            value = str(worked.get(key) or "").strip()
+            if value:
+                blocks.append(_paragraph(_runs((label + value, False))))
+        steps = worked.get("steps") or []
+        if isinstance(steps, list):
+            blocks.extend(_bullets([
+                str(step).strip() for step in steps if str(step).strip()
+            ]))
     return blocks
 
 
@@ -233,6 +264,22 @@ def _assessment_blocks(lp: LessonPlan) -> List[Dict[str, Any]]:
             ):
                 if value:
                     blocks.append(_paragraph(_runs((prefix + value, False))))
+    questions = getattr(lp, "practice_questions", None) or []
+    answered = [q for q in questions
+                if isinstance(q, dict) and str(q.get("question") or "").strip()]
+    if answered:
+        blocks.append(_heading("Practice Questions with Answers", 3))
+        for question in answered:
+            blocks.append(_paragraph(_runs(
+                (str(question.get("question") or "").strip(), False)),
+                style="List Bullet"))
+            for label, key in (
+                ("Answer: ", "expected_answer"),
+                ("Reasoning: ", "reasoning"),
+            ):
+                value = str(question.get(key) or "").strip()
+                if value:
+                    blocks.append(_paragraph(_runs((label + value, False))))
     rubric = lp.assessment_rubric
     if rubric is not None and rubric.criteria:
         blocks.append(_heading("Marking Rubric for the Learner Task", 3))
@@ -479,8 +526,15 @@ def _assessment_appendix(lp: LessonPlan) -> List[Dict[str, Any]]:
     class_task = (getattr(lp, "class_assignment", "") or "").strip()
     home_task = ((getattr(lp, "home_assignment", "") or "")
                  or (getattr(lp, "homework", "") or "")).strip()
+    worked_example = getattr(lp, "worked_example", None) or {}
+    practice_questions = [
+        q for q in (getattr(lp, "practice_questions", None) or [])
+        if isinstance(q, dict) and str(q.get("question") or "").strip()
+    ]
+    resource_guidance = getattr(lp, "resource_guidance", None) or {}
     if not items and not (rubric is not None and rubric.criteria) \
-            and not class_task and not home_task:
+            and not class_task and not home_task and not worked_example \
+            and not practice_questions and not resource_guidance:
         return []
 
     blocks: List[Dict[str, Any]] = []
@@ -533,6 +587,41 @@ def _assessment_appendix(lp: LessonPlan) -> List[Dict[str, Any]]:
             paragraph(rubric.evidence_to_award)
         if rubric.authority_note:
             paragraph(rubric.authority_note)
+    if isinstance(worked_example, dict) and worked_example:
+        heading("Worked Example")
+        for prefix, key in (
+            ("Problem: ", "problem"),
+            ("Answer: ", "answer"),
+            ("Reasoning: ", "reasoning"),
+        ):
+            value = str(worked_example.get(key) or "").strip()
+            if value:
+                paragraph(prefix + value)
+        for step in (worked_example.get("steps") or []):
+            value = str(step or "").strip()
+            if value:
+                paragraph("• " + value)
+    if practice_questions:
+        heading("Practice Questions with Answers")
+        for question in practice_questions:
+            paragraph("• " + str(question.get("question") or "").strip())
+            for prefix, key in (
+                ("Answer: ", "expected_answer"),
+                ("Reasoning: ", "reasoning"),
+            ):
+                value = str(question.get(key) or "").strip()
+                if value:
+                    paragraph(prefix + value)
+    if isinstance(resource_guidance, dict) and resource_guidance:
+        heading("Low-Cost Resource Guidance")
+        for prefix, key in (
+            ("Preparation: ", "preparation"),
+            ("Use: ", "use"),
+            ("No-cost alternative: ", "no_cost_alternative"),
+        ):
+            value = str(resource_guidance.get(key) or "").strip()
+            if value:
+                paragraph(prefix + value)
     return blocks
 
 

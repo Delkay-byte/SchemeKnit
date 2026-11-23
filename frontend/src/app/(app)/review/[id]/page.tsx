@@ -187,7 +187,7 @@ export default function ReviewPage() {
 
   const handleChooseMethod = async (method: 'standard' | 'zeli') => {
     try {
-      const next = { ...lessonConfig, generation_method: method, ai_mode: 'OFF' as const }
+      const next = { ...lessonConfig, generation_method: method }
       const saved = await api.saveLessonConfig(schemeId, next)
       if (saved?.config) setLessonConfig(saved.config)
       toast({
@@ -300,9 +300,8 @@ export default function ReviewPage() {
           title="Review Curriculum"
           description={
             <>
-              Check what SchemeKnit extracted from{' '}
-              <span className="font-medium text-[#102A43]">{scheme.filename}</span>, then approve
-              to continue.
+              Review the {scheme.subject} {scheme.class_level} curriculum for {scheme.term},
+              then approve to continue.
             </>
           }
           actions={
@@ -372,7 +371,7 @@ export default function ReviewPage() {
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <CheckCircle className="h-5 w-5 shrink-0 text-green-600" aria-hidden="true" />
-                <h2 className="truncate text-lg font-semibold text-[#102A43]">{scheme.filename}</h2>
+                <h2 className="truncate text-lg font-semibold text-[#102A43]">Curriculum reviewed</h2>
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
                 {scheme.subject} &bull; {scheme.class_level} &bull; {scheme.term} &bull; {scheme.academic_year}
@@ -795,6 +794,10 @@ export default function ReviewPage() {
         open={configModalOpen}
         onOpenChange={setConfigModalOpen}
         config={lessonConfig}
+        onLoaded={(saved, missing) => {
+          setLessonConfig(saved)
+          setLessonConfigMissing(missing)
+        }}
         onSaved={(saved, missing) => {
           setLessonConfig(saved)
           setLessonConfigMissing(missing)

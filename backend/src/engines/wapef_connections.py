@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Any, Dict, Iterable, Tuple
 
 from .wapef_fields import (
     WAPEF_GODS_STORY,
@@ -660,14 +660,13 @@ def suggest_wapef_fields(lesson: Any) -> Dict[str, Any]:
 
 
 def wapef_field_text(lesson: Any, field: str) -> str:
-    """Render one WAPEF cell: teacher value first, generated connection second.
+    """Render one WAPEF cell from the teacher's saved value only.
 
-    A teacher-selected approved label is preserved exactly and followed by a
-    lesson-specific PRACTICE sentence, so the cell is meaningful without the
-    label being rewritten. A teacher's own free text is returned verbatim.
+    Approved labels and teacher free text are returned verbatim. Topic-level
+    connection prose remains available through ``suggest_wapef_fields`` for the
+    review UI to offer as a suggestion; it is never appended here, so an annual
+    Storyline such as "Shaping our world." stays byte-for-byte exact in export.
     """
-    theme = _choose_theme(lesson)
-    focus = _focus_phrase(lesson)
     suggestion = suggest_wapef_fields(lesson)
 
     if field == "through_lines":
@@ -693,20 +692,9 @@ def wapef_field_text(lesson: Any, field: str) -> str:
                   if line.lower() not in approved_lower]
         ordered = approved + [line for line in custom
                               if line.lower() not in {x.lower() for x in approved}]
-        # Keep the approved list as one readable phrase (the form's established
-        # presentation), then explain how learners practise each habit.
-        notes: List[str] = []
-        for label in ordered:
-            chosen = _safe_label(label, WAPEF_THROUGH_LINES)
-            habit = _THROUGHLINE_HABITS.get(chosen, theme.habit) if chosen else label
-            notes.append(f"{habit} while working with {focus}")
-        sentence = format_through_lines(ordered)
-        if notes:
-            if len(notes) == 1:
-                sentence += f". Learners practise {notes[0]}."
-            else:
-                sentence += ". Learners practise " + "; ".join(notes[:-1]) + f"; and {notes[-1]}."
-        return sentence
+        # Approved order is preserved. No generated practice sentence: the
+        # teacher's selected Through lines are authoritative in the export.
+        return format_through_lines(ordered)
 
     if field == "deep_hope":
         raw = str(_get(lesson, "wapef_deep_hope", "") or "").strip()
@@ -718,21 +706,10 @@ def wapef_field_text(lesson: Any, field: str) -> str:
 
     if field == "storyline":
         raw = str(_get(lesson, "wapef_storyline", "") or "").strip()
-        if not raw:
-            return suggestion["storyline"]
-        if _safe_label(raw, WAPEF_STORYLINES):
-            return (
-                f"{raw} In this lesson, learners work with {focus} and "
-                f"discover that {theme.creation_truth}."
-            )
-        return raw
+        return raw or suggestion["storyline"]
 
     if field == "gods_story":
         raw = str(_get(lesson, "wapef_gods_story", "") or "").strip()
-        if not raw:
-            return suggestion["gods_story"]
-        if _safe_label(raw, WAPEF_GODS_STORY):
-            return gods_story_for_label(raw, theme, focus)
-        return raw
+        return raw or suggestion["gods_story"]
 
     return ""

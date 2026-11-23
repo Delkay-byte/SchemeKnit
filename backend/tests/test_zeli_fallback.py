@@ -47,12 +47,29 @@ def _science_lesson():
             "source_resources": ["Chart"],
             "suggested_alternatives": ["Chalkboard", "Samples of table salt and water"],
         },
+        "worked_example": {
+            "problem": "Water has the formula H2O. Identify its elements.",
+            "steps": ["Read the formula from left to right.",
+                      "Name each element symbol and count its atoms."],
+            "answer": "Hydrogen and oxygen, with two hydrogen atoms and one oxygen atom.",
+            "reasoning": "A binary compound contains exactly two different elements.",
+        },
+        "practice_questions": [{
+            "question": "Sodium chloride is NaCl. Name its two elements.",
+            "expected_answer": "Sodium and chlorine.",
+            "reasoning": "The symbols Na and Cl stand for sodium and chlorine.",
+        }],
+        "resource_guidance": {
+            "preparation": "Place small labelled containers of table salt and water on the desk.",
+            "use": "Learners read each label and name the two elements in the formula.",
+            "no_cost_alternative": "Draw the formulae on the chalkboard if samples are unavailable.",
+        },
         "starter": {
             "activity": (
-                "Teacher displays water, table salt and carbon dioxide and asks "
-                "learners to identify the elements in each binary compound. "
-                "Learners discuss in pairs and name the binary compounds they see."),
-            "duration_minutes": 10,
+                "Display water, table salt and carbon dioxide and ask learners "
+                "to identify the elements in each binary compound. Learners "
+                "discuss in pairs and name the compounds they see."),
+            "duration_minutes": 8,
             "teacher_action": "Display the substances and ask guiding questions.",
             "learner_action": "Name each binary compound and its elements.",
         },
@@ -60,11 +77,10 @@ def _science_lesson():
             "phase1": {
                 "name": "Presentation",
                 "activity": (
-                    "Teacher presents the names and formulae of common binary "
-                    "compounds: water, sodium chloride, carbon dioxide, hydrogen "
-                    "chloride, ammonia and calcium oxide. Teacher explains that "
-                    "each binary compound contains exactly two elements and "
-                    "discusses one use of each binary compound."),
+                    "Present the names and formulae of common binary compounds: "
+                    "water, sodium chloride, carbon dioxide, hydrogen chloride, "
+                    "ammonia and calcium oxide. Explain that each contains "
+                    "exactly two elements and discuss one use of each."),
                 "duration_minutes": 15,
                 "teacher_action": "Write each formula and explain its two elements.",
                 "learner_action": "Copy the formulae and ask questions.",
@@ -73,9 +89,9 @@ def _science_lesson():
             "phase2": {
                 "name": "Discussion",
                 "activity": (
-                    "Learners work in small groups to list at least five binary "
-                    "compounds and one use of each binary compound. Teacher moves "
-                    "around to correct misconceptions about binary compounds."),
+                    "Ask learners to work in small groups to list at least five "
+                    "binary compounds and one use of each. Move around the room "
+                    "to correct misconceptions about binary compounds."),
                 "duration_minutes": 15,
                 "teacher_action": "Guide groups and correct misconceptions.",
                 "learner_action": "List compounds and uses, then share with the class.",
@@ -96,19 +112,23 @@ def _science_lesson():
         "assessment": {
             "method": "Oral questioning and a written matching task",
             "activity": (
-                "Teacher asks each learner to identify by name three binary "
-                "compounds from their formulae and state one use of each binary "
-                "compound. Teacher also checks the matching task."),
+                "Ask each learner to identify three binary compounds from their "
+                "formulae and state one use of each. Check the matching task."),
             "success_criteria": (
                 "Each learner correctly names three binary compounds, states one "
                 "use of each, and names one further binary compound."),
-            "duration_minutes": 10,
+            "duration_minutes": 7,
         },
+        "assessment_items": [{
+            "prompt": "Name three binary compounds from their formulae and state one use each.",
+            "expected_evidence": "Correct element names, formulae and one use per compound.",
+            "marking_guidance": "Award one mark per correct compound, element pair and use.",
+        }],
         "plenary": {
             "activity": (
-                "Teacher summarises the lesson and asks each learner to write one "
-                "binary compound and one use on an exit slip. Teacher collects the "
-                "slips to check individual understanding."),
+                "Summarise the lesson and ask each learner to write one binary "
+                "compound and one use on an exit slip. Collect the slips to "
+                "check individual understanding."),
             "duration_minutes": 5,
             "teacher_action": "Collect exit slips and correct misconceptions.",
             "learner_action": "Write one binary compound and one use on the slip.",

@@ -41,7 +41,7 @@ ZELI_METHOD = "zeli"
 #: Hard upper bound for one whole-lesson response (matches the Settings field).
 _ZELI_OUTPUT_TOKEN_CEILING = 8192
 #: Bump when the prompt/contract changes enough to invalidate cached output.
-ZELI_PROMPT_VERSION = "zeli-generation-v6"
+ZELI_PROMPT_VERSION = "zeli-generation-v7"
 
 #: God's Story note contract. This is a SEPARATE, tiny provider request after
 #: the whole lesson succeeds. It enriches ONLY the teacher-selected God's Story
@@ -62,6 +62,40 @@ ZELI_REQUIRED_SECTIONS = (
     "plenary",
     "differentiation",
 )
+
+#: The ONLY response keys a provider may supply. Everything else — school,
+#: teacher, dates, duration, template, generation method and per-lesson teacher
+#: selections — belongs to the saved configuration and is never merged from an
+#: AI response, however the response is worded.
+ZELI_OUTPUT_ALLOWLIST = frozenset({
+    "learning_objectives",
+    "prior_knowledge",
+    "key_vocabulary",
+    "resources",
+    "worked_example",
+    "practice_questions",
+    "resource_guidance",
+    "starter",
+    "main_learning",
+    "assessment",
+    "assessment_items",
+    "class_assignment",
+    "plenary",
+    "differentiation",
+    "homework_or_extension",
+    "teacher_notes",
+})
+
+
+def filter_zeli_content_to_allowlist(content: Any) -> Any:
+    """Drop any response key outside the explicit AI-output allowlist."""
+    if not isinstance(content, dict):
+        return content
+    return {
+        key: value for key, value in content.items()
+        if key in ZELI_OUTPUT_ALLOWLIST
+    }
+
 
 #: Provider kwargs accepted by ``generate_lesson_v2`` that the pipeline fills.
 #: Kept explicit so a provider that predates a field is never sent it blindly.
@@ -709,6 +743,7 @@ def generate_zeli_content(
         raise zeli_failure_from_provider(
             getattr(provider, "last_error", None))
 
+    content = filter_zeli_content_to_allowlist(content)
     problem = validate_zeli_content(content)
     if problem:
         # The provider answered, but the output cannot be trusted. Never merge

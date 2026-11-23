@@ -324,7 +324,7 @@ class TestWapefIntegration:
         assert math["theme"] != science["theme"]
         assert math["gods_story"] != science["gods_story"]
 
-    def test_selected_values_are_preserved_with_a_connection(self):
+    def test_selected_values_are_preserved_exactly_and_suggestions_stay_separate(self):
         lesson = _wapef_lesson(
             wapef_gods_story="Creation",
             wapef_storyline="Shaping our world.",
@@ -333,10 +333,29 @@ class TestWapefIntegration:
         gods = wapef_field_text(lesson, "gods_story")
         storyline = wapef_field_text(lesson, "storyline")
         through = wapef_field_text(lesson, "through_lines")
-        assert gods.startswith("Creation")
-        assert "Psalm 147:4" in gods
-        assert storyline.startswith("Shaping our world.")
-        assert through.startswith("Order discoverer")
+        assert gods == "Creation"
+        assert storyline == "Shaping our world."
+        assert through == "Order discoverer"
+        # Topic prose is still available as an optional review suggestion.
+        suggestion = suggest_wapef_fields(lesson)
+        assert "Psalm 147:4" in suggestion["gods_story"]
+        assert "In this lesson" in suggestion["storyline"]
+
+    def test_approved_annual_values_are_never_rewritten_or_appended(self):
+        story = "Shaping our world."
+        hope = "Learners will recognize the beauty of orderly work."
+        through = ["Order discoverer"]
+        gods = "Creation"
+        lesson = _wapef_lesson(
+            wapef_gods_story=gods,
+            wapef_deep_hope=hope,
+            wapef_storyline=story,
+            wapef_through_lines=through,
+        )
+        assert wapef_field_text(lesson, "deep_hope") == hope
+        assert wapef_field_text(lesson, "storyline") == story
+        assert wapef_field_text(lesson, "through_lines") == through[0]
+        assert wapef_field_text(lesson, "gods_story") == gods
 
     def test_custom_teacher_text_is_returned_verbatim(self):
         lesson = _wapef_lesson(

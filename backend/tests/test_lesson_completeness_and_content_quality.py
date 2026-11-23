@@ -65,7 +65,7 @@ def test_dotted_curriculum_codes_are_preserved_in_structured_fields():
     assert _focus_phrase(lesson) == "Fractions"
 
 
-def test_throughline_uses_natural_focus_not_bare_class_code():
+def test_throughline_keeps_the_teacher_selection_exactly():
     from src.engines.wapef_connections import wapef_field_text
 
     lesson = {
@@ -76,7 +76,8 @@ def test_throughline_uses_natural_focus_not_bare_class_code():
         "wapef_through_lines": ["Order discoverer"],
     }
     text = wapef_field_text(lesson, "through_lines")
-    assert "Fractions" in text
+    assert text == "Order discoverer"
+    assert "Fractions" not in text
     assert "with B4" not in text
 
 

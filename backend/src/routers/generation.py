@@ -1445,6 +1445,23 @@ def _saved_lesson_config(scheme_db) -> dict:
     return dict(saved) if isinstance(saved, dict) else {}
 
 
+def _merge_saved_lesson_config(existing: dict, updates: dict) -> dict:
+    """Merge one teacher save into the plan's authoritative snapshot.
+
+    An absent field (``None`` in the request model) means "not sent" and keeps
+    the saved value. An explicit ``{}`` means the teacher removed every entry
+    from that per-lesson map and is saved as such. The modal refetches the
+    authoritative snapshot on open, so its draft always knows which maps are
+    loaded before it sends anything.
+    """
+    merged = dict(existing or {})
+    for key, value in (updates or {}).items():
+        if value is None:
+            continue
+        merged[key] = value
+    return merged
+
+
 def _lesson_config_readiness(config: dict) -> dict:
     """Which REQUIRED fields the plan is still missing (never invented)."""
     missing = [name for name in LESSON_CONFIG_REQUIRED
@@ -1516,17 +1533,12 @@ async def put_lesson_config(
     scheme_db = data_service.get_scheme(db, scheme_id, user.id)
     if not scheme_db:
         raise HTTPException(status_code=404, detail="Scheme not found")
-    config = _normalize_lesson_config(payload)
-    # A client that saves teaching setup without touching per-lesson resources
-    # must not wipe the teacher's existing references/TLRs.
-    if payload.indicator_resources is None:
-        existing = _saved_lesson_config(scheme_db)
-        if isinstance(existing.get("indicator_resources"), dict):
-            config["indicator_resources"] = existing["indicator_resources"]
-    if payload.competency_selections is None:
-        existing = _saved_lesson_config(scheme_db)
-        if isinstance(existing.get("competency_selections"), dict):
-            config["competency_selections"] = existing["competency_selections"]
+    updates = _normalize_lesson_config(payload)
+    # Every save writes one authoritative snapshot. The merge keeps fields the
+    # modal did not carry (including per-lesson maps) instead of replacing them
+    # with an empty draft. Only values actually submitted may change.
+    config = _merge_saved_lesson_config(
+        _saved_lesson_config(scheme_db), updates)
     scheme_db.lesson_config = config
     db.commit()
     readiness = _lesson_config_readiness(config)
@@ -4323,6 +4335,8 @@ def _apply_saved_lesson_config(db: Session, scheme_db, config: TermConfig,
         config.indicator_resources = saved["indicator_resources"]
     if isinstance(saved.get("competency_selections"), dict):
         config.competency_selections = saved["competency_selections"]
+    if isinstance(saved.get("indicator_keywords"), dict):
+        config.indicator_keywords = saved["indicator_keywords"]
     if isinstance(saved.get("indicator_wapef"), dict):
         config.indicator_wapef = saved["indicator_wapef"]
     if saved.get("reference"):
@@ -5028,6 +5042,12 @@ def _serialize_lesson(lp, scheme_db=None) -> dict:
         ],
         "assessment_rubric": _rubric_json(
             parse_assessment_rubric(getattr(lp, "assessment_rubric", None))),
+        "worked_example": parse_zeli_json_object(
+            getattr(lp, "worked_example", None)),
+        "practice_questions": parse_zeli_json_list(
+            getattr(lp, "practice_questions", None)),
+        "resource_guidance": parse_zeli_json_object(
+            getattr(lp, "resource_guidance", None)),
         "conclusion": lp.conclusion,
         "references": normalize_text_items(lp.references),
         "structured_references": normalize_structured_references(
@@ -5104,6 +5124,18 @@ def parse_assessment_items(raw) -> list:
             except Exception:
                 continue
     return out
+
+
+def parse_zeli_json_object(raw) -> dict:
+    """Stored JSON object → plain dict; malformed legacy rows stay empty."""
+    return dict(raw) if isinstance(raw, dict) else {}
+
+
+def parse_zeli_json_list(raw) -> list:
+    """Stored JSON list → list of plain dicts; malformed legacy rows stay empty."""
+    if not isinstance(raw, list):
+        return []
+    return [dict(entry) for entry in raw if isinstance(entry, dict)]
 
 
 def _rubric_json(rubric):
@@ -5259,6 +5291,12 @@ def _db_to_lesson_model(lp) -> LessonPlan:
             getattr(lp, "assessment_items", None)),
         assessment_rubric=parse_assessment_rubric(
             getattr(lp, "assessment_rubric", None)),
+        worked_example=parse_zeli_json_object(
+            getattr(lp, "worked_example", None)),
+        practice_questions=parse_zeli_json_list(
+            getattr(lp, "practice_questions", None)),
+        resource_guidance=parse_zeli_json_object(
+            getattr(lp, "resource_guidance", None)),
         conclusion=lp.conclusion,
         references=references,
         structured_references=structured_references,

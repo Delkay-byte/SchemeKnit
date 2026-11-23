@@ -204,6 +204,8 @@ export interface TermConfig {
   competency_selections?: Record<string, string[]>
   // Canonical occurrence id -> teacher key words / new vocabulary.
   indicator_keywords?: Record<string, string[]>
+  // Canonical occurrence id -> per-lesson WAPEF topic choices.
+  indicator_wapef?: Record<string, { through_lines?: string[]; gods_story?: string }>
   // Free Tier: which indicators the teacher chose to spend this month's
   // lesson-plan units on. Empty = all indicators (paid/unlimited).
   selected_indicator_codes?: string[]

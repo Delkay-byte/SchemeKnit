@@ -970,6 +970,11 @@ class LessonPlan(BaseModel):
     #: marks a learner-created product/performance/task; never invented for
     #: short oral/written checks.
     assessment_rubric: Optional[AnalyticRubric] = None
+    #: Zeli-only pedagogy that must survive reload, preview and export. These
+    #: are provider-authored and teacher-owned content, never teacher config.
+    worked_example: Dict[str, Any] = {}
+    practice_questions: List[Dict[str, Any]] = []
+    resource_guidance: Dict[str, Any] = {}
     differentiation: str = ""
     remediation: str = ""
     extension: str = ""

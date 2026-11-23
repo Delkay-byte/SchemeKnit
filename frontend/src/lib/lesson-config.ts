@@ -6,7 +6,7 @@
  * occurrence ids produced by the curriculum spine (`week<W>:<pos>:<code>`).
  */
 
-import type { LessonRubricConfig } from '@/types'
+import type { LessonRubricConfig, TermConfig } from '@/types'
 
 export const WEEK_DAYS = [
   { value: 0, label: 'Monday' },
@@ -229,4 +229,76 @@ export function mergeIndicatorResources(
     }
   }
   return merged
+}
+
+/**
+ * One exact snapshot for save, autosave and reopen.
+ *
+ * Every editable map is copied even when empty: an empty map can mean the
+ * teacher removed every entry, and the server merge treats it as authoritative
+ * for that key. Dropping it here would silently restore older work.
+ */
+export function lessonConfigPayload(draft: LessonRubricConfig): LessonRubricConfig {
+  const payload: LessonRubricConfig = {
+    ...draft,
+    school_name: (draft.school_name || '').trim() || null,
+    teacher_name: (draft.teacher_name || '').trim() || null,
+    term: draft.term || null,
+    term_start_date: draft.term_start_date || null,
+    term_end_date: draft.term_end_date || null,
+    periods_per_week: draft.lessons_per_week ?? null,
+    lessons_per_week: draft.lessons_per_week ?? null,
+    generation_method: draft.generation_method || 'standard',
+    ai_mode: draft.ai_mode || 'OFF',
+    template_id: draft.template_id || null,
+    reference: (draft.reference || '').trim() || null,
+  }
+  // Absent means the draft never loaded that map; {} means the teacher removed
+  // every entry. The backend must be able to tell the two apart.
+  const maps = [
+    'indicator_resources', 'competency_selections',
+    'indicator_keywords', 'indicator_wapef',
+  ] as const
+  const source = draft as Record<string, unknown>
+  const target = payload as Record<string, unknown>
+  for (const key of maps) {
+    const value = source[key]
+    if (value === undefined) delete target[key]
+    else target[key] = { ...(value as Record<string, unknown>) }
+  }
+  return payload
+}
+
+/** Apply the server's saved snapshot to a generation config without omissions. */
+export function applySavedLessonConfig<T extends TermConfig>(
+  current: T,
+  saved: LessonRubricConfig,
+): T {
+  return {
+    ...current,
+    school_name: saved.school_name ?? current.school_name,
+    teacher_name: saved.teacher_name ?? current.teacher_name,
+    class_size: saved.class_size ?? current.class_size,
+    lesson_duration_minutes: saved.lesson_duration_minutes ?? current.lesson_duration_minutes,
+    lessons_per_week: saved.lessons_per_week
+      ?? saved.periods_per_week
+      ?? current.lessons_per_week,
+    period: saved.period ?? current.period,
+    term: saved.term ?? current.term,
+    term_start_date: saved.term_start_date ?? current.term_start_date,
+    term_end_date: saved.term_end_date ?? current.term_end_date,
+    teaching_days: saved.teaching_days?.length
+      ? [...saved.teaching_days]
+      : current.teaching_days,
+    generation_method: saved.generation_method ?? current.generation_method,
+    ai_mode: saved.ai_mode ?? current.ai_mode,
+    template_id: saved.template_id ?? current.template_id,
+    references: saved.reference ? [saved.reference] : current.references,
+    indicator_resources: { ...(saved.indicator_resources ?? current.indicator_resources ?? {}) },
+    competency_selections: {
+      ...(saved.competency_selections ?? current.competency_selections ?? {}),
+    },
+    indicator_keywords: { ...(saved.indicator_keywords ?? current.indicator_keywords ?? {}) },
+    indicator_wapef: { ...(saved.indicator_wapef ?? current.indicator_wapef ?? {}) },
+  }
 }

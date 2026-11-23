@@ -33,3 +33,21 @@ test('the dashboard free-plan card uses neutral wording', () => {
   assert.match(page, /Free plan/)
   assert.doesNotMatch(page, /Individual plan/)
 })
+
+test('workspace headers describe the curriculum, not the uploaded filename', () => {
+  const review = readFileSync('src/app/(app)/review/[id]/page.tsx', 'utf8')
+  const generate = readFileSync('src/app/(app)/generate/[id]/page.tsx', 'utf8')
+  assert.doesNotMatch(review, /Check what SchemeKnit extracted from/)
+  assert.doesNotMatch(review, /\{scheme\.filename\}/)
+  assert.doesNotMatch(generate, /description=\{(?:<>)?\{scheme\.filename\}/)
+  assert.match(review, /Review the \{scheme\.subject\} \{scheme\.class_level\} curriculum for \{scheme\.term\}/)
+  assert.match(generate, /\{scheme\.subject\} &bull; \{scheme\.class_level\} &bull; \{scheme\.term\}/)
+})
+
+test('saved AI mode is never forced off by a method choice', () => {
+  const review = readFileSync('src/app/(app)/review/[id]/page.tsx', 'utf8')
+  const generate = readFileSync('src/app/(app)/generate/[id]/page.tsx', 'utf8')
+  assert.doesNotMatch(review, /generation_method: method, ai_mode: 'OFF'/)
+  assert.equal(generate.match(/ai_mode: 'OFF',/g)?.length || 0, 1) // initial default only
+  assert.match(generate, /ai_mode: saved\.ai_mode \?\? current\.ai_mode|applySavedLessonConfig/)
+})

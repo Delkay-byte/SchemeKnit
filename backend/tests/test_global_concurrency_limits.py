@@ -190,16 +190,44 @@ def test_worker_queues_for_a_shared_permit_instead_of_failing(monkeypatch):
                 429, code="ai_concurrency_limited")
         return {
             "learning_objectives": ["Learners can name a device."],
-            "starter": {"activity": "Teacher shows a device."},
+            "worked_example": {
+                "problem": "Identify one classroom device.",
+                "steps": ["Look at the object.", "Name it and state one use."],
+                "answer": "A chalkboard is a device for writing.",
+                "reasoning": "It displays written work for the class.",
+            },
+            "practice_questions": [{
+                "question": "Name one device in the classroom.",
+                "expected_answer": "A chalkboard.",
+                "reasoning": "It is used to display writing.",
+            }],
+            "resource_guidance": {
+                "preparation": "Collect two real classroom devices.",
+                "use": "Learners handle each device while naming its use.",
+                "no_cost_alternative": "Use stones or bottle tops if needed.",
+            },
+            "starter": {
+                "activity": "Show a device and ask learners to name it.",
+                "duration_minutes": 8,
+            },
             "main_learning": {
-                "phase1": {"activity": "Learners sort devices.",
+                "phase1": {"activity": "Learners sort the real devices into working and non-working groups.",
                            "duration_minutes": 20},
-                "phase2": {"activity": "Pairs label a chart.",
+                "phase2": {"activity": "Pairs label a chart with device uses.",
                            "duration_minutes": 20},
             },
             "assessment": {"method": "Observation",
-                           "activity": "Teacher checks the chart."},
-            "plenary": {"activity": "Learners state one use."},
+                           "activity": "Check each labelled chart for the correct device name and one accurate use.",
+                           "duration_minutes": 7},
+            "assessment_items": [{
+                "prompt": "Name one device and state its use.",
+                "expected_evidence": "Learner names a device and one use.",
+                "marking_guidance": "One mark for the name, one for the use.",
+            }],
+            "plenary": {
+                "activity": "Learners state one use in their exercise books.",
+                "duration_minutes": 5,
+            },
         }, {"provider": "deepseek", "model": "test", "attempts": [],
             "cache_hit": False, "external_calls": 1}
 

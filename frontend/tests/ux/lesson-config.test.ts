@@ -2,8 +2,10 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
   CORE_COMPETENCY_LABELS,
+  applySavedLessonConfig,
   firstLessonConfigProblem,
   indicatorCode,
+  lessonConfigPayload,
   mergeIndicatorResources,
   sourceOccurrenceId,
   splitEntries,
@@ -174,4 +176,125 @@ test('all six approved core competencies are selectable together', () => {
   assert.deepEqual(toggleCompetency(null, CORE_COMPETENCY_LABELS[5]), [
     CORE_COMPETENCY_LABELS[5],
   ])
+})
+
+test('save payload carries the whole teacher snapshot, not fallback maps', () => {
+  const payload = lessonConfigPayload({
+    school_name: ' Kpogede Community School ',
+    teacher_name: ' Deladem Amegayie ',
+    class_size: 38,
+    lesson_duration_minutes: 45,
+    lessons_per_week: 4,
+    period: '3rd & 4th',
+    teaching_days: [1, 3],
+    term: 'Second Term',
+    term_start_date: '2027-01-05',
+    term_end_date: '2027-04-01',
+    generation_method: 'zeli',
+    ai_mode: 'BASIC',
+    template_id: 'tpl-wapef-maths-b4',
+    reference: ' GES Basic 4 ',
+    indicator_resources: {
+      'week2:0:B4.1.1.1.1': { references: ['Page 19'], tlrs: ['Bottle tops'] },
+    },
+    competency_selections: {
+      'week2:0:B4.1.1.1.1': [CORE_COMPETENCY_LABELS[0]],
+    },
+    indicator_keywords: {
+      'week2:0:B4.1.1.1.1': ['regroup', 'place value'],
+      'week3:0:B4.1.1.2.1': [],
+    },
+    indicator_wapef: {
+      'week2:0:B4.1.1.1.1': {
+        through_lines: ['Order discoverer'], gods_story: 'Creation',
+      },
+    },
+  })
+  assert.equal(payload.school_name, 'Kpogede Community School')
+  assert.equal(payload.teacher_name, 'Deladem Amegayie')
+  assert.equal(payload.class_size, 38)
+  assert.equal(payload.lesson_duration_minutes, 45)
+  assert.equal(payload.lessons_per_week, 4)
+  assert.equal(payload.period, '3rd & 4th')
+  assert.deepEqual(payload.teaching_days, [1, 3])
+  assert.equal(payload.term, 'Second Term')
+  assert.equal(payload.term_start_date, '2027-01-05')
+  assert.equal(payload.term_end_date, '2027-04-01')
+  assert.equal(payload.generation_method, 'zeli')
+  assert.equal(payload.ai_mode, 'BASIC')
+  assert.equal(payload.template_id, 'tpl-wapef-maths-b4')
+  assert.equal(payload.reference, 'GES Basic 4')
+  assert.deepEqual(payload.indicator_keywords?.['week3:0:B4.1.1.2.1'], [])
+  assert.deepEqual(payload.indicator_wapef?.['week2:0:B4.1.1.1.1'], {
+    through_lines: ['Order discoverer'], gods_story: 'Creation',
+  })
+})
+
+test('save payload distinguishes an unloaded map from an explicit clear', () => {
+  const maps = [
+    'indicator_resources', 'competency_selections',
+    'indicator_keywords', 'indicator_wapef',
+  ]
+  const absent = lessonConfigPayload({ school_name: 'Kpogede Community School' })
+  for (const key of maps) assert.equal(key in absent, false)
+
+  const cleared = lessonConfigPayload({
+    school_name: 'Kpogede Community School',
+    indicator_resources: {},
+    competency_selections: {},
+    indicator_keywords: {},
+    indicator_wapef: {},
+  })
+  for (const key of maps) assert.deepEqual(cleared[key as keyof typeof cleared], {})
+})
+
+test('generation config keeps saved AI mode and every per-lesson map', () => {
+  const base: Parameters<typeof applySavedLessonConfig>[0] = {
+    scheme_of_work_id: 'scheme-42',
+    term_start_date: '2026-09-07',
+    term_end_date: '2026-12-18',
+    lessons_per_week: 3,
+    lesson_duration_minutes: 60,
+    class_size: 24,
+    teaching_days: [0, 2, 4],
+    holidays: [],
+    ai_mode: 'OFF',
+    generation_method: 'standard',
+    include_special_weeks: false,
+  }
+  const next = applySavedLessonConfig(base, {
+    class_size: 38,
+    lesson_duration_minutes: 45,
+    lessons_per_week: 4,
+    period: '3rd & 4th',
+    term: 'Second Term',
+    term_start_date: '2027-01-05',
+    term_end_date: '2027-04-01',
+    teaching_days: [1, 3],
+    generation_method: 'zeli',
+    ai_mode: 'BASIC',
+    template_id: 'tpl-wapef-maths-b4',
+    indicator_resources: {
+      'week2:0:B4.1.1.1.1': { references: ['Page 19'], tlrs: ['Bottle tops'] },
+    },
+    competency_selections: {
+      'week2:0:B4.1.1.1.1': [CORE_COMPETENCY_LABELS[0]],
+    },
+    indicator_keywords: { 'week3:0:B4.1.1.2.1': [] },
+    indicator_wapef: {
+      'week2:0:B4.1.1.1.1': {
+        through_lines: ['Order discoverer'], gods_story: 'Creation',
+      },
+    },
+  })
+  assert.equal(next.ai_mode, 'BASIC')
+  assert.equal(next.generation_method, 'zeli')
+  assert.equal(next.class_size, 38)
+  assert.deepEqual(next.teaching_days, [1, 3])
+  assert.deepEqual(next.indicator_wapef, {
+    'week2:0:B4.1.1.1.1': {
+      through_lines: ['Order discoverer'], gods_story: 'Creation',
+    },
+  })
+  assert.deepEqual(next.indicator_keywords, { 'week3:0:B4.1.1.2.1': [] })
 })

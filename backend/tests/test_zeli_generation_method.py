@@ -127,12 +127,30 @@ def _full_lesson(marker="ZELI"):
             "Learners can explain one use of a device to a partner",
         ],
         "key_vocabulary": [f"{marker.lower()}_vocab"],
+        "worked_example": {
+            "problem": f"{marker} worked example: identify one classroom device.",
+            "steps": ["Look at the object.", "Name it and state one use."],
+            "answer": "A chalkboard is a device for writing.",
+            "reasoning": "It is used in the lesson to show written work.",
+        },
+        "practice_questions": [
+            {
+                "question": f"{marker} practice: name one device in the classroom.",
+                "expected_answer": "A chalkboard.",
+                "reasoning": "It is used to display writing for the class.",
+            }
+        ],
+        "resource_guidance": {
+            "preparation": f"{marker} preparation: collect two real devices.",
+            "use": "Learners handle each device while naming its use.",
+            "no_cost_alternative": "Use stones or bottle tops if devices are scarce.",
+        },
         "starter": {
             "activity": (
-                f"{marker} starter: the teacher shows real classroom devices "
-                "and asks learners in pairs to name each device and say one "
-                "use."
-            )
+                f"{marker} starter: show real classroom devices and ask learners "
+                "in pairs to name each device and say one use."
+            ),
+            "duration_minutes": 8,
         },
         "main_learning": {
             "phase1": {
@@ -158,17 +176,25 @@ def _full_lesson(marker="ZELI"):
         "assessment": {
             "method": "Observation",
             "activity": (
-                f"{marker} assessment: the teacher observes each pair as they "
-                "identify a device and match it to its use, and marks correct "
-                "answers on a checklist."
+                f"{marker} assessment: observe each pair as they identify a "
+                "device, match it to its use and mark correct answers on a "
+                "checklist."
             ),
+            "duration_minutes": 7,
         },
+        "assessment_items": [
+            {
+                "prompt": f"{marker} check: identify one device and state its use.",
+                "expected_evidence": "Learner names the device and states one use.",
+                "marking_guidance": "Award one mark for the name and one for the use.",
+            }
+        ],
         "plenary": {
             "activity": (
                 f"{marker} plenary: learners summarise in one sentence what "
-                "they learned about each device, and the teacher checks that "
-                "every pair can identify one device correctly."
-            )
+                "they learned, then answer the closing device question in books."
+            ),
+            "duration_minutes": 5,
         },
         "differentiation": {
             "support": f"{marker} support: pair with a peer",
@@ -201,7 +227,20 @@ class FakeZeliProvider:
         self.calls.append(kwargs)
         if self.last_error:
             return {}
-        return json.loads(json.dumps(self.content))
+        content = json.loads(json.dumps(self.content))
+        # Real providers get a distinct indicator per unit. Keep the fixture
+        # honest so the cross-indicator duplicate guard sees different plans.
+        code = str(kwargs.get("indicator_code") or "")
+        if code:
+            suffix = f" [{code}]"
+            for section in ("starter", "plenary"):
+                block = content.get(section)
+                if isinstance(block, dict) and block.get("activity"):
+                    block["activity"] = str(block["activity"]) + suffix
+            worked = content.get("worked_example")
+            if isinstance(worked, dict) and worked.get("problem"):
+                worked["problem"] = str(worked["problem"]) + suffix
+        return content
 
 
 def _settings(**overrides):

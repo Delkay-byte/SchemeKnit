@@ -29,20 +29,6 @@ from .indicator_interpreter import (
 
 LESSON_OUTPUT_SCHEMA = """
 {
-  "lesson_identity": {
-    "subject": "string",
-    "class_level": "string",
-    "strand": "string",
-    "sub_strand": "string",
-    "indicator_code": "string",
-    "indicator_text": "string",
-    "lesson_topic": "string"
-  },
-  "curriculum_context": {
-    "content_standard": "string",
-    "bloom_level": "string",
-    "activity_type": "string"
-  },
   "learning_objectives": [
     "Learners can <measurable verb> <specific content>"
   ],
@@ -50,6 +36,24 @@ LESSON_OUTPUT_SCHEMA = """
   "key_vocabulary": ["term1", "term2", "term3"],
   "resources": {
     "source_resources": ["ONLY the exact scheme/teacher resources supplied below"]
+  },
+  "worked_example": {
+    "problem": "A concrete problem with actual numbers or objects",
+    "steps": ["Step 1 with the method made explicit", "Step 2 with the reason"],
+    "answer": "The correct answer with units where relevant",
+    "reasoning": "Why the method and answer are correct"
+  },
+  "practice_questions": [
+    {
+      "question": "A specific question that practises this indicator",
+      "expected_answer": "The correct answer",
+      "reasoning": "How the answer is obtained"
+    }
+  ],
+  "resource_guidance": {
+    "preparation": "How to prepare the listed resources before the lesson",
+    "use": "Exactly how learners use them to learn the skill",
+    "no_cost_alternative": "One affordable local substitute, or an empty string when none is needed"
   },
   "starter": {
     "activity": "Description of starter activity",
@@ -109,8 +113,12 @@ You generate lesson plans that are:
 2. SUBJECT-AWARE: Pedagogy matches the subject discipline.
 3. MEASURABLE: Objectives use observable verbs, not vague terms.
 4. COHERENT: Starter → Main → Assessment → Plenary form a logical instructional story.
-5. PRACTICAL: Activities work in ordinary Ghanaian classrooms using ONLY the
-   resources the teacher's scheme supplies or the teacher adds.
+5. PRACTICAL: Activities work in ordinary Ghanaian classrooms with no reliance
+   on electricity, internet, projectors, computers or printed worksheets for
+   every learner. Use low-cost local objects (sticks, straws, stones, beans,
+   maize kernels, bottle tops, reused cardboard, chalkboard and exercise books)
+   and explain how to prepare and use them. Prefer locally available materials
+   that genuinely teach the skill.
 6. SEQUENTIAL: Starter, each main-learning phase, assessment and plenary form
    ONE continuous lesson. Every phase starts from the previous phase's outcome,
    introduces a new step, and never repeats the opening activity.
@@ -123,10 +131,21 @@ RULES:
 - ALWAYS connect assessment to the indicator and objectives.
 - ALWAYS use the indicator's action verb in the objectives.
 - ALWAYS provide realistic Ghanaian classroom activities.
-- NEVER invent a Teaching & Learning Resource. Use only the SOURCE TLRs and
-  OTHER TLRs supplied in the prompt; leave resource lists empty when the
-  scheme and the teacher supplied none. Do not propose "alternatives",
-  "diagrams", "flowcharts", "hand lenses" or "locally available materials".
+- NEVER invent, rename or append to the SOURCE TLRs and OTHER TLRs supplied in
+  the prompt; those lists are teacher-owned. Explain their preparation and use
+  in resource_guidance and give one no-cost local substitute there where useful.
+- Write every teacher action as a direct classroom instruction in the imperative
+  mood (Write, Ask, Demonstrate, Guide, Check, Mark, Conclude). Never use
+  third-person narration of teacher actions, and never use passive directions
+  such as "learners are expected to be guided". Learner actions stay natural
+  descriptions such as "Learners identify the digits in their exercise books".
+- Teach the actual concept named by the indicator. Provide a worked example with
+  real numbers or objects, explicit steps, the answer and the reasoning. Provide
+  practice questions with expected answers. State marking guidance for each
+  assessment item. Name the sub-strand at most once in instructional prose; it
+  is a curriculum label, not a replacement for teaching content.
+- Allocate realistic minutes to the starter, every main phase, assessment and
+  plenary. The phase durations MUST add up to the configured lesson period.
 - ALWAYS keep examples factually and scientifically correct. When the indicator
   names a category, every example MUST belong to that category (for example, a
   "binary compound" contains exactly two elements, so a carbonate or bicarbonate
@@ -360,14 +379,15 @@ CRITICAL RULES:
 8. NO ICT/projector/smartboard assumptions unless clearly appropriate.
 9. Differentiation must be COMPACT — not three separate lessons.
 10. The lesson must form a COHERENT instructional story.
-11. lesson_identity MUST copy subject, class_level, strand, sub_strand,
-    indicator_code and indicator_text EXACTLY from CURRICULUM CONTEXT — never
-    paraphrased, reworded, or invented. Generation can enrich pedagogy but can
-    NEVER change or fabricate curriculum facts.
-12. The starter activity, assessment task and plenary activity MUST each name
-    the indicator's action verb and key topic words. Use the indicator wording
-    verbatim where it reads naturally, so the link to this indicator is
-    explicit rather than implied.
+11. Curriculum identity, class, school, dates, duration, templates and teacher
+    selections are supplied by the saved plan. Do NOT return them as fields and
+    do NOT change them. Generation enriches pedagogy only and never fabricates
+    curriculum facts.
+12. Each phase MUST teach the concept or skill in the indicator, using the
+    descriptive indicator text and curriculum content as evidence. The
+    sub-strand is a taxonomy label: use its exact name at most once across all
+    instructional prose and never as a stand-in for the actual concept,
+    numbers, objects or method being taught.
 13. The assessment MUST state concrete success criteria: the evidence the
     teacher will check (what each learner says, writes, makes or does).
 14. The plenary MUST summarise the learning and include an exit check that

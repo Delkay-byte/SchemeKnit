@@ -474,6 +474,21 @@ class DOCXExportEngine:
         # No stored resources renders blank — never fabricated TLR suggestions.
         for r in lp.teaching_learning_resources or []:
             doc.add_paragraph(r, style='List Bullet')
+        guidance = getattr(lp, 'resource_guidance', None) or {}
+        if isinstance(guidance, dict):
+            lines = []
+            for label, key in (
+                ('Preparation: ', 'preparation'),
+                ('Use: ', 'use'),
+                ('No-cost alternative: ', 'no_cost_alternative'),
+            ):
+                value = str(guidance.get(key) or '').strip()
+                if value:
+                    lines.append(label + value)
+            if lines:
+                doc.add_heading('Low-Cost Resource Guidance', level=3)
+                for line in lines:
+                    doc.add_paragraph(line, style='List Bullet')
 
     def _render_introduction(self, doc: Document, lp: LessonPlan):
         doc.add_heading('Introduction / Starter', level=2)
@@ -489,6 +504,21 @@ class DOCXExportEngine:
             p.add_run(act.description)
             if act.duration_minutes:
                 p.add_run(f" ({act.duration_minutes} min)")
+        worked = getattr(lp, 'worked_example', None) or {}
+        if isinstance(worked, dict) and worked:
+            doc.add_heading('Worked Example', level=3)
+            for label, key in (
+                ('Problem: ', 'problem'),
+                ('Answer: ', 'answer'),
+                ('Reasoning: ', 'reasoning'),
+            ):
+                value = str(worked.get(key) or '').strip()
+                if value:
+                    doc.add_paragraph(label + value)
+            for step in (worked.get('steps') or []):
+                value = str(step).strip()
+                if value:
+                    doc.add_paragraph(value, style='List Bullet')
 
     def _render_learner_activities(self, doc: Document, lp: LessonPlan):
         doc.add_heading('Learner Activities', level=2)
@@ -533,6 +563,22 @@ class DOCXExportEngine:
                 if getattr(i, "follow_up", ""):
                     doc.add_paragraph(
                         f"If not reached: {i.follow_up}")
+        questions = getattr(lp, 'practice_questions', None) or []
+        answered = [q for q in questions
+                    if isinstance(q, dict) and str(q.get('question') or '').strip()]
+        if answered:
+            doc.add_heading('Practice Questions with Answers', level=3)
+            for question in answered:
+                doc.add_paragraph(
+                    str(question.get('question') or '').strip(),
+                    style='List Bullet')
+                for label, key in (
+                    ('Answer: ', 'expected_answer'),
+                    ('Reasoning: ', 'reasoning'),
+                ):
+                    value = str(question.get(key) or '').strip()
+                    if value:
+                        doc.add_paragraph(label + value)
         rubric = lp.assessment_rubric
         if rubric is not None and rubric.criteria:
             doc.add_heading('Marking Rubric for the Learner Task', level=3)
@@ -624,8 +670,15 @@ def _append_assessment_structure(document, lessons) -> None:
         class_task = (getattr(lp, "class_assignment", "") or "").strip()
         home_task = ((getattr(lp, "home_assignment", "") or "")
                      or (getattr(lp, "homework", "") or "")).strip()
+        worked_example = getattr(lp, "worked_example", None) or {}
+        practice_questions = [
+            q for q in (getattr(lp, "practice_questions", None) or [])
+            if isinstance(q, dict) and str(q.get("question") or "").strip()
+        ]
+        resource_guidance = getattr(lp, "resource_guidance", None) or {}
         if not items and not (rubric is not None and rubric.criteria) \
-                and not class_task and not home_task:
+                and not class_task and not home_task and not worked_example \
+                and not practice_questions and not resource_guidance:
             continue
         _heading(document,
                  f'Assessment Structure — Week {lp.week_number} '
@@ -662,6 +715,42 @@ def _append_assessment_structure(document, lessons) -> None:
                 document.add_paragraph(rubric.evidence_to_award)
             if rubric.authority_note:
                 document.add_paragraph(rubric.authority_note)
+        if isinstance(worked_example, dict) and worked_example:
+            _heading(document, 'Worked Example')
+            for prefix, key in (
+                ('Problem: ', 'problem'),
+                ('Answer: ', 'answer'),
+                ('Reasoning: ', 'reasoning'),
+            ):
+                value = str(worked_example.get(key) or '').strip()
+                if value:
+                    document.add_paragraph(prefix + value)
+            for step in (worked_example.get('steps') or []):
+                value = str(step or '').strip()
+                if value:
+                    document.add_paragraph('• ' + value)
+        if practice_questions:
+            _heading(document, 'Practice Questions with Answers')
+            for question in practice_questions:
+                document.add_paragraph(
+                    '• ' + str(question.get('question') or '').strip())
+                for prefix, key in (
+                    ('Answer: ', 'expected_answer'),
+                    ('Reasoning: ', 'reasoning'),
+                ):
+                    value = str(question.get(key) or '').strip()
+                    if value:
+                        document.add_paragraph(prefix + value)
+        if isinstance(resource_guidance, dict) and resource_guidance:
+            _heading(document, 'Low-Cost Resource Guidance')
+            for prefix, key in (
+                ('Preparation: ', 'preparation'),
+                ('Use: ', 'use'),
+                ('No-cost alternative: ', 'no_cost_alternative'),
+            ):
+                value = str(resource_guidance.get(key) or '').strip()
+                if value:
+                    document.add_paragraph(prefix + value)
     _pagination_ready(document)
 
 

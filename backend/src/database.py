@@ -361,6 +361,11 @@ class LessonPlanDB(Base):
     # additive JSON columns (v033) — legacy rows stay valid empty.
     assessment_items = Column(JSON, default=list)
     assessment_rubric = Column(JSON, nullable=True, default=None)
+    #: Zeli-only worked example, answered questions and low-cost resource use.
+    #: Additive JSON columns (v057); legacy lessons stay valid with empty values.
+    worked_example = Column(JSON, default=dict)
+    practice_questions = Column(JSON, default=list)
+    resource_guidance = Column(JSON, default=dict)
     conclusion = Column(Text, default="")
     references = Column(JSON, default=list)
     #: Structured per-lesson references: {type,title,author_publisher,page,notes}.

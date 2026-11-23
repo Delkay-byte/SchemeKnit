@@ -25,6 +25,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.auth import create_access_token, hash_password  # noqa: E402
 from src.database import Base, get_db, generate_id, SchemeDB, User  # noqa: E402
 from src.main import app  # noqa: E402
+from src.models import TermConfig  # noqa: E402
+from src.routers.generation import _apply_saved_lesson_config  # noqa: E402
 from tests.conftest import make_school, make_product_plan, make_license  # noqa: E402
 
 
@@ -338,3 +340,148 @@ class TestExtendedLessonConfiguration:
         body = http.get(f"/api/generation/{scheme.id}/lesson-config").json()["config"]
         assert body["class_size"] == 41
         assert body["indicator_resources"] == resources
+
+    def test_full_snapshot_survives_setup_only_save(self, http):
+        """A save that omits per-lesson maps keeps the saved snapshot.
+
+        Resources, competencies, teacher keywords and WAPEF choices are
+        teacher-owned. Only a field actually sent by the modal may change.
+        """
+        scheme = http.scheme_factory()
+        key = "week1:0:B9.1.1.1.1"
+        snapshot = {
+            **FULL_CONFIG,
+            "school_name": "Kpogede Community School",
+            "teacher_name": "Deladem Amegayie",
+            "class_size": 37,
+            "term": "Second Term",
+            "term_start_date": "2027-01-05",
+            "term_end_date": "2027-04-01",
+            "period": "3rd & 4th",
+            "lessons_per_week": 4,
+            "template_id": "tpl-wapef-maths-b4",
+            "generation_method": "zeli",
+            "indicator_resources": {
+                key: {"references": ["NaCCA B4 p.12"], "tlrs": ["Beans", "sticks"]},
+            },
+            "competency_selections": {key: ["Critical Thinking and Problem Solving (CP)"]},
+            "indicator_keywords": {key: ["bundle", "regroup", "place value"]},
+            "indicator_wapef": {
+                key: {
+                    "through_lines": ["Order discoverer"],
+                    "gods_story": "Creation",
+                },
+            },
+        }
+        assert http.put(
+            f"/api/generation/{scheme.id}/lesson-config", json=snapshot,
+        ).status_code == 200
+
+        # A setup-only save omits the maps entirely: absent is not a clear.
+        setup_only = {
+            key: value for key, value in snapshot.items()
+            if key not in {
+                "indicator_resources", "competency_selections",
+                "indicator_keywords", "indicator_wapef",
+            }
+        }
+        setup_only["class_size"] = 38
+        assert http.put(
+            f"/api/generation/{scheme.id}/lesson-config", json=setup_only,
+        ).status_code == 200
+
+        body = http.get(f"/api/generation/{scheme.id}/lesson-config").json()["config"]
+        assert body["class_size"] == 38
+        assert body["school_name"] == "Kpogede Community School"
+        assert body["teacher_name"] == "Deladem Amegayie"
+        assert body["term"] == "Second Term"
+        assert body["term_start_date"] == "2027-01-05"
+        assert body["term_end_date"] == "2027-04-01"
+        assert body["period"] == "3rd & 4th"
+        assert body["lessons_per_week"] == 4
+        assert body["template_id"] == "tpl-wapef-maths-b4"
+        assert body["generation_method"] == "zeli"
+        assert body["indicator_resources"] == snapshot["indicator_resources"]
+        assert body["competency_selections"] == snapshot["competency_selections"]
+        assert body["indicator_keywords"] == snapshot["indicator_keywords"]
+        assert body["indicator_wapef"] == snapshot["indicator_wapef"]
+
+    def test_explicit_empty_map_clears_saved_entries(self, http):
+        """An empty map the teacher sent is authoritative, not a stale draft."""
+        scheme = http.scheme_factory()
+        key = "week1:0:B9.1.1.1.1"
+        saved = {
+            **FULL_CONFIG,
+            "indicator_resources": {
+                key: {"references": ["NaCCA p.1"], "tlrs": ["Beans"]},
+            },
+            "competency_selections": {
+                key: ["Critical Thinking and Problem Solving (CP)"],
+            },
+            "indicator_keywords": {key: ["bundle"]},
+            "indicator_wapef": {key: {"gods_story": "Creation"}},
+        }
+        assert http.put(
+            f"/api/generation/{scheme.id}/lesson-config", json=saved,
+        ).status_code == 200
+
+        clear = {
+            **FULL_CONFIG,
+            "indicator_resources": {},
+            "competency_selections": {},
+            "indicator_keywords": {},
+            "indicator_wapef": {},
+        }
+        assert http.put(
+            f"/api/generation/{scheme.id}/lesson-config", json=clear,
+        ).status_code == 200
+        body = http.get(f"/api/generation/{scheme.id}/lesson-config").json()["config"]
+        assert body["indicator_resources"] == {}
+        assert body["competency_selections"] == {}
+        assert body["indicator_keywords"] == {}
+        assert body["indicator_wapef"] == {}
+
+
+def test_saved_snapshot_is_authoritative_for_generation_config():
+    """A stale client payload can never override the saved plan snapshot."""
+    saved = {
+        "school_name": "Kpogede Community School",
+        "teacher_name": "Deladem Amegayie",
+        "class_size": 37,
+        "lesson_duration_minutes": 70,
+        "period": "3rd & 4th",
+        "periods_per_week": 4,
+        "teaching_days": [1, 3],
+        "term": "Second Term",
+        "term_start_date": "2027-01-05",
+        "term_end_date": "2027-04-01",
+        "template_id": "tpl-wapef-maths-b4",
+        "generation_method": "zeli",
+        "indicator_resources": {"week1:0:B4.1.1.1.1": {"references": ["p.12"], "tlrs": []}},
+        "competency_selections": {"week1:0:B4.1.1.1.1": ["Critical Thinking and Problem Solving (CP)"]},
+        "indicator_keywords": {"week1:0:B4.1.1.1.1": ["bundle"]},
+        "indicator_wapef": {"week1:0:B4.1.1.1.1": {"through_lines": ["Careful work"]}},
+        "reference": "NaCCA B4",
+    }
+    scheme_db = type("Scheme", (), {"lesson_config": saved})()
+    config = TermConfig(scheme_of_work_id="scheme-1", school_name="Stale School")
+
+    _apply_saved_lesson_config(None, scheme_db, config, None)
+
+    assert config.school_name == "Kpogede Community School"
+    assert config.teacher_name == "Deladem Amegayie"
+    assert config.class_size == 37
+    assert config.lesson_duration_minutes == 70
+    assert config.period == "3rd & 4th"
+    assert config.lessons_per_week == 4
+    assert config.teaching_days == [1, 3]
+    assert config.term == "Second Term"
+    assert config.term_start_date.isoformat() == "2027-01-05"
+    assert config.term_end_date.isoformat() == "2027-04-01"
+    assert config.template_id == "tpl-wapef-maths-b4"
+    assert config.generation_method.value == "zeli"
+    assert config.indicator_resources == saved["indicator_resources"]
+    assert config.competency_selections == saved["competency_selections"]
+    assert config.indicator_keywords == saved["indicator_keywords"]
+    assert config.indicator_wapef == saved["indicator_wapef"]
+    assert config.references == ["NaCCA B4"]

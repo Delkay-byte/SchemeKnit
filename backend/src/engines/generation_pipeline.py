@@ -10,7 +10,7 @@ import inspect
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Sequence
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -49,12 +49,20 @@ from .template_engine import (
 from .ai_provider import get_provider, resolve_provider_mode
 from .zeli_generation import (
     ZeliGenerationError,
+    filter_zeli_content_to_allowlist,
     generate_zeli_content,
     generate_zeli_with_fallback,
     generate_gods_story_note,
     get_zeli_fallback_provider,
     get_zeli_provider,
     zeli_lesson_context,
+)
+from .zeli_quality import (
+    focus_terms_from_text,
+    lesson_content_fingerprint,
+    normalize_zeli_teacher_voice,
+    quality_failure_summary,
+    validate_zeli_quality,
 )
 
 
@@ -840,6 +848,23 @@ class GenerationPipeline:
                     results[pos] = record
                     self._emit_unit_progress(unit_progress, record)
 
+        # Distinct indicators cannot share one identical teaching sequence.
+        # Reject those units before merge so no duplicate lesson is persisted
+        # and no lesson-plan quota is committed for it.
+        for pos in self._duplicate_indicator_content_positions(results):
+            record = results[pos]
+            duplicate_error = ZeliGenerationError(
+                "Zeli produced the same teaching content for two different "
+                "indicators, so this lesson was not saved and no lesson-plan "
+                "quota was used. Please try again, or choose Standard generation.",
+                502,
+                code="duplicate_indicator_content",
+            )
+            results[pos] = self._failed_lesson_record(
+                record["lesson"], duplicate_error, primary_name, primary_model,
+                timing=record.get("timing"),
+            )
+
         failed_ids: set = set()
         failures: list = []
         last_error: Optional[ZeliGenerationError] = None
@@ -894,6 +919,32 @@ class GenerationPipeline:
             job.ai_enrichment_succeeded, len(failures), primary_name,
             job._zeli_fallback_used, workers, job.id,
         )
+
+    @staticmethod
+    def _duplicate_indicator_content_positions(records: Sequence[Optional[dict]]) -> set:
+        """Positions whose successful content is identical across indicators.
+
+        A repeated label inside one lesson is a different defect and is handled
+        by the per-lesson validator. Here the comparison is strictly across
+        lessons with different indicator codes, so genuine sequences about the
+        same sub-strand are not rejected for sharing a curriculum label.
+        """
+        seen: Dict[str, str] = {}
+        duplicates: set = set()
+        for pos, record in enumerate(records or []):
+            if not record or not record.get("success"):
+                continue
+            fingerprint = lesson_content_fingerprint(record.get("content") or {})
+            if not fingerprint:
+                continue
+            code = str(record.get("indicator_code") or "")
+            previous_code = seen.get(fingerprint)
+            if previous_code is None:
+                seen[fingerprint] = code
+                continue
+            if previous_code and code and previous_code != code:
+                duplicates.add(pos)
+        return duplicates
 
     @staticmethod
     def _emit_unit_progress(callback, record: Optional[dict]) -> None:
@@ -1035,6 +1086,35 @@ class GenerationPipeline:
             provider_name = meta.get("provider") or primary_name
             model = meta.get("model") or primary_model
 
+            period_minutes = int(
+                getattr(config, "lesson_duration_minutes", 0)
+                or getattr(lp, "duration_minutes", 0) or 0)
+
+            def _prepare_quality(candidate):
+                # The allowlist is applied again here so a mocked or cached
+                # provider path cannot smuggle teacher-owned fields into the
+                # lesson. Voice normalisation touches teacher actions only.
+                candidate = filter_zeli_content_to_allowlist(candidate)
+                candidate = normalize_zeli_teacher_voice(candidate)
+                allowed_resources = (
+                    list(context.get("source_resources") or [])
+                    + list(context.get("other_tlrs") or [])
+                )
+                failures = validate_zeli_quality(
+                    candidate,
+                    sub_strand=str(getattr(lp, "sub_strand", "") or ""),
+                    duration_minutes=period_minutes,
+                    allowed_resources=allowed_resources,
+                    rubric=getattr(lp, "assessment_rubric", None),
+                    focus_terms=focus_terms_from_text(
+                        " ".join(str(item or "")
+                                 for item in (lp.indicators or []))),
+                )
+                timing["quality_warnings"] = list(failures)
+                return candidate, failures
+
+            content, quality_failures = _prepare_quality(content)
+
             _t = time.perf_counter()
             # Apply the validated whole-lesson content. Curriculum fields and
             # teacher-owned metadata are protected inside _apply_v2_content;
@@ -1044,17 +1124,31 @@ class GenerationPipeline:
             timing["apply_seconds"] = round(time.perf_counter() - _t, 4)
 
             # Content check: a provider phase that repeats the previous phase
-            # is not a lesson that progresses. Give the provider ONE bounded
-            # correction attempt before any mechanical clean-up.
-            if self._phase_repetition_score(lp) >= 0.75:
+            # is not a lesson that progresses. Quality failures get the same
+            # ONE bounded correction attempt before any mechanical clean-up.
+            repeated = self._phase_repetition_score(lp) >= 0.75
+            if quality_failures or repeated:
+                notes = []
+                if repeated:
+                    notes.append(
+                        "The starter or an earlier main phase was repeated "
+                        "inside a later phase."
+                    )
+                if quality_failures:
+                    notes.append(
+                        "The lesson was missing "
+                        + quality_failure_summary(quality_failures) + "."
+                    )
                 revision_context = dict(context)
                 revision_context["previous_lesson_context"] = (
                     (prev_context or "")
-                    + "\nREVISION REQUIRED: The previous attempt repeated the "
-                      "starter or an earlier main-learning phase inside a "
-                      "later phase. Rewrite each phase so it begins from the "
-                      "outcome of the preceding phase, introduces a new "
-                      "learner action, and never restates a completed activity."
+                    + "\nREVISION REQUIRED: " + " ".join(notes)
+                    + " Rewrite the whole lesson: begin each phase from the "
+                      "outcome of the previous one, teach the actual concept "
+                      "with worked examples and answered questions, use direct "
+                      "teacher instructions and realistic low-cost local "
+                      "resources, and make the phase minutes add up to the "
+                      "configured period."
                 )
                 try:
                     _t = time.perf_counter()
@@ -1065,14 +1159,28 @@ class GenerationPipeline:
                     metas.append(retry_meta)
                     provider_name = retry_meta.get("provider") or provider_name
                     model = retry_meta.get("model") or model
+                    retry_content, retry_failures = _prepare_quality(
+                        retry_content)
                     self._apply_v2_content(
                         lp, retry_content, config, whole_lesson=True)
                     content = retry_content
+                    quality_failures = retry_failures
                 except ZeliGenerationError:
-                    # Keep the original valid lesson and clean exact
-                    # duplication below; the quality gate remains the final
-                    # authority.
+                    # Keep the original attempt and let the final quality gate
+                    # decide. Never present an incomplete lesson as saved.
                     pass
+
+            # Incomplete, generic or third-person output is not honest
+            # completed work. Report a safe failure; never claim quota was
+            # saved when nothing was persisted.
+            if quality_failures:
+                raise ZeliGenerationError(
+                    "Zeli returned a lesson plan that was missing "
+                    + quality_failure_summary(quality_failures)
+                    + ", so nothing was saved and no lesson-plan quota was "
+                      "used. Please try again, or choose Standard generation.",
+                    502,
+                )
 
             _t = time.perf_counter()
             self._strip_cross_phase_repetition(lp)
@@ -1117,6 +1225,9 @@ class GenerationPipeline:
                 "lesson_sequence": timing["lesson_sequence"],
                 "indicator_code": timing["indicator_code"],
                 "timing": timing,
+                # Internal only: used by the cross-indicator duplicate gate.
+                # The provider payload is already allowlist-filtered here.
+                "content": content,
             }
         except ZeliGenerationError as exc:
             return self._failed_lesson_record(
@@ -1883,6 +1994,26 @@ class GenerationPipeline:
                     ))
                 if items:
                     lp.assessment_items = items
+
+            worked = content.get("worked_example")
+            if isinstance(worked, dict) and worked:
+                lp.worked_example = {
+                    key: value for key, value in worked.items()
+                    if key in {"problem", "steps", "answer", "reasoning"}
+                }
+            questions = content.get("practice_questions")
+            if isinstance(questions, list):
+                lp.practice_questions = [
+                    {key: value for key, value in item.items()
+                     if key in {"question", "expected_answer", "reasoning"}}
+                    for item in questions if isinstance(item, dict)
+                ]
+            guidance = content.get("resource_guidance")
+            if isinstance(guidance, dict) and guidance:
+                lp.resource_guidance = {
+                    key: value for key, value in guidance.items()
+                    if key in {"preparation", "use", "no_cost_alternative"}
+                }
 
         # Plenary / conclusion — keep the provider's closing actions and exit
         # check so the lesson ends with evidence, not just a summary.

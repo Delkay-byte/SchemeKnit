@@ -8,6 +8,7 @@ import { SurfaceCard } from '@/components/ui/surface-card'
 import { Banner } from '@/components/ui/banner'
 import { Download, Settings, Play, CheckCircle, FileText, FileArchive, Loader2, Eye, ChevronDown, ChevronRight } from 'lucide-react'
 import { api, sanitizeTermConfig } from '@/lib/api'
+import { applySavedLessonConfig } from '@/lib/lesson-config'
 import { exportLessonPlans } from '@/lib/docx'
 import { downloadBlob } from '@/lib/docx/filename'
 import { DetailPageSkeleton } from '@/components/ui/skeleton'
@@ -158,26 +159,16 @@ export default function GeneratePage() {
     setLessonConfig(saved)
     setLessonConfigMissing(missing)
     setConfigSavedAt(new Date().toLocaleTimeString())
-    setConfig(prev => ({
-      ...prev,
-      school_name: saved.school_name || prev.school_name,
-      teacher_name: saved.teacher_name || prev.teacher_name,
-      class_size: saved.class_size ?? prev.class_size,
-      lesson_duration_minutes: saved.lesson_duration_minutes ?? prev.lesson_duration_minutes,
-      lessons_per_week: saved.lessons_per_week ?? saved.periods_per_week ?? prev.lessons_per_week,
-      period: saved.period ?? prev.period,
-      references: saved.reference ? [saved.reference] : prev.references,
-      teaching_days: saved.teaching_days?.length ? [...saved.teaching_days] : prev.teaching_days,
-      term: saved.term || prev.term,
-      term_start_date: saved.term_start_date || prev.term_start_date,
-      term_end_date: saved.term_end_date || prev.term_end_date,
-      generation_method: (saved.generation_method || prev.generation_method) as any,
-      ai_mode: 'OFF',
-      template_id: saved.template_id || prev.template_id,
-      indicator_resources: saved.indicator_resources || {},
-      indicator_keywords: saved.indicator_keywords || {},
-    }))
+    setConfig(prev => applySavedLessonConfig(prev, saved))
     try { await handlePreviewAllocation() } catch { /* preview refreshes debounced anyway */ }
+  }
+
+  // A fresh modal load is not a save action: sync state without the "saved at"
+  // message or a preview request, but keep generation config identical.
+  const handleLessonConfigLoaded = (saved: LessonRubricConfig, missing: string[] = []) => {
+    setLessonConfig(saved)
+    setLessonConfigMissing(missing)
+    setConfig(prev => applySavedLessonConfig(prev, saved))
   }
 
   const [config, setConfig] = useState<TermConfig>({
@@ -216,6 +207,7 @@ export default function GeneratePage() {
     core_competencies: [],
     references: [],
     indicator_keywords: {},
+    indicator_wapef: {},
     selected_indicator_codes: [],
   })
 
@@ -309,38 +301,9 @@ export default function GeneratePage() {
       if (savedConfig?.config) {
         setLessonConfig(savedConfig.config)
         setLessonConfigMissing(savedConfig.missing || [])
-        if (savedConfig.config.lesson_duration_minutes) {
-          setConfig(prev => ({ ...prev,
-            lesson_duration_minutes: savedConfig.config.lesson_duration_minutes as number }))
-        }
-        if (savedConfig.config.periods_per_week) {
-          setConfig(prev => ({ ...prev,
-            lessons_per_week: savedConfig.config.periods_per_week as number }))
-        }
-        if (savedConfig.config.period !== undefined && savedConfig.config.period !== null) {
-          setConfig(prev => ({ ...prev, period: savedConfig.config.period as string }))
-        }
-        if (savedConfig.config.teaching_days?.length) {
-          setConfig(prev => ({ ...prev, teaching_days: [...savedConfig.config.teaching_days!] }))
-        }
-        // The saved configuration is the plan's authority: method, term,
-        // dates, template and class must survive reload, not just this visit.
-        setConfig(prev => ({
-          ...prev,
-          generation_method:
-            (savedConfig.config.generation_method || prev.generation_method) as TermConfig['generation_method'],
-          ai_mode: 'OFF',
-          template_id: savedConfig.config.template_id || prev.template_id,
-          term: savedConfig.config.term || prev.term,
-          term_start_date: savedConfig.config.term_start_date || prev.term_start_date,
-          term_end_date: savedConfig.config.term_end_date || prev.term_end_date,
-          lessons_per_week:
-            savedConfig.config.lessons_per_week
-            ?? savedConfig.config.periods_per_week
-            ?? prev.lessons_per_week,
-          period: savedConfig.config.period ?? prev.period,
-          class_size: savedConfig.config.class_size ?? prev.class_size,
-        }))
+        // The saved configuration is the plan's authority: every editable map,
+        // method, dates, template and class survive reload.
+        setConfig(prev => applySavedLessonConfig(prev, savedConfig.config))
       } else {
         setLessonConfigMissing([])
       }
@@ -1312,7 +1275,7 @@ export default function GeneratePage() {
           className="mb-6"
           eyebrow="Generate"
           title="Generate Lesson Plans"
-          description={<>{scheme.filename} &bull; {scheme.subject} &bull; {scheme.class_level} &bull; {scheme.term}</>}
+          description={<>{scheme.subject} &bull; {scheme.class_level} &bull; {scheme.term}</>}
         />
 
         <div className="grid gap-6 lg:grid-cols-3">
@@ -2146,6 +2109,7 @@ export default function GeneratePage() {
         onOpenChange={setConfigModalOpen}
         config={lessonConfig}
         onSaved={handleLessonConfigSaved}
+        onLoaded={handleLessonConfigLoaded}
       />
     </div>
   )

@@ -38,11 +38,30 @@ def _full_lesson(marker="PARALLEL"):
             f"Learners can explain one use to a partner ({marker}).",
         ],
         "key_vocabulary": [f"{marker.lower()}_vocab"],
+        "worked_example": {
+            "problem": f"{marker} worked example: identify one classroom device.",
+            "steps": ["Look at the object.", "Name it and state one use."],
+            "answer": "A chalkboard is a device for writing.",
+            "reasoning": "It is used in the lesson to show written work.",
+        },
+        "practice_questions": [
+            {
+                "question": f"{marker} practice: name one device in the classroom.",
+                "expected_answer": "A chalkboard.",
+                "reasoning": "It is used to display writing for the class.",
+            }
+        ],
+        "resource_guidance": {
+            "preparation": f"{marker} preparation: collect two real devices.",
+            "use": "Learners handle each device while naming its use.",
+            "no_cost_alternative": "Use stones or bottle tops if devices are scarce.",
+        },
         "starter": {
             "activity": (
-                f"{marker} starter: the teacher shows real classroom devices "
-                "and asks learners in pairs to name each device and say one use."
-            )
+                f"{marker} starter: show real classroom devices and ask learners "
+                "in pairs to name each device and say one use."
+            ),
+            "duration_minutes": 8,
         },
         "main_learning": {
             "phase1": {
@@ -66,15 +85,24 @@ def _full_lesson(marker="PARALLEL"):
         "assessment": {
             "method": "Observation",
             "activity": (
-                f"{marker} assessment: the teacher observes each pair as they "
-                "identify a device and match it to its use on a checklist."
+                f"{marker} assessment: observe each pair as they identify a "
+                "device and match it to its use on a checklist."
             ),
+            "duration_minutes": 7,
         },
+        "assessment_items": [
+            {
+                "prompt": f"{marker} assessment check: identify one device and its use.",
+                "expected_evidence": "Learner names the device and states one use.",
+                "marking_guidance": "Award one mark for the name and one for the use.",
+            }
+        ],
         "plenary": {
             "activity": (
                 f"{marker} plenary: learners summarise in one sentence what they "
-                "learned, and the teacher checks every pair can identify a device."
-            )
+                "learned, then answer the closing device question in books."
+            ),
+            "duration_minutes": 5,
         },
         "differentiation": {
             "support": f"{marker} support: pair with a peer",
@@ -252,7 +280,7 @@ def test_rate_limit_is_retried_without_duplicate_units(monkeypatch):
             first = seen[code] == 1
         if first:
             raise ZeliGenerationError("Provider is busy. Try again.", 429)
-        return json.loads(json.dumps(_full_lesson())), {
+        return json.loads(json.dumps(_full_lesson(code))), {
             "provider": "groq", "model": "parallel-test-model",
             "attempts": [{"provider": "groq", "cache_hit": False}],
             "cache_hit": False, "external_calls": 1,
@@ -266,6 +294,32 @@ def test_rate_limit_is_retried_without_duplicate_units(monkeypatch):
     assert calls["n"] == 4  # one refusal + one success per unit
     timings = getattr(job, "_lesson_timings", [])
     assert all(t.get("retry_count") == 1 for t in timings), timings
+
+
+def test_low_quality_lesson_is_not_saved_or_counted(monkeypatch):
+    calls = {"n": 0}
+
+    def _poor_generate(*, primary, fallback, context, db=None, user_id=None,
+                       request_id=None):
+        calls["n"] += 1
+        content = _full_lesson("LOW QUALITY")
+        content.pop("worked_example")
+        content["main_learning"]["phase2"]["activity"] = "Solve two problems."
+        return content, {
+            "provider": "groq", "model": "parallel-test-model",
+            "attempts": [], "cache_hit": False, "external_calls": 1,
+        }
+
+    _patch(monkeypatch, 1, _poor_generate)
+    job = GenerationPipeline().generate_all(_scheme(1), _config())
+
+    assert job._lesson_plans == []
+    assert calls["n"] == 2  # one bounded correction attempt
+    failures = job._generation_failures
+    assert len(failures) == 1
+    assert failures[0]["status_code"] == 502
+    assert "worked example" in failures[0]["message"]
+    assert "no lesson-plan quota" in failures[0]["message"]
 
 
 def test_progress_callback_receives_each_unit_once(monkeypatch):

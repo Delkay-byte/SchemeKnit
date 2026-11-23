@@ -654,6 +654,13 @@ class DataService:
             assessment_rubric=(
                 lp.assessment_rubric.model_dump(mode="json")
                 if getattr(lp, "assessment_rubric", None) else None),
+            worked_example=dict(getattr(lp, "worked_example", None) or {}),
+            practice_questions=[
+                dict(item) for item in
+                (getattr(lp, "practice_questions", None) or [])
+                if isinstance(item, dict)
+            ],
+            resource_guidance=dict(getattr(lp, "resource_guidance", None) or {}),
             conclusion=lp.conclusion or "",
             references=lp.references,
             structured_references=[
