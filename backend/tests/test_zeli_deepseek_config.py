@@ -147,6 +147,19 @@ def test_deepseek_defaults_and_key_fallback():
     assert cfg.thinking_mode == "disabled"
 
 
+def test_whole_lesson_budget_is_not_clamped_by_generic_section_cap():
+    # The generic per-section ceiling must not truncate a whole Zeli lesson.
+    # Truncated JSON was rejected by the strict validator on both providers.
+    cfg = zg._zeli_config(_fake_settings(
+        ZELI_MAX_TOKENS=5000, AI_MAX_OUTPUT_TOKENS=2000))
+    assert cfg.max_tokens == 5000
+    provider = zg.get_zeli_provider(_fake_settings(ZELI_MAX_TOKENS=5000))
+    assert provider.max_tokens == 5000
+    fallback = zg.get_zeli_fallback_provider(_fake_settings(
+        ZELI_MAX_TOKENS=5000, ZELI_FALLBACK_PROVIDER="groq"))
+    assert fallback is not None and fallback.max_tokens == 5000
+
+
 def test_zeli_api_key_takes_precedence():
     cfg = zg._zeli_config(_fake_settings(
         ZELI_API_KEY="test-zeli-key", DEEPSEEK_API_KEY="test-ds-key"))

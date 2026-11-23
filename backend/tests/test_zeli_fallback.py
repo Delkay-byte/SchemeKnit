@@ -207,10 +207,24 @@ def test_eligible_primary_failure_falls_back_once(db, error, status):
 
 
 @pytest.mark.parametrize("error", [
-    "auth_failed", "missing_api_key", "invalid_api_key",
-    "model_not_found", "invalid_request",
+    "auth_failed", "missing_api_key", "invalid_api_key", "auth_key_rejected",
+    "model_not_found", "http_401", "http_403", "http_404",
+    "insufficient_balance", "http_402",
 ])
-def test_ineligible_primary_failure_does_not_fall_back(db, error):
+def test_auth_config_billing_and_model_failures_fall_back_once(db, error):
+    primary = FakeProvider(error=error, name="deepseek", model="deepseek-flash")
+    fallback = FakeProvider(name="groq", model="groq-model")
+    content, meta = zg.generate_zeli_with_fallback(
+        primary=primary, fallback=fallback, context=_context(), db=db)
+    assert content
+    assert primary.calls == 1  # a failed primary is never retried
+    assert fallback.calls == 1
+    assert meta["fallback_used"] is True
+    assert meta["provider"] == "groq"
+
+
+@pytest.mark.parametrize("error", ["invalid_request", "http_400", "http_422"])
+def test_malformed_request_does_not_fall_back(db, error):
     primary = FakeProvider(error=error, name="deepseek", model="deepseek-flash")
     fallback = FakeProvider(name="groq", model="groq-model")
     with pytest.raises(zg.ZeliGenerationError):
@@ -393,7 +407,7 @@ def test_http_quality_rejection_falls_back_once(db, monkeypatch):
     assert db.query(AIUsageEventDB).count() == 1
 
 
-def test_http_primary_auth_failure_does_not_fall_back(db, monkeypatch):
+def test_http_primary_auth_failure_falls_back_once(db, monkeypatch):
     user = make_user(db)
     _entitle(db, user)
     scheme = _seed_scheme(db, user.id)
@@ -401,9 +415,13 @@ def test_http_primary_auth_failure_does_not_fall_back(db, monkeypatch):
     fallback = FakeProvider(name="groq", model="groq-model")
 
     resp = _run_http(db, monkeypatch, user, scheme, primary, fallback)
-    assert resp.status_code == 503
-    assert fallback.calls == 0
-    assert db.query(LessonPlanDB).count() == 0
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["ai"]["fallback_used"] is True
+    assert body["ai"]["provider"] == "groq"
+    assert body["ai"]["primary_error"] == "auth_failed"
+    assert primary.calls == 1 and fallback.calls == 1
+    assert db.query(LessonPlanDB).one().ai_provider == "groq"
 
 
 def test_http_pure_cache_replay_does_not_charge_ai_credit(db, monkeypatch):

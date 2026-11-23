@@ -38,6 +38,8 @@ from .ai_provider import (
 ZELI_PROVIDER_KEY = "deepseek"
 #: Method label persisted on jobs/lessons.
 ZELI_METHOD = "zeli"
+#: Hard upper bound for one whole-lesson response (matches the Settings field).
+_ZELI_OUTPUT_TOKEN_CEILING = 8192
 #: Bump when the prompt/contract changes enough to invalidate cached output.
 ZELI_PROMPT_VERSION = "zeli-generation-v6"
 
@@ -192,10 +194,6 @@ def _zeli_config(settings=None) -> ZeliConfig:
         enabled=enabled, provider=provider, model=model,
         base_url=base_url, api_key=api_key,
         temperature=float(getattr(s, "ZELI_TEMPERATURE", 0.3) or 0.3),
-        max_tokens=min(
-            int(getattr(s, "ZELI_MAX_TOKENS", 2000) or 2000),
-            int(getattr(s, "AI_MAX_OUTPUT_TOKENS", 2000) or 2000),
-        ),
         thinking_mode=str(
             getattr(s, "ZELI_THINKING_MODE", "disabled") or "auto").strip().lower(),
         connect_timeout=float(
@@ -203,6 +201,15 @@ def _zeli_config(settings=None) -> ZeliConfig:
         read_timeout=float(
             getattr(s, "ZELI_READ_TIMEOUT_SECONDS", 90.0) or 90.0),
         max_retries=int(getattr(s, "ZELI_MAX_RETRIES", 2) or 0),
+        # A whole lesson is one large response. The generic per-section
+        # AI_MAX_OUTPUT_TOKENS ceiling truncates it to a partial JSON object,
+        # which the strict Zeli validator then rejects. ZELI_MAX_TOKENS is the
+        # authoritative budget here; keep only the Settings field's hard upper
+        # bound and let the spend reservation price the real value.
+        max_tokens=min(
+            int(getattr(s, "ZELI_MAX_TOKENS", 5000) or 5000),
+            _ZELI_OUTPUT_TOKEN_CEILING,
+        ),
         fallback_provider=fallback_provider,
         fallback_model=fallback_model,
         fallback_base_url=fallback_base_url,
@@ -739,12 +746,15 @@ def _safe_provider_error_code(provider) -> str:
     if not raw:
         return "unknown_error"
     for token in (
-        "missing_api_key", "auth_failed", "invalid_api_key", "model_not_found",
+        "missing_api_key", "auth_failed", "auth_key_rejected",
+        "invalid_api_key", "model_not_found",
         "invalid_request", "rate_limit", "timeout", "connection",
-        "insufficient_balance", "malformed_response", "malformed_json",
+        "insufficient_balance", "insufficient_quota",
+        "malformed_response", "malformed_json",
         "schema_invalid", "empty_output", "content_refusal",
-        "http_401", "http_402", "http_403", "http_404", "http_408",
-        "http_429", "http_500", "http_502", "http_503", "http_504",
+        "http_400", "http_401", "http_402", "http_403", "http_404",
+        "http_408", "http_422", "http_429",
+        "http_500", "http_502", "http_503", "http_504",
     ):
         if token in raw:
             return token
@@ -755,18 +765,21 @@ def _safe_provider_error_code(provider) -> str:
     return "provider_error"
 
 
-#: Provider diagnostics that must NOT trigger a fallback. A broken primary
-#: credential/model configuration is an operational fault; hiding it behind a
-#: second provider would conceal the misconfiguration.
+#: Provider diagnostics that must NOT trigger a fallback. An invalid request
+#: is a defect in our own payload; a second provider cannot repair it.
 _FALLBACK_BLOCKED_ERRORS = frozenset({
-    "missing_api_key", "auth_failed", "invalid_api_key", "model_not_found",
-    "invalid_request", "http_401", "http_403", "http_404",
+    "invalid_request", "http_400", "http_422",
 })
 
 #: Provider diagnostics that are eligible for exactly one bounded fallback.
+#: DeepSeek exhaustion/402, auth/config failures and unknown models are all
+#: primary-side faults that the configured Groq provider can still serve. The
+#: primary is never retried after any of them (see generate_zeli_with_fallback).
 _FALLBACK_ELIGIBLE_ERRORS = frozenset({
-    "rate_limit", "timeout", "connection", "insufficient_balance",
-    "http_402", "http_408", "http_429",
+    "missing_api_key", "auth_failed", "invalid_api_key", "auth_key_rejected",
+    "model_not_found", "rate_limit", "timeout", "connection",
+    "insufficient_balance", "insufficient_quota",
+    "http_401", "http_402", "http_403", "http_404", "http_408", "http_429",
     "malformed_response", "malformed_json", "schema_invalid",
     "empty_output", "content_refusal",
 })
@@ -775,10 +788,11 @@ _FALLBACK_ELIGIBLE_ERRORS = frozenset({
 def zeli_fallback_eligible(error: "ZeliGenerationError", provider) -> bool:
     """True when a failed primary attempt may be retried on the fallback.
 
-    Eligible: transport/timeouts, 429/5xx, malformed/schema-invalid output and
-    a quality-gate rejection. Not eligible: missing/invalid credentials, an
-    unknown model, an invalid request, a spend-budget block (a second provider
-    would also be blocked), or any non-provider application error.
+    Eligible: DeepSeek exhaustion/billing, auth/config failures, unknown model,
+    transport/timeouts, 401/402/403/404/429/5xx and malformed output. Not
+    eligible: an invalid request, a spend-budget block (a second provider would
+    also be blocked), or any non-provider application error. Exactly one
+    fallback attempt is made by the caller; the failed provider is not retried.
     """
     if getattr(error, "budget_blocked", False):
         return False
