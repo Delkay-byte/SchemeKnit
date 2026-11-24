@@ -29,7 +29,7 @@ import { prefillLessonConfig } from '@/lib/prefill'
 import { readClearedFields, setFieldCleared } from '@/lib/prefill-overrides'
 import {
   CORE_COMPETENCY_LABELS, TERMS, WEEK_DAYS, firstLessonConfigProblem,
-  indicatorCode, lessonConfigPayload,
+  indicatorCode, lessonConfigDiffPayload, lessonConfigPayload,
   sourceOccurrenceId, toggleCompetency, validateLessonConfig, weekOccurrences,
 } from '@/lib/lesson-config'
 import { LessonRubricConfig, WapefAnnualProfile, WapefOptions } from '@/types'
@@ -75,6 +75,12 @@ export function LessonConfigModal({
   const [annualEditing, setAnnualEditing] = useState(false)
   const [autoStatus, setAutoStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [autoSavedAt, setAutoSavedAt] = useState<Date | null>(null)
+  // Autosave may only write after the authoritative snapshot has loaded. A
+  // failed GET leaves fields unknown; submitting the inferred blanks would
+  // erase the teacher's saved values.
+  const [configLoadState, setConfigLoadState] = useState<
+    'idle' | 'loading' | 'loaded' | 'failed'
+  >('idle')
   const autoSeq = useRef(0)
   const configRequestSeq = useRef(0)
 
@@ -123,6 +129,7 @@ export function LessonConfigModal({
     setError(null)
     setShowProblems(false)
     setDiscardArmed(false)
+    setConfigLoadState('loading')
 
     // Each opening refetches the authoritative snapshot. A page may have been
     // remounted, navigated away from, or had another tab save since mount;
@@ -133,8 +140,14 @@ export function LessonConfigModal({
       const authoritative = buildDraft(saved)
       setDraft(authoritative)
       setBaseline(authoritative)
+      setConfigLoadState('loaded')
       onLoaded?.(saved, response.missing || [])
-    }).catch(() => { /* opening the dialog still works without the refresh */ })
+    }).catch(() => {
+      if (requestSeq !== configRequestSeq.current) return
+      // Do not guess values. Autosave and Save stay blocked until the saved
+      // snapshot can be read, so a failed refresh cannot clear the plan.
+      setConfigLoadState('failed')
+    })
 
     api.getScheme(schemeId).then((data) => {
       setScheme(data)
@@ -330,6 +343,14 @@ export function LessonConfigModal({
 
   const handleSave = async () => {
     if (savingRef.current) return
+    if (configLoadState !== 'loaded') {
+      setError(
+        configLoadState === 'failed'
+          ? 'Your saved lesson settings could not be loaded. Reopen the dialog before saving so nothing is cleared.'
+          : 'Your saved lesson settings are still loading. Wait a moment, then save.',
+      )
+      return
+    }
     setShowProblems(true)
     const problem = firstLessonConfigProblem(problems)
     if (problem) {
@@ -383,6 +404,7 @@ export function LessonConfigModal({
   // validation and for the "I am done" moment; autosave keeps the draft.
   useEffect(() => {
     if (!open) return
+    if (configLoadState !== 'loaded') return
     const wapef = (draft.template_id || '').startsWith('tpl-wapef')
     const annualChanged = wapef && annualDirty && !annualEditing && Boolean(
       annual?.deep_hope && annual?.storyline)
@@ -398,8 +420,13 @@ export function LessonConfigModal({
           })
           if (seq === autoSeq.current) setAnnualDirty(false)
         }
-        await api.saveLessonConfig(schemeId, configPayload())
-        await persistSchoolName()
+        // Diff only: untouched fields stay absent, so an unloaded or stale
+        // value can never be submitted as an inferred blank.
+        const payload = lessonConfigDiffPayload(draft, baseline)
+        if (Object.keys(payload).length) {
+          await api.saveLessonConfig(schemeId, payload)
+          await persistSchoolName()
+        }
         if (seq !== autoSeq.current) return
         setAutoStatus('saved')
         setAutoSavedAt(new Date())
@@ -411,7 +438,7 @@ export function LessonConfigModal({
     }, 1200)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft, baseline, annualDirty, annual?.deep_hope, annual?.storyline, open, schemeId, annualEditing])
+  }, [draft, baseline, annualDirty, annual?.deep_hope, annual?.storyline, open, schemeId, annualEditing, configLoadState])
 
   const applyRecovered = () => {
     const recovered = draftStore.accept()

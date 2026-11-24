@@ -245,6 +245,7 @@ def _build_v2_prompt_from_context(
         other_tlrs=other_tlrs,
         core_competencies=core_competencies,
         references=references,
+        wapef_context=wapef_context,
     )
 
 

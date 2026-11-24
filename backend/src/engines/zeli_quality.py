@@ -20,7 +20,11 @@ _THIRD_PERSON_OPENERS = re.compile(
     re.IGNORECASE,
 )
 _THIRD_PERSON_MID = re.compile(
-    r"\b(?:by|for|of)\s+the\s+(?:teacher|facilitator|instructor|educator)\b",
+    r"\b(?:by|for|of)\s+the\s+(?:teacher|facilitator|instructor|educator)\s+"
+    r"(?:goes?|moves?|asks?|writes?|shows?|demonstrates?|explains?|gives?|"
+    r"guides?|helps?|checks?|marks?|observes?|points?|prepares?|provides?|"
+    r"records?|reminds?|repeats?|sets?|states?|summarises?|summarizes?|"
+    r"supports?|tells?|works?|is|will|should|must|can)\b",
     re.IGNORECASE,
 )
 _THIRD_PERSON_FUTURE = re.compile(
@@ -34,7 +38,7 @@ _THIRD_PERSON_SUBJECT = re.compile(
     r"(?:goes?|moves?|asks?|writes?|shows?|demonstrates?|explains?|gives?|"
     r"guides?|helps?|checks?|marks?|observes?|points?|prepares?|provides?|"
     r"records?|reminds?|repeats?|sets?|states?|summarises?|summarizes?|"
-    r"supports?|tells?|uses?|works?|is|will|should|must|can)\b",
+    r"supports?|tells?|works?|is|will|should|must|can)\b",
     re.IGNORECASE,
 )
 _PASSIVE_DIRECTION = re.compile(
@@ -599,7 +603,7 @@ def validate_zeli_quality(
 
     prose = [value for value in _instructional_strings(content) if value.strip()]
     label = str(sub_strand or "").strip()
-    if label:
+    if label and (len(label.split()) >= 3 or len(label) >= 20):
         occurrences = sum(
             value.lower().count(label.lower()) for value in prose
         )

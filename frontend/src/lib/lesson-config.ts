@@ -269,11 +269,34 @@ export function lessonConfigPayload(draft: LessonRubricConfig): LessonRubricConf
   return payload
 }
 
+/**
+ * Autosave payload: only the fields the teacher actually changed.
+ *
+ * Autosave must never send inferred blanks for fields it has not loaded. The
+ * dialog therefore compares the loaded draft against the loaded baseline and
+ * submits the difference only. An explicit clear still appears here because
+ * the empty value differs from the loaded baseline.
+ */
+export function lessonConfigDiffPayload(
+  draft: LessonRubricConfig,
+  baseline: LessonRubricConfig,
+): LessonRubricConfig {
+  const current = lessonConfigPayload(draft) as Record<string, unknown>
+  const previous = lessonConfigPayload(baseline) as Record<string, unknown>
+  const changed: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(current)) {
+    if (JSON.stringify(value) !== JSON.stringify(previous[key])) changed[key] = value
+  }
+  return changed as LessonRubricConfig
+}
+
+
 /** Apply the server's saved snapshot to a generation config without omissions. */
 export function applySavedLessonConfig<T extends TermConfig>(
   current: T,
   saved: LessonRubricConfig,
 ): T {
+  const has = (key: keyof LessonRubricConfig) => key in saved
   return {
     ...current,
     school_name: saved.school_name ?? current.school_name,
@@ -287,13 +310,15 @@ export function applySavedLessonConfig<T extends TermConfig>(
     term: saved.term ?? current.term,
     term_start_date: saved.term_start_date ?? current.term_start_date,
     term_end_date: saved.term_end_date ?? current.term_end_date,
-    teaching_days: saved.teaching_days?.length
-      ? [...saved.teaching_days]
+    teaching_days: has('teaching_days')
+      ? [...(saved.teaching_days || [])]
       : current.teaching_days,
     generation_method: saved.generation_method ?? current.generation_method,
     ai_mode: saved.ai_mode ?? current.ai_mode,
     template_id: saved.template_id ?? current.template_id,
-    references: saved.reference ? [saved.reference] : current.references,
+    references: has('reference')
+      ? (saved.reference ? [saved.reference] : [])
+      : current.references,
     indicator_resources: { ...(saved.indicator_resources ?? current.indicator_resources ?? {}) },
     competency_selections: {
       ...(saved.competency_selections ?? current.competency_selections ?? {}),

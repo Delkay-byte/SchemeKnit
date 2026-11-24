@@ -4327,58 +4327,85 @@ def _apply_saved_lesson_config(db: Session, scheme_db, config: TermConfig,
     saved = _saved_lesson_config(scheme_db)
     if not saved:
         return
-    if saved.get("school_name"):
-        config.school_name = saved["school_name"]
+
+    def _has(key: str) -> bool:
+        # Presence, not truthiness: an explicit blank/null/empty value is a
+        # teacher's clear decision and must survive into generation.
+        return key in saved
+
+    if _has("school_name"):
+        config.school_name = saved.get("school_name") or None
     # The dialog prefills the teacher's profile name, but an explicit saved
     # value (including a deliberately cleared one) is the teacher's choice.
-    if "teacher_name" in saved:
+    if _has("teacher_name"):
         config.teacher_name = saved.get("teacher_name") or None
-    if saved.get("class_size") is not None:
-        config.class_size = saved["class_size"]
-    if saved.get("lesson_duration_minutes") is not None:
-        config.lesson_duration_minutes = saved["lesson_duration_minutes"]
-    if saved.get("period"):
-        config.period = saved["period"]
-    if saved.get("periods_per_week") is not None:
-        config.lessons_per_week = saved["periods_per_week"]
-    if saved.get("teaching_days"):
-        config.teaching_days = list(saved["teaching_days"])
-    if saved.get("term"):
-        config.term = saved["term"]
-    if saved.get("lessons_per_week") is not None:
-        config.lessons_per_week = saved["lessons_per_week"]
-    if saved.get("term_start_date"):
-        try:
-            config.term_start_date = date.fromisoformat(saved["term_start_date"])
-        except (TypeError, ValueError):
-            pass
-    if saved.get("term_end_date"):
-        try:
-            config.term_end_date = date.fromisoformat(saved["term_end_date"])
-        except (TypeError, ValueError):
-            pass
-    if saved.get("template_id"):
-        config.template_id = saved["template_id"]
-    if saved.get("generation_method"):
-        try:
-            config.generation_method = GenerationMethod(saved["generation_method"])
-        except ValueError:
-            pass
-    if saved.get("ai_mode"):
-        try:
-            config.ai_mode = AIMode(saved["ai_mode"])
-        except ValueError:
-            pass
-    if isinstance(saved.get("indicator_resources"), dict):
-        config.indicator_resources = saved["indicator_resources"]
-    if isinstance(saved.get("competency_selections"), dict):
-        config.competency_selections = saved["competency_selections"]
-    if isinstance(saved.get("indicator_keywords"), dict):
-        config.indicator_keywords = saved["indicator_keywords"]
-    if isinstance(saved.get("indicator_wapef"), dict):
-        config.indicator_wapef = saved["indicator_wapef"]
-    if saved.get("reference"):
-        config.references = [saved["reference"]]
+    if _has("class_size"):
+        config.class_size = saved.get("class_size")
+    if _has("lesson_duration_minutes"):
+        config.lesson_duration_minutes = saved.get("lesson_duration_minutes")
+    if _has("period"):
+        config.period = saved.get("period") or ""
+    if _has("periods_per_week"):
+        config.lessons_per_week = saved.get("periods_per_week")
+    if _has("teaching_days"):
+        config.teaching_days = list(saved.get("teaching_days") or [])
+    if _has("term"):
+        config.term = saved.get("term") or ""
+    if _has("lessons_per_week"):
+        config.lessons_per_week = saved.get("lessons_per_week")
+    if _has("term_start_date"):
+        raw = saved.get("term_start_date")
+        if raw is None:
+            config.term_start_date = None
+        else:
+            try:
+                config.term_start_date = date.fromisoformat(raw)
+            except (TypeError, ValueError):
+                pass
+    if _has("term_end_date"):
+        raw = saved.get("term_end_date")
+        if raw is None:
+            config.term_end_date = None
+        else:
+            try:
+                config.term_end_date = date.fromisoformat(raw)
+            except (TypeError, ValueError):
+                pass
+    if _has("template_id"):
+        config.template_id = saved.get("template_id") or None
+    if _has("generation_method"):
+        raw = saved.get("generation_method")
+        if raw is None:
+            config.generation_method = GenerationMethod.STANDARD
+        else:
+            try:
+                config.generation_method = GenerationMethod(raw)
+            except ValueError:
+                pass
+    if _has("ai_mode"):
+        raw = saved.get("ai_mode")
+        if raw is None:
+            config.ai_mode = AIMode.OFF
+        else:
+            try:
+                config.ai_mode = AIMode(raw)
+            except ValueError:
+                pass
+    if _has("indicator_resources"):
+        value = saved.get("indicator_resources")
+        config.indicator_resources = value if isinstance(value, dict) else {}
+    if _has("competency_selections"):
+        value = saved.get("competency_selections")
+        config.competency_selections = value if isinstance(value, dict) else {}
+    if _has("indicator_keywords"):
+        value = saved.get("indicator_keywords")
+        config.indicator_keywords = value if isinstance(value, dict) else {}
+    if _has("indicator_wapef"):
+        value = saved.get("indicator_wapef")
+        config.indicator_wapef = value if isinstance(value, dict) else {}
+    if _has("reference"):
+        reference = saved.get("reference")
+        config.references = [reference] if reference else []
 
 
 def _require_lesson_config(config: TermConfig) -> None:

@@ -1,10 +1,11 @@
-import assert from 'node:assert/strict'
+﻿import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
   CORE_COMPETENCY_LABELS,
   applySavedLessonConfig,
   firstLessonConfigProblem,
   indicatorCode,
+  lessonConfigDiffPayload,
   lessonConfigPayload,
   mergeIndicatorResources,
   sourceOccurrenceId,
@@ -298,3 +299,68 @@ test('generation config keeps saved AI mode and every per-lesson map', () => {
   })
   assert.deepEqual(next.indicator_keywords, { 'week3:0:B4.1.1.2.1': [] })
 })
+
+
+test('autosave diff payload carries only changed fields', () => {
+  const baseline = {
+    school_name: 'Kpogede Community School',
+    class_size: 35,
+    lesson_duration_minutes: 60,
+    lessons_per_week: 3,
+    teaching_days: [0, 2, 4],
+    term_start_date: '2026-09-07',
+    term_end_date: '2026-12-18',
+    term: 'First Term',
+    generation_method: 'standard' as const,
+    indicator_keywords: { 'week1:0:B6.1.1.1.1': ['mouse'] },
+  }
+  const draft = { ...baseline, class_size: 36 }
+  const diff = lessonConfigDiffPayload(draft, baseline)
+  assert.equal(diff.class_size, 36)
+  assert.equal('school_name' in diff, false)
+  assert.equal('indicator_keywords' in diff, false)
+  assert.equal('lessons_per_week' in diff, false)
+})
+
+test('autosave diff keeps an explicit clear as a sent empty value', () => {
+  const baseline = {
+    school_name: 'Kpogede Community School',
+    class_size: 35,
+    teaching_days: [0, 2, 4],
+    indicator_keywords: { 'week1:0:B6.1.1.1.1': ['mouse'] },
+  }
+  const draft = {
+    ...baseline,
+    school_name: '',
+    teaching_days: [],
+    indicator_keywords: {},
+  }
+  const diff = lessonConfigDiffPayload(draft, baseline)
+  assert.equal(diff.school_name, null)
+  assert.deepEqual(diff.teaching_days, [])
+  assert.deepEqual(diff.indicator_keywords, {})
+})
+
+test('saved empty teaching days and reference clear the generation config', () => {
+  const base: Parameters<typeof applySavedLessonConfig>[0] = {
+    scheme_of_work_id: 'scheme-42',
+    term_start_date: '2026-09-07',
+    term_end_date: '2026-12-18',
+    lessons_per_week: 3,
+    lesson_duration_minutes: 60,
+    class_size: 24,
+    teaching_days: [0, 2, 4],
+    holidays: [],
+    ai_mode: 'OFF',
+    generation_method: 'standard',
+    include_special_weeks: false,
+    references: ['Old reference'],
+  }
+  const next = applySavedLessonConfig(base, {
+    teaching_days: [],
+    reference: null,
+  })
+  assert.deepEqual(next.teaching_days, [])
+  assert.deepEqual(next.references, [])
+})
+

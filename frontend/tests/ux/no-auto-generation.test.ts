@@ -36,3 +36,14 @@ test('lesson configuration persists the reference field', () => {
   assert.doesNotMatch(modal, /reference: null/)
   assert.match(modal, /id="lcfg-reference"/)
 })
+
+test('lesson-config autosave waits for the loaded snapshot and sends a diff', () => {
+  const modal = source('components/lesson-config-modal.tsx')
+  assert.match(modal, /configLoadState !== 'loaded'/)
+  assert.match(modal, /lessonConfigDiffPayload\(draft, baseline\)/)
+  assert.match(modal, /configLoadState === 'failed'/)
+  assert.doesNotMatch(
+    modal,
+    /await api\.saveLessonConfig\(schemeId, configPayload\(\)\)\n\s+await persistSchoolName\(\)\n\s+if \(seq/,
+  )
+})

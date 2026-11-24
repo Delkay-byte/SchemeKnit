@@ -12,6 +12,7 @@ path a browser takes:
 """
 
 import sys
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -551,3 +552,91 @@ def test_saved_snapshot_is_authoritative_for_generation_config():
     assert config.indicator_keywords == saved["indicator_keywords"]
     assert config.indicator_wapef == saved["indicator_wapef"]
     assert config.references == ["NaCCA B4"]
+
+
+def test_saved_clear_values_survive_into_generation_config():
+    """An explicit clear in the saved snapshot is honoured, not resurrected."""
+    saved = {
+        "school_name": None,
+        "teacher_name": "",
+        "class_size": None,
+        "lesson_duration_minutes": None,
+        "period": "",
+        "teaching_days": [],
+        "term": "",
+        "term_start_date": None,
+        "term_end_date": None,
+        "template_id": None,
+        "reference": None,
+        "indicator_resources": {},
+        "competency_selections": {},
+        "indicator_keywords": {},
+        "indicator_wapef": {},
+    }
+    scheme_db = type("Scheme", (), {"lesson_config": saved})()
+    config = TermConfig(
+        scheme_of_work_id="scheme-1",
+        school_name="Stale School",
+        teacher_name="Stale Teacher",
+        class_size=40,
+        lesson_duration_minutes=45,
+        period="1st",
+        teaching_days=[0, 2, 4],
+        term="First Term",
+        term_start_date=date(2026, 9, 1),
+        term_end_date=date(2026, 12, 18),
+        template_id="stale-template",
+        references=["stale reference"],
+        indicator_resources={"week1:0:B9.1.1.1.1": {"references": ["old"], "tlrs": []}},
+        competency_selections={"week1:0:B9.1.1.1.1": ["CP"]},
+        indicator_keywords={"week1:0:B9.1.1.1.1": ["old"]},
+        indicator_wapef={"week1:0:B9.1.1.1.1": {"gods_story": "old"}},
+    )
+
+    _apply_saved_lesson_config(None, scheme_db, config, None)
+
+    assert config.school_name is None
+    assert config.teacher_name is None
+    assert config.class_size is None
+    assert config.lesson_duration_minutes is None
+    assert config.period == ""
+    assert config.teaching_days == []
+    assert config.term == ""
+    assert config.term_start_date is None
+    assert config.term_end_date is None
+    assert config.template_id is None
+    assert config.references == []
+    assert config.indicator_resources == {}
+    assert config.competency_selections == {}
+    assert config.indicator_keywords == {}
+    assert config.indicator_wapef == {}
+
+
+def test_saved_absent_fields_keep_request_values():
+    """A field the teacher never saved is not cleared by the snapshot."""
+    saved = {"class_size": 37}
+    scheme_db = type("Scheme", (), {"lesson_config": saved})()
+    config = TermConfig(
+        scheme_of_work_id="scheme-1",
+        school_name="Request School",
+        teacher_name="Request Teacher",
+        class_size=10,
+        lesson_duration_minutes=55,
+        period="2nd",
+        teaching_days=[1, 3],
+        term="Second Term",
+        template_id="request-template",
+        references=["request reference"],
+    )
+
+    _apply_saved_lesson_config(None, scheme_db, config, None)
+
+    assert config.class_size == 37
+    assert config.school_name == "Request School"
+    assert config.teacher_name == "Request Teacher"
+    assert config.lesson_duration_minutes == 55
+    assert config.period == "2nd"
+    assert config.teaching_days == [1, 3]
+    assert config.term == "Second Term"
+    assert config.template_id == "request-template"
+    assert config.references == ["request reference"]

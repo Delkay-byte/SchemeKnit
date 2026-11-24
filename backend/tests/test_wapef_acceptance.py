@@ -603,3 +603,34 @@ class TestKBasicNonRegression:
     def test_wapef_template_never_default_for_ges_level(self):
         template = get_template_by_id(TEMPLATE_ID)
         assert template.is_default is False
+
+
+def test_v2_prompt_forwards_wapef_context_without_rewriting_annual_values():
+    """The provider prompt carries the per-lesson WAPEF guidance.
+
+    Deep Hope, Storyline, God's Story and Throughline remain the plan's own
+    values; forwarding only renders them as read-only context.
+    """
+    from src.engines.ai_provider import _build_v2_prompt_from_context
+
+    lesson = _wapef_lesson()
+    from src.engines.generation_pipeline import _wapef_context_lines
+    lines = _wapef_context_lines(lesson)
+
+    prompt = _build_v2_prompt_from_context(
+        subject="Mathematics",
+        class_level="Basic 4",
+        strand="Number",
+        sub_strand="Fractions",
+        content_standard="B4.1.1.1",
+        indicator_code="B4.1.1.1.1",
+        indicator_text="Identify fractions",
+        wapef_context=lines,
+    )
+
+    assert "Deep Hope:" in prompt
+    assert "Through lines:" in prompt
+    assert lesson.wapef_deep_hope == wf.WAPEF_DEEP_HOPES[0]
+    assert lesson.wapef_storyline == wf.WAPEF_STORYLINES[0]
+    assert lesson.wapef_gods_story == "Creation"
+    assert lesson.wapef_through_lines == list(wf.WAPEF_THROUGH_LINES)
